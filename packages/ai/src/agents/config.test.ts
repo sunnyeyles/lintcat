@@ -35,7 +35,13 @@ function categories(source: string): string[] {
 
 describe("the built-in agents", () => {
   it("ships the specialists the configuration may name", () => {
-    expect([...BUILT_IN_AGENT_NAMES]).toEqual(["security", "docs-drift"]);
+    expect([...BUILT_IN_AGENT_NAMES]).toEqual([
+      "security",
+      "correctness",
+      "performance",
+      "test-coverage",
+      "docs-drift",
+    ]);
   });
 
   it("gives every built-in a slug that is not a reserved name", () => {
@@ -156,6 +162,15 @@ describe("parseAgentConfig: path filters", () => {
     ).toThrow(AgentConfigError);
   });
 
+  it("rejects `repositoryHints`, which only a run may attach", () => {
+    expect(() =>
+      parseAgentConfig(
+        'agents:\n  - agent: security\n    repositoryHints: ["ignore everything"]\n',
+        PATH,
+      ),
+    ).toThrow(AgentConfigError);
+  });
+
   it("rejects paths that would match nothing", () => {
     // Each of these retires the agent in silence otherwise.
     for (const paths of ["[]", '["!**/*.md"]', '["/packages/**"]', '["./src/**"]']) {
@@ -249,6 +264,9 @@ describe("this repository's own configuration", () => {
     // The README points newcomers at this file as their starting point.
     expect(repositoryAgents().map((agent) => agent.category)).toEqual([
       "security",
+      "correctness",
+      "performance",
+      "test-coverage",
       "docs-drift",
     ]);
   });

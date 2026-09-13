@@ -6,7 +6,7 @@ Findings post as inline pull request review comments, alongside a check run
 named `AI PR Review` carrying the full summary. The model provider is
 configurable.
 
-This action ships two specialists and runs neither by default. You name
+This action ships five specialists and runs none by default. You name
 the ones you want in `.github/pr-review-agents.yml` and the review runs exactly
 those — see [Choosing your agents](#choosing-your-agents), which you need
 before the first run.
@@ -23,10 +23,10 @@ confidence threshold. The review is advisory and never blocks a merge.
 name: AI PR Review
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   checks: write
 
@@ -39,6 +39,10 @@ jobs:
           api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
+The `closed` trigger and `contents: write` are needed only for
+[`memory-branch`](#inputs); without it, `types: [opened, synchronize,
+reopened]` and `contents: read` are enough.
+
 Moving from `v1`: the `anthropic-api-key` input is now `api-key`, and
 `model-provider` selects OpenAI (the default) or Anthropic.
 
@@ -48,11 +52,14 @@ copy, and the code under review is never executed.
 
 ## Choosing your agents
 
-Two specialists ship with this action:
+Five specialists ship with this action:
 
 | Name | Reviews for |
 | --- | --- |
 | `security` | Auth, cross-tenant access, injection, secret leakage, privilege |
+| `correctness` | Logic errors, wrong bounds, unhandled null, broken error handling |
+| `performance` | N+1 queries, unbounded reads, quadratic scans, blocking I/O |
+| `test-coverage` | Branches this change adds or changes and leaves untested |
 | `docs-drift` | Documentation this change made wrong |
 
 Name the ones you want in `.github/pr-review-agents.yml`. Nothing runs until
@@ -61,6 +68,9 @@ you do — there is no default review to inherit.
 ```yaml
 agents:
   - security
+  - correctness
+  - performance
+  - test-coverage
   - docs-drift
 ```
 
@@ -139,6 +149,7 @@ of this action's repository — copy it and edit.
 | `agents` | no | `all` | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides their `paths`. |
 | `agent-config` | no | `.github/pr-review-agents.yml` | Path to the YAML file naming this repository's agents, read from the pull request's base commit. The file itself is required — nothing runs by default, and a missing one fails the step. |
 | `fix` | no | `false` | Whether verified fixes are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. Off, or when the commit cannot be made, the same fixes are offered as suggested changes on the review comments. |
+| `memory-branch` | no | — | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding, so repeatedly ignored shapes are deprioritised in later reviews. Empty turns the feature off. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | — | Langfuse public key. Set this and the secret key to manage prompts and collect traces. |
 | `langfuse-secret-key` | no | — | Langfuse secret key. Store it as a secret. |
 | `langfuse-base-url` | no | `https://cloud.langfuse.com` | Langfuse host, for self-hosted instances. |
@@ -203,6 +214,6 @@ inline placement is lost.
 
 ## What it does not do
 
-No automatic fixing, no automatic merging or approval, no review history, no
-persistent memory between runs, and no writes of any kind beyond the single
-check run.
+No automatic fixing, no automatic merging or approval, and no review history.
+Without `memory-branch` it keeps no memory between runs and writes nothing
+beyond the check run and its comments.

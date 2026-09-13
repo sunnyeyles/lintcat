@@ -1,6 +1,6 @@
 /**
  * Serves a fixture repository through the real GithubInstallationClient
- * interface. Nothing talks to GitHub, and both write methods throw.
+ * interface. Nothing talks to GitHub, and every write method throws.
  */
 import type {
   ChangedFile,
@@ -18,6 +18,8 @@ import type {
   PullRequestDetails,
   PullRequestRef,
   PullRequestReview,
+  ReviewThread,
+  WriteFileRequest,
 } from "@pr-review/github";
 
 import type { LoadedFixture } from "./fixture.js";
@@ -182,6 +184,11 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
       return [];
     },
 
+    async listReviewThreads(ref): Promise<ReviewThread[]> {
+      checkRef(ref);
+      return [];
+    },
+
     async createCheckRun(input: CreateCheckRunInput): Promise<CheckRun> {
       throw new Error(
         `the evaluation harness must never publish: createCheckRun called for ` +
@@ -211,6 +218,13 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
       throw new Error(
         `the evaluation harness must never publish: createCommitOnBranch called for ` +
           `${input.owner}/${input.repo}@${input.branch}`,
+      );
+    },
+
+    async writeFileOnBranch(request: WriteFileRequest): Promise<void> {
+      throw new Error(
+        `the evaluation harness must never publish: writeFileOnBranch called for ` +
+          `${request.owner}/${request.repo}@${request.branch}:${request.path}`,
       );
     },
   };

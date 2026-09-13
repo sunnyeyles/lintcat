@@ -192,9 +192,26 @@ export interface CommitRef {
   sha: string;
 }
 
+/** One review thread; `body` is its first comment, where our marker lives. */
+export interface ReviewThread {
+  body: string;
+  isResolved: boolean;
+  isOutdated: boolean;
+}
+
+/** One file written to a branch, created from the default branch if absent. */
+export interface WriteFileRequest {
+  owner: string;
+  repo: string;
+  branch: string;
+  path: string;
+  content: string;
+  message: string;
+}
+
 /**
- * Repository-scoped throughout. Read-only except createCheckRun,
- * createReview, and createCommitOnBranch.
+ * One installation's client. Read-only except createCheckRun, createReview,
+ * createCommitOnBranch and writeFileOnBranch; all repository-scoped.
  */
 export interface GithubInstallationClient {
   getPullRequest(ref: PullRequestRef): Promise<PullRequestDetails>;
@@ -214,9 +231,13 @@ export interface GithubInstallationClient {
   getBranchTip(request: BranchTipRequest): Promise<string>;
   /** One commit's message, used to recognise this system's own commits. */
   getCommitMessage(request: CommitMessageRequest): Promise<string>;
+  /** Every review thread on the pull request, with its resolution state. */
+  listReviewThreads(ref: PullRequestRef): Promise<ReviewThread[]>;
   createCheckRun(input: CreateCheckRunInput): Promise<CheckRun>;
   /** Publishes one advisory review with inline comments. */
   createReview(input: CreateReviewInput): Promise<PullRequestReview>;
   /** Commits file contents onto a branch. Write; never forces. */
   createCommitOnBranch(input: CreateCommitInput): Promise<CommitRef>;
+  /** Writes one file to a branch, creating the branch from default if absent. */
+  writeFileOnBranch(request: WriteFileRequest): Promise<void>;
 }

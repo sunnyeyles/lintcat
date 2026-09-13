@@ -9,6 +9,9 @@ import type {
   FileContentsRequest,
   GithubInstallationClient,
   PullRequestDetails,
+  PullRequestRef,
+  ReviewThread,
+  WriteFileRequest,
 } from "@pr-review/github";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { vi } from "vitest";
@@ -217,9 +220,13 @@ export function makeGithub() {
     listReviewComments: vi.fn(async () => []),
     getBranchTip: vi.fn(async () => headSha),
     getCommitMessage: vi.fn(async () => "Rate limit sessions"),
+    listReviewThreads: vi.fn(async (_ref: PullRequestRef): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async () => ({ id: 987 })),
     createReview: vi.fn(async () => ({ id: 654 })),
     createCommitOnBranch: vi.fn(async () => ({ sha: "fix1234" })),
+    writeFileOnBranch: vi.fn(async (request: WriteFileRequest): Promise<void> => {
+      throw new Error(`unexpected write to ${request.path}`);
+    }),
   } satisfies GithubInstallationClient;
 }
 

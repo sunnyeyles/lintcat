@@ -21,7 +21,10 @@ import {
   type PullRequestDetails,
   type PullRequestRef,
   type PullRequestReview,
+  type ReviewThread,
+  type WriteFileRequest,
 } from "./client.js";
+import { httpStatus } from "./errors.js";
 
 /**
  * The slice of Octokit this package consumes. Octokit satisfies it
@@ -68,6 +71,7 @@ export interface OctokitLike {
       }): Promise<{ data: unknown }>;
     };
     repos: {
+      get(params: { owner: string; repo: string }): Promise<{ data: unknown }>;
       getContent(params: {
         owner: string;
         repo: string;
@@ -85,12 +89,27 @@ export interface OctokitLike {
         repo: string;
         ref: string;
       }): Promise<{ data: unknown }>;
+      createOrUpdateFileContents(params: {
+        owner: string;
+        repo: string;
+        path: string;
+        message: string;
+        content: string;
+        branch: string;
+        sha?: string;
+      }): Promise<{ data: unknown }>;
     };
     git: {
       getRef(params: {
         owner: string;
         repo: string;
         ref: string;
+      }): Promise<{ data: unknown }>;
+      createRef(params: {
+        owner: string;
+        repo: string;
+        ref: string;
+        sha: string;
       }): Promise<{ data: unknown }>;
       createTree(params: {
         owner: string;
@@ -142,6 +161,7 @@ export interface OctokitLike {
       }): Promise<{ data: unknown }>;
     };
   };
+  graphql(query: string, variables: Record<string, unknown>): Promise<unknown>;
 }
 
 const PAGE_SIZE = 100;
@@ -175,6 +195,53 @@ const reviewResponseSchema = z.object({ id: z.number() });
 
 const reviewCommentsSchema = z.array(z.object({ body: z.string() }));
 
+const REVIEW_THREADS_QUERY = `
+  query ReviewThreads($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        reviewThreads(first: 100, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            isResolved
+            isOutdated
+            comments(first: 1) { nodes { body } }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const reviewThreadsSchema = z.object({
+  repository: z.object({
+    pullRequest: z.object({
+      reviewThreads: z.object({
+        pageInfo: z.object({
+          hasNextPage: z.boolean(),
+          endCursor: z.string().nullable(),
+        }),
+        nodes: z.array(
+          z.object({
+            isResolved: z.boolean(),
+            isOutdated: z.boolean(),
+            comments: z.object({
+              nodes: z.array(z.object({ body: z.string() })),
+            }),
+          }),
+        ),
+      }),
+    }),
+  }),
+});
+
+/** The head SHA of a ref; a missing ref is a 404, not an empty response. */
+const refSchema = z.object({ object: z.object({ sha: z.string() }) });
+
+const repositorySchema = z.object({ default_branch: z.string() });
+
+/** Only a plain file has a blob SHA to overwrite; a directory does not. */
+const existingFileSchema = z.object({ type: z.string(), sha: z.string() });
+
 /** A repos.getContent response for a single (non-directory) entry. */
 const fileContentsSchema = z.object({
   type: z.string(),
@@ -195,8 +262,6 @@ const textMatchesSchema = z
 const commitListSchema = z.array(z.object({ sha: z.string() }));
 
 const objectShaSchema = z.object({ sha: z.string() });
-
-const refSchema = z.object({ object: z.object({ sha: z.string() }) });
 
 const commitMessageSchema = z.object({
   commit: z.object({ message: z.string() }),
@@ -242,6 +307,81 @@ async function paginate<T>(
     if (pageItems.length < PAGE_SIZE) {
       return items;
     }
+  }
+}
+
+/** The head SHA of one branch, or undefined when GitHub says it has none. */
+async function branchSha(
+  octokit: OctokitLike,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string | undefined> {
+  try {
+    const response = await octokit.rest.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+    });
+    return refSchema.parse(response.data).object.sha;
+  } catch (error) {
+    if (httpStatus(error) === 404) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+/** Branches the default branch's head when `branch` does not exist yet. */
+async function ensureBranch(
+  octokit: OctokitLike,
+  request: WriteFileRequest,
+): Promise<void> {
+  const { owner, repo, branch } = request;
+  if ((await branchSha(octokit, owner, repo, branch)) !== undefined) {
+    return;
+  }
+  const repository = await octokit.rest.repos.get({ owner, repo });
+  const defaultBranch = repositorySchema.parse(repository.data).default_branch;
+  const sha = await branchSha(octokit, owner, repo, defaultBranch);
+  if (sha === undefined) {
+    throw new Error(
+      `${owner}/${repo} has no ${defaultBranch} branch to branch ${branch} from`,
+    );
+  }
+  await octokit.rest.git.createRef({
+    owner,
+    repo,
+    ref: `refs/heads/${branch}`,
+    sha,
+  });
+}
+
+/** The blob SHA an overwrite must supply; undefined when the file is new. */
+async function existingFileSha(
+  octokit: OctokitLike,
+  request: WriteFileRequest,
+): Promise<string | undefined> {
+  try {
+    const response = await octokit.rest.repos.getContent({
+      owner: request.owner,
+      repo: request.repo,
+      path: request.path,
+      ref: request.branch,
+    });
+    if (Array.isArray(response.data)) {
+      throw new Error(`${request.path} is a directory, not a file`);
+    }
+    const data = existingFileSchema.parse(response.data);
+    if (data.type !== "file") {
+      throw new Error(`${request.path} is a ${data.type}, not a file`);
+    }
+    return data.sha;
+  } catch (error) {
+    if (httpStatus(error) === 404) {
+      return undefined;
+    }
+    throw error;
   }
 }
 
@@ -425,6 +565,36 @@ export function createInstallationClient(
       );
     },
 
+    async listReviewThreads(ref: PullRequestRef): Promise<ReviewThread[]> {
+      const threads: ReviewThread[] = [];
+      let cursor: string | null = null;
+      for (;;) {
+        const response: unknown = await octokit.graphql(REVIEW_THREADS_QUERY, {
+          owner: ref.owner,
+          name: ref.repo,
+          number: ref.pullRequestNumber,
+          cursor,
+        });
+        const page =
+          reviewThreadsSchema.parse(response).repository.pullRequest
+            .reviewThreads;
+        for (const node of page.nodes) {
+          const body = node.comments.nodes[0]?.body;
+          if (body !== undefined) {
+            threads.push({
+              body,
+              isResolved: node.isResolved,
+              isOutdated: node.isOutdated,
+            });
+          }
+        }
+        if (!page.pageInfo.hasNextPage) {
+          return threads;
+        }
+        cursor = page.pageInfo.endCursor;
+      }
+    },
+
     async createReview(input: CreateReviewInput): Promise<PullRequestReview> {
       const response = await octokit.rest.pulls.createReview({
         owner: input.owner,
@@ -477,6 +647,20 @@ export function createInstallationClient(
         force: false,
       });
       return { sha };
+    },
+
+    async writeFileOnBranch(request: WriteFileRequest): Promise<void> {
+      await ensureBranch(octokit, request);
+      const sha = await existingFileSha(octokit, request);
+      await octokit.rest.repos.createOrUpdateFileContents({
+        owner: request.owner,
+        repo: request.repo,
+        path: request.path,
+        message: request.message,
+        content: Buffer.from(request.content, "utf8").toString("base64"),
+        branch: request.branch,
+        ...(sha === undefined ? {} : { sha }),
+      });
     },
   };
 }

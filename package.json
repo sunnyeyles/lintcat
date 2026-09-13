@@ -9,15 +9,21 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "turbo run typecheck",
     "test": "vitest run",
     "eval": "vitest run --config evals/vitest.eval.config.ts",
     "seed-prompts": "node scripts/seed-prompts.mjs",
-    "build": "pnpm -r build"
+    "db:generate": "pnpm --filter @pr-review/db db:generate",
+    "db:migrate": "pnpm --filter @pr-review/db db:migrate",
+    "db:push": "pnpm --filter @pr-review/db db:push",
+    "db:studio": "pnpm --filter @pr-review/db db:studio",
+    "build": "turbo run build",
+    "dev": "turbo run dev"
   },
   "devDependencies": {
     "@types/node": "^25.9.5",
     "esbuild": "^0.28.1",
+    "turbo": "^2.5.8",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },

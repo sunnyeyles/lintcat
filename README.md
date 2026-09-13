@@ -6,15 +6,15 @@ check run carrying the full summary.
 
 The agents ship with the action, in
 [`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists) —
-Security and Docs drift. Neither runs by
+Security, Correctness, Performance, Test coverage and Docs drift. None runs by
 default. A repository names the ones it wants in
 [`.github/pr-review-agents.yml`](#choosing-your-agents), and a review runs
 exactly those, in the order that file lists them; with no such file the step
 fails rather than guessing. Any subset can be selected per run.
 
 This repository's own [`.github/pr-review-agents.yml`](.github/pr-review-agents.yml) names
-both and is a working starting point to copy — but it is configuration, not a
-default.
+all five and is a working starting point to copy — but it is configuration, not
+a default.
 
 The agents never touch GitHub. They propose structured findings; deterministic
 application code decides what actually gets published.
@@ -39,10 +39,10 @@ workflow's own token authenticates the reads and publishes the check run.
 name: AI PR Review
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
-  contents: read
+  contents: write      # read is enough; write only for `memory-branch`
   pull-requests: write
   checks: write        # omit and reviews still land, in the job summary
 
@@ -54,6 +54,10 @@ jobs:
         with:
           api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
+
+The `closed` trigger and `contents: write` are needed only for
+[`memory-branch`](#configuration); without it, drop both back to
+`types: [opened, synchronize, reopened]` and `contents: read`.
 
 Source lives in [`apps/action`](apps/action); `release-action.yml` publishes the
 bundle to the public action repository. `v2` made the provider configurable and
@@ -219,6 +223,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `agents` | no (default `all`) | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides any [path filters](#path-filters). |
 | `agent-config` | no (default `.github/pr-review-agents.yml`) | Path to the YAML file naming the agents. Required — nothing runs until a repository names it. |
 | `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
+| `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding, so repeatedly ignored shapes are deprioritised later. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompts from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
 | `langfuse-secret-key` | no | The other half. Setting only one of the two disables both features and logs `langfuse.disabled_incomplete_credentials`. |
 | `langfuse-base-url` | no (default `https://cloud.langfuse.com`) | Langfuse host, for a self-hosted or regional instance. Keys are region-scoped: the wrong host 401s and drops every trace. |
@@ -250,12 +255,15 @@ at zero; that is expected, not a regression.
 
 ### Choosing your agents
 
-Two specialists ship with the action, one file each in
+Five specialists ship with the action, one file each in
 [`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists):
 
 | Name | Reviews for |
 | --- | --- |
 | `security` | Auth, cross-tenant access, injection, secret leakage, privilege |
+| `correctness` | Logic errors, wrong bounds, unhandled null, broken error handling |
+| `performance` | N+1 queries, unbounded reads, quadratic scans, blocking I/O |
+| `test-coverage` | Branches this change adds or changes and leaves untested |
 | `docs-drift` | Documentation this change made wrong |
 
 A repository names the ones it wants in `.github/pr-review-agents.yml` (or
@@ -264,6 +272,9 @@ wherever `agent-config` points):
 ```yaml
 agents:
   - security
+  - correctness
+  - performance
+  - test-coverage
   - docs-drift
 ```
 
@@ -383,14 +394,14 @@ across the three agents it ran at the time:
 | Correctness | 9 | ~594k |
 | Security | 4 | ~185k |
 
-Architecture and Correctness were dropped after that run; only `security` and
-`docs-drift` ship today. The shape of the number is what carries over, not the
-row.
+Architecture was dropped after that run, and today's `correctness` agent is a
+different prompt from the one measured here. The shape of the number is what
+carries over, not the row.
 
 An agent declaring `contextGuidance` costs the most, because it must retrieve
 surrounding repository context before it may make a claim, and every retrieval
-is another round trip carrying the whole conversation. Of the shipped pair,
-that is `docs-drift`.
+is another round trip carrying the whole conversation. Every shipped agent but
+`security` declares one.
 
 Prompt caching reprices that traffic rather than reducing it: roughly 0.1x for
 a cache read against 1.25x for the write that put it there. Each agent turn asks
@@ -416,7 +427,7 @@ the sum of its agents, and narrowing the set cuts that roughly in proportion:
 ```yaml
         with:
           api-key: ${{ secrets.OPENAI_API_KEY }}
-          agents: security        # or: security,docs-drift
+          agents: security        # or: security,correctness
 ```
 
 An unrecognised name fails the step **before any model call**, rather than
