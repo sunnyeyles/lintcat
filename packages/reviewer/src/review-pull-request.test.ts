@@ -6,6 +6,7 @@ import {
 import type {
   ChangedFile,
   CreateCheckRunInput,
+  CreateCommitInput,
   CreateReviewInput,
   ExistingReviewComment,
   GithubInstallationClient,
@@ -92,9 +93,14 @@ function makeClient() {
     listCommitShas: vi.fn(async () => []),
     listCommitFiles: vi.fn(async () => []),
     listReviewComments: vi.fn(async (): Promise<ExistingReviewComment[]> => []),
+    getBranchTip: vi.fn(async () => target.headSha),
+    getCommitMessage: vi.fn(async () => "Rate limit sessions"),
     listReviewThreads: vi.fn(async (): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async (_input: CreateCheckRunInput) => ({ id: 987 })),
     createReview: vi.fn(async (_input: CreateReviewInput) => ({ id: 654 })),
+    createCommitOnBranch: vi.fn(async (_input: CreateCommitInput) => ({
+      sha: "fix1234",
+    })),
     writeFileOnBranch: vi.fn(async (_request: WriteFileRequest) => {}),
   } satisfies GithubInstallationClient;
 }
@@ -230,7 +236,12 @@ describe("reviewPullRequest", () => {
     const review = reviewResult({ candidates: [finding] });
     const { deps } = makeDeps(review);
 
-    await expect(reviewPullRequest(target, deps)).resolves.toBe(review);
+    // Not the same object: patch verification may strip an unprovable patch,
+    // and it adds its own tally.
+    await expect(reviewPullRequest(target, deps)).resolves.toEqual({
+      ...review,
+      patches: { proposed: 0, verified: 0 },
+    });
   });
 
   it("emits the lifecycle events for one review (spec §26)", async () => {
@@ -243,6 +254,7 @@ describe("reviewPullRequest", () => {
       "synthesis.started",
       "synthesis.completed",
       "findings.validated",
+      "patches.verified",
       "review.comments.published",
       "review.published",
     ]);
@@ -579,6 +591,88 @@ describe("reviewPullRequest: path filters", () => {
 
       expect(client.createCheckRun).not.toHaveBeenCalled();
       expect(publishReview).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("fixes", () => {
+    const patchedFiles: ChangedFile[] = [
+      {
+        filename: "src/sessions.ts",
+        status: "modified",
+        additions: 2,
+        deletions: 0,
+        patch: ["@@ -0,0 +1,2 @@", "+const a = 1;", "+const b = 2;"].join("\n"),
+      },
+    ];
+    const contents = "const a = 1;\nconst b = 2;\n";
+    const patchedFinding: ReviewFinding = {
+      ...finding,
+      line: 1,
+      patch: {
+        startLine: 1,
+        endLine: 1,
+        expected: "const a = 1;",
+        replacement: "const a = 0;",
+      },
+    };
+
+    function makeFixDeps(applyFixes: boolean) {
+      const made = makeDeps(reviewResult({ candidates: [patchedFinding] }));
+      made.client.listChangedFiles.mockResolvedValue(patchedFiles);
+      made.client.getFileContents.mockResolvedValue(contents);
+      return { ...made, deps: { ...made.deps, applyFixes } };
+    }
+
+    it("commits the verified patch when fixes are enabled", async () => {
+      const { deps, client } = makeFixDeps(true);
+
+      await reviewPullRequest(target, deps);
+
+      expect(client.createCommitOnBranch).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          branch: "feature/rate-limit",
+          baseSha: target.headSha,
+          files: [{ path: "src/sessions.ts", content: "const a = 0;\nconst b = 2;\n" }],
+        }),
+      );
+      const review = client.createReview.mock.calls[0]?.[0];
+      expect(review?.body).toContain("1 fix committed to this branch");
+      expect(review?.comments[0]?.body).not.toContain("```suggestion");
+    });
+
+    it("offers the patch as a suggestion when fixes are disabled", async () => {
+      const { deps, client } = makeFixDeps(false);
+
+      await reviewPullRequest(target, deps);
+
+      expect(client.createCommitOnBranch).not.toHaveBeenCalled();
+      const review = client.createReview.mock.calls[0]?.[0];
+      expect(review?.comments[0]?.body).toContain("```suggestion\nconst a = 0;\n```");
+      expect(review?.body).toContain("offered as suggested changes");
+    });
+
+    it("publishes the finding without its patch when the file does not match", async () => {
+      const { deps, client } = makeFixDeps(true);
+      client.getFileContents.mockResolvedValue("const a = 99;\nconst b = 2;\n");
+
+      await reviewPullRequest(target, deps);
+
+      expect(client.createCommitOnBranch).not.toHaveBeenCalled();
+      const review = client.createReview.mock.calls[0]?.[0];
+      expect(review?.comments[0]?.body).toContain(patchedFinding.title);
+      expect(review?.comments[0]?.body).not.toContain("```suggestion");
+    });
+
+    it("does not commit when the branch moved during the review", async () => {
+      const { deps, client } = makeFixDeps(true);
+      client.getBranchTip.mockResolvedValue("movedon1");
+
+      await reviewPullRequest(target, deps);
+
+      expect(client.createCommitOnBranch).not.toHaveBeenCalled();
+      const review = client.createReview.mock.calls[0]?.[0];
+      expect(review?.comments[0]?.body).toContain("```suggestion");
+      expect(review?.body).toContain("the branch moved during the review");
     });
   });
 });

@@ -1,5 +1,6 @@
 import type {
   CreateCheckRunInput,
+  CreateCommitInput,
   CreateReviewInput,
   ExistingReviewComment,
   GithubInstallationClient,
@@ -34,9 +35,14 @@ function makeClient() {
     listCommitShas: vi.fn(async () => []),
     listCommitFiles: vi.fn(async () => []),
     listReviewComments: vi.fn(async (): Promise<ExistingReviewComment[]> => []),
+    getBranchTip: vi.fn(async () => target.headSha),
+    getCommitMessage: vi.fn(async () => "Rate limit sessions"),
     listReviewThreads: vi.fn(async (): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async (_input: CreateCheckRunInput) => ({ id: 987 })),
     createReview: vi.fn(async (_input: CreateReviewInput) => ({ id: 654 })),
+    createCommitOnBranch: vi.fn(async (_input: CreateCommitInput) => ({
+      sha: "fix1234",
+    })),
     writeFileOnBranch: vi.fn(async (_request: WriteFileRequest) => {}),
   } satisfies GithubInstallationClient;
 }

@@ -163,6 +163,8 @@ interface StubOptions {
   reviewCommentPages?: unknown[][];
   commitListData?: unknown;
   commitData?: unknown;
+  treeData?: unknown;
+  newCommitData?: unknown;
   graphqlPages?: unknown[];
   /** Refs that exist, keyed as git.getRef takes them ("heads/main"). */
   refShas?: Record<string, string>;
@@ -255,6 +257,21 @@ function makeOctokit(options: StubOptions = {}) {
           async (
             _params: Parameters<OctokitLike["rest"]["git"]["createRef"]>[0],
           ) => ({ data: { ref: "created" } }),
+        ),
+        createTree: vi.fn(
+          async (
+            _params: Parameters<OctokitLike["rest"]["git"]["createTree"]>[0],
+          ) => ({ data: options.treeData ?? { sha: "tree222" } }),
+        ),
+        createCommit: vi.fn(
+          async (
+            _params: Parameters<OctokitLike["rest"]["git"]["createCommit"]>[0],
+          ) => ({ data: options.newCommitData ?? { sha: "commit333" } }),
+        ),
+        updateRef: vi.fn(
+          async (
+            _params: Parameters<OctokitLike["rest"]["git"]["updateRef"]>[0],
+          ) => ({ data: {} }),
         ),
       },
       search: {

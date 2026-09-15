@@ -5,13 +5,14 @@
 
 ## What is evaluated
 
-Five fixtures, ten assertions. Five of them are quality signals; five are
-health checks that stop a crashed agent from reading as a quality result.
+Five fixtures, twelve assertions. Seven of them are quality signals; five
+are health checks that stop a crashed agent from reading as a quality result.
 
 | Fixture | Assertion | Signal |
 | --- | --- | --- |
 | `security-tenant-scope` | every agent completes | health |
 | `security-tenant-scope` | a `security` finding lands on `findCustomerById` or `getCustomer` | recall |
+| `security-tenant-scope` | every proposed patch matches the file at head | precision |
 | `correctness-admin-check` | every agent completes | health |
 | `correctness-admin-check` | a `correctness` finding lands on `getAuditEvents` | recall |
 | `test-coverage-untested-branch` | every agent completes | health |
@@ -20,6 +21,12 @@ health checks that stop a crashed agent from reading as a quality result.
 | `performance-n-plus-one` | a `performance` finding lands on `buildOrderSummary` | recall |
 | `clean-pagination` | every agent completes | health |
 | `clean-pagination` | zero findings | precision |
+| `clean-pagination` | every proposed patch matches the file at head | precision |
+
+`patches-verify` is precision only: proposing no patch passes it. What fails is
+a patch whose quoted `expected` lines do not match the file, which is the one
+thing about a fix a unit test cannot check — whether the model counted lines
+correctly against a real tree.
 
 The clean fixture is what makes the other four mean anything. A reviewer that
 reports nothing passes `clean-pagination` and fails every recall assertion; one
@@ -39,6 +46,8 @@ passing.
   `.github/pr-review-agents.yml` ships have a recall fixture; `docs-drift` is
   the one that does not, and is exercised only as "did not crash, stayed quiet
   on clean code".
+- **No fixture requires a patch.** `patches-verify` catches a wrong patch but
+  cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
 - **The Anthropic default model does not clear the suite.** On
   `claude-haiku-4-5` most agents, the two original ones included, hit the
   turn cap or return unparseable JSON. Run Anthropic with

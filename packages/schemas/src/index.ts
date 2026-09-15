@@ -6,9 +6,11 @@ export {
 export {
   categoryLabel,
   findingCategorySchema,
+  findingPatchSchema,
   reviewFindingSchema,
   wellFormedFindings,
   type FindingCategory,
+  type FindingPatch,
   type ReviewFinding,
 } from "./review-finding.js";
 export {

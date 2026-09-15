@@ -6,8 +6,11 @@ import { readFileSync } from "node:fs";
 
 import type {
   ChangedFile,
+  FileContentsRequest,
   GithubInstallationClient,
   PullRequestDetails,
+  PullRequestRef,
+  ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
 import type { ReviewFinding } from "@pr-review/schemas";
@@ -198,7 +201,9 @@ export function makeGithub() {
     getPullRequest: vi.fn(async () => pullRequest),
     listChangedFiles: vi.fn(async () => changedFiles),
     getDiff: vi.fn(async () => context.diff),
-    getFileContents: vi.fn(async () => "export const sessions = [];\n"),
+    getFileContents: vi.fn(
+      async (_request: FileContentsRequest) => "export const sessions = [];\n",
+    ),
     searchCode: vi.fn(async () => ({
       matches: [
         {
@@ -213,10 +218,13 @@ export function makeGithub() {
     listCommitShas: vi.fn(async () => ["c0ffee1"]),
     listCommitFiles: vi.fn(async () => ["src/sessions.ts", "docs/sessions.md"]),
     listReviewComments: vi.fn(async () => []),
-    listReviewThreads: vi.fn(async () => []),
+    getBranchTip: vi.fn(async () => headSha),
+    getCommitMessage: vi.fn(async () => "Rate limit sessions"),
+    listReviewThreads: vi.fn(async (_ref: PullRequestRef): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async () => ({ id: 987 })),
     createReview: vi.fn(async () => ({ id: 654 })),
-    writeFileOnBranch: vi.fn(async (request: WriteFileRequest) => {
+    createCommitOnBranch: vi.fn(async () => ({ sha: "fix1234" })),
+    writeFileOnBranch: vi.fn(async (request: WriteFileRequest): Promise<void> => {
       throw new Error(`unexpected write to ${request.path}`);
     }),
   } satisfies GithubInstallationClient;
