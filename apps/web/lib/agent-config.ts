@@ -1,7 +1,4 @@
-/**
- * Serialises a dashboard AgentConfig into the two YAML documents it maps
- * onto: the repository's agent file, and the workflow inputs beside it.
- */
+// Two documents: the repository's agent file, and the workflow inputs beside it.
 import { AGENTS, type AgentConfig, type AgentName } from "./data/types";
 
 export const AGENT_CONFIG_PATH = ".github/pr-review-agents.yml";
@@ -43,10 +40,7 @@ export function pathPatterns(paths: AgentConfig["paths"]): string[] {
   ];
 }
 
-/**
- * The dashboard carries one path gate; the file spells it per agent, so the
- * same patterns are written under each.
- */
+// The dashboard carries one path gate; the file spells it per agent.
 export function toYaml(config: AgentConfig): string {
   if (config.agents.length === 0) {
     return "# No agents selected. The action fails until this names at least one.\nagents: []\n";
@@ -65,10 +59,7 @@ export function toYaml(config: AgentConfig): string {
   return `${lines.join("\n")}\n`;
 }
 
-/**
- * `fix` and `memory-branch` are action inputs, not keys of the agent file —
- * its schema is strict and would reject them.
- */
+// Action inputs, not keys of the agent file, whose schema is strict and rejects them.
 export function toWorkflowYaml(config: AgentConfig): string {
   const lines: string[] = [];
   if (config.fix) lines.push('  fix: "true"');

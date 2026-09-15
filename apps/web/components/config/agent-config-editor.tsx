@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCcw, TriangleAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { Button, Label, Separator, Switch } from "@/components/ui";
 import {
@@ -21,7 +21,7 @@ export type AgentConfigEditorProps = {
   repoLabel: string;
 };
 
-function Warning({ children }: { children: React.ReactNode }) {
+function Warning({ children }: { children: ReactNode }) {
   return (
     <p className="mt-1.5 flex items-start gap-1.5 font-mono text-[0.68rem] leading-relaxed text-warn">
       <TriangleAlert aria-hidden className="mt-px size-3 shrink-0" />
@@ -154,7 +154,9 @@ export function AgentConfigEditor({ loaded, repoLabel }: AgentConfigEditorProps)
             Reset to loaded config
           </Button>
           <span className="font-mono text-[0.68rem] text-slate-dim">
-            {dirty ? `Edited, not yet copied out of ${repoLabel}` : "Matches the loaded configuration"}
+            {dirty
+              ? "Edited here only. Copy the YAML to keep these changes."
+              : `Matches the configuration loaded for ${repoLabel}.`}
           </span>
         </div>
       </form>
