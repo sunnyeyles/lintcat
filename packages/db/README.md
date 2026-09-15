@@ -9,6 +9,7 @@ erDiagram
   teams ||--o{ repos : "owns"
   repos ||--o{ reviews : "collects"
   reviews ||--o{ findings : "holds"
+  reviews ||--o{ agent_runs : "times"
 
   users {
     serial id PK
@@ -39,6 +40,18 @@ erDiagram
     text head_sha
     text[] agents
     text summary
+    int duration_ms
+  }
+  agent_runs {
+    serial id PK
+    int review_id FK
+    text agent
+    int duration_ms
+    int finding_count
+    int input_tokens
+    int cache_creation_input_tokens
+    int cache_read_input_tokens
+    int output_tokens
   }
   findings {
     serial id PK
@@ -55,6 +68,9 @@ erDiagram
 ```
 
 - `teams.slug` is the subdomain: `acme` → `acme.<app-domain>`.
+- `agent_runs` is one row per agent per review, carrying the four token counters
+  the logging events already emit. Nothing writes it yet — see the dashboard's
+  `lib/data/`.
 - One team per user: `users.team_id`, null until they create or join one.
   Many teams per user later means moving that column into a join table.
 - Deleting a team cascades to its repos, reviews and findings; its users stay

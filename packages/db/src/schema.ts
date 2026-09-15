@@ -62,8 +62,30 @@ export const reviews = pgTable("reviews", {
   headSha: text("head_sha").notNull(),
   agents: text("agents").array().notNull(),
   summary: text("summary").notNull(),
+  durationMs: integer("duration_ms").notNull().default(0),
   createdAt: createdAt(),
 });
+
+// Per-agent leg of a review: the four token counters the logging events already carry.
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: serial("id").primaryKey(),
+    reviewId: integer("review_id")
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    agent: text("agent").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    findingCount: integer("finding_count").notNull(),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    cacheCreationInputTokens: integer("cache_creation_input_tokens")
+      .notNull()
+      .default(0),
+    cacheReadInputTokens: integer("cache_read_input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+  },
+  (t) => [uniqueIndex("agent_runs_review_agent_idx").on(t.reviewId, t.agent)],
+);
 
 // Mirrors reviewFindingSchema in @pr-review/schemas; keep the two in step.
 export const findings = pgTable("findings", {
@@ -89,5 +111,7 @@ export type Repo = typeof repos.$inferSelect;
 export type NewRepo = typeof repos.$inferInsert;
 export type Review = typeof reviews.$inferSelect;
 export type NewReview = typeof reviews.$inferInsert;
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type NewAgentRun = typeof agentRuns.$inferInsert;
 export type Finding = typeof findings.$inferSelect;
 export type NewFinding = typeof findings.$inferInsert;
