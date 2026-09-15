@@ -52,14 +52,14 @@ export function TokenCompositionChart({
       footer={
         <div>
           <p className="mb-1.5 tracking-[0.1em] uppercase">Share of spend</p>
-          <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-[2px]">
+          <div className="flex h-2.5 w-full gap-[2px] rounded-[2px]">
             {TOKEN_SERIES.map((series) => (
               <span
                 key={series.key}
                 aria-hidden
-                className="h-full min-w-[2px] shrink-0 rounded-[1px]"
+                className="h-full min-w-0 grow-0 rounded-[1px]"
                 style={{
-                  width: `${pct(costByClass[series.key], costTotal)}%`,
+                  flexBasis: `${pct(costByClass[series.key], costTotal)}%`,
                   backgroundColor: colors[series.color],
                 }}
               />

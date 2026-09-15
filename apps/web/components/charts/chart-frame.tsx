@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactElement, ReactNode } from "react";
+import { type ReactElement, type ReactNode, useId } from "react";
 import { ResponsiveContainer } from "recharts";
 
 import {
@@ -38,6 +38,7 @@ export function ChartFrame({
   className,
   children,
 }: ChartFrameProps) {
+  const captionId = useId();
   return (
     <Card className={cn("flex min-w-0 flex-col", className)}>
       <CardHeader className="block">
@@ -53,7 +54,8 @@ export function ChartFrame({
         <figure className="m-0 min-w-0">
           <div
             role="img"
-            aria-label={`${title}. ${summary}`}
+            aria-label={title}
+            aria-describedby={captionId}
             className="w-full min-w-0"
             style={{ height }}
           >
@@ -61,7 +63,10 @@ export function ChartFrame({
               {children}
             </ResponsiveContainer>
           </div>
-          <figcaption className="mt-3 font-mono text-[0.68rem] leading-relaxed text-slate">
+          <figcaption
+            id={captionId}
+            className="mt-3 font-mono text-[0.68rem] leading-relaxed text-slate"
+          >
             {summary}
           </figcaption>
         </figure>
