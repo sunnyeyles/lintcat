@@ -71,9 +71,9 @@ export function toYaml(config: AgentConfig): string {
  */
 export function toWorkflowYaml(config: AgentConfig): string {
   const lines: string[] = [];
-  if (config.fix) lines.push('    fix: "true"');
+  if (config.fix) lines.push('  fix: "true"');
   if (config.memoryBranch !== null && config.memoryBranch !== "") {
-    lines.push(`    memory-branch: ${yamlString(config.memoryBranch)}`);
+    lines.push(`  memory-branch: ${yamlString(config.memoryBranch)}`);
   }
   if (lines.length === 0) return "";
   return `# In your workflow, under the action's \`with:\`\nwith:\n${lines.join("\n")}\n`;

@@ -27,8 +27,10 @@ export type AgentRun = TokenCounts & {
   findingCount: number;
 };
 
-export type ReviewSummary = Review &
+// `agents` narrows Drizzle's text[] to the names the UI can actually render.
+export type ReviewSummary = Omit<Review, "agents"> &
   TokenCounts & {
+    agents: AgentName[];
     repo: Repo;
     findingCount: number;
     bySeverity: Record<Severity, number>;

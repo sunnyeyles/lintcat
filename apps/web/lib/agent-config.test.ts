@@ -164,9 +164,12 @@ describe("toWorkflowYaml", () => {
 
   it("emits both inputs under one with: block", () => {
     const yaml = toWorkflowYaml(config({ fix: true, memoryBranch: "pr-review-memory" }));
-    expect(yaml).toContain("with:");
-    expect(yaml).toContain('fix: "true"');
-    expect(yaml).toContain("memory-branch: pr-review-memory");
+    expect(yaml.split("\n").slice(1)).toEqual([
+      "with:",
+      '  fix: "true"',
+      "  memory-branch: pr-review-memory",
+      "",
+    ]);
   });
 
   it("quotes a branch name YAML would misread", () => {

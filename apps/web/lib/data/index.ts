@@ -10,4 +10,4 @@ export function data(): DataSource {
 }
 
 export * from "./types";
-export { costOf } from "./mock";
+export { agentForCategory, costOf } from "./mock";

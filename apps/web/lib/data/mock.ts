@@ -107,6 +107,11 @@ const AGENT_OF_CATEGORY = new Map<string, AgentName>(
   AGENTS.flatMap((a) => CATEGORIES[a].map((c) => [c, a] as const)),
 );
 
+// Findings carry a category, not an agent; this is how the UI gets back to one.
+export function agentForCategory(category: string): AgentName | null {
+  return AGENT_OF_CATEGORY.get(category) ?? null;
+}
+
 function severityFor(r: () => number, agent: AgentName): Severity {
   const roll = r();
   if (agent === "security") return roll < 0.3 ? "high" : roll < 0.7 ? "medium" : "low";
@@ -155,7 +160,7 @@ type World = {
   reviews: ReviewDetail[];
 };
 
-function build(now: Date): World {
+function build(now: Date, ceiling: number): World {
   const r = rng(SEED);
   const team: Team = {
     id: 1,
@@ -190,9 +195,9 @@ function build(now: Date): World {
       const agents = enabled.length > 0 ? enabled : (["correctness"] as AgentName[]);
       reviewId += 1;
 
-      const createdAt = new Date(
-        date.getTime() + intBetween(r, 8, 19) * 36e5 + intBetween(r, 0, 59) * 6e4,
-      );
+      // Today's slots run to 19:00, so clamp back or reviews land in the future.
+      const slot = date.getTime() + intBetween(r, 8, 19) * 36e5 + intBetween(r, 0, 59) * 6e4;
+      const createdAt = new Date(Math.min(slot, ceiling - k * 9e4));
 
       const findings: Finding[] = [];
       const runs: AgentRun[] = [];
@@ -268,9 +273,10 @@ let cached: World | null = null;
 function world(): World {
   // Anchored to midnight so the fixture is stable within a day.
   if (!cached) {
+    const ceiling = Date.now() - 6e4;
     const now = new Date();
     now.setUTCHours(0, 0, 0, 0);
-    cached = build(now);
+    cached = build(now, ceiling);
   }
   return cached;
 }
@@ -469,4 +475,4 @@ export function createMockSource(): DataSource {
   };
 }
 
-export { AGENT_OF_CATEGORY };
+

@@ -17,6 +17,11 @@ describe("mock data source", () => {
     expect(times).toEqual([...times].sort((x, y) => y - x));
   });
 
+  it("never dates a review in the future", async () => {
+    const reviews = await source.listReviews();
+    expect(reviews[0]!.createdAt.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+
   it("agrees between review rollups and their findings", async () => {
     const review = (await source.getReview(1))!;
     expect(review.findings).toHaveLength(review.findingCount);

@@ -4,6 +4,7 @@ import type { Finding } from "@pr-review/db";
 import { useId, useMemo, useState } from "react";
 
 import {
+  AGENT_LABELS,
   Button,
   EmptyState,
   Label,
@@ -25,33 +26,44 @@ import type { Severity } from "@/lib/data";
 import { ConfidenceMeter } from "./confidence-meter";
 import { FilePath } from "./file-path";
 import { FindingSheet } from "./finding-sheet";
-import { SEVERITIES, categoriesOf, sortFindings } from "./sort";
+import {
+  type AgentFilterKey,
+  OTHER_AGENT,
+  SEVERITIES,
+  agentKeyOf,
+  agentKeysOf,
+  sortFindings,
+} from "./sort";
 
 const ALL = "all";
 
+function agentLabel(key: AgentFilterKey): string {
+  return key === OTHER_AGENT ? "other" : AGENT_LABELS[key];
+}
+
 export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
   const severityId = useId();
-  const categoryId = useId();
+  const agentId = useId();
   const [severity, setSeverity] = useState<Severity | typeof ALL>(ALL);
-  const [category, setCategory] = useState<string>(ALL);
+  const [agent, setAgent] = useState<AgentFilterKey | typeof ALL>(ALL);
   const [selected, setSelected] = useState<Finding | null>(null);
 
   const sorted = useMemo(() => sortFindings(findings), [findings]);
-  const categories = useMemo(() => categoriesOf(findings), [findings]);
+  const agents = useMemo(() => agentKeysOf(findings), [findings]);
   const rows = useMemo(
     () =>
       sorted.filter(
         (f) =>
           (severity === ALL || f.severity === severity) &&
-          (category === ALL || f.category === category),
+          (agent === ALL || agentKeyOf(f) === agent),
       ),
-    [sorted, severity, category],
+    [sorted, severity, agent],
   );
 
-  const filtered = severity !== ALL || category !== ALL;
+  const filtered = severity !== ALL || agent !== ALL;
   const reset = () => {
     setSeverity(ALL);
-    setCategory(ALL);
+    setAgent(ALL);
   };
 
   return (
@@ -81,16 +93,19 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
             </Select>
           </div>
           <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={categoryId}>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger id={categoryId} className="w-44">
+            <Label htmlFor={agentId}>Agent</Label>
+            <Select
+              value={agent}
+              onValueChange={(v) => setAgent(v as AgentFilterKey | typeof ALL)}
+            >
+              <SelectTrigger id={agentId} className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                <SelectItem value={ALL}>All agents</SelectItem>
+                {agents.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {agentLabel(a)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -111,7 +126,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
       {rows.length === 0 ? (
         <EmptyState
           title="No findings match these filters"
-          description="Widen the severity or category filter to see the rest of this review."
+          description="Widen the severity or agent filter to see the rest of this review."
           action={
             <Button variant="outline" size="sm" onClick={reset}>
               Clear filters

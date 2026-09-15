@@ -1,8 +1,12 @@
 import type { Finding } from "@pr-review/db";
 
-import type { Severity } from "@/lib/data";
+import { AGENTS, agentForCategory, type AgentName, type Severity } from "@/lib/data";
 
 export const SEVERITIES: readonly Severity[] = ["high", "medium", "low"];
+
+export const OTHER_AGENT = "other";
+
+export type AgentFilterKey = AgentName | typeof OTHER_AGENT;
 
 const RANK: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 
@@ -15,6 +19,12 @@ export function sortFindings(findings: readonly Finding[]): Finding[] {
   return [...findings].sort(bySeverityThenConfidence);
 }
 
-export function categoriesOf(findings: readonly Finding[]): string[] {
-  return [...new Set(findings.map((f) => f.category))].sort();
+export function agentKeyOf(finding: Finding): AgentFilterKey {
+  return agentForCategory(finding.category) ?? OTHER_AGENT;
+}
+
+export function agentKeysOf(findings: readonly Finding[]): AgentFilterKey[] {
+  const present = new Set<AgentFilterKey>(findings.map(agentKeyOf));
+  const known: AgentFilterKey[] = AGENTS.filter((a) => present.has(a));
+  return present.has(OTHER_AGENT) ? [...known, OTHER_AGENT] : known;
 }
