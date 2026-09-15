@@ -71,3 +71,6 @@ pnpm db:studio     # browse the data
 
 `DATABASE_URL` comes from Vercel in production and from the nearest
 `.env.local` locally.
+
+`.github/workflows/db-migrate.yml` runs `db:migrate` against `secrets.DATABASE_URL`
+when a merge to `main` adds anything under `drizzle/`; it can also be run by hand.
