@@ -15,14 +15,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui";
-import { AGENTS, data, type AgentName } from "@/lib/data";
+import { data } from "@/lib/data";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Reviews" };
-
-function isAgentName(value: string): value is AgentName {
-  return (AGENTS as readonly string[]).includes(value);
-}
 
 export default async function ReviewsIndexPage() {
   const reviews = await data().listReviews({ limit: 50 });
@@ -71,7 +67,7 @@ export default async function ReviewsIndexPage() {
                   </TableCell>
                   <TableCell>
                     <span className="flex flex-wrap gap-1">
-                      {review.agents.filter(isAgentName).map((agent) => (
+                      {review.agents.map((agent) => (
                         <AgentChip key={agent} agent={agent} />
                       ))}
                     </span>
