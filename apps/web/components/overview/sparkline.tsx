@@ -44,7 +44,7 @@ export function Sparkline({ points, label, className }: SparklineProps) {
         vectorEffect="non-scaling-stroke"
         className="text-accent"
       />
-      <circle cx={W} cy={y(last)} r="1.8" fill="currentColor" className="text-accent" />
+      <circle cx={W - 2} cy={y(last)} r="1.8" fill="currentColor" className="text-accent" />
     </svg>
   );
 }
