@@ -1,0 +1,59 @@
+# Applies pending Drizzle migrations to secrets.DATABASE_URL when a merge to
+# main touches packages/db/drizzle.
+
+name: Migrate database
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/db/drizzle/**"
+      - "packages/db/drizzle.config.ts"
+      - ".github/workflows/db-migrate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Two runs against one database must never overlap, and a queued one must not be dropped.
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Apply pending migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Require a database connection string
+        env:
+          # Only tested for emptiness, never printed.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::Secret DATABASE_URL is not set. Add the Neon connection string under Settings > Secrets and variables > Actions > Secrets. Without it drizzle-kit would read an empty url and fail mid-run."
+            exit 1
+          fi
+          echo "Connection string is configured."
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # drizzle-kit compares the journal against the database, so no pending migration is a no-op.
+      - name: Apply pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm db:migrate
