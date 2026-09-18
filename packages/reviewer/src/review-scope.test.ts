@@ -25,12 +25,12 @@ const changedFiles = [file("src/a.ts"), file("src/b.ts")];
 const diff = "the whole pull request diff";
 
 function completedRun(name = CHECK_RUN_NAME) {
-  return { name, status: "completed", conclusion: "neutral" };
+  return { name, status: "completed" };
 }
 
 interface ClientOptions {
   commits?: string[];
-  runs?: Record<string, { name: string; status: string; conclusion: string | null }[]>;
+  runs?: Record<string, { name: string; status: string }[]>;
   comparison?: { status: "ahead" | "behind" | "identical" | "diverged"; files: ChangedFile[] };
   failOn?: "commits" | "runs" | "compare";
 }
@@ -116,7 +116,7 @@ describe("resolveReviewScope", () => {
   it("ignores a check run that never completed", async () => {
     const client = makeClient({
       runs: {
-        old111: [{ name: CHECK_RUN_NAME, status: "in_progress", conclusion: null }],
+        old111: [{ name: CHECK_RUN_NAME, status: "in_progress" }],
       },
     });
 

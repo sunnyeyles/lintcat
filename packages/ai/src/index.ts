@@ -15,7 +15,6 @@ export {
   type ReviewModel,
 } from "./model.js";
 export type {
-  IncrementalReview,
   ReviewAgent,
   ReviewContext,
 } from "./agent-contract.js";

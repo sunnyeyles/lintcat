@@ -18,7 +18,6 @@ export {
   type CommitMessageRequest,
   type CommitRef,
   type CompareCommitsRequest,
-  type ComparisonStatus,
   type CreateCheckRunInput,
   type CreateCommitInput,
   type CreateReviewInput,

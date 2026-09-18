@@ -497,7 +497,7 @@ function incrementalClient(
   client.listPullRequestCommitShas.mockResolvedValue(["old111", target.headSha]);
   client.listCheckRuns.mockImplementation(async ({ sha }) =>
     sha === "old111"
-      ? [{ name: "AI PR Review", status: "completed", conclusion: "neutral" }]
+      ? [{ name: "AI PR Review", status: "completed" }]
       : [],
   );
   client.compareCommits.mockResolvedValue({ status: "ahead", files: since });

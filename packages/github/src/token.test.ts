@@ -879,7 +879,7 @@ describe("listPullRequestCommitShas", () => {
 });
 
 describe("listCheckRuns", () => {
-  it("unwraps the check_runs envelope and keeps name, status and conclusion", async () => {
+  it("unwraps the check_runs envelope and keeps name and status", async () => {
     const { octokit, client } = makeClient({
       checkRunPages: [
         [
@@ -899,30 +899,10 @@ describe("listCheckRuns", () => {
         repo: "example-service",
         sha: "old111",
       }),
-    ).toEqual([
-      { name: "AI PR Review", status: "completed", conclusion: "neutral" },
-    ]);
+    ).toEqual([{ name: "AI PR Review", status: "completed" }]);
     expect(octokit.rest.checks.listForRef).toHaveBeenCalledWith(
       expect.objectContaining({ ref: "old111", per_page: 100, page: 1 }),
     );
-  });
-
-  it("accepts a run that has not concluded", async () => {
-    const { client } = makeClient({
-      checkRunPages: [
-        [{ name: "AI PR Review", status: "in_progress", conclusion: null }],
-      ],
-    });
-
-    expect(
-      (
-        await client.listCheckRuns({
-          owner: "octo-org",
-          repo: "example-service",
-          sha: "old111",
-        })
-      )[0]?.conclusion,
-    ).toBeNull();
   });
 });
 

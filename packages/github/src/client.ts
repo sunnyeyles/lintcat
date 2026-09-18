@@ -181,14 +181,10 @@ export interface CheckRunsRequest {
   sha: string;
 }
 
-/** `conclusion` is null until the run completes. */
 export interface CheckRunSummary {
   name: string;
   status: string;
-  conclusion: string | null;
 }
-
-export type ComparisonStatus = "ahead" | "behind" | "identical" | "diverged";
 
 export interface CompareCommitsRequest {
   owner: string;
@@ -199,7 +195,7 @@ export interface CompareCommitsRequest {
 
 /** `files` is capped at 300 by GitHub. */
 export interface CommitComparison {
-  status: ComparisonStatus;
+  status: "ahead" | "behind" | "identical" | "diverged";
   files: ChangedFile[];
 }
 
