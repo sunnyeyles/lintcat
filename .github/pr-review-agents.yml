@@ -1,4 +1,4 @@
-# The review agents for this repository; the action fails if this file is missing.
+# Opts this repository into the specialists; without this file the general agent reviews alone.
 # Entries name built-in agents (see the README). `paths` is a gate, not a filter.
 
 agents:

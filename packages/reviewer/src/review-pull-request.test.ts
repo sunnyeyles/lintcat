@@ -115,7 +115,7 @@ function reviewResult(
     agentFailures: [],
     synthesis:
       candidates.length === 0
-        ? skippedSynthesis()
+        ? skippedSynthesis("no candidate findings", [])
         : {
             outcome: "completed",
             candidates,

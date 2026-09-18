@@ -719,15 +719,19 @@ describe("agent configuration", () => {
     expect(fileReads).toEqual([{ path: "ci/agents.yml", ref: baseSha }]);
   });
 
-  it("fails the step when the base commit has no configuration", async () => {
-    const { environment, modelConfigs } = harness(reviewEnv, pullRequestEvent(), {
-      config: httpError(404),
-    });
-
-    await expect(runAction(environment)).rejects.toThrow(
-      /No review agents are configured/,
+  it("reviews with the general agent when the base commit has no configuration", async () => {
+    const { environment, entries, modelCalls } = harness(
+      reviewEnv,
+      pullRequestEvent(),
+      { config: httpError(404) },
     );
-    expect(modelConfigs).toEqual([]);
+
+    await runAction(environment);
+
+    expect(
+      entries.find((entry) => entry["event"] === "review.agents_selected"),
+    ).toMatchObject({ agents: ["general"], configuredAgents: ["general"] });
+    expect(modelCalls()).toBe(1);
   });
 
   it("fails the step when the configuration is malformed", async () => {

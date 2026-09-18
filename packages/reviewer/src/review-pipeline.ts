@@ -27,7 +27,7 @@ type AgentOutcome =
 
 /** The synthesise step's outcome; the tag decides which fields exist. */
 export type SynthesisState =
-  | { outcome: "skipped"; candidates: unknown[] }
+  | { outcome: "skipped"; candidates: unknown[]; reason: SkipReason }
   | {
       outcome: "completed";
       candidates: unknown[];
@@ -42,9 +42,14 @@ export type SynthesisState =
       durationMs: number;
     };
 
+type SkipReason = "no candidate findings" | "standalone agent";
+
 /** The outcome of a synthesise step that never ran. */
-export function skippedSynthesis(): SynthesisState {
-  return { outcome: "skipped", candidates: [] };
+export function skippedSynthesis(
+  reason: SkipReason,
+  candidates: unknown[],
+): SynthesisState {
+  return { outcome: "skipped", candidates, reason };
 }
 
 /** Runs one agent, recording success or failure; never throws. */
@@ -93,7 +98,7 @@ async function synthesise(
   hints: SynthesisHints | undefined,
 ): Promise<SynthesisState> {
   if (candidates.length === 0) {
-    return skippedSynthesis();
+    return skippedSynthesis("no candidate findings", candidates);
   }
 
   const startedAt = Date.now();
@@ -143,7 +148,11 @@ export async function runReviewPipeline(
     agents.map((agent) => runAgent(agent, context)),
   );
   const { candidates, agentFailures } = join(outcomes);
-  const synthesis = await synthesise(synthesiser, candidates, hints);
+  // Nothing to merge; a lone specialist still synthesises so narrowed runs test the full path.
+  const synthesis =
+    agents.length === 1 && agents[0]?.standalone === true
+      ? skippedSynthesis("standalone agent", candidates)
+      : await synthesise(synthesiser, candidates, hints);
 
   return {
     candidates,

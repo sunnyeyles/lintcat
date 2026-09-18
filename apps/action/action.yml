@@ -75,9 +75,9 @@ inputs:
       Repository-relative path to the YAML file naming this repository's
       review agents. It is read from the pull request's base commit over the
       API, never from the workspace, so a pull request cannot choose the
-      agents that review it. No agent runs by default, so this file is
-      required: a missing, malformed, or empty one fails the step rather than
-      running a review nobody configured.
+      agents that review it. Without this file the general agent reviews
+      alone; create it to opt into the specialist agents. A malformed or empty
+      one fails the step rather than running a review nobody configured.
     required: false
     default: .github/pr-review-agents.yml
   memory-branch:
