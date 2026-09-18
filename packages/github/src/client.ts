@@ -249,9 +249,9 @@ export interface GithubInstallationClient {
   listCommitShas(request: CommitHistoryRequest): Promise<string[]>;
   /** Paths one commit changed; GitHub caps this at 300, so a sweep comes back short. */
   listCommitFiles(request: CommitFilesRequest): Promise<string[]>;
-  /** Every commit on the pull request, oldest first. */
+  /** Oldest first. */
   listPullRequestCommitShas(ref: PullRequestRef): Promise<string[]>;
-  /** Check runs from every app, not only ours. */
+  /** From every app, not only ours. */
   listCheckRuns(request: CheckRunsRequest): Promise<CheckRunSummary[]>;
   compareCommits(request: CompareCommitsRequest): Promise<CommitComparison>;
   /** Every inline review comment already on the pull request. */

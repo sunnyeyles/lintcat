@@ -604,7 +604,7 @@ export function createInstallationClient(
     },
 
     listCheckRuns(request: CheckRunsRequest): Promise<CheckRunSummary[]> {
-      // check_runs pages like a list, but arrives wrapped in a total_count object.
+      // check_runs arrives wrapped in a total_count object.
       return paginate(
         (page) =>
           octokit.rest.checks.listForRef({

@@ -58,7 +58,6 @@ function truncateDiff(diff: string): string {
   );
 }
 
-/** Says the diff is narrowed, and where the rest of the pull request is. */
 function scopeNote(context: ReviewContext): string[] {
   const { incremental } = context;
   if (incremental === undefined) {

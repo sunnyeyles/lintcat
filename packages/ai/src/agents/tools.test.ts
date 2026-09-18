@@ -41,7 +41,6 @@ function run(tools: ToolSet, name: string, input: unknown): Promise<unknown> {
   return Promise.resolve(execute(input, executeOptions));
 }
 
-/** A narrowed review: the tools must still describe the whole pull request. */
 const narrowed = {
   ...context,
   diff: "@@ -2 +2 @@\n+const limit = 0;\n",

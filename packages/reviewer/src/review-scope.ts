@@ -1,4 +1,4 @@
-/** Whole PR or only the commits since the last review; failures widen to whole. */
+/** Every failure here widens to a full review; none fails one. */
 import {
   CHECK_RUN_NAME,
   type ChangedFile,
@@ -117,7 +117,6 @@ export function intersectWithPullRequest(
   return since.filter((file) => inPullRequest.has(file.filename));
 }
 
-/** Never throws: an unreadable baseline is a full review, not a failed one. */
 async function narrow(
   target: ReviewTarget,
   deps: ResolveReviewScopeDeps,

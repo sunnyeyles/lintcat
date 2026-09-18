@@ -196,7 +196,7 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
       return [fixture.pullRequest.headSha];
     },
 
-    // A fixture is one snapshot: no earlier commit, so no earlier review.
+    // A fixture has one commit, so no earlier review.
     async listCheckRuns(): Promise<CheckRunSummary[]> {
       return [];
     },

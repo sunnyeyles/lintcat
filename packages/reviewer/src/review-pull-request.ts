@@ -80,7 +80,6 @@ interface ReviewPullRequestDeps {
   memoryStore?: MemoryStore | undefined;
   /** Injectable clock, so a test can pin what counts as a fresh signal. */
   now?: (() => Date) | undefined;
-  /** Whether the diff narrows to the commits added since the last review. */
   incremental?: boolean | undefined;
 }
 
@@ -102,7 +101,6 @@ async function listPostedComments(
   }
 }
 
-/** Findings an earlier review posted whose threads are neither resolved nor outdated. */
 async function openEarlierFindings(
   client: GithubInstallationClient,
   target: ReviewTarget,
@@ -215,7 +213,6 @@ function logSynthesisOutcome(
   });
 }
 
-/** Drops earlier findings this run reported again, so none is listed twice. */
 function stillOpen(
   carriedForward: readonly PostedFinding[],
   findings: readonly ReviewFinding[],

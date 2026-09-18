@@ -162,7 +162,6 @@ interface StubOptions {
   reviewData?: unknown;
   reviewCommentPages?: unknown[][];
   commitListData?: unknown;
-  /** pulls.listCommits pages, oldest first, as GitHub orders them. */
   pullCommitPages?: unknown[][];
   checkRunPages?: unknown[][];
   comparisonData?: unknown;

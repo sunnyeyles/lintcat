@@ -62,10 +62,10 @@ export function postedFindingKeys(
 export interface PostedFinding {
   key: string;
   file: string;
-  /** Normalised: the marker carries no punctuation or case. */
+  /** Normalised: no punctuation or case. */
   title: string;
   category: string;
-  /** The comment's own heading, when it has one: the title as it was written. */
+  /** The title as written, when the comment has a heading. */
   heading?: string | undefined;
 }
 

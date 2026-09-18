@@ -1141,7 +1141,6 @@ describe("actionEnvironment", () => {
 });
 
 describe("the incremental input", () => {
-  /** How the run decided what to read; absent when the input is off. */
   function scope(entries: Harness["entries"]): unknown {
     return entries.find((entry) => entry["event"] === "review.scope_resolved")?.[
       "reason"
@@ -1179,7 +1178,7 @@ describe("the incremental input", () => {
     await runAction(environment);
 
     expect(client.listPullRequestCommitShas).toHaveBeenCalledTimes(1);
-    // The stub pull request has only its head commit, so there is none.
+    // The stub pull request has only its head commit.
     expect(scope(entries)).toBe("no_baseline");
   });
 });

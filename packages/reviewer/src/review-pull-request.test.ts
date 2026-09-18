@@ -477,7 +477,6 @@ describe("reviewPullRequest inline comments", () => {
   });
 });
 
-/** A thread carrying one of our comments, as listReviewThreads returns it. */
 function postedThread(
   posted: ReviewFinding,
   flags: { isResolved?: boolean; isOutdated?: boolean } = {},
@@ -489,7 +488,6 @@ function postedThread(
   };
 }
 
-/** A baseline commit our check run already read, and what changed since it. */
 function incrementalClient(
   client: ReturnType<typeof makeClient>,
   since: ChangedFile[],

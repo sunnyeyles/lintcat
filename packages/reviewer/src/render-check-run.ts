@@ -38,9 +38,7 @@ interface RenderCheckRunOptions {
   annotate: boolean;
   /** Agents whose paths no changed file matched, named in the summary. */
   skippedAgents?: readonly SkippedAgent[] | undefined;
-  /** Earlier commits' findings still open, which a narrowed diff cannot restate. */
   carriedForward?: readonly PostedFinding[] | undefined;
-  /** One sentence on what this review read, when it read less than the whole. */
   scopeNote?: string | undefined;
 }
 
