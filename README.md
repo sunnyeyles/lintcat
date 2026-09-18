@@ -622,6 +622,9 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 - **[Propose, Refine, Decide](https://sunnyeyles.github.io/pr-review-agents/)**
   — the pipeline traced stage by stage, with a diagram, the file that owns each
   step, and the failure modes. Source: [`docs/index.html`](docs/index.html).
+- **[Incremental review](docs/incremental-review.md)** — a proposal, not
+  shipped: reviewing only the commits added since a pull request was last
+  reviewed, where the baseline comes from, and what recall it costs.
 
 ## Out of scope
 
