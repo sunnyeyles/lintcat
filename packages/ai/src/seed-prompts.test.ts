@@ -2,16 +2,16 @@
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it, vi } from "vitest";
 
-import { agentPromptKey } from "./agents/definition.js";
+import { agentPromptKey } from "#src/agents/definition";
 import {
   validRemotePrompt,
-} from "./agent-test-support.js";
+} from "#src/agent-test-support";
 import {
   seedFailed,
   seedManagedPrompts,
   type LabelledPrompt,
   type LangfusePromptWriter,
-} from "./seed-prompts.js";
+} from "#src/seed-prompts";
 
 /** One prompt per agent of an arbitrary set, all satisfying the guard. */
 function validPrompts() {

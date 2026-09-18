@@ -5,10 +5,10 @@
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
-import type { AgentDefinition } from "./definition.js";
-import { GENERAL_AGENT } from "./general-agent.js";
-import { agentPathsSchema } from "./path-filter.js";
-import { BUILT_IN_AGENT_NAMES, findBuiltInAgent } from "./specialists/index.js";
+import type { AgentDefinition } from "#src/agents/definition";
+import { GENERAL_AGENT } from "#src/agents/general-agent";
+import { agentPathsSchema } from "#src/agents/path-filter";
+import { BUILT_IN_AGENT_NAMES, findBuiltInAgent } from "#src/agents/specialists/index";
 
 /** Where the agent configuration is read from unless a path is given. */
 export const DEFAULT_AGENT_CONFIG_PATH = ".github/pr-review-agents.yml";

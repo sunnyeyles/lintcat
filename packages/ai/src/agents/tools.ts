@@ -10,8 +10,8 @@ import type {
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
-import type { ReviewContext } from "../agent-contract.js";
-import { truncateWithMarker } from "./truncate.js";
+import type { ReviewContext } from "#src/agent-contract";
+import { truncateWithMarker } from "#src/agents/truncate";
 
 /** Tool results larger than this are truncated to bound token usage. */
 const MAX_TOOL_RESULT_CHARS = 50_000;

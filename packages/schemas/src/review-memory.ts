@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { findingCategorySchema } from "./review-finding.js";
+import { findingCategorySchema } from "#src/review-finding";
 
 const count = z.number().int().nonnegative();
 

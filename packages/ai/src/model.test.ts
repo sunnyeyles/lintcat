@@ -9,7 +9,7 @@ import {
   createLanguageModel,
   defaultModelFor,
   resolveModelProvider,
-} from "./model.js";
+} from "#src/model";
 
 describe("resolveModelProvider", () => {
   it("defaults to OpenAI when configuration names none", () => {

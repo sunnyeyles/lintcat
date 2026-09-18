@@ -10,7 +10,7 @@ import type { ReviewContext } from "@pr-review/ai";
 import type { ChangedFile, PullRequestDetails } from "@pr-review/github";
 import { z } from "zod";
 
-import { buildFileDiff, buildPatch } from "./unified-diff.js";
+import { buildFileDiff, buildPatch } from "#src/unified-diff";
 
 /** The directory holding every fixture, one subdirectory each. */
 const FIXTURES_DIR = resolve(

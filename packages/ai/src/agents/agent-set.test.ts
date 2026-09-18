@@ -11,14 +11,14 @@ import {
   buildReviewSystemPrompt,
   withRepositoryHints,
   type AgentDefinition,
-} from "./definition.js";
+} from "#src/agents/definition";
 import {
   createReviewAgents,
   gateAgentsByPaths,
   resolveAgentDefinitions,
-} from "./agent-set.js";
-import { createReviewAgent, type ReviewAgentDeps } from "./runtime.js";
-import { promptContractProblems } from "../prompts.js";
+} from "#src/agents/agent-set";
+import { createReviewAgent, type ReviewAgentDeps } from "#src/agents/runtime";
+import { promptContractProblems } from "#src/prompts";
 import {
   REVIEW_TOOL_NAMES,
   context,
@@ -30,7 +30,7 @@ import {
   repositoryAgent,
   repositoryAgents,
   textBlock,
-} from "../agent-test-support.js";
+} from "#src/agent-test-support";
 
 const configuredAgents = repositoryAgents();
 const securityAgent = repositoryAgent("security");

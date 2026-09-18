@@ -10,7 +10,7 @@ import {
   appendJobSummary,
   createFallbackPublisher,
   renderJobSummary,
-} from "./summary.js";
+} from "#src/summary";
 
 const target: ReviewTarget = {
   owner: "octo-org",

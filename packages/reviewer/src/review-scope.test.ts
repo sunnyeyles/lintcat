@@ -7,8 +7,8 @@ import {
   renderDiff,
   resolveReviewScope,
   wholePullRequest,
-} from "./review-scope.js";
-import type { ReviewTarget } from "./review-target.js";
+} from "#src/review-scope";
+import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
   owner: "octo-org",

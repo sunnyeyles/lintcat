@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReviewSystemPrompt } from "../definition.js";
-import { TEST_COVERAGE_AGENT } from "./test-coverage-agent.js";
+import { buildReviewSystemPrompt } from "#src/agents/definition";
+import { TEST_COVERAGE_AGENT } from "#src/agents/specialists/test-coverage-agent";
 
 describe("TEST_COVERAGE_AGENT", () => {
   it("owns the test-coverage category and nothing else", () => {

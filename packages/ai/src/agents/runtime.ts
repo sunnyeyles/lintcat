@@ -16,14 +16,14 @@ import {
   buildReviewSystemPrompt,
   renderRepositoryHints,
   type AgentDefinition,
-} from "./definition.js";
-import { extractAgentOutput } from "./output.js";
-import type { ReviewModel } from "../model.js";
-import type { ReviewAgent, ReviewContext } from "../agent-contract.js";
-import type { ManagedPrompts } from "../prompts.js";
-import { createReviewTools } from "./tools.js";
-import { truncateWithMarker } from "./truncate.js";
-import { addTokenUsage, emptyTokenUsage, toTokenUsage } from "../usage.js";
+} from "#src/agents/definition";
+import { extractAgentOutput } from "#src/agents/output";
+import type { ReviewModel } from "#src/model";
+import type { ReviewAgent, ReviewContext } from "#src/agent-contract";
+import type { ManagedPrompts } from "#src/prompts";
+import { createReviewTools } from "#src/agents/tools";
+import { truncateWithMarker } from "#src/agents/truncate";
+import { addTokenUsage, emptyTokenUsage, toTokenUsage } from "#src/usage";
 
 /** An agent-level failure (bad final output, turn cap, ...). */
 export class AgentRunError extends Error {

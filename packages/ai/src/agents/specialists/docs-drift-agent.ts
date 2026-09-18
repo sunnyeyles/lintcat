@@ -1,4 +1,4 @@
-import type { AgentDefinition } from "../definition.js";
+import type { AgentDefinition } from "#src/agents/definition";
 
 export const DOCS_DRIFT_AGENT: AgentDefinition = {
   category: "docs-drift",

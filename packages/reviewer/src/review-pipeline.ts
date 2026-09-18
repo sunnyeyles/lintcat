@@ -12,7 +12,7 @@ import {
 import { errorMessage, errorName } from "@pr-review/logging";
 import type { ReviewFinding } from "@pr-review/schemas";
 
-import { validateFindings } from "./validate-findings.js";
+import { validateFindings } from "#src/validate-findings";
 
 /** One agent that did not produce candidates, and why. */
 export interface AgentFailure {

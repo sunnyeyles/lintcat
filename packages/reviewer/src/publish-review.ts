@@ -10,19 +10,19 @@ import {
 import type { StructuredLogger } from "@pr-review/logging";
 import type { ReviewFinding } from "@pr-review/schemas";
 
-import { applyFixes, type FixInput, type FixOutcome } from "./apply-fixes.js";
-import { fixCount } from "./finding-format.js";
+import { applyFixes, type FixInput, type FixOutcome } from "#src/apply-fixes";
+import { fixCount } from "#src/finding-format";
 import {
   renderCheckRun,
   type RenderedCheckRun,
-} from "./render-check-run.js";
+} from "#src/render-check-run";
 import {
   renderReview,
   type PostedFinding,
   type RenderedReview,
   type ReviewNotes,
-} from "./render-review.js";
-import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+} from "#src/render-review";
+import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
 /** What the comment publisher itself can report. */
 type CommentsPublished = "posted" | "unavailable";

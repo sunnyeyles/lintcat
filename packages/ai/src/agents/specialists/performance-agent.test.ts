@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReviewSystemPrompt } from "../definition.js";
-import { PERFORMANCE_AGENT } from "./performance-agent.js";
+import { buildReviewSystemPrompt } from "#src/agents/definition";
+import { PERFORMANCE_AGENT } from "#src/agents/specialists/performance-agent";
 
 describe("PERFORMANCE_AGENT", () => {
   it("owns exactly the performance category", () => {

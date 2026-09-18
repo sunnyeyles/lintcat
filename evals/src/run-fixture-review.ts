@@ -19,9 +19,9 @@ import {
   type ReviewOutcome,
 } from "@pr-review/reviewer";
 
-import { createFixtureClient } from "./fixture-client.js";
-import type { LoadedFixture } from "./fixture.js";
-import type { ModelAccess } from "./model-access.js";
+import { createFixtureClient } from "#src/fixture-client";
+import type { LoadedFixture } from "#src/fixture";
+import type { ModelAccess } from "#src/model-access";
 
 /** The model-facing half of a review; the harness's own tests inject scripted agents. */
 export interface FixtureReviewDeps {

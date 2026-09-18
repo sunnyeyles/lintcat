@@ -4,8 +4,8 @@
  */
 import { Octokit } from "@octokit/rest";
 
-import { createInstallationClient, type OctokitLike } from "./app.js";
-import type { GithubInstallationClient } from "./client.js";
+import { createInstallationClient, type OctokitLike } from "#src/app";
+import type { GithubInstallationClient } from "#src/client";
 
 export interface GithubTokenConfig {
   /** A GitHub token — in Actions, `${{ github.token }}`. */

@@ -1,4 +1,4 @@
-import type { AgentDefinition } from "./definition.js";
+import type { AgentDefinition } from "#src/agents/definition";
 
 // The default review: what runs when a repository configures no agents.
 export const GENERAL_AGENT: AgentDefinition = {

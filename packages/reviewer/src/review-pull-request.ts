@@ -21,8 +21,8 @@ import {
 } from "@pr-review/logging";
 import type { ReviewFinding } from "@pr-review/schemas";
 
-import { buildDiffLineIndex } from "./diff-lines.js";
-import { countLabel } from "./finding-format.js";
+import { buildDiffLineIndex } from "#src/diff-lines";
+import { countLabel } from "#src/finding-format";
 import {
   createCheckRunPublisher,
   createFixPublisher,
@@ -31,28 +31,28 @@ import {
   type PublishFixes,
   type PublishReview,
   type PublishReviewComments,
-} from "./publish-review.js";
+} from "#src/publish-review";
 import {
   computeHints,
   computeSynthesisHints,
   emptyMemory,
   readMemory,
   type MemoryStore,
-} from "./memory.js";
-import { renderCheckRun, renderNoAgentMatched } from "./render-check-run.js";
-import { verifyPatches, type PatchSummary } from "./validate-patches.js";
+} from "#src/memory";
+import { renderCheckRun, renderNoAgentMatched } from "#src/render-check-run";
+import { verifyPatches, type PatchSummary } from "#src/validate-patches";
 import {
   findingKey,
   parsePostedFinding,
   postedFindingKeys,
   type PostedFinding,
-} from "./render-review.js";
+} from "#src/render-review";
 import {
   skippedSynthesis,
   type ReviewPipelineResult,
-} from "./review-pipeline.js";
-import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
-import { resolveReviewScope, wholePullRequest } from "./review-scope.js";
+} from "#src/review-pipeline";
+import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 
 interface ReviewPullRequestDeps {
   /** Authenticated GitHub client for this repository. */

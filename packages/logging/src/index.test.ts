@@ -5,7 +5,7 @@ import {
   createConsoleLogger,
   errorMessage,
   errorName,
-} from "./index.js";
+} from "#src/index";
 
 afterEach(() => {
   vi.restoreAllMocks();

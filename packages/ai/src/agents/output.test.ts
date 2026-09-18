@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { agentOutputSchema, extractAgentOutput } from "./output.js";
+import { agentOutputSchema, extractAgentOutput } from "#src/agents/output";
 
 const validFinding = {
   file: "src/sessions.ts",

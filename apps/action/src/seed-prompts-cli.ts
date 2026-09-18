@@ -21,7 +21,7 @@ import {
   type StructuredLogger,
 } from "@pr-review/logging";
 
-import { readOptional } from "./read-optional.js";
+import { readOptional } from "#src/read-optional";
 
 /** Environment variables the seeder authenticates with. */
 const PUBLIC_KEY_ENV = "LANGFUSE_PUBLIC_KEY";

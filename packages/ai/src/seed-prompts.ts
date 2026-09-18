@@ -8,7 +8,7 @@ import {
   type StructuredLogger,
 } from "@pr-review/logging";
 
-import { agentPromptKey } from "./agents/definition.js";
+import { agentPromptKey } from "#src/agents/definition";
 import {
   DEFAULT_PROMPT_LABEL,
   createLangfuseClient,
@@ -16,7 +16,7 @@ import {
   promptContractProblems,
   type LangfusePromptClientConfig,
   type ManagedPrompts,
-} from "./prompts.js";
+} from "#src/prompts";
 
 /** One prompt version as it currently stands at a label. */
 export interface LabelledPrompt {

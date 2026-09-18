@@ -12,7 +12,7 @@ import {
   repositoryAgentConfigYaml,
   textBlock,
   validRemotePrompt,
-} from "../../../packages/ai/src/agent-test-support.js";
+} from "@pr-review/ai/agent-test-support";
 import { createCapturingLogger } from "@pr-review/logging";
 import type {
   FileContentsRequest,
@@ -37,7 +37,7 @@ import {
   runAction,
   runEntrypoint,
   type ActionEnvironment,
-} from "./index.js";
+} from "#src/index";
 
 afterAll(() => {
   if (originalGithubActions === undefined) {

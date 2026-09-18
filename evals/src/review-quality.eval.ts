@@ -8,16 +8,16 @@ import { resolveAgentDefinitions } from "@pr-review/ai";
 import { createConsoleLogger } from "@pr-review/logging";
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { repositoryAgents } from "../../packages/ai/src/agent-test-support.js";
-import { evalCases } from "./cases.js";
-import { evaluateExpectation } from "./expectations.js";
-import { loadFixture } from "./fixture.js";
-import { AGENTS_ENV, requireModelAccess } from "./model-access.js";
+import { repositoryAgents } from "@pr-review/ai/agent-test-support";
+import { evalCases } from "#src/cases";
+import { evaluateExpectation } from "#src/expectations";
+import { loadFixture } from "#src/fixture";
+import { AGENTS_ENV, requireModelAccess } from "#src/model-access";
 import {
   modelBackedDeps,
   runFixtureReview,
   type FixtureReview,
-} from "./run-fixture-review.js";
+} from "#src/run-fixture-review";
 
 // A full review takes minutes, and silence looks like a hang.
 const deps = modelBackedDeps(

@@ -4,8 +4,8 @@
  */
 import type { FindingCategory, ReviewFinding } from "@pr-review/schemas";
 
-import type { LoadedFixture } from "./fixture.js";
-import type { FixtureReview } from "./run-fixture-review.js";
+import type { LoadedFixture } from "#src/fixture";
+import type { FixtureReview } from "#src/run-fixture-review";
 
 /**
  * A region of one changed file, from `startMarker` to `endMarker` or the

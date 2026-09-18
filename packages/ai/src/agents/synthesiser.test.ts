@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import { MockLanguageModelV4 } from "ai/test";
 
-import { finalFindingsJson, repositoryAgents } from "../agent-test-support.js";
-import type { ReviewModel } from "../model.js";
+import { finalFindingsJson, repositoryAgents } from "#src/agent-test-support";
+import type { ReviewModel } from "#src/model";
 import {
   SynthesisError,
   buildSynthesisMessage,
   buildSynthesisSystemPrompt,
   createSynthesiser,
-} from "./synthesiser.js";
+} from "#src/agents/synthesiser";
 
 const configuredAgents = repositoryAgents();
 const SYNTHESIS_SYSTEM_PROMPT = buildSynthesisSystemPrompt(configuredAgents);

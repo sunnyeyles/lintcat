@@ -1,8 +1,8 @@
 /** Working with a run's agent set. Callers pass the set, so they control what runs. */
-import { ALL_AGENTS, type AgentDefinition } from "./definition.js";
-import { compilePathFilter } from "./path-filter.js";
-import { createReviewAgent, type ReviewAgentDeps } from "./runtime.js";
-import type { ReviewAgent } from "../agent-contract.js";
+import { ALL_AGENTS, type AgentDefinition } from "#src/agents/definition";
+import { compilePathFilter } from "#src/agents/path-filter";
+import { createReviewAgent, type ReviewAgentDeps } from "#src/agents/runtime";
+import type { ReviewAgent } from "#src/agent-contract";
 
 /**
  * Narrows an agent set by name, in `available` order. An unknown name throws.

@@ -1,7 +1,7 @@
 import type { ChangedFile } from "@pr-review/github";
 import { describe, expect, it } from "vitest";
 
-import { buildChangedLineIndex, changedLinesFromPatch } from "./diff-lines.js";
+import { buildChangedLineIndex, changedLinesFromPatch } from "#src/diff-lines";
 
 describe("changedLinesFromPatch", () => {
   it("returns the new-side line numbers of added lines in a single hunk", () => {

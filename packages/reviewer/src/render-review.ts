@@ -12,12 +12,12 @@ import {
   heading,
   skipNotes,
   summarise,
-} from "./finding-format.js";
-import type { AgentFailure } from "./review-pipeline.js";
+} from "#src/finding-format";
+import type { AgentFailure } from "#src/review-pipeline";
 import {
   compareFindingStrength,
   normaliseTitle,
-} from "./validate-findings.js";
+} from "#src/validate-findings";
 
 export interface RenderedReview {
   body: string;

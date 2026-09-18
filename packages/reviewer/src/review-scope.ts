@@ -6,7 +6,7 @@ import {
 } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
-import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
 export interface FullReviewScope {
   kind: "full";

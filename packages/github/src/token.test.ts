@@ -1,9 +1,9 @@
 /** The token auth path end to end, over an injected Octokit stub. */
 import { describe, expect, it, vi } from "vitest";
 
-import type { OctokitLike } from "./app.js";
-import { CHECK_RUN_NAME, type PullRequestRef } from "./client.js";
-import { createTokenClient } from "./token.js";
+import type { OctokitLike } from "#src/app";
+import { CHECK_RUN_NAME, type PullRequestRef } from "#src/client";
+import { createTokenClient } from "#src/token";
 
 const ref: PullRequestRef = {
   owner: "octo-org",

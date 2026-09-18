@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReviewSystemPrompt } from "../definition.js";
-import { CORRECTNESS_AGENT } from "./correctness-agent.js";
+import { buildReviewSystemPrompt } from "#src/agents/definition";
+import { CORRECTNESS_AGENT } from "#src/agents/specialists/correctness-agent";
 
 const guidance = CORRECTNESS_AGENT.contextGuidance ?? "";
 
