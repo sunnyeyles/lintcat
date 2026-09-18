@@ -1,7 +1,8 @@
 # @pr-review/db
 
 Postgres on Neon, accessed through Drizzle. `db()` returns the client; the
-tables are exported from `src/schema.ts`.
+tables are exported from `src/schema.ts`. Writes that need a transaction take
+`dbSession()` instead — see the note on `src/index-store.ts` below.
 
 ```mermaid
 erDiagram
@@ -138,7 +139,10 @@ erDiagram
 - `src/index-store.ts` writes it: one transaction inserts the build, flips
   `repo_index.current_index_id` to it and deletes the repository's older
   builds, so a review never reads a half-built index. That needs a driver with
-  real transactions; `db()` over neon-http has none.
+  real transactions, which `db()` over neon-http is not — pass `dbSession()`,
+  the WebSocket pool over `drizzle-orm/neon-serverless`, to `writeLayerA`. The
+  read path stays on `db()`: it only selects. Node 22 supplies the WebSocket
+  the pool needs, so nothing configures one.
 - `index_edges.src`/`dst` are file ids for `imports` and `tests`, symbol ids
   otherwise; `kind` says which. No source text is stored anywhere.
 - `index_symbols` is Layer B: created with the rest so the migration is one

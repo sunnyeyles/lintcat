@@ -311,7 +311,7 @@ Per-plan overrides live on the team, not the repository.
 
 | Situation | Behaviour |
 |---|---|
-| Index building on the first PR | absent mode; the review runs on the eight existing tools |
+| Index building on the first PR | absent mode; the review runs on the eight pre-index tools |
 | Build failed | previous index served as stale; dashboard shows the reason |
 | Language not covered | Layer A answers; Layer B tools say `indexed: false` for it |
 | Unknown `schema_version` | absent mode; rebuild enqueued |

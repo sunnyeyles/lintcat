@@ -24,7 +24,7 @@ inputs:
     default: ""
   github-token:
     description: >-
-      Token used for the eight read-only repository tools, for the review
+      Token used for the nine read-only repository tools, for the review
       comments, and for publishing the check run. The default workflow token
       is enough when the job grants contents: read, pull-requests: write, and
       checks: write — and contents: write when `fix` is on.
@@ -42,6 +42,18 @@ inputs:
       instead, so nothing is lost by leaving it off.
     required: false
     default: "false"
+  index:
+    description: >-
+      Whether the agents get the repository index — a map of the repository
+      (packages, file roles, tests covering a file, CODEOWNERS owners) built at
+      review start from the pull request's base commit, one tree listing plus a
+      handful of manifest reads. It backs the `describe_area` tool and the index
+      block in each agent's opening message. On by default; any value other than
+      `true` turns it off, and the agents review without it. Needs nothing
+      beyond the contents: read the review already has, and a build failure
+      leaves the review running rather than failing the step.
+    required: false
+    default: "true"
   model:
     description: >-
       Default model id, as the selected provider spells it. An agent may

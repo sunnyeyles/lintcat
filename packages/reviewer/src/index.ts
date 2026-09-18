@@ -30,6 +30,10 @@ export {
   type ReviewOutcome,
 } from "./review-pull-request.js";
 export {
+  buildRepositoryIndex,
+  type IndexTarget,
+} from "./build-index.js";
+export {
   learnFromMergedPullRequest,
   type LearnFromMergeDeps,
 } from "./learn-from-merge.js";

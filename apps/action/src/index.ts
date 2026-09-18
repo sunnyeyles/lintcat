@@ -41,6 +41,7 @@ import {
   type StructuredLogger,
 } from "@pr-review/logging";
 import {
+  buildRepositoryIndex,
   createBranchMemoryStore,
   createCheckRunPublisher,
   isFixCommit,
@@ -386,13 +387,27 @@ export async function runAction(
       applyFixes,
     });
 
+    // On unless the input says otherwise; a failed build is absent mode, never
+    // a failed review.
+    const indexEnabled = (getInput(env, "index") || "true") === "true";
+    const index = indexEnabled
+      ? await buildRepositoryIndex(client, { ...target, baseSha }, logger)
+      : undefined;
+
     await reviewPullRequest(target, {
       applyFixes,
       client,
       agents,
+      index,
       // `activeAgents` is the subset the path gate woke, decided once the
       // changed files are known.
-      runReviewPipeline: (reviewClient, context, activeAgents, hints) =>
+      runReviewPipeline: (
+        reviewClient,
+        context,
+        activeAgents,
+        hints,
+        reviewIndex,
+      ) =>
         runReviewPipeline(
           createReviewAgents(
             {
@@ -400,6 +415,7 @@ export async function runAction(
               createModel,
               github: reviewClient,
               ...(prompts === undefined ? {} : { systemPrompts: prompts }),
+              ...(reviewIndex === undefined ? {} : { index: reviewIndex }),
             },
             activeAgents,
           ),

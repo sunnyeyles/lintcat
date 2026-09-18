@@ -14,6 +14,7 @@ import type {
   ExistingReviewComment,
   GithubInstallationClient,
 } from "@pr-review/github";
+import type { RepositoryIndex } from "@pr-review/index";
 import {
   createConsoleLogger,
   errorMessage,
@@ -57,6 +58,7 @@ interface ReviewPullRequestDeps {
     context: ReviewContext,
     agents: readonly AgentDefinition[],
     hints: SynthesisHints,
+    index: RepositoryIndex | undefined,
   ) => Promise<ReviewPipelineResult>;
   /** Defaults to publishing a check run through `client`. */
   publishReview?: PublishReview | undefined;
@@ -70,6 +72,8 @@ interface ReviewPullRequestDeps {
   logger?: StructuredLogger | undefined;
   /** Where this repository's review memory lives; undefined means no hints. */
   memoryStore?: MemoryStore | undefined;
+  /** This repository's index; without it the agents' tools run in absent mode. */
+  index?: RepositoryIndex | undefined;
   /** Injectable clock, so a test can pin what counts as a fresh signal. */
   now?: (() => Date) | undefined;
 }
@@ -213,6 +217,7 @@ export async function reviewPullRequest(
     publishFixes,
     logger = createConsoleLogger(),
     memoryStore,
+    index,
     now = () => new Date(),
   }: ReviewPullRequestDeps,
 ): Promise<ReviewOutcome> {
@@ -271,6 +276,7 @@ export async function reviewPullRequest(
     },
     active,
     synthesisHints,
+    index,
   );
   logSynthesisOutcome(logger, target, review);
 

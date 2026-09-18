@@ -12,6 +12,7 @@
   "dependencies": {
     "@pr-review/ai": "workspace:*",
     "@pr-review/github": "workspace:*",
+    "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",
     "@pr-review/schemas": "workspace:*"
   }

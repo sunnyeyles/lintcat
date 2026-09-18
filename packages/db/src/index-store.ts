@@ -8,7 +8,7 @@ import type {
   RepositoryIndex,
 } from "@pr-review/index";
 import { MAX_SIBLINGS } from "@pr-review/index";
-import type { Database } from "./client.js";
+import type { Database, SessionDatabase } from "./client.js";
 import type { TestEdgeRow } from "./index-rows.js";
 import {
   batchRows,
@@ -32,7 +32,7 @@ const INSERT_BATCH = 1000;
 
 // The atomic flip: everything here, including dropping the repository's older builds.
 export async function writeLayerA(
-  client: Database,
+  client: SessionDatabase,
   repoId: number,
   index: LayerAIndex,
   buildMs: number,

@@ -740,7 +740,7 @@ html { scroll-behavior: smooth; }
       <div class="prose">
         <p>
           Every agent shares one runtime. An <code>AgentDefinition</code>
-          supplies the role, the focus text, and the category; the loop, the eight
+          supplies the role, the focus text, and the category; the loop, the nine
           tools, the injection hardening, and the output contract are identical
           by construction, so a new agent costs a YAML entry and no code.
         </p>
@@ -805,7 +805,7 @@ html { scroll-behavior: smooth; }
         </p>
       </div>
 
-      <h3>The eight tools</h3>
+      <h3>The nine tools</h3>
       <div class="paths">
         <span class="chip">packages/ai/src/agents/<b>tools.ts</b></span>
       </div>
@@ -1165,7 +1165,7 @@ review.started<br>
             <tr><th colspan="2" style="padding-top:1.5rem">04 · The pipeline</th></tr>
             <tr><td><code>packages/reviewer/src/review-pipeline.ts</code></td><td>Agent fan-out, join, synthesise, validate</td></tr>
             <tr><td><code>packages/ai/src/agents/runtime.ts</code></td><td>The shared agent loop, its turn cap, and the category filter</td></tr>
-            <tr><td><code>packages/ai/src/agents/tools.ts</code></td><td>The eight read-only tools</td></tr>
+            <tr><td><code>packages/ai/src/agents/tools.ts</code></td><td>The nine read-only tools</td></tr>
             <tr><td><code>packages/ai/src/agents/output.ts</code></td><td>Parsing an agent's final JSON; bad output fails the agent, not the run</td></tr>
             <tr><td><code>packages/ai/src/usage.ts</code></td><td>Token accounting for every model call</td></tr>
             <tr><td><code>packages/ai/src/agents/synthesiser.ts</code></td><td>The single refining model call</td></tr>

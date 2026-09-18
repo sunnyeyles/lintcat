@@ -141,11 +141,12 @@ Agents ──► raw candidates (unknown[])
 
 Reinforcing rules:
 
-- Agents are given **eight read-only tools** and nothing else:
+- Agents are given **nine read-only tools** and nothing else:
   `get_pull_request`, `list_changed_files`, `get_diff`, `get_file`,
   `get_base_file`, `search_repository`, `find_importers`,
-  `find_co_changed_files`. No write, comment, approve, merge, or execute tool
-  exists. The last three read the repository's default branch, so an agent is
+  `find_co_changed_files`, `describe_area`. No write, comment, approve, merge,
+  or execute tool exists. `search_repository`, `find_importers` and
+  `find_co_changed_files` read the repository's default branch, so an agent is
   told to treat their results as pointers to read with `get_file`, never as
   evidence.
 - Every agent's system prompt carries the same non-negotiable **prompt-injection
@@ -163,6 +164,43 @@ Reinforcing rules:
 - Fixes are **committed, never forced**. The branch tip must still be the commit
   the review read, and the ref update is a plain fast-forward — a push that
   landed mid-review wins the race, and the fixes become suggestions instead.
+
+---
+
+## Repository index
+
+`describe_area(path)` answers what a diff cannot: which package a path belongs
+to, its role (source, test, config, …), its language, its CODEOWNERS owners,
+the tests covering it — or, for a test, the sources it covers — and its
+siblings in the same directory, capped at 30.
+
+Today it is built live at review start from the pull request's **base** commit:
+one recursive tree listing, plus a read of each manifest that listing turns up
+(`pnpm-workspace.yaml`, `package.json`, `go.mod`, `pyproject.toml`,
+`Cargo.toml`) and `CODEOWNERS`. That is a handful of API calls on the
+`contents: read` the review already has, and a second or two before the first
+agent starts. Nothing is cloned and nothing is stored: the index holds paths,
+names and roles, it never holds file contents, and it is dropped when the
+review ends. The same map writes one `<repository_index>` line per changed file
+into every agent's opening message, so the cheap questions are answered before
+an agent spends a turn asking.
+
+It is honest about what it does not know:
+
+- `known: false` means **the path is not in the index**, never that the file
+  does not exist. A file this pull request adds is not in the base commit, so
+  it is never indexed.
+- GitHub truncates a very large tree. The result then carries
+  `truncated: true`, which means files are missing outright — every answer,
+  including "no tests cover this", is a maybe.
+- A build failure logs `index.failed` and the review runs without it:
+  `describe_area` returns `status: "absent"`, the opening block says so in one
+  line, and the agents fall back to the other eight tools. The index can make a
+  review better; it must never make one fail.
+
+Set [`index: false`](#configuration) to turn the whole thing off.
+`docs/specs/repo-index.md` has the phases this one is the first of — symbols,
+resolved references, impact — which need a stored index rather than a live one.
 
 ---
 
@@ -228,12 +266,13 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | --- | --- | --- |
 | `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agents and synthesiser authenticate with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. |
 | `model-provider` | no (default `openai`) | Which provider the agents and synthesiser call: `openai` or `anthropic`. An unknown name fails the step before any model call. |
-| `github-token` | no (default `${{ github.token }}`) | Token for the eight read-only repository tools and for publishing the check run. |
+| `github-token` | no (default `${{ github.token }}`) | Token for the nine read-only repository tools and for publishing the check run. |
 | `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-haiku-4-5`) | Default model id, as the provider spells it. An agent may [override it](#per-agent-models); the synthesiser always uses this one. |
 | `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `agents` | no (default `all`) | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides any [path filters](#path-filters). |
 | `agent-config` | no (default `.github/pr-review-agents.yml`) | Path to the YAML file naming the agents. Required — nothing runs until a repository names it. |
 | `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
+| `index` | no (default `true`) | Whether the agents get the [repository index](#repository-index), built at review start from the base commit. `true` keeps it on; any other value turns it off and the agents review without it. |
 | `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agents and cut first by the synthesiser; shapes the repository acted on are the ones the synthesiser keeps. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompts from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
 | `langfuse-secret-key` | no | The other half. Setting only one of the two disables both features and logs `langfuse.disabled_incomplete_credentials`. |

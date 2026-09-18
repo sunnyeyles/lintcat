@@ -11,7 +11,7 @@ the ones you want in `.github/pr-review-agents.yml` and the review runs exactly
 those — see [Choosing your agents](#choosing-your-agents), which you need
 before the first run.
 
-The agents never write to GitHub. They are given eight read-only tools and
+The agents never write to GitHub. They are given nine read-only tools and
 propose structured findings; deterministic code then decides what actually gets
 published: every finding must pass a schema check, name a file in the pull
 request, anchor to a line the pull request actually added, and clear a
@@ -149,6 +149,7 @@ of this action's repository — copy it and edit.
 | `agents` | no | `all` | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides their `paths`. |
 | `agent-config` | no | `.github/pr-review-agents.yml` | Path to the YAML file naming this repository's agents, read from the pull request's base commit. The file itself is required — nothing runs by default, and a missing one fails the step. |
 | `fix` | no | `false` | Whether verified fixes are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. Off, or when the commit cannot be made, the same fixes are offered as suggested changes on the review comments. |
+| `index` | no | `true` | Whether the agents get the repository index — package, role, language, owners and covering tests per path, built at review start from the pull request's base commit (one tree listing plus a few manifest reads). `true` keeps it on; any other value turns it off. A build failure leaves the review running without it. |
 | `memory-branch` | no | — | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding, so repeatedly ignored shapes are deprioritised in later reviews. Empty turns the feature off. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | — | Langfuse public key. Set this and the secret key to manage prompts and collect traces. |
 | `langfuse-secret-key` | no | — | Langfuse secret key. Store it as a secret. |

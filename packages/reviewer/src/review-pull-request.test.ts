@@ -16,6 +16,7 @@ import type {
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
+import type { RepositoryIndex } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import {
   reviewMemorySchema,
@@ -141,10 +142,34 @@ function makeAgent(
   };
 }
 
+/** An index whose contents no test asserts on: only that it reaches the agents. */
+function fakeIndex(): RepositoryIndex {
+  return {
+    status: async () => ({
+      sha: pullRequest.baseSha,
+      builtAt: new Date().toISOString(),
+      coverage: { files: 0, truncated: false, languages: {}, manifests: [] },
+    }),
+    describeArea: async (path) => ({
+      path,
+      known: false,
+      package: null,
+      role: null,
+      language: null,
+      owners: [],
+      tests: [],
+      covers: [],
+      siblings: [],
+      siblingsTotal: 0,
+    }),
+  };
+}
+
 interface DepsOptions {
   agents?: readonly AgentDefinition[];
   publishReview?: PublishReview;
   memoryStore?: MemoryStore;
+  index?: RepositoryIndex;
   now?: () => Date;
 }
 
@@ -159,6 +184,7 @@ function makeDeps(
       _context: ReviewContext,
       _agents: readonly AgentDefinition[],
       _hints: SynthesisHints,
+      _index: RepositoryIndex | undefined,
     ) => review,
   );
   const { logger, entries } = createCapturingLogger();
@@ -204,7 +230,17 @@ describe("reviewPullRequest", () => {
       },
       agents,
       { keep: [], drop: [] },
+      undefined,
     );
+  });
+
+  it("hands the pipeline the repository index it was given", async () => {
+    const index = fakeIndex();
+    const { deps, runReviewPipeline } = makeDeps(reviewResult(), { index });
+
+    await reviewPullRequest(target, deps);
+
+    expect(runReviewPipeline.mock.calls[0]?.[4]).toBe(index);
   });
 
   it("publishes a check run through the client by default", async () => {

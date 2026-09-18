@@ -1214,3 +1214,56 @@ describe("the fix input", () => {
     expect(applyFixes(entries)).toBe(false);
   });
 });
+
+describe("the index input", () => {
+  /** The `index.built` entry, which a run with the index on emits. */
+  const built = (entries: Harness["entries"]) =>
+    entries.find((entry) => entry["event"] === "index.built");
+
+  it("builds the index from the base commit by default", async () => {
+    const { environment, entries, client } = harness({ ...reviewEnv });
+
+    await runAction(environment);
+
+    expect(client.listTree).toHaveBeenCalledExactlyOnceWith({
+      owner: "octo-org",
+      repo: "example-service",
+      ref: baseSha,
+    });
+    expect(built(entries)).toMatchObject({
+      files: 2,
+      packages: 0,
+      truncated: false,
+    });
+  });
+
+  it.each(["false", "no", "TRUE", "1"])(
+    "builds no index for the value %s",
+    async (value) => {
+      const { environment, entries, client } = harness({
+        ...reviewEnv,
+        INPUT_INDEX: value,
+      });
+
+      await runAction(environment);
+
+      expect(client.listTree).not.toHaveBeenCalled();
+      expect(built(entries)).toBeUndefined();
+    },
+  );
+
+  it("reviews without the index when the tree cannot be read", async () => {
+    const { environment, entries, client, modelCalls } = harness({
+      ...reviewEnv,
+    });
+    client.listTree.mockRejectedValue(httpError(403));
+
+    await expect(runAction(environment)).resolves.toBeUndefined();
+
+    expect(entries).toContainEqual(
+      expect.objectContaining({ event: "index.failed", reason: "HTTP 403" }),
+    );
+    expect(built(entries)).toBeUndefined();
+    expect(modelCalls()).toBe(5);
+  });
+});
