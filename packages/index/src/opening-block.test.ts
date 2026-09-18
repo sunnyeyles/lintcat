@@ -6,6 +6,18 @@ import { createInMemoryIndex } from "./memory.js";
 import { MAX_INDEX_LINES, renderRepositoryIndexBlock } from "./opening-block.js";
 import type { FileSource } from "./types.js";
 
+const LAYER_B = {
+  symbols: [],
+  references: [],
+  imports: [
+    { from: "packages/api/src/handlers.ts", to: "packages/api/src/routes.ts" },
+    { from: "packages/api/src/server.ts", to: "packages/api/src/routes.ts" },
+  ],
+  coverage: [
+    { language: "typescript", files: 3, indexed: true, resolutionRate: 1 },
+  ],
+};
+
 const FILES: Record<string, string> = {
   "pnpm-workspace.yaml": 'packages:\n  - "packages/*"\n',
   "package.json": JSON.stringify({ name: "root", private: true }),
@@ -44,6 +56,23 @@ describe("renderRepositoryIndexBlock", () => {
         "</repository_index>",
       ].join("\n"),
     );
+  });
+
+  it("counts importers per file once Layer B is there", async () => {
+    const withGraph = createInMemoryIndex({
+      ...(await buildLayerA(source, BUILT_AT)),
+      layerB: LAYER_B,
+    });
+    const block = await renderRepositoryIndexBlock(
+      withGraph,
+      ["packages/api/src/routes.ts", "README.md"],
+      NOW,
+    );
+
+    expect(block.split("\n").slice(1, 3)).toEqual([
+      "- packages/api/src/routes.ts — @acme/api, source, tested by routes.test.ts, owners @org/api, 2 importers",
+      "- README.md — no package, docs, 0 importers",
+    ]);
   });
 
   it("says so when there is no index", async () => {

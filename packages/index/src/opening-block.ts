@@ -30,7 +30,7 @@ function ageHours(builtAt: string, now: Date): number {
   return Math.max(0, Math.round((now.getTime() - built) / HOUR_MS));
 }
 
-function renderLine(area: AreaDescription): string {
+function renderLine(area: AreaDescription, importers: number | undefined): string {
   const parts: string[] = [area.package?.name ?? "no package"];
   if (area.role !== null) parts.push(area.role);
   if (area.tests.length > 0) {
@@ -39,6 +39,7 @@ function renderLine(area: AreaDescription): string {
     );
   }
   if (area.owners.length > 0) parts.push(`owners ${area.owners.join(" ")}`);
+  if (importers !== undefined) parts.push(`${importers} importers`);
   return `- ${area.path} — ${parts.join(", ")}${area.known ? "" : " (not in index)"}`;
 }
 
@@ -51,9 +52,13 @@ export async function renderRepositoryIndexBlock(
   if (index === undefined) return ABSENT_BLOCK;
   const status = await index.status();
 
+  const indexed = status.languages.some((language) => language.indexed);
   const lines: string[] = [];
   for (const path of changedPaths.slice(0, MAX_INDEX_LINES)) {
-    lines.push(renderLine(await index.describeArea(path)));
+    const importers = indexed
+      ? (await index.findReferences(path)).totalImporters
+      : undefined;
+    lines.push(renderLine(await index.describeArea(path), importers));
   }
   if (changedPaths.length > MAX_INDEX_LINES) {
     lines.push(`- [... ${changedPaths.length - MAX_INDEX_LINES} more files]`);
