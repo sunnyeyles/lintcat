@@ -1,0 +1,40 @@
+import { RepoTable } from "@/components/overview";
+import { PageHeader } from "@/components/shell";
+import { Card, EmptyState } from "@/components/ui";
+import { data } from "@/lib/data";
+import { formatNumber } from "@/lib/format";
+
+export default async function ReposPage() {
+  const repos = await data().listRepos();
+  const reviewCount = repos.reduce((n, repo) => n + repo.reviewCount, 0);
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="Repositories"
+        title="Repositories"
+        description={
+          repos.length > 0
+            ? `${formatNumber(repos.length)} connected repositories, ${formatNumber(reviewCount)} reviews all time. Most recently reviewed first.`
+            : "No repositories are connected to this team yet."
+        }
+      />
+
+      <div className="mt-8">
+        {repos.length > 0 ? (
+          <Card className="px-4 py-3 sm:px-5">
+            <RepoTable
+              repos={repos}
+              caption="All connected repositories, most recently reviewed first."
+            />
+          </Card>
+        ) : (
+          <EmptyState
+            title="No repositories yet"
+            description="Install the review workflow on a repository and its first review will appear here."
+          />
+        )}
+      </div>
+    </>
+  );
+}

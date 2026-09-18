@@ -614,6 +614,12 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 
 ## Out of scope
 
-By design there is no database, review history, dashboard, automatic fixing,
-automatic merging or approval, vector database, repository embeddings, or
-persistent agent memory.
+The Action itself stays self-contained: it reads the pull request, publishes the
+review, and keeps no state. No automatic merging or approval, no vector
+database, no repository embeddings, no persistent agent memory beyond
+[`memory-branch`](#configuration).
+
+Review history and a dashboard now live in [`apps/web`](apps/web), separately
+from the Action and optional to run. It reads the schema in
+[`packages/db`](packages/db) — which nothing writes to yet, so the dashboard
+currently renders seeded demo data and says so on every page.
