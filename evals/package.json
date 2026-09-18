@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@pr-review/ai": "workspace:*",
     "@pr-review/github": "workspace:*",
+    "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",
     "@pr-review/reviewer": "workspace:*",
     "@pr-review/schemas": "workspace:*",

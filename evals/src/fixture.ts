@@ -60,6 +60,8 @@ export interface LoadedFixture {
   diff: string;
   /** The context the review pipeline runs against. */
   context: ReviewContext;
+  /** The `repo/` directory on disk, which the index is built from. */
+  repoDir: string;
   /** Every file in the repository at the head SHA, by path. */
   headFiles: ReadonlyMap<string, string>;
   /** Every file that existed at the base SHA, by path. */
@@ -105,7 +107,8 @@ export function loadFixture(name: string): LoadedFixture {
     );
   }
 
-  const headFiles = readTree(join(dir, "repo"));
+  const repoDir = join(dir, "repo");
+  const headFiles = readTree(repoDir);
   const changedPaths = new Set(manifest.changedFiles.map((file) => file.path));
   const modifiedPaths = new Set(
     manifest.changedFiles
@@ -181,6 +184,7 @@ export function loadFixture(name: string): LoadedFixture {
       changedFiles,
       diff,
     },
+    repoDir,
     headFiles,
     baseFiles,
   };

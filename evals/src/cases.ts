@@ -69,6 +69,29 @@ export const evalCases: EvalCase[] = [
     ],
   },
   {
+    fixture: "correctness-cross-file-caller",
+    expectations: [
+      agentsCompleted,
+      patchesVerify,
+      {
+        kind: "finding",
+        description:
+          "reports a correctness finding on the new return contract, which an untouched caller in src/checkout/summary.ts still reads as a number",
+        category: "correctness",
+        anchors: [
+          {
+            file: "src/pricing/discount.ts",
+            startMarker: "export interface DiscountResult",
+          },
+          {
+            file: "src/pricing/discount.ts",
+            startMarker: "export function applyDiscount",
+          },
+        ],
+      },
+    ],
+  },
+  {
     fixture: "test-coverage-untested-branch",
     expectations: [
       agentsCompleted,

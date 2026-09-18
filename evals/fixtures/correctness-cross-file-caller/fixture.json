@@ -1,0 +1,20 @@
+{
+  "name": "correctness-cross-file-caller",
+  "title": "Correctness — a changed return contract an untouched caller still reads the old way",
+  "owner": "northwind-shop",
+  "repo": "storefront-checkout",
+  "baseSha": "3b8f1d60c9a47e25f0b1d8c36a94e75218df3c06",
+  "headSha": "a1d472f9c53b806e7f2a9d41c6b385027e94fda8",
+  "pullRequest": {
+    "number": 431,
+    "title": "Return the discount amount alongside the total",
+    "body": "The price panel has to show \"you saved $4.50\", and today the only way to get that number is to re-run the code lookup in the view layer, which has already drifted once.\n\nSo `applyDiscount` now returns `{ total, applied }` instead of a bare total. `buildQuote` is updated to destructure it and carries `savedCents` through to the panel.\n\nNo behaviour change: the total is computed exactly as before, and the minimum-subtotal rule is untouched.",
+    "author": "tom-okafor",
+    "baseRef": "main",
+    "headRef": "feature/quote-savings-line"
+  },
+  "changedFiles": [
+    { "path": "src/pricing/discount.ts", "status": "modified" },
+    { "path": "src/pricing/quote.ts", "status": "modified" }
+  ]
+}
