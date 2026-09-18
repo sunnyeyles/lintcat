@@ -27,6 +27,7 @@ function makeClient() {
     listChangedFiles: vi.fn(async () => []),
     getDiff: vi.fn(async () => ""),
     getFileContents: vi.fn(async () => ""),
+    listTree: vi.fn(async () => ({ paths: [], truncated: false })),
     searchCode: vi.fn(async () => ({
       matches: [],
       totalCount: 0,

@@ -7,6 +7,7 @@ import type {
   CodeSearchResult,
   GithubInstallationClient,
 } from "@pr-review/github";
+import type { RepositoryIndex } from "@pr-review/index";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -163,6 +164,17 @@ function tallyCoChanges(
 
 const emptyInputSchema = z.strictObject({});
 
+/** No index for this review; the tool still answers, saying so. */
+const ABSENT_INDEX = {
+  status: "absent",
+  reason: "no repository index for this review",
+};
+
+/** Whole hours since the index was built, so the model can judge staleness. */
+function ageHours(builtAt: string): number {
+  return Math.max(0, Math.round((Date.now() - Date.parse(builtAt)) / 3_600_000));
+}
+
 /** One changed file's patch; a file outside the PR, or without one, is an error. */
 function patchFor(changedFiles: readonly ChangedFile[], path: string): string {
   const file = changedFiles.find((entry) => entry.filename === path);
@@ -175,10 +187,11 @@ function patchFor(changedFiles: readonly ChangedFile[], path: string): string {
   return file.patch;
 }
 
-/** Exactly the eight read-only tools, bound to one pull request. */
+/** Exactly the nine read-only tools, bound to one pull request. */
 export function createReviewTools(
   github: GithubInstallationClient,
   context: ReviewContext,
+  index?: RepositoryIndex,
 ): ToolSet {
   const { owner, repo } = context;
   // Commits are immutable, so one fetch per SHA serves every call this run.
@@ -337,6 +350,41 @@ export function createReviewTools(
           },
           null,
           2,
+        );
+      },
+    }),
+    describe_area: tool({
+      description:
+        "What the repository index knows about a path: the package it belongs to, its role " +
+        "(source, test, config, ...), its language, its CODEOWNERS owners, the test files " +
+        "covering it (or, for a test, the sources it covers), and its sibling files in the same " +
+        "directory. The result also carries the index's own sha, age in hours, and coverage, so " +
+        "you can tell how current it is. `known: false` means the path is NOT IN THE INDEX — it " +
+        "does not mean the file does not exist: a file this pull request adds is never indexed, " +
+        "and an index whose coverage says truncated is missing files outright. No file contents " +
+        "are returned; use get_file for those.",
+      inputSchema: z.strictObject({ path: repositoryPathSchema }),
+      async execute({ path }) {
+        if (index === undefined) {
+          return truncate(JSON.stringify({ index: ABSENT_INDEX }, null, 2));
+        }
+        const [status, description] = await Promise.all([
+          index.status(),
+          index.describeArea(path),
+        ]);
+        return truncate(
+          JSON.stringify(
+            {
+              index: {
+                sha: status.sha,
+                ageHours: ageHours(status.builtAt),
+                coverage: status.coverage,
+              },
+              ...description,
+            },
+            null,
+            2,
+          ),
         );
       },
     }),

@@ -137,6 +137,12 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
       return contents;
     },
 
+    // The fixture's head tree is the whole repository the eval knows about.
+    async listTree(request): Promise<{ paths: string[]; truncated: boolean }> {
+      record("listTree", request.ref);
+      return { paths: [...fixture.headFiles.keys()].sort(), truncated: false };
+    },
+
     async searchCode(request): Promise<CodeSearchResult> {
       const { owner, repo } = fixture.context;
       if (request.owner !== owner || request.repo !== repo) {

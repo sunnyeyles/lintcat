@@ -66,6 +66,17 @@ const fileContentsResponse = {
   sha: "def456",
 };
 
+/** A git.getTree response: blobs out of order, plus a tree entry to drop. */
+const treeListResponse = {
+  sha: headSha,
+  truncated: false,
+  tree: [
+    { path: "src/sessions.ts", type: "blob", mode: "100644", sha: "b1" },
+    { path: "src", type: "tree", mode: "040000", sha: "t1" },
+    { path: "README.md", type: "blob", mode: "100644", sha: "b2" },
+  ],
+};
+
 /** A search.code response with one in-repo match and one foreign match. */
 const codeSearchResponse = {
   total_count: 2,
@@ -164,6 +175,7 @@ interface StubOptions {
   commitListData?: unknown;
   commitData?: unknown;
   treeData?: unknown;
+  treeListData?: unknown;
   newCommitData?: unknown;
   graphqlPages?: unknown[];
   /** Refs that exist, keyed as git.getRef takes them ("heads/main"). */
@@ -244,6 +256,11 @@ function makeOctokit(options: StubOptions = {}) {
         ),
       },
       git: {
+        getTree: vi.fn(
+          async (_params: Parameters<OctokitLike["rest"]["git"]["getTree"]>[0]) => ({
+            data: options.treeListData ?? treeListResponse,
+          }),
+        ),
         getRef: vi.fn(
           async (params: Parameters<OctokitLike["rest"]["git"]["getRef"]>[0]) => {
             const sha = refShas[params.ref];
@@ -606,6 +623,43 @@ describe("listCommitFiles", () => {
         sha: "aaa111",
       }),
     ).resolves.toEqual([]);
+  });
+});
+
+describe("listTree", () => {
+  it("returns the ref's blob paths, sorted, without tree entries", async () => {
+    const { octokit, client } = makeClient();
+
+    const tree = await client.listTree({
+      owner: "octo-org",
+      repo: "example-service",
+      ref: headSha,
+    });
+
+    expect(octokit.rest.git.getTree).toHaveBeenCalledExactlyOnceWith({
+      owner: "octo-org",
+      repo: "example-service",
+      tree_sha: headSha,
+      recursive: "1",
+    });
+    expect(tree).toEqual({
+      paths: ["README.md", "src/sessions.ts"],
+      truncated: false,
+    });
+  });
+
+  it("reports a tree GitHub cut short", async () => {
+    const { client } = makeClient({
+      treeListData: { ...treeListResponse, truncated: true },
+    });
+
+    await expect(
+      client.listTree({
+        owner: "octo-org",
+        repo: "example-service",
+        ref: headSha,
+      }),
+    ).resolves.toMatchObject({ truncated: true });
   });
 });
 

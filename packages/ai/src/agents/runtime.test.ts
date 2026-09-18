@@ -3,6 +3,10 @@
  * parsing, failure semantics — exercised through the Security agent.
  */
 import { createCapturingLogger } from "@pr-review/logging";
+import {
+  renderRepositoryIndexBlock,
+  type RepositoryIndex,
+} from "@pr-review/index";
 import { describe, expect, it } from "vitest";
 
 import type { ManagedPrompts } from "../prompts.js";
@@ -104,9 +108,44 @@ const finding = {
 
 const finalJson = JSON.stringify({ findings: [finding] });
 
+/** Hand-written: only the two methods the index read seam exposes. */
+const index: RepositoryIndex = {
+  status: async () => ({
+    sha: "1111111111111111111111111111111111111111",
+    builtAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    coverage: {
+      files: 120,
+      truncated: false,
+      languages: { typescript: 120 },
+      manifests: ["pnpm-workspace"],
+    },
+  }),
+  describeArea: async (path) => ({
+    path,
+    known: true,
+    package: {
+      name: "@octo/example-service",
+      root: "",
+      entryPoints: ["src/index.ts"],
+      dependsOn: [],
+    },
+    role: "source",
+    language: "typescript",
+    owners: ["@octo-org/platform"],
+    tests: ["src/sessions.test.ts"],
+    covers: [],
+    siblings: ["src/index.ts"],
+    siblingsTotal: 2,
+  }),
+};
+
 function makeAgent(
   responses: ScriptedResponse[],
-  options: { maxTurns?: number; systemPrompts?: ManagedPrompts } = {},
+  options: {
+    maxTurns?: number;
+    systemPrompts?: ManagedPrompts;
+    index?: RepositoryIndex;
+  } = {},
 ) {
   const { model, doGenerate: create, calls } = makeModel(responses);
   const github = makeGithub();
@@ -119,6 +158,7 @@ function makeAgent(
     ...(options.systemPrompts !== undefined
       ? { systemPrompts: options.systemPrompts }
       : {}),
+    ...(options.index !== undefined ? { index: options.index } : {}),
   });
   return { agent, create, calls: calls as unknown as Call[], github, entries };
 }
@@ -153,7 +193,7 @@ describe("the Security agent", () => {
     expect(opening).toContain("user.isAdmin = true");
   });
 
-  it("exposes exactly the eight read-only review tools to the model", async () => {
+  it("exposes exactly the nine read-only review tools to the model", async () => {
     const { agent, calls } = makeAgent([
       message([textBlock(finalJson)], "end_turn"),
     ]);
@@ -161,6 +201,33 @@ describe("the Security agent", () => {
     await agent.run(context);
 
     expect(toolNamesOf(calls[0])).toEqual(REVIEW_TOOL_NAMES);
+  });
+
+  it("appends the repository index block after the diff", async () => {
+    const { agent, calls } = makeAgent(
+      [message([textBlock(finalJson)], "end_turn")],
+      { index },
+    );
+
+    await agent.run(context);
+
+    const block = await renderRepositoryIndexBlock(index, ["src/sessions.ts"]);
+    expect(block).not.toBe("");
+    expect(openingOf(calls[0])).toContain(`</diff>\n\n${block}`);
+  });
+
+  it("appends the absent block when the review has no index", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run(context);
+
+    const block = await renderRepositoryIndexBlock(undefined, [
+      "src/sessions.ts",
+    ]);
+    expect(block).not.toBe("");
+    expect(openingOf(calls[0])).toContain(`</diff>\n\n${block}`);
   });
 
   it("hardens the system prompt against prompt injection", async () => {

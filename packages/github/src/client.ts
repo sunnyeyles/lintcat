@@ -35,6 +35,14 @@ export interface FileContentsRequest {
   ref: string;
 }
 
+/** A request for every file path at one commit or ref. */
+export interface TreeRequest {
+  owner: string;
+  repo: string;
+  /** Commit SHA (or ref) whose tree is listed. */
+  ref: string;
+}
+
 /** A code search request; always scoped to the single named repository. */
 export interface CodeSearchRequest {
   owner: string;
@@ -219,6 +227,8 @@ export interface GithubInstallationClient {
   getDiff(ref: PullRequestRef): Promise<string>;
   /** Reads one file's decoded contents at a specific SHA. Read-only. */
   getFileContents(request: FileContentsRequest): Promise<string>;
+  /** Every blob path at one ref, sorted; `truncated` when GitHub cut the tree short. */
+  listTree(request: TreeRequest): Promise<{ paths: string[]; truncated: boolean }>;
   /** Searches code within the single named repository. Read-only. */
   searchCode(request: CodeSearchRequest): Promise<CodeSearchResult>;
   /** Default-branch commits touching one path, newest first; an unmerged addition has none. */

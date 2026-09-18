@@ -15,6 +15,7 @@
     "@langfuse/client": "^5.11.0",
     "@langfuse/tracing": "^5.11.0",
     "@pr-review/github": "workspace:*",
+    "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",
     "@pr-review/schemas": "workspace:*",
     "ai": "^7.0.93",

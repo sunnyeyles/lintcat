@@ -171,6 +171,9 @@ importers:
       '@pr-review/github':
         specifier: workspace:*
         version: link:../github
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../logging
@@ -199,6 +202,9 @@ importers:
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)

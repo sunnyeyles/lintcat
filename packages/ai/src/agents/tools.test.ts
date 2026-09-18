@@ -1,5 +1,10 @@
+import type {
+  AreaDescription,
+  IndexStatus,
+  RepositoryIndex,
+} from "@pr-review/index";
 import type { Tool, ToolSet } from "ai";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
 
 import { createReviewTools } from "./tools.js";
@@ -22,6 +27,45 @@ const scope = {
   ],
 };
 
+const builtAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+
+const status: IndexStatus = {
+  sha: "1111111111111111111111111111111111111111",
+  builtAt,
+  coverage: {
+    files: 120,
+    truncated: false,
+    languages: { typescript: 118, json: 2 },
+    manifests: ["pnpm-workspace"],
+  },
+};
+
+const described: AreaDescription = {
+  path: "src/sessions.ts",
+  known: true,
+  package: {
+    name: "@octo/example-service",
+    root: "",
+    entryPoints: ["src/index.ts"],
+    dependsOn: [],
+  },
+  role: "source",
+  language: "typescript",
+  owners: ["@octo-org/platform"],
+  tests: ["src/sessions.test.ts"],
+  covers: [],
+  siblings: ["src/index.ts"],
+  siblingsTotal: 2,
+};
+
+/** Hand-written, not the real index: only the read seam the tools use. */
+function makeIndex(description: AreaDescription = described): RepositoryIndex {
+  return {
+    status: async () => status,
+    describeArea: async () => description,
+  };
+}
+
 /** The SDK stores the Zod schema we passed, so tests can parse against it. */
 function schemaOf(tools: ToolSet, name: string): z.ZodType {
   return tools[name]?.inputSchema as unknown as z.ZodType;
@@ -42,10 +86,16 @@ function run(tools: ToolSet, name: string, input: unknown): Promise<unknown> {
 }
 
 describe("createReviewTools", () => {
-  it("exposes exactly the eight read-only tools from the spec", () => {
+  it("exposes exactly the nine read-only tools from the spec", () => {
     expect(Object.keys(createReviewTools(makeGithub(), scope)).sort()).toEqual(
       REVIEW_TOOL_NAMES,
     );
+  });
+
+  it("exposes the same nine tools when an index is bound", () => {
+    expect(
+      Object.keys(createReviewTools(makeGithub(), scope, makeIndex())).sort(),
+    ).toEqual(REVIEW_TOOL_NAMES);
   });
 
   it("describes every tool it exposes", () => {
@@ -62,6 +112,7 @@ describe("createReviewTools", () => {
     ["get_diff", "path"],
     ["find_importers", "path"],
     ["find_co_changed_files", "path"],
+    ["describe_area", "path"],
   ])("describes %s's %s parameter", (name, parameter) => {
     const tools = createReviewTools(makeGithub(), scope);
     const shape = (
@@ -427,6 +478,75 @@ describe("review tool execution", () => {
     );
   });
 
+  it("answers describe_area from the index, with the index's own status", async () => {
+    const index = makeIndex();
+    const describeArea = vi.spyOn(index, "describeArea");
+
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, index),
+      "describe_area",
+      { path: "src/sessions.ts" },
+    )) as string;
+
+    expect(describeArea).toHaveBeenCalledExactlyOnceWith("src/sessions.ts");
+    expect(JSON.parse(result)).toEqual({
+      index: { sha: status.sha, ageHours: 3, coverage: status.coverage },
+      ...described,
+    });
+  });
+
+  it("reports a path the index does not know without claiming it is missing", async () => {
+    const unknown: AreaDescription = {
+      path: "src/added-by-this-pr.ts",
+      known: false,
+      package: null,
+      role: null,
+      language: null,
+      owners: [],
+      tests: [],
+      covers: [],
+      siblings: [],
+      siblingsTotal: 0,
+    };
+
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, makeIndex(unknown)),
+      "describe_area",
+      { path: "src/added-by-this-pr.ts" },
+    )) as string;
+
+    expect(JSON.parse(result)).toMatchObject({ known: false });
+  });
+
+  it("answers describe_area in absent mode when there is no index", async () => {
+    const result = (await run(
+      createReviewTools(makeGithub(), scope),
+      "describe_area",
+      { path: "src/sessions.ts" },
+    )) as string;
+
+    expect(JSON.parse(result)).toEqual({
+      index: {
+        status: "absent",
+        reason: "no repository index for this review",
+      },
+    });
+  });
+
+  it("reaches no github call for describe_area in either mode", async () => {
+    const github = makeGithub();
+
+    await run(createReviewTools(github, scope), "describe_area", {
+      path: "src/sessions.ts",
+    });
+    await run(createReviewTools(github, scope, makeIndex()), "describe_area", {
+      path: "src/sessions.ts",
+    });
+
+    expect(github.getFileContents).not.toHaveBeenCalled();
+    expect(github.searchCode).not.toHaveBeenCalled();
+  });
+
   it("truncates oversized tool results", async () => {
     const huge = { ...scope, diff: "x".repeat(200_000) };
 
@@ -480,6 +600,15 @@ describe("review tool input schemas", () => {
     expect(schemaOf(tools, "search_repository").safeParse(input).success).toBe(
       false,
     );
+  });
+
+  it.each([
+    ["path traversal", { path: "../../secrets/config.yml" }],
+    ["absolute path", { path: "/etc/passwd" }],
+    ["extra properties", { path: "src/sessions.ts", depth: 2 }],
+  ])("rejects describe_area input with %s", (_label, input) => {
+    const tools = createReviewTools(makeGithub(), scope, makeIndex());
+    expect(schemaOf(tools, "describe_area").safeParse(input).success).toBe(false);
   });
 
   it("rejects unexpected properties on a no-input tool", () => {

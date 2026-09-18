@@ -22,6 +22,7 @@ import {
   type PullRequestRef,
   type PullRequestReview,
   type ReviewThread,
+  type TreeRequest,
   type WriteFileRequest,
 } from "./client.js";
 import { httpStatus } from "./errors.js";
@@ -100,6 +101,12 @@ export interface OctokitLike {
       }): Promise<{ data: unknown }>;
     };
     git: {
+      getTree(params: {
+        owner: string;
+        repo: string;
+        tree_sha: string;
+        recursive: string;
+      }): Promise<{ data: unknown }>;
       getRef(params: {
         owner: string;
         repo: string;
@@ -270,6 +277,12 @@ const commitMessageSchema = z.object({
 /** An empty commit (a merge with no conflicts) carries no files array. */
 const commitFilesSchema = z.object({
   files: z.array(z.object({ filename: z.string() })).optional(),
+});
+
+/** A recursive tree; only blobs are files, and GitHub cuts a huge tree short. */
+const treeSchema = z.object({
+  truncated: z.boolean(),
+  tree: z.array(z.object({ path: z.string(), type: z.string() })),
 });
 
 const codeSearchSchema = z.object({
@@ -457,6 +470,23 @@ export function createInstallationClient(
         );
       }
       return Buffer.from(data.content, "base64").toString("utf8");
+    },
+
+    async listTree(
+      request: TreeRequest,
+    ): Promise<{ paths: string[]; truncated: boolean }> {
+      const response = await octokit.rest.git.getTree({
+        owner: request.owner,
+        repo: request.repo,
+        tree_sha: request.ref,
+        recursive: "1",
+      });
+      const data = treeSchema.parse(response.data);
+      const paths = data.tree
+        .filter((entry) => entry.type === "blob")
+        .map((entry) => entry.path)
+        .sort();
+      return { paths, truncated: data.truncated };
     },
 
     async searchCode(request: CodeSearchRequest): Promise<CodeSearchResult> {

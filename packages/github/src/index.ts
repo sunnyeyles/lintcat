@@ -24,5 +24,6 @@ export {
   type PullRequestReview,
   type ReviewComment,
   type ReviewThread,
+  type TreeRequest,
   type WriteFileRequest,
 } from "./client.js";

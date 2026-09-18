@@ -86,6 +86,7 @@ function makeClient() {
     listChangedFiles: vi.fn(async (_ref: PullRequestRef) => changedFiles),
     getDiff: vi.fn(async (_ref: PullRequestRef) => diff),
     getFileContents: vi.fn(async () => "export const sessions = [];\n"),
+    listTree: vi.fn(async () => ({ paths: [], truncated: false })),
     searchCode: vi.fn(async () => ({
       matches: [],
       totalCount: 0,

@@ -54,6 +54,7 @@ export function repositoryAgent(category: string): AgentDefinition {
 
 /** Every tool createReviewTools exposes, sorted. */
 export const REVIEW_TOOL_NAMES = [
+  "describe_area",
   "find_co_changed_files",
   "find_importers",
   "get_base_file",
@@ -204,6 +205,10 @@ export function makeGithub() {
     getFileContents: vi.fn(
       async (_request: FileContentsRequest) => "export const sessions = [];\n",
     ),
+    listTree: vi.fn(async () => ({
+      paths: ["src/sessions.ts", "docs/sessions.md"],
+      truncated: false,
+    })),
     searchCode: vi.fn(async () => ({
       matches: [
         {
