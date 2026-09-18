@@ -19,8 +19,10 @@ import {
   errorMessage,
   type StructuredLogger,
 } from "@pr-review/logging";
+import type { ReviewFinding } from "@pr-review/schemas";
 
 import { buildDiffLineIndex } from "./diff-lines.js";
+import { countLabel } from "./finding-format.js";
 import {
   createCheckRunPublisher,
   createFixPublisher,
@@ -37,14 +39,20 @@ import {
   readMemory,
   type MemoryStore,
 } from "./memory.js";
-import { renderNoAgentMatched } from "./render-check-run.js";
+import { renderCheckRun, renderNoAgentMatched } from "./render-check-run.js";
 import { verifyPatches, type PatchSummary } from "./validate-patches.js";
-import { postedFindingKeys } from "./render-review.js";
+import {
+  findingKey,
+  parsePostedFinding,
+  postedFindingKeys,
+  type PostedFinding,
+} from "./render-review.js";
 import {
   skippedSynthesis,
   type ReviewPipelineResult,
 } from "./review-pipeline.js";
 import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+import { resolveReviewScope, wholePullRequest } from "./review-scope.js";
 
 interface ReviewPullRequestDeps {
   /** Authenticated GitHub client for this repository. */
@@ -72,6 +80,7 @@ interface ReviewPullRequestDeps {
   memoryStore?: MemoryStore | undefined;
   /** Injectable clock, so a test can pin what counts as a fresh signal. */
   now?: (() => Date) | undefined;
+  incremental?: boolean | undefined;
 }
 
 /** The comments already on the pull request; none if they cannot be read. */
@@ -87,6 +96,26 @@ async function listPostedComments(
       ...reviewCorrelation(target),
       reason: errorMessage(error),
       fallback: "publishing every finding, which may repeat an earlier one",
+    });
+    return [];
+  }
+}
+
+async function openEarlierFindings(
+  client: GithubInstallationClient,
+  target: ReviewTarget,
+  logger: StructuredLogger,
+): Promise<PostedFinding[]> {
+  try {
+    const threads = await client.listReviewThreads(target);
+    return threads
+      .filter((thread) => !thread.isResolved && !thread.isOutdated)
+      .flatMap((thread) => parsePostedFinding(thread.body) ?? []);
+  } catch (error) {
+    logger.error("review.carried_forward.unreadable", {
+      ...reviewCorrelation(target),
+      reason: errorMessage(error),
+      fallback: "publishing only this run's findings",
     });
     return [];
   }
@@ -184,6 +213,22 @@ function logSynthesisOutcome(
   });
 }
 
+function stillOpen(
+  carriedForward: readonly PostedFinding[],
+  findings: readonly ReviewFinding[],
+): PostedFinding[] {
+  const reported = new Set(findings.map(findingKey));
+  return carriedForward.filter((posted) => !reported.has(posted.key));
+}
+
+function incrementalNote(sinceSha: string, fileCount: number): string {
+  return `> **Note:** This review read the ${countLabel(fileCount, "file")} changed since \`${sinceSha.slice(0, 7)}\`; earlier commits were reviewed then.`;
+}
+
+function noNewChangesNote(sinceSha: string): string {
+  return `> **Note:** No file this pull request changed has moved since \`${sinceSha.slice(0, 7)}\`, so no agent ran.`;
+}
+
 /** One review's outcome, plus how the patches its agents proposed fared. */
 export interface ReviewOutcome extends ReviewPipelineResult {
   patches: PatchSummary;
@@ -214,6 +259,7 @@ export async function reviewPullRequest(
     logger = createConsoleLogger(),
     memoryStore,
     now = () => new Date(),
+    incremental = false,
   }: ReviewPullRequestDeps,
 ): Promise<ReviewOutcome> {
   const fields = reviewCorrelation(target);
@@ -222,12 +268,44 @@ export async function reviewPullRequest(
     client.listChangedFiles(target),
     client.getDiff(target),
   ]);
-  const filenames = changedFiles.map((file) => file.filename);
   logger.info("review.loaded", {
     ...fields,
     changedFileCount: changedFiles.length,
     diffLength: diff.length,
   });
+
+  const scope = await resolveReviewScope(target, {
+    client,
+    incremental,
+    diff,
+    changedFiles,
+    logger,
+  });
+  const whole = wholePullRequest(scope);
+  const publish = publishReview ?? createCheckRunPublisher(client);
+  // Agents see the scope; publishing sees the whole PR, so comments anchor anywhere.
+  const filenames = scope.changedFiles.map((file) => file.filename);
+  const carriedForward =
+    scope.kind === "incremental"
+      ? await openEarlierFindings(client, target, logger)
+      : [];
+
+  if (scope.kind === "incremental" && scope.changedFiles.length === 0) {
+    logger.info("review.incremental.no_changes", {
+      ...fields,
+      sinceSha: scope.sinceSha,
+      carriedForwardCount: carriedForward.length,
+    });
+    await publish(
+      target,
+      renderCheckRun([], [], {
+        annotate: false,
+        carriedForward,
+        scopeNote: noNewChangesNote(scope.sinceSha),
+      }),
+    );
+    return unreviewed();
+  }
 
   const { agents: hinted, synthesisHints } = await attachRepositoryHints(
     agents,
@@ -248,14 +326,16 @@ export async function reviewPullRequest(
     });
   }
 
-  const publish = publishReview ?? createCheckRunPublisher(client);
   if (active.length === 0) {
     logger.info("review.no_agents_matched", {
       ...fields,
       changedFileCount: changedFiles.length,
       skippedAgents: skippedNames,
     });
-    await publish(target, renderNoAgentMatched(skipped, filenames));
+    await publish(
+      target,
+      renderNoAgentMatched(skipped, filenames, carriedForward),
+    );
     return unreviewed();
   }
 
@@ -266,8 +346,12 @@ export async function reviewPullRequest(
       owner: target.owner,
       repo: target.repo,
       pullRequest,
-      changedFiles,
-      diff,
+      changedFiles: scope.changedFiles,
+      diff: scope.diff,
+      incremental:
+        scope.kind === "incremental"
+          ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
+          : undefined,
     },
     active,
     synthesisHints,
@@ -282,7 +366,7 @@ export async function reviewPullRequest(
 
   // Still inside the AI boundary: a patch is proved against the head commit
   // before any of it can be committed or offered.
-  const verified = await verifyPatches(review.findings, changedFiles, {
+  const verified = await verifyPatches(review.findings, whole.changedFiles, {
     client,
     owner: target.owner,
     repo: target.repo,
@@ -301,7 +385,7 @@ export async function reviewPullRequest(
       findings: verified.findings,
       agentFailures: review.agentFailures,
       skippedAgents: skipped,
-      diffLines: buildDiffLineIndex(changedFiles),
+      diffLines: buildDiffLineIndex(whole.changedFiles),
       patches: {
         branch: pullRequest.headRef,
         files: verified.files,
@@ -310,6 +394,11 @@ export async function reviewPullRequest(
       alreadyPosted: postedFindingKeys(
         await listPostedComments(client, target, logger),
       ),
+      carriedForward: stillOpen(carriedForward, verified.findings),
+      scopeNote:
+        scope.kind === "incremental"
+          ? incrementalNote(scope.sinceSha, scope.changedFiles.length)
+          : undefined,
     },
     {
       publishCheckRun: publish,

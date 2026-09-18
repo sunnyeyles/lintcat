@@ -1140,6 +1140,49 @@ describe("actionEnvironment", () => {
   });
 });
 
+describe("the incremental input", () => {
+  function scope(entries: Harness["entries"]): unknown {
+    return entries.find((entry) => entry["event"] === "review.scope_resolved")?.[
+      "reason"
+    ];
+  }
+
+  it("reads the whole pull request when the input is absent", async () => {
+    const { environment, client } = harness({ ...reviewEnv });
+
+    await runAction(environment);
+
+    expect(client.listPullRequestCommitShas).not.toHaveBeenCalled();
+  });
+
+  it.each(["false", "yes", "TRUE", "1"])(
+    "reads the whole pull request for the value %s",
+    async (value) => {
+      const { environment, client } = harness({
+        ...reviewEnv,
+        INPUT_INCREMENTAL: value,
+      });
+
+      await runAction(environment);
+
+      expect(client.listPullRequestCommitShas).not.toHaveBeenCalled();
+    },
+  );
+
+  it("looks for a baseline when the input is true", async () => {
+    const { environment, entries, client } = harness({
+      ...reviewEnv,
+      INPUT_INCREMENTAL: "true",
+    });
+
+    await runAction(environment);
+
+    expect(client.listPullRequestCommitShas).toHaveBeenCalledTimes(1);
+    // The stub pull request has only its head commit.
+    expect(scope(entries)).toBe("no_baseline");
+  });
+});
+
 describe("the fix input", () => {
   /** Whether the run decided it may commit fixes. */
   function applyFixes(entries: Harness["entries"]): unknown {

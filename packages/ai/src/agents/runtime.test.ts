@@ -153,6 +153,38 @@ describe("the Security agent", () => {
     expect(opening).toContain("user.isAdmin = true");
   });
 
+  it("says the diff is narrowed, and where the rest of the pull request is", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run({
+      ...context,
+      diff: "@@ -2 +2 @@\n+const limit = 0;\n",
+      incremental: {
+        sinceSha: "old111",
+        diff: context.diff,
+        changedFiles: context.changedFiles,
+      },
+    });
+
+    const opening = openingOf(calls[0]);
+    expect(opening).toContain('<review_scope since="old111">');
+    expect(opening).toContain("+const limit = 0;");
+    // The whole pull request stays reachable, so it is not in the message.
+    expect(opening).not.toContain("user.isAdmin = true");
+  });
+
+  it("says nothing about scope when the whole pull request is under review", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run(context);
+
+    expect(openingOf(calls[0])).not.toContain("<review_scope");
+  });
+
   it("exposes exactly the eight read-only review tools to the model", async () => {
     const { agent, calls } = makeAgent([
       message([textBlock(finalJson)], "end_turn"),

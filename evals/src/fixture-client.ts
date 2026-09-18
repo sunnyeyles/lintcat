@@ -5,8 +5,10 @@
 import type {
   ChangedFile,
   CheckRun,
+  CheckRunSummary,
   CodeSearchMatch,
   CodeSearchResult,
+  CommitComparison,
   CommitMessageRequest,
   CommitRef,
   CreateCheckRunInput,
@@ -187,6 +189,22 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
     async listReviewThreads(ref): Promise<ReviewThread[]> {
       checkRef(ref);
       return [];
+    },
+
+    async listPullRequestCommitShas(ref): Promise<string[]> {
+      checkRef(ref);
+      return [fixture.pullRequest.headSha];
+    },
+
+    // A fixture has one commit, so no earlier review.
+    async listCheckRuns(): Promise<CheckRunSummary[]> {
+      return [];
+    },
+
+    async compareCommits(): Promise<CommitComparison> {
+      throw new FixtureNotFoundError(
+        `fixture ${fixture.name} has a single commit, so there is nothing to compare`,
+      );
     },
 
     async createCheckRun(input: CreateCheckRunInput): Promise<CheckRun> {
