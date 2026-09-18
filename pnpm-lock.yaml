@@ -216,6 +216,18 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/index:
+    dependencies:
+      '@pr-review/github':
+        specifier: workspace:*
+        version: link:../github
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
   packages/logging: {}
 
   packages/reviewer:
