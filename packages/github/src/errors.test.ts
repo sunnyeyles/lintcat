@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { httpStatus, isPermissionError } from "./errors.js";
+import { httpStatus, isPermissionError } from "#src/errors";
 
 /** An Octokit RequestError carries the HTTP status on `.status`. */
 function requestError(status: number, message = "request failed"): Error {

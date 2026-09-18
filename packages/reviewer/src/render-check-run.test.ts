@@ -5,7 +5,7 @@ import {
   MAX_ANNOTATIONS_PER_REQUEST,
   renderCheckRun,
   renderNoAgentMatched,
-} from "./render-check-run.js";
+} from "#src/render-check-run";
 
 function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   return {

@@ -12,9 +12,9 @@ import {
   type FindingOutcome,
   type FindingSignal,
   type MemoryStore,
-} from "./memory.js";
-import { parsePostedFinding } from "./render-review.js";
-import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+} from "#src/memory";
+import { parsePostedFinding } from "#src/render-review";
+import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
 export interface LearnFromMergeDeps {
   client: Pick<GithubInstallationClient, "listReviewThreads">;

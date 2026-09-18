@@ -12,12 +12,12 @@ import {
   repositoryAgents,
   textBlock,
   validRemotePrompt,
-} from "./agent-test-support.js";
+} from "#src/agent-test-support";
 import {
   buildSynthesisSystemPrompt,
   createSynthesiser,
-} from "./agents/synthesiser.js";
-import { inCodePrompts, loadManagedPrompts, type LangfusePromptClient } from "./prompts.js";
+} from "#src/agents/synthesiser";
+import { inCodePrompts, loadManagedPrompts, type LangfusePromptClient } from "#src/prompts";
 
 const configuredAgents = repositoryAgents();
 const SYNTHESIS_SYSTEM_PROMPT = buildSynthesisSystemPrompt(configuredAgents);

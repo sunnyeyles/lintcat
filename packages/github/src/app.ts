@@ -23,8 +23,8 @@ import {
   type PullRequestReview,
   type ReviewThread,
   type WriteFileRequest,
-} from "./client.js";
-import { httpStatus } from "./errors.js";
+} from "#src/client";
+import { httpStatus } from "#src/errors";
 
 /**
  * The slice of Octokit this package consumes. Octokit satisfies it

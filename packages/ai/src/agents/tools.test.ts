@@ -2,7 +2,7 @@ import type { Tool, ToolSet } from "ai";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
-import { createReviewTools } from "./tools.js";
+import { createReviewTools } from "#src/agents/tools";
 import {
   REVIEW_TOOL_NAMES,
   baseSha,
@@ -11,7 +11,7 @@ import {
   headSha,
   makeGithub,
   pullRequest,
-} from "../agent-test-support.js";
+} from "#src/agent-test-support";
 
 /** The shared context plus one changed file that carries no patch. */
 const scope = {

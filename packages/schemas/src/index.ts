@@ -2,7 +2,7 @@
 export {
   isLearnPullRequestAction,
   isSupportedPullRequestAction,
-} from "./pull-request-event.js";
+} from "#src/pull-request-event";
 export {
   categoryLabel,
   findingCategorySchema,
@@ -12,10 +12,10 @@ export {
   type FindingCategory,
   type FindingPatch,
   type ReviewFinding,
-} from "./review-finding.js";
+} from "#src/review-finding";
 export {
   memoryShapeSchema,
   reviewMemorySchema,
   type MemoryShape,
   type ReviewMemory,
-} from "./review-memory.js";
+} from "#src/review-memory";

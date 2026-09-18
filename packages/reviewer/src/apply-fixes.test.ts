@@ -5,8 +5,8 @@ import type {
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it, vi } from "vitest";
 
-import { FIX_COMMIT_MARKER, applyFixes, isFixCommit } from "./apply-fixes.js";
-import type { ReviewTarget } from "./review-target.js";
+import { FIX_COMMIT_MARKER, applyFixes, isFixCommit } from "#src/apply-fixes";
+import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
   owner: "octo-org",

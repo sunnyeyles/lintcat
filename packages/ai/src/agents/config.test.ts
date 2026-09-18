@@ -4,22 +4,22 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { repositoryAgent, repositoryAgents } from "../agent-test-support.js";
-import { resolveAgentDefinitions } from "./agent-set.js";
-import { buildSynthesisSystemPrompt } from "./synthesiser.js";
+import { repositoryAgent, repositoryAgents } from "#src/agent-test-support";
+import { resolveAgentDefinitions } from "#src/agents/agent-set";
+import { buildSynthesisSystemPrompt } from "#src/agents/synthesiser";
 import {
   DEFAULT_AGENT_CONFIG_PATH,
   AgentConfigError,
   loadAgentDefinitions,
   parseAgentConfig,
-} from "./config.js";
+} from "#src/agents/config";
 import {
   ALL_AGENTS,
   buildReviewSystemPrompt,
   agentPromptKey,
-} from "./definition.js";
-import { BUILT_IN_AGENT_NAMES } from "./specialists/index.js";
-import { inCodePrompts } from "../prompts.js";
+} from "#src/agents/definition";
+import { BUILT_IN_AGENT_NAMES } from "#src/agents/specialists/index";
+import { inCodePrompts } from "#src/prompts";
 
 const PATH = "config.yml";
 

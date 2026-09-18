@@ -3,9 +3,9 @@ import { createCapturingLogger } from "@pr-review/logging";
 import type { ReviewMemory } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
-import { learnFromMergedPullRequest } from "./learn-from-merge.js";
-import { type MemoryStore } from "./memory.js";
-import type { ReviewTarget } from "./review-target.js";
+import { learnFromMergedPullRequest } from "#src/learn-from-merge";
+import { type MemoryStore } from "#src/memory";
+import type { ReviewTarget } from "#src/review-target";
 
 const NOW = new Date("2026-09-13T12:00:00.000Z");
 

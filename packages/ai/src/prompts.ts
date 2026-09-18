@@ -14,7 +14,7 @@ import {
   buildReviewSystemPrompt,
   agentPromptKey,
   type AgentDefinition,
-} from "./agents/definition.js";
+} from "#src/agents/definition";
 
 /** Where a resolved prompt came from. */
 type PromptSource = "langfuse" | "fallback";

@@ -66,6 +66,12 @@ Hard cap: 2 lines. One is better. None is best. Enforced by
 `.claude/hooks/comment-length.sh`, which rejects any longer comment block you
 add. See `.claude/rules/comments.md`.
 
+## Imports
+
+No `.js` suffixes. Inside a package import with `#src/foo` (package.json
+`imports`); `packages/db` uses extensionless relative paths, and `apps/web`
+uses `@/`.
+
 ## Commands
 
 ```bash

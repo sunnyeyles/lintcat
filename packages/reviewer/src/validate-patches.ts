@@ -5,8 +5,8 @@
 import type { ChangedFile, GithubInstallationClient } from "@pr-review/github";
 import type { FindingPatch, ReviewFinding } from "@pr-review/schemas";
 
-import { buildChangedLineIndex } from "./diff-lines.js";
-import { compareFindingStrength } from "./validate-findings.js";
+import { buildChangedLineIndex } from "#src/diff-lines";
+import { compareFindingStrength } from "#src/validate-findings";
 
 /** At most this many files may be edited by one review. */
 export const MAX_PATCHED_FILES = 5;

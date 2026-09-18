@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reviewFindingSchema, type ReviewFinding } from "./index.js";
+import { reviewFindingSchema, type ReviewFinding } from "#src/index";
 
 const validFinding: ReviewFinding = {
   file: "src/auth/session.ts",

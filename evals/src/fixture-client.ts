@@ -22,7 +22,7 @@ import type {
   WriteFileRequest,
 } from "@pr-review/github";
 
-import type { LoadedFixture } from "./fixture.js";
+import type { LoadedFixture } from "#src/fixture";
 
 /** At most this many search matches come back from one query. */
 const MAX_SEARCH_MATCHES = 25;

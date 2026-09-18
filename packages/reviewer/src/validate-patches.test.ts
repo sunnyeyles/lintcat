@@ -6,7 +6,7 @@ import {
   MAX_PATCHED_FILES,
   MAX_PATCHED_LINES,
   verifyPatches,
-} from "./validate-patches.js";
+} from "#src/validate-patches";
 
 const headSha = "f00dcafe";
 

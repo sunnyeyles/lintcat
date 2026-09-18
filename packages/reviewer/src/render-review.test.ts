@@ -7,7 +7,7 @@ import {
   parsePostedFinding,
   postedFindingKeys,
   renderReview,
-} from "./render-review.js";
+} from "#src/render-review";
 
 function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   return {

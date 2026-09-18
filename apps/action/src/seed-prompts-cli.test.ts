@@ -10,7 +10,7 @@ import {
 import {
   repositoryAgentConfigYaml,
   repositoryAgents,
-} from "../../../packages/ai/src/agent-test-support.js";
+} from "@pr-review/ai/agent-test-support";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it, vi } from "vitest";
 
@@ -20,7 +20,7 @@ import {
   main,
   parseSeedArgs,
   requireLangfuseConfig,
-} from "./seed-prompts-cli.js";
+} from "#src/seed-prompts-cli";
 
 const CREDENTIALS = {
   LANGFUSE_PUBLIC_KEY: "pk-test",

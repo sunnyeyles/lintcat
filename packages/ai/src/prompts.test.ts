@@ -5,18 +5,18 @@ import {
   buildReviewSystemPrompt,
   agentPromptKey,
   type AgentDefinition,
-} from "./agents/definition.js";
+} from "#src/agents/definition";
 import {
   repositoryAgent,
   repositoryAgents,
   validRemotePrompt,
-} from "./agent-test-support.js";
+} from "#src/agent-test-support";
 import {
   DEFAULT_PROMPT_LABEL,
   inCodePrompts,
   loadManagedPrompts,
   type LangfusePromptClient,
-} from "./prompts.js";
+} from "#src/prompts";
 
 const configuredAgents = repositoryAgents();
 const SECURITY_FALLBACK = buildReviewSystemPrompt(repositoryAgent("security"));

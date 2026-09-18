@@ -9,9 +9,9 @@ import {
 } from "@pr-review/github";
 import type { StructuredLogger } from "@pr-review/logging";
 
-import { fixCount } from "./finding-format.js";
-import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
-import type { PatchedFile } from "./validate-patches.js";
+import { fixCount } from "#src/finding-format";
+import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { PatchedFile } from "#src/validate-patches";
 
 /** Names this system's own commits, so a later run does not fix its own fix. */
 export const FIX_COMMIT_MARKER = "pr-review-agents: automated fix";

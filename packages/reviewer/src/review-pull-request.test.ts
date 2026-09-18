@@ -24,15 +24,15 @@ import {
 } from "@pr-review/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { MemoryStore } from "./memory.js";
-import type { PublishReview } from "./publish-review.js";
-import { findingMarker } from "./render-review.js";
+import type { MemoryStore } from "#src/memory";
+import type { PublishReview } from "#src/publish-review";
+import { findingMarker } from "#src/render-review";
 import {
   skippedSynthesis,
   type ReviewPipelineResult,
-} from "./review-pipeline.js";
-import { reviewPullRequest } from "./review-pull-request.js";
-import type { ReviewTarget } from "./review-target.js";
+} from "#src/review-pipeline";
+import { reviewPullRequest } from "#src/review-pull-request";
+import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
   owner: "octo-org",

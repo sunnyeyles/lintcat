@@ -5,15 +5,15 @@
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it } from "vitest";
 
-import type { ManagedPrompts } from "../prompts.js";
+import type { ManagedPrompts } from "#src/prompts";
 import {
   buildReviewSystemPrompt,
   withRepositoryHints,
-} from "./definition.js";
+} from "#src/agents/definition";
 import {
   AgentRunError,
   createReviewAgent,
-} from "./runtime.js";
+} from "#src/agents/runtime";
 import {
   REVIEW_TOOL_NAMES,
   context,
@@ -27,7 +27,7 @@ import {
   repositoryAgent,
   textBlock,
   toolUseBlock,
-} from "../agent-test-support.js";
+} from "#src/agent-test-support";
 
 type ScriptedResponse = ReturnType<typeof message>;
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
   owner: "octo-org",

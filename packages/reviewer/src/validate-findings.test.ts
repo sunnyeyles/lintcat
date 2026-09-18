@@ -6,7 +6,7 @@ import {
   CONFIDENCE_THRESHOLD,
   MAX_FINDINGS,
   validateFindings,
-} from "./validate-findings.js";
+} from "#src/validate-findings";
 
 /** src/service.ts has added lines 10, 11, and 12 (line 9 is context). */
 const servicePatch = [

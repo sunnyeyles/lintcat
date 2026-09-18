@@ -5,7 +5,7 @@
 import type { ChangedFile } from "@pr-review/github";
 import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
 
-import { buildChangedLineIndex } from "./diff-lines.js";
+import { buildChangedLineIndex } from "#src/diff-lines";
 
 /** Findings with confidence below this threshold are dropped. */
 export const CONFIDENCE_THRESHOLD = 0.7;

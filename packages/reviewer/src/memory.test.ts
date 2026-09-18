@@ -14,7 +14,7 @@ import {
   SYNTHESIS_HINT_CAP,
   type FindingSignal,
   type MemoryStore,
-} from "./memory.js";
+} from "#src/memory";
 
 const NOW = new Date("2026-09-13T12:00:00.000Z");
 

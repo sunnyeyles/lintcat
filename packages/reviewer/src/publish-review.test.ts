@@ -10,9 +10,9 @@ import type {
 } from "@pr-review/github";
 import { describe, expect, it, vi } from "vitest";
 
-import { createCheckRunPublisher } from "./publish-review.js";
-import type { RenderedCheckRun } from "./render-check-run.js";
-import type { ReviewTarget } from "./review-target.js";
+import { createCheckRunPublisher } from "#src/publish-review";
+import type { RenderedCheckRun } from "#src/render-check-run";
+import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
   owner: "octo-org",

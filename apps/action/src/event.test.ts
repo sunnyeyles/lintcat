@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inspectEvent } from "./event.js";
+import { inspectEvent } from "#src/event";
 
 const headSha = "6dcb09b5b57875f334f61aebed695e2e4193db5e";
 const baseSha = "a3f1c0d9e2b4867501fedcba9876543210abcdef";

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { agentPathsSchema, compilePathFilter } from "./path-filter.js";
+import { agentPathsSchema, compilePathFilter } from "#src/agents/path-filter";
 
 /** The files a pattern list matches, out of one fixed changed-file set. */
 function matched(patterns: string[], files: string[]): string[] {

@@ -5,34 +5,34 @@
 export {
   runReviewPipeline,
   type ReviewPipelineResult,
-} from "./review-pipeline.js";
-export { validateFindings } from "./validate-findings.js";
-export type { RenderedCheckRun } from "./render-check-run.js";
+} from "#src/review-pipeline";
+export { validateFindings } from "#src/validate-findings";
+export type { RenderedCheckRun } from "#src/render-check-run";
 export {
   createCheckRunPublisher,
   createFixPublisher,
   type PublishFixes,
   type PublishReview,
   type PublishReviewComments,
-} from "./publish-review.js";
+} from "#src/publish-review";
 export {
   FIX_COMMIT_MARKER,
   isFixCommit,
   type FixOutcome,
-} from "./apply-fixes.js";
+} from "#src/apply-fixes";
 export {
   verifyPatches,
   type PatchSummary,
   type PatchedFile,
-} from "./validate-patches.js";
+} from "#src/validate-patches";
 export {
   reviewPullRequest,
   type ReviewOutcome,
-} from "./review-pull-request.js";
+} from "#src/review-pull-request";
 export {
   learnFromMergedPullRequest,
   type LearnFromMergeDeps,
-} from "./learn-from-merge.js";
+} from "#src/learn-from-merge";
 export {
   computeHints,
   computeSynthesisHints,
@@ -51,7 +51,7 @@ export {
   type FindingOutcome,
   type FindingSignal,
   type MemoryStore,
-} from "./memory.js";
+} from "#src/memory";
 export {
   categoryMarker,
   findingMarker,
@@ -61,5 +61,5 @@ export {
   type PostedFinding,
   type RenderedReview,
   type ReviewNotes,
-} from "./render-review.js";
-export { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+} from "#src/render-review";
+export { reviewCorrelation, type ReviewTarget } from "#src/review-target";

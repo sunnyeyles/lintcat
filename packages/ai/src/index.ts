@@ -13,26 +13,26 @@ export {
   type LanguageModelConfig,
   type ModelProvider,
   type ReviewModel,
-} from "./model.js";
-export type { ReviewAgent, ReviewContext } from "./agent-contract.js";
-export { emptyTokenUsage, type TokenUsage } from "./usage.js";
-export { createReviewAgent } from "./agents/runtime.js";
+} from "#src/model";
+export type { ReviewAgent, ReviewContext } from "#src/agent-contract";
+export { emptyTokenUsage, type TokenUsage } from "#src/usage";
+export { createReviewAgent } from "#src/agents/runtime";
 export {
   renderRepositoryHints,
   withRepositoryHints,
   type AgentDefinition,
-} from "./agents/definition.js";
+} from "#src/agents/definition";
 export {
   createReviewAgents,
   gateAgentsByPaths,
   resolveAgentDefinitions,
   type SkippedAgent,
-} from "./agents/agent-set.js";
+} from "#src/agents/agent-set";
 export {
   DEFAULT_AGENT_CONFIG_PATH,
   loadAgentDefinitions,
   type ReadOptionalFile,
-} from "./agents/config.js";
+} from "#src/agents/config";
 export {
   SynthesisError,
   createSynthesiser,
@@ -40,7 +40,7 @@ export {
   renderSynthesisHints,
   type Synthesiser,
   type SynthesisHints,
-} from "./agents/synthesiser.js";
+} from "#src/agents/synthesiser";
 export {
   DEFAULT_LANGFUSE_BASE_URL,
   DEFAULT_PROMPT_LABEL,
@@ -50,10 +50,10 @@ export {
   type LangfusePromptClient,
   type LangfusePromptClientConfig,
   type ManagedPrompts,
-} from "./prompts.js";
+} from "#src/prompts";
 export {
   createLangfusePromptWriter,
   seedFailed,
   seedManagedPrompts,
   type LangfusePromptWriter,
-} from "./seed-prompts.js";
+} from "#src/seed-prompts";

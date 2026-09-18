@@ -17,9 +17,9 @@ import {
   pathList,
   skipNotes,
   summarise,
-} from "./finding-format.js";
-import type { AgentFailure } from "./review-pipeline.js";
-import { compareFindingStrength } from "./validate-findings.js";
+} from "#src/finding-format";
+import type { AgentFailure } from "#src/review-pipeline";
+import { compareFindingStrength } from "#src/validate-findings";
 
 /** The GitHub checks API accepts at most 50 annotations per request. */
 export const MAX_ANNOTATIONS_PER_REQUEST = 50;

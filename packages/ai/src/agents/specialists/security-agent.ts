@@ -1,4 +1,4 @@
-import type { AgentDefinition } from "../definition.js";
+import type { AgentDefinition } from "#src/agents/definition";
 
 export const SECURITY_AGENT: AgentDefinition = {
   category: "security",

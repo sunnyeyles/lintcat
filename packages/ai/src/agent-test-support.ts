@@ -18,9 +18,9 @@ import { vi } from "vitest";
 
 import { MockLanguageModelV4 } from "ai/test";
 
-import type { AgentDefinition } from "./agents/definition.js";
-import { parseAgentConfig } from "./agents/config.js";
-import type { ReviewContext } from "./agent-contract.js";
+import type { AgentDefinition } from "#src/agents/definition";
+import { parseAgentConfig } from "#src/agents/config";
+import type { ReviewContext } from "#src/agent-contract";
 
 const REPOSITORY_AGENT_CONFIG = ".github/pr-review-agents.yml";
 

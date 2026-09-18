@@ -20,7 +20,7 @@ import {
   type StructuredLogger,
 } from "@pr-review/logging";
 
-import { buildDiffLineIndex } from "./diff-lines.js";
+import { buildDiffLineIndex } from "#src/diff-lines";
 import {
   createCheckRunPublisher,
   createFixPublisher,
@@ -29,22 +29,22 @@ import {
   type PublishFixes,
   type PublishReview,
   type PublishReviewComments,
-} from "./publish-review.js";
+} from "#src/publish-review";
 import {
   computeHints,
   computeSynthesisHints,
   emptyMemory,
   readMemory,
   type MemoryStore,
-} from "./memory.js";
-import { renderNoAgentMatched } from "./render-check-run.js";
-import { verifyPatches, type PatchSummary } from "./validate-patches.js";
-import { postedFindingKeys } from "./render-review.js";
+} from "#src/memory";
+import { renderNoAgentMatched } from "#src/render-check-run";
+import { verifyPatches, type PatchSummary } from "#src/validate-patches";
+import { postedFindingKeys } from "#src/render-review";
 import {
   skippedSynthesis,
   type ReviewPipelineResult,
-} from "./review-pipeline.js";
-import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+} from "#src/review-pipeline";
+import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
 interface ReviewPullRequestDeps {
   /** Authenticated GitHub client for this repository. */

@@ -1,5 +1,5 @@
-export { httpStatus, isPermissionError } from "./errors.js";
-export { createTokenClient, type GithubTokenConfig } from "./token.js";
+export { httpStatus, isPermissionError } from "#src/errors";
+export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
   type AnnotationLevel,
   type BranchTipRequest,
@@ -25,4 +25,4 @@ export {
   type ReviewComment,
   type ReviewThread,
   type WriteFileRequest,
-} from "./client.js";
+} from "#src/client";

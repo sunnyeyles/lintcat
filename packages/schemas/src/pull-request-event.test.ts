@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   isLearnPullRequestAction,
   isSupportedPullRequestAction,
-} from "./pull-request-event.js";
+} from "#src/pull-request-event";
 
 describe("isSupportedPullRequestAction", () => {
   it.each(["opened", "synchronize", "reopened"])(

@@ -6,7 +6,7 @@ import process from "node:process";
 
 import { ModelProviderError } from "@pr-review/ai";
 
-import { requireModelAccess } from "./model-access.js";
+import { requireModelAccess } from "#src/model-access";
 
 export default function setup(): void {
   try {

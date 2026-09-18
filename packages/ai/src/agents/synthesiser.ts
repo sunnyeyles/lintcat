@@ -4,16 +4,16 @@
  */
 import { startActiveObservation } from "@langfuse/tracing";
 import { generateText } from "ai";
-import { extractAgentOutput } from "./output.js";
-import type { ReviewModel } from "../model.js";
-import { emptyTokenUsage, toTokenUsage, type TokenUsage } from "../usage.js";
+import { extractAgentOutput } from "#src/agents/output";
+import type { ReviewModel } from "#src/model";
+import { emptyTokenUsage, toTokenUsage, type TokenUsage } from "#src/usage";
 import { errorMessage } from "@pr-review/logging";
 import {
   categoryLabel,
   wellFormedFindings,
   type ReviewFinding,
 } from "@pr-review/schemas";
-import type { AgentDefinition } from "./definition.js";
+import type { AgentDefinition } from "#src/agents/definition";
 
 /** A synthesis-level failure (the model broke the output contract). */
 export class SynthesisError extends Error {

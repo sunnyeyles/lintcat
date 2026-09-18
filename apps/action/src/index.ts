@@ -51,13 +51,13 @@ import {
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
-import { inspectEvent } from "./event.js";
+import { inspectEvent } from "#src/event";
 import {
   createLangfuseRuntime,
   type LangfuseRuntime,
   type LangfuseRuntimeConfig,
-} from "./langfuse.js";
-import { createFallbackPublisher } from "./summary.js";
+} from "#src/langfuse";
+import { createFallbackPublisher } from "#src/summary";
 
 /** Everything the entrypoint reads from outside itself; tests pass fakes. */
 export interface ActionEnvironment {

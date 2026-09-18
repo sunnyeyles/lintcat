@@ -2,7 +2,7 @@
  * The evaluation fixtures and what each must produce. The clean fixture
  * separates a reviewer that finds problems from one that invents them.
  */
-import type { FixtureExpectation } from "./expectations.js";
+import type { FixtureExpectation } from "#src/expectations";
 
 /** One fixture and the expectations its review must satisfy. */
 interface EvalCase {

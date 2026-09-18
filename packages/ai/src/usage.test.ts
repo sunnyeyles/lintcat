@@ -4,8 +4,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { TokenUsage } from "./usage.js";
-import { addTokenUsage, emptyTokenUsage, toTokenUsage } from "./usage.js";
+import type { TokenUsage } from "#src/usage";
+import { addTokenUsage, emptyTokenUsage, toTokenUsage } from "#src/usage";
 
 /** A usage block in the shape an adapter returns, cache counters included. */
 function usage(
