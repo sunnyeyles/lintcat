@@ -17,7 +17,8 @@ describe("PERFORMANCE_AGENT", () => {
   });
 
   it("tells the agent to read callers before reporting", () => {
-    expect(PERFORMANCE_AGENT.contextGuidance).toContain("find_importers");
+    expect(PERFORMANCE_AGENT.contextGuidance).toContain("find_references");
+    expect(PERFORMANCE_AGENT.contextGuidance).toContain("get_symbol");
     expect(PERFORMANCE_AGENT.contextGuidance).toContain("get_file");
     expect(PERFORMANCE_AGENT.contextGuidance).toContain("search_repository");
   });

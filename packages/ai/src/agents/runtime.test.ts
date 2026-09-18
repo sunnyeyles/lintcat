@@ -108,7 +108,7 @@ const finding = {
 
 const finalJson = JSON.stringify({ findings: [finding] });
 
-/** Hand-written: only the two methods the index read seam exposes. */
+/** Hand-written: only the read seam the tools use. */
 const index: RepositoryIndex = {
   status: async () => ({
     sha: "1111111111111111111111111111111111111111",
@@ -119,6 +119,9 @@ const index: RepositoryIndex = {
       languages: { typescript: 120 },
       manifests: ["pnpm-workspace"],
     },
+    languages: [
+      { language: "typescript", files: 120, indexed: true, resolutionRate: 0.97 },
+    ],
   }),
   describeArea: async (path) => ({
     path,
@@ -136,6 +139,25 @@ const index: RepositoryIndex = {
     covers: [],
     siblings: ["src/index.ts"],
     siblingsTotal: 2,
+  }),
+  getSymbol: async (path, name) => ({
+    path,
+    name,
+    known: false,
+    symbol: null,
+    candidates: [],
+    inboundReferences: 0,
+    referencingFiles: 0,
+  }),
+  findReferences: async (path, name) => ({
+    path,
+    name: name ?? null,
+    known: false,
+    importers: [],
+    totalImporters: 0,
+    references: [],
+    totalReferences: 0,
+    totalFiles: 0,
   }),
 };
 
@@ -193,7 +215,7 @@ describe("the Security agent", () => {
     expect(opening).toContain("user.isAdmin = true");
   });
 
-  it("exposes exactly the nine read-only review tools to the model", async () => {
+  it("exposes exactly the ten read-only review tools to the model", async () => {
     const { agent, calls } = makeAgent([
       message([textBlock(finalJson)], "end_turn"),
     ]);

@@ -1,7 +1,9 @@
 import type {
   AreaDescription,
   IndexStatus,
+  ReferencesResult,
   RepositoryIndex,
+  SymbolDescription,
 } from "@pr-review/index";
 import type { Tool, ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
@@ -38,6 +40,10 @@ const status: IndexStatus = {
     languages: { typescript: 118, json: 2 },
     manifests: ["pnpm-workspace"],
   },
+  languages: [
+    { language: "typescript", files: 118, indexed: true, resolutionRate: 0.96 },
+    { language: "python", files: 2, indexed: false, resolutionRate: 0 },
+  ],
 };
 
 const described: AreaDescription = {
@@ -58,13 +64,89 @@ const described: AreaDescription = {
   siblingsTotal: 2,
 };
 
+const symbol: SymbolDescription = {
+  path: "src/sessions.ts",
+  name: "createSession",
+  known: true,
+  symbol: {
+    id: 7,
+    file: "src/sessions.ts",
+    name: "createSession",
+    kind: "function",
+    line: 40,
+    endLine: 52,
+    exported: true,
+  },
+  candidates: [
+    {
+      id: 91,
+      file: "src/legacy/sessions.ts",
+      name: "createSession",
+      kind: "function",
+      line: 12,
+      endLine: 18,
+      exported: false,
+    },
+  ],
+  inboundReferences: 14,
+  referencingFiles: 5,
+};
+
+const importers: ReferencesResult = {
+  path: "src/sessions.ts",
+  name: null,
+  known: true,
+  importers: ["src/api/routes.ts", "src/sessions.test.ts"],
+  totalImporters: 2,
+  references: [],
+  totalReferences: 0,
+  totalFiles: 0,
+};
+
+const symbolReferences: ReferencesResult = {
+  path: "src/sessions.ts",
+  name: "createSession",
+  known: true,
+  importers: [],
+  totalImporters: 0,
+  references: [
+    { file: "src/api/routes.ts", lines: [11, 88] },
+    { file: "src/sessions.test.ts", lines: [4] },
+  ],
+  totalReferences: 212,
+  totalFiles: 50,
+};
+
+interface IndexParts {
+  description?: AreaDescription;
+  symbol?: SymbolDescription;
+  references?: ReferencesResult;
+}
+
 /** Hand-written, not the real index: only the read seam the tools use. */
-function makeIndex(description: AreaDescription = described): RepositoryIndex {
+function makeIndex(parts: IndexParts = {}): RepositoryIndex {
   return {
     status: async () => status,
-    describeArea: async () => description,
+    describeArea: async () => parts.description ?? described,
+    getSymbol: async () => parts.symbol ?? symbol,
+    findReferences: async (_path, name) =>
+      parts.references ?? (name === undefined ? importers : symbolReferences),
   };
 }
+
+/** What an index tool answers with when no index is bound to the review. */
+const ABSENT_PAYLOAD = {
+  status: "absent",
+  reason: "no repository index for this review",
+};
+
+/** The header every index tool repeats, so a result says how current it is. */
+const indexHeader = {
+  sha: status.sha,
+  ageHours: 3,
+  coverage: status.coverage,
+  languages: status.languages,
+};
 
 /** The SDK stores the Zod schema we passed, so tests can parse against it. */
 function schemaOf(tools: ToolSet, name: string): z.ZodType {
@@ -86,13 +168,13 @@ function run(tools: ToolSet, name: string, input: unknown): Promise<unknown> {
 }
 
 describe("createReviewTools", () => {
-  it("exposes exactly the nine read-only tools from the spec", () => {
+  it("exposes exactly the ten read-only tools from the spec", () => {
     expect(Object.keys(createReviewTools(makeGithub(), scope)).sort()).toEqual(
       REVIEW_TOOL_NAMES,
     );
   });
 
-  it("exposes the same nine tools when an index is bound", () => {
+  it("exposes the same ten tools when an index is bound", () => {
     expect(
       Object.keys(createReviewTools(makeGithub(), scope, makeIndex())).sort(),
     ).toEqual(REVIEW_TOOL_NAMES);
@@ -110,7 +192,6 @@ describe("createReviewTools", () => {
     ["get_base_file", "path"],
     ["search_repository", "query"],
     ["get_diff", "path"],
-    ["find_importers", "path"],
     ["find_co_changed_files", "path"],
     ["describe_area", "path"],
   ])("describes %s's %s parameter", (name, parameter) => {
@@ -122,6 +203,22 @@ describe("createReviewTools", () => {
     ).shape;
     expect(Object.keys(shape)).toEqual([parameter]);
     expect(shape[parameter]?.description).toBeTruthy();
+  });
+
+  it.each([
+    ["get_symbol", ["path", "name"]],
+    ["find_references", ["path", "name"]],
+  ])("describes both of %s's parameters", (name, parameters) => {
+    const tools = createReviewTools(makeGithub(), scope);
+    const shape = (
+      schemaOf(tools, name) as unknown as {
+        shape: Record<string, { description?: string }>;
+      }
+    ).shape;
+    expect(Object.keys(shape)).toEqual(parameters);
+    for (const parameter of parameters) {
+      expect(shape[parameter]?.description).toBeTruthy();
+    }
   });
 
   it("offers no tool that could write to the repository", () => {
@@ -308,65 +405,6 @@ describe("review tool execution", () => {
     }
   });
 
-  it("names the stem it searched and drops the subject file from its own results", async () => {
-    const github = makeGithub();
-
-    const result = (await run(createReviewTools(github, scope), "find_importers", {
-      path: "src/sessions.ts",
-    })) as string;
-
-    expect(github.searchCode).toHaveBeenCalledExactlyOnceWith({
-      owner: scope.owner,
-      repo: scope.repo,
-      query: '"sessions"',
-    });
-    const payload = JSON.parse(result);
-    expect(payload.searchedFor).toBe("sessions");
-    // The stub's only match is the subject file itself.
-    expect(payload.matches).toEqual([]);
-  });
-
-  it.each([
-    ["src/sessions.ts", "sessions"],
-    ["src/session/index.ts", "session"],
-    ["pkg/auth/__init__.py", "auth"],
-    ["crates/parser/src/mod.rs", "parser"],
-    ["cmd/server/main.go", "server"],
-    ["types/session.d.ts", "session.d"],
-  ])("derives a distinctive stem for %s", async (path, stem) => {
-    const github = makeGithub();
-
-    await run(createReviewTools(github, scope), "find_importers", { path });
-
-    expect(github.searchCode).toHaveBeenCalledExactlyOnceWith({
-      owner: scope.owner,
-      repo: scope.repo,
-      query: `"${stem}"`,
-    });
-  });
-
-  it.each([
-    ["every segment is generic", "src/index.ts"],
-    ["the stem would carry a qualifier", "org:someone.ts"],
-    ["the stem would carry a space", "a b/index.ts"],
-  ])("rejects find_importers when %s, client untouched", async (_label, path) => {
-    const github = makeGithub();
-
-    await expect(
-      run(createReviewTools(github, scope), "find_importers", { path }),
-    ).rejects.toThrow(/no distinctive name/i);
-    expect(github.searchCode).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["path traversal", { path: "../secrets/config.yml" }],
-    ["absolute path", { path: "/etc/passwd" }],
-    ["extra properties", { path: "src/sessions.ts", ref: "deadbeef" }],
-  ])("rejects find_importers input with %s", (_label, input) => {
-    const tools = createReviewTools(makeGithub(), scope);
-    expect(schemaOf(tools, "find_importers").safeParse(input).success).toBe(false);
-  });
-
   it("ranks co-changed files by commit count and excludes the subject file", async () => {
     const github = makeGithub();
     github.listCommitShas.mockResolvedValueOnce(["c1", "c2", "c3"]);
@@ -489,10 +527,7 @@ describe("review tool execution", () => {
     )) as string;
 
     expect(describeArea).toHaveBeenCalledExactlyOnceWith("src/sessions.ts");
-    expect(JSON.parse(result)).toEqual({
-      index: { sha: status.sha, ageHours: 3, coverage: status.coverage },
-      ...described,
-    });
+    expect(JSON.parse(result)).toEqual({ index: indexHeader, ...described });
   });
 
   it("reports a path the index does not know without claiming it is missing", async () => {
@@ -510,7 +545,7 @@ describe("review tool execution", () => {
     };
 
     const result = (await run(
-      createReviewTools(makeGithub(), scope, makeIndex(unknown)),
+      createReviewTools(makeGithub(), scope, makeIndex({ description: unknown })),
       "describe_area",
       { path: "src/added-by-this-pr.ts" },
     )) as string;
@@ -525,26 +560,130 @@ describe("review tool execution", () => {
       { path: "src/sessions.ts" },
     )) as string;
 
+    expect(JSON.parse(result)).toEqual({ index: ABSENT_PAYLOAD });
+  });
+
+  it("answers get_symbol from the index, with the index's own status", async () => {
+    const index = makeIndex();
+    const getSymbol = vi.spyOn(index, "getSymbol");
+
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, index),
+      "get_symbol",
+      { path: "src/sessions.ts", name: "createSession" },
+    )) as string;
+
+    expect(getSymbol).toHaveBeenCalledExactlyOnceWith(
+      "src/sessions.ts",
+      "createSession",
+    );
+    expect(JSON.parse(result)).toEqual({ index: indexHeader, ...symbol });
+  });
+
+  it("reports a symbol the index does not define without denying it exists", async () => {
+    const unknown: SymbolDescription = {
+      path: "src/added-by-this-pr.ts",
+      name: "createSession",
+      known: false,
+      symbol: null,
+      candidates: [],
+      inboundReferences: 0,
+      referencingFiles: 0,
+    };
+
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, makeIndex({ symbol: unknown })),
+      "get_symbol",
+      { path: "src/added-by-this-pr.ts", name: "createSession" },
+    )) as string;
+
+    expect(JSON.parse(result)).toMatchObject({ known: false, symbol: null });
+  });
+
+  it("answers get_symbol in absent mode when there is no index", async () => {
+    const result = (await run(
+      createReviewTools(makeGithub(), scope),
+      "get_symbol",
+      { path: "src/sessions.ts", name: "createSession" },
+    )) as string;
+
+    expect(JSON.parse(result)).toEqual({ index: ABSENT_PAYLOAD });
+  });
+
+  it("returns the importing files when find_references names no symbol", async () => {
+    const index = makeIndex();
+    const findReferences = vi.spyOn(index, "findReferences");
+
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, index),
+      "find_references",
+      { path: "src/sessions.ts" },
+    )) as string;
+
+    expect(findReferences).toHaveBeenCalledExactlyOnceWith(
+      "src/sessions.ts",
+      undefined,
+    );
+    expect(JSON.parse(result)).toEqual({ index: indexHeader, ...importers });
+  });
+
+  it("returns references grouped by file when find_references names a symbol", async () => {
+    const index = makeIndex();
+    const findReferences = vi.spyOn(index, "findReferences");
+
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, index),
+      "find_references",
+      { path: "src/sessions.ts", name: "createSession" },
+    )) as string;
+
+    expect(findReferences).toHaveBeenCalledExactlyOnceWith(
+      "src/sessions.ts",
+      "createSession",
+    );
     expect(JSON.parse(result)).toEqual({
-      index: {
-        status: "absent",
-        reason: "no repository index for this review",
-      },
+      index: indexHeader,
+      ...symbolReferences,
     });
   });
 
-  it("reaches no github call for describe_area in either mode", async () => {
+  it("passes the exact totals through beside the capped lists", async () => {
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, makeIndex()),
+      "find_references",
+      { path: "src/sessions.ts", name: "createSession" },
+    )) as string;
+
+    const payload = JSON.parse(result);
+    // The counts are the index's, not a length of what was returned.
+    expect(payload.references).toHaveLength(2);
+    expect(payload.totalReferences).toBe(212);
+    expect(payload.totalFiles).toBe(50);
+  });
+
+  it("answers find_references in absent mode when there is no index", async () => {
+    const result = (await run(
+      createReviewTools(makeGithub(), scope),
+      "find_references",
+      { path: "src/sessions.ts" },
+    )) as string;
+
+    expect(JSON.parse(result)).toEqual({ index: ABSENT_PAYLOAD });
+  });
+
+  it.each([
+    ["describe_area", { path: "src/sessions.ts" }],
+    ["get_symbol", { path: "src/sessions.ts", name: "createSession" }],
+    ["find_references", { path: "src/sessions.ts", name: "createSession" }],
+  ])("reaches no github call for %s in either mode", async (name, input) => {
     const github = makeGithub();
 
-    await run(createReviewTools(github, scope), "describe_area", {
-      path: "src/sessions.ts",
-    });
-    await run(createReviewTools(github, scope, makeIndex()), "describe_area", {
-      path: "src/sessions.ts",
-    });
+    await run(createReviewTools(github, scope), name, input);
+    await run(createReviewTools(github, scope, makeIndex()), name, input);
 
     expect(github.getFileContents).not.toHaveBeenCalled();
     expect(github.searchCode).not.toHaveBeenCalled();
+    expect(github.listCommitShas).not.toHaveBeenCalled();
   });
 
   it("truncates oversized tool results", async () => {
@@ -609,6 +748,36 @@ describe("review tool input schemas", () => {
   ])("rejects describe_area input with %s", (_label, input) => {
     const tools = createReviewTools(makeGithub(), scope, makeIndex());
     expect(schemaOf(tools, "describe_area").safeParse(input).success).toBe(false);
+  });
+
+  it.each([
+    ["an empty name", { path: "src/sessions.ts", name: "" }],
+    ["a missing name", { path: "src/sessions.ts" }],
+    ["an over-long name", { path: "src/sessions.ts", name: "x".repeat(201) }],
+    ["path traversal", { path: "../../secrets/config.yml", name: "createSession" }],
+    ["an absolute path", { path: "/etc/passwd", name: "createSession" }],
+    ["extra properties", { path: "src/sessions.ts", name: "a", kind: "function" }],
+  ])("rejects get_symbol input with %s", (_label, input) => {
+    const tools = createReviewTools(makeGithub(), scope, makeIndex());
+    expect(schemaOf(tools, "get_symbol").safeParse(input).success).toBe(false);
+  });
+
+  it.each([
+    ["an empty name", { path: "src/sessions.ts", name: "" }],
+    ["path traversal", { path: "../../secrets/config.yml" }],
+    ["an absolute path", { path: "/etc/passwd" }],
+    ["extra properties", { path: "src/sessions.ts", depth: 2 }],
+  ])("rejects find_references input with %s", (_label, input) => {
+    const tools = createReviewTools(makeGithub(), scope, makeIndex());
+    expect(schemaOf(tools, "find_references").safeParse(input).success).toBe(false);
+  });
+
+  it("accepts find_references with no name, for a file's importers", () => {
+    const tools = createReviewTools(makeGithub(), scope, makeIndex());
+    expect(
+      schemaOf(tools, "find_references").safeParse({ path: "src/sessions.ts" })
+        .success,
+    ).toBe(true);
   });
 
   it("rejects unexpected properties on a no-input tool", () => {

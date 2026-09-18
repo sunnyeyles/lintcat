@@ -29,7 +29,13 @@ describe("the correctness agent", () => {
   });
 
   it("names the tools it must read the code with", () => {
-    for (const tool of ["get_file", "get_base_file", "search_repository", "find_importers"]) {
+    for (const tool of [
+      "get_file",
+      "get_base_file",
+      "search_repository",
+      "find_references",
+      "get_symbol",
+    ]) {
       expect(guidance).toContain(tool);
     }
   });

@@ -56,11 +56,12 @@ export function repositoryAgent(category: string): AgentDefinition {
 export const REVIEW_TOOL_NAMES = [
   "describe_area",
   "find_co_changed_files",
-  "find_importers",
+  "find_references",
   "get_base_file",
   "get_diff",
   "get_file",
   "get_pull_request",
+  "get_symbol",
   "list_changed_files",
   "search_repository",
 ];

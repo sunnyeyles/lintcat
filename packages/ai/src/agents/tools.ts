@@ -7,7 +7,7 @@ import type {
   CodeSearchResult,
   GithubInstallationClient,
 } from "@pr-review/github";
-import type { RepositoryIndex } from "@pr-review/index";
+import type { IndexStatus, RepositoryIndex } from "@pr-review/index";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -38,14 +38,9 @@ function boundSnippets(snippets: readonly string[]): string[] {
     .map((snippet) => truncateWithMarker(snippet, MAX_SNIPPET_CHARS, "…"));
 }
 
-/** `searchedFor` is absent unless the caller derived the query it searched. */
-function renderSearchResult(
-  result: CodeSearchResult,
-  searchedFor?: string,
-): string {
+function renderSearchResult(result: CodeSearchResult): string {
   return JSON.stringify(
     {
-      searchedFor,
       totalCount: result.totalCount,
       incompleteResults: result.incompleteResults,
       matches: result.matches.slice(0, MAX_SEARCH_MATCHES).map((match) => ({
@@ -92,50 +87,12 @@ const searchQuerySchema = z
     'Search terms, e.g. "createSession". Do not include repo:/org:/user: qualifiers.',
   );
 
-// Split by position: a file-name list must not judge a directory slot.
-const GENERIC_FILE_STEMS = new Set(["index", "mod", "main", "__init__"]);
-
-const GENERIC_DIRECTORIES = new Set([
-  "src",
-  "lib",
-  "app",
-  "pkg",
-  "internal",
-  "util",
-  "utils",
-  "common",
-  "core",
-  "components",
-  "packages",
-]);
-
-/** A stem safe to quote into a query: no search operators, no qualifiers. */
-const SEARCHABLE_STEM = /^[A-Za-z0-9._-]+$/;
-
-function distinctive(name: string, generic: ReadonlySet<string>): boolean {
-  return !generic.has(name.toLowerCase()) && SEARCHABLE_STEM.test(name);
-}
-
-/** Basename without its final extension, walking up when that stem is generic. */
-function importerSearchStem(path: string): string {
-  const directories = path.split("/");
-  const file = directories.pop() ?? "";
-  const dot = file.lastIndexOf(".");
-  const base = dot > 0 ? file.slice(0, dot) : file;
-  if (distinctive(base, GENERIC_FILE_STEMS)) {
-    return base;
-  }
-  const directory = directories
-    .toReversed()
-    .find((candidate) => distinctive(candidate, GENERIC_DIRECTORIES));
-  if (directory !== undefined) {
-    return directory;
-  }
-  throw new Error(
-    `no distinctive name to search for in "${path}": every segment is a generic ` +
-      "module name. Use search_repository with a symbol from the file instead.",
-  );
-}
+/** A symbol's own name; the index matches it exactly, with no wildcards. */
+const symbolNameSchema = z
+  .string()
+  .min(1)
+  .max(200)
+  .describe('The symbol\'s name exactly as it is written, e.g. "createSession".');
 
 // Each sampled commit costs its own API call, so this is the request budget.
 const MAX_HISTORY_COMMITS = 10;
@@ -170,9 +127,23 @@ const ABSENT_INDEX = {
   reason: "no repository index for this review",
 };
 
+function absentIndexResult(): string {
+  return truncate(JSON.stringify({ index: ABSENT_INDEX }, null, 2));
+}
+
 /** Whole hours since the index was built, so the model can judge staleness. */
 function ageHours(builtAt: string): number {
   return Math.max(0, Math.round((Date.now() - Date.parse(builtAt)) / 3_600_000));
+}
+
+/** The provenance header every index tool result carries. */
+function indexHeader(status: IndexStatus) {
+  return {
+    sha: status.sha,
+    ageHours: ageHours(status.builtAt),
+    coverage: status.coverage,
+    languages: status.languages,
+  };
 }
 
 /** One changed file's patch; a file outside the PR, or without one, is an error. */
@@ -187,7 +158,7 @@ function patchFor(changedFiles: readonly ChangedFile[], path: string): string {
   return file.patch;
 }
 
-/** Exactly the nine read-only tools, bound to one pull request. */
+/** Exactly the ten read-only tools, bound to one pull request. */
 export function createReviewTools(
   github: GithubInstallationClient,
   context: ReviewContext,
@@ -290,29 +261,6 @@ export function createReviewTools(
         return renderSearchResult(result);
       },
     }),
-    find_importers: tool({
-      description:
-        "Find files that MENTION this file's name — a cheap proxy for \"what imports it\", NOT a " +
-        "resolved import graph. It is a text search for the file's name stem (returned as " +
-        "searchedFor), so it includes unrelated files using the same word and MISSES importers " +
-        "that alias the path or import the directory. An empty result means the search found " +
-        "nothing — never that nothing imports the file.",
-      inputSchema: z.strictObject({ path: repositoryPathSchema }),
-      async execute({ path }) {
-        const stem = importerSearchStem(path);
-        const result = await github.searchCode({ owner, repo, query: `"${stem}"` });
-        const subject = path.toLowerCase();
-        return renderSearchResult(
-          {
-            ...result,
-            matches: result.matches.filter(
-              (match) => match.path.toLowerCase() !== subject,
-            ),
-          },
-          stem,
-        );
-      },
-    }),
     find_co_changed_files: tool({
       description:
         "Find files that were edited in the same commits as this file. This is CORRELATION, not " +
@@ -366,25 +314,70 @@ export function createReviewTools(
       inputSchema: z.strictObject({ path: repositoryPathSchema }),
       async execute({ path }) {
         if (index === undefined) {
-          return truncate(JSON.stringify({ index: ABSENT_INDEX }, null, 2));
+          return absentIndexResult();
         }
         const [status, description] = await Promise.all([
           index.status(),
           index.describeArea(path),
         ]);
         return truncate(
-          JSON.stringify(
-            {
-              index: {
-                sha: status.sha,
-                ageHours: ageHours(status.builtAt),
-                coverage: status.coverage,
-              },
-              ...description,
-            },
-            null,
-            2,
-          ),
+          JSON.stringify({ index: indexHeader(status), ...description }, null, 2),
+        );
+      },
+    }),
+    get_symbol: tool({
+      description:
+        "What the repository index knows about one symbol defined in a file: where its " +
+        "definition is, its kind (function, class, type, ...), whether it is exported, how many " +
+        "references and how many distinct files point at it, and any same-named symbols defined " +
+        "elsewhere in the repository, so you can tell which one the diff means. The result also " +
+        "carries the index's own sha, age in hours, and coverage. `known: false` means THE INDEX " +
+        "HAS NO SUCH DEFINITION in that file — not that the symbol does not exist: a file this " +
+        "pull request adds is never indexed, and a language no indexer covered contributes no " +
+        "symbols at all. No body is returned; use get_file for that.",
+      inputSchema: z.strictObject({
+        path: repositoryPathSchema,
+        name: symbolNameSchema,
+      }),
+      async execute({ path, name }) {
+        if (index === undefined) {
+          return absentIndexResult();
+        }
+        const [status, description] = await Promise.all([
+          index.status(),
+          index.getSymbol(path, name),
+        ]);
+        return truncate(
+          JSON.stringify({ index: indexHeader(status), ...description }, null, 2),
+        );
+      },
+    }),
+    find_references: tool({
+      description:
+        "Who uses this, RESOLVED by the repository index rather than found by a text search. " +
+        "Without `name`: the files that import `path`. With `name`: every reference to that " +
+        "symbol, grouped by file, with line numbers you can read with get_file. The lists are " +
+        "capped and the total* counts are exact, so 50 files returned against a totalFiles of " +
+        "212 tells you what you are not seeing. A language the index did not cover returns " +
+        "nothing at all, and that means NOT INDEXED, never unreferenced — check " +
+        "index.languages[].indexed before you conclude anything from an empty result, and fall " +
+        "back to search_repository when it says false.",
+      inputSchema: z.strictObject({
+        path: repositoryPathSchema,
+        name: symbolNameSchema.optional().describe(
+          "One symbol's name for its references; omit it for the files importing the path.",
+        ),
+      }),
+      async execute({ path, name }) {
+        if (index === undefined) {
+          return absentIndexResult();
+        }
+        const [status, references] = await Promise.all([
+          index.status(),
+          index.findReferences(path, name),
+        ]);
+        return truncate(
+          JSON.stringify({ index: indexHeader(status), ...references }, null, 2),
         );
       },
     }),

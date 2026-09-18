@@ -24,7 +24,7 @@ inputs:
     default: ""
   github-token:
     description: >-
-      Token used for the nine read-only repository tools, for the review
+      Token used for the ten read-only repository tools, for the review
       comments, and for publishing the check run. The default workflow token
       is enough when the job grants contents: read, pull-requests: write, and
       checks: write — and contents: write when `fix` is on.
