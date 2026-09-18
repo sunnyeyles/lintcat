@@ -1,11 +1,12 @@
 /**
  * The agent set a run works with, read from repository configuration.
- * Configuration names shipped specialists; it cannot define new ones.
+ * Configuration names shipped agents; it cannot define new ones.
  */
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
 import type { AgentDefinition } from "#src/agents/definition";
+import { GENERAL_AGENT } from "#src/agents/general-agent";
 import { agentPathsSchema } from "#src/agents/path-filter";
 import { BUILT_IN_AGENT_NAMES, findBuiltInAgent } from "#src/agents/specialists/index";
 
@@ -151,25 +152,9 @@ interface LoadAgentDefinitionsOptions {
   path?: string | undefined;
 }
 
-/** The message shown when no configuration is found. */
-function missingConfigMessage(path: string): string {
-  return [
-    `No review agents are configured: ${path} does not exist.`,
-    "",
-    "This action runs no agents of its own — it reviews with exactly the",
-    "ones you name. Create the file with at least one built-in specialist:",
-    "",
-    "  agents:",
-    ...builtInList(),
-    "",
-    "The action reads this from the pull request's base commit, so commit it",
-    "to your default branch. See the README for a fuller starting point.",
-  ].join("\n");
-}
-
 /**
- * The agent set for one run. A missing or unusable config throws: a review
- * that ran no agents looks exactly like a clean bill of health.
+ * The agent set for one run: the general agent when no config exists. An
+ * unusable config throws, since a review that ran no agents looks clean.
  */
 export async function loadAgentDefinitions(
   options: LoadAgentDefinitionsOptions,
@@ -178,7 +163,7 @@ export async function loadAgentDefinitions(
 
   const source = await options.readFile(path);
   if (source === undefined) {
-    throw new AgentConfigError(missingConfigMessage(path));
+    return [GENERAL_AGENT];
   }
   return parseAgentConfig(source, path);
 }

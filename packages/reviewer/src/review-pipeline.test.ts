@@ -6,7 +6,7 @@ import {
 } from "@pr-review/ai";
 import type { ChangedFile } from "@pr-review/github";
 import type { ReviewFinding } from "@pr-review/schemas";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { runReviewPipeline } from "#src/review-pipeline";
 
@@ -210,8 +210,50 @@ describe("runReviewPipeline: synthesis (spec §16)", () => {
       context,
     );
 
-    expect(result.synthesis).toEqual({ outcome: "skipped", candidates: [] });
+    expect(result.synthesis).toEqual({
+      outcome: "skipped",
+      candidates: [],
+      reason: "no candidate findings",
+    });
     expect(result.findings).toEqual([]);
+  });
+
+  it("skips synthesis when a standalone agent runs alone, validating its raw findings", async () => {
+    const finding = makeFinding({ category: "general" });
+    const synthesiser: Synthesiser = {
+      async synthesise() {
+        throw new Error("the synthesiser must not run");
+      },
+    };
+
+    const result = await runReviewPipeline(
+      [{ ...agent("general", async () => [finding]), standalone: true }],
+      synthesiser,
+      context,
+    );
+
+    expect(result.synthesis).toEqual({
+      outcome: "skipped",
+      candidates: [finding],
+      reason: "standalone agent",
+    });
+    expect(result.findings).toEqual([finding]);
+  });
+
+  it("still synthesises a lone specialist, so narrowed runs take the full path", async () => {
+    const synthesise = vi.fn(async (candidates: readonly unknown[]) => ({
+      findings: candidates as ReviewFinding[],
+      usage: emptyTokenUsage(),
+    }));
+
+    const result = await runReviewPipeline(
+      [agent("correctness", async () => [makeFinding()])],
+      { synthesise },
+      context,
+    );
+
+    expect(synthesise).toHaveBeenCalledOnce();
+    expect(result.synthesis.outcome).toBe("completed");
   });
 
   it("feeds raw candidates through the synthesiser and validates its output", async () => {

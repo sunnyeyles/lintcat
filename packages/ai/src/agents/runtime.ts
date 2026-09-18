@@ -153,6 +153,7 @@ export function createReviewAgent(
 
   return {
     name: agent.category,
+    ...(agent.standalone === true ? { standalone: true } : {}),
 
     async run(context: ReviewContext): Promise<readonly unknown[]> {
       // Every event of this run carries these fields.

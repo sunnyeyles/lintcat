@@ -185,7 +185,7 @@ function logSynthesisOutcome(
   const fields = reviewCorrelation(target);
   const { synthesis } = review;
   if (synthesis.outcome === "skipped") {
-    logger.info("synthesis.skipped", { ...fields, reason: "no candidate findings" });
+    logger.info("synthesis.skipped", { ...fields, reason: synthesis.reason });
     return;
   }
 
@@ -239,7 +239,7 @@ function unreviewed(): ReviewOutcome {
   return {
     candidates: [],
     agentFailures: [],
-    synthesis: skippedSynthesis(),
+    synthesis: skippedSynthesis("no candidate findings", []),
     findings: [],
     patches: { proposed: 0, verified: 0 },
   };

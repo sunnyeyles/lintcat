@@ -24,5 +24,7 @@ export interface ReviewContext {
  */
 export interface ReviewAgent {
   name: string;
+  /** Running alone, its findings need no synthesis. */
+  standalone?: boolean;
   run(context: ReviewContext): Promise<readonly unknown[]>;
 }

@@ -1,8 +1,9 @@
 /**
- * The specialists this action ships. None run unless a repository names one in
- * its agent configuration.
+ * The agents this action ships. The specialists are opt-in: none run unless a
+ * repository names one in its agent configuration.
  */
 import type { AgentDefinition } from "#src/agents/definition";
+import { GENERAL_AGENT } from "#src/agents/general-agent";
 import { CORRECTNESS_AGENT } from "#src/agents/specialists/correctness-agent";
 import { DOCS_DRIFT_AGENT } from "#src/agents/specialists/docs-drift-agent";
 import { PERFORMANCE_AGENT } from "#src/agents/specialists/performance-agent";
@@ -11,6 +12,7 @@ import { TEST_COVERAGE_AGENT } from "#src/agents/specialists/test-coverage-agent
 
 /** Listing order is what an error message offers; it is not a run order. */
 const BUILT_IN_AGENTS: readonly AgentDefinition[] = [
+  GENERAL_AGENT,
   SECURITY_AGENT,
   CORRECTNESS_AGENT,
   PERFORMANCE_AGENT,
