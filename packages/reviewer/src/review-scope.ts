@@ -1,7 +1,4 @@
-/**
- * What one review reads: the whole pull request, or only the commits added
- * since the last review of it. Every failure here widens to a full review.
- */
+/** Whole PR or only the commits since the last review; failures widen to whole. */
 import {
   CHECK_RUN_NAME,
   type ChangedFile,
@@ -11,7 +8,6 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import { reviewCorrelation, type ReviewTarget } from "./review-target.js";
 
-/** The whole pull request, and why it was not narrowed. */
 export interface FullReviewScope {
   kind: "full";
   reason: string;
@@ -19,7 +15,7 @@ export interface FullReviewScope {
   changedFiles: readonly ChangedFile[];
 }
 
-/** Only the commits since `sinceSha`; `pullRequest` stays the whole diff. */
+/** `pullRequest` keeps the whole diff beside the narrowed one. */
 export interface IncrementalReviewScope {
   kind: "incremental";
   sinceSha: string;
@@ -33,7 +29,6 @@ export interface IncrementalReviewScope {
 
 export type ReviewScope = FullReviewScope | IncrementalReviewScope;
 
-/** The whole pull request, whatever the scope: what publishing anchors against. */
 export function wholePullRequest(scope: ReviewScope): {
   diff: string;
   changedFiles: readonly ChangedFile[];
@@ -50,7 +45,6 @@ type ScopeClient = Pick<
 
 export interface ResolveReviewScopeDeps {
   client: ScopeClient;
-  /** False resolves straight to a full review, reading nothing. */
   incremental: boolean;
   diff: string;
   changedFiles: readonly ChangedFile[];
@@ -69,26 +63,20 @@ function full(
   };
 }
 
-/** Commits searched for a baseline before giving up and reviewing it all. */
 const MAX_BASELINE_LOOKBACK = 20;
 
-/** A completed run of our own check, whatever it concluded. */
 function reviewedHere(runs: readonly { name: string; status: string }[]): boolean {
   return runs.some(
     (run) => run.name === CHECK_RUN_NAME && run.status === "completed",
   );
 }
 
-/**
- * The newest commit before the head that our check run has already read.
- * undefined when no earlier commit carries one.
- */
 async function findBaseline(
   client: ScopeClient,
   target: ReviewTarget,
 ): Promise<string | undefined> {
   const shas = await client.listPullRequestCommitShas(target);
-  // Newest first, head excluded: the head's own run is this one, if any.
+  // The head's own check run belongs to this review, so skip it.
   const earlier = shas
     .filter((sha) => sha !== target.headSha)
     .reverse()
@@ -106,7 +94,6 @@ async function findBaseline(
   return undefined;
 }
 
-/** A unified diff rebuilt from the files it should cover, and nothing else. */
 export function renderDiff(files: readonly ChangedFile[]): string {
   return files
     .filter((file) => file.patch !== undefined)
@@ -121,10 +108,7 @@ export function renderDiff(files: readonly ChangedFile[]): string {
     .join("\n");
 }
 
-/**
- * The files changed since the baseline that this pull request also changed.
- * A base-branch merge brings in files the pull request never touched.
- */
+// Drops files that only changed because the base branch was merged in.
 export function intersectWithPullRequest(
   since: readonly ChangedFile[],
   pullRequest: readonly ChangedFile[],
@@ -134,43 +118,50 @@ export function intersectWithPullRequest(
 }
 
 /** Never throws: an unreadable baseline is a full review, not a failed one. */
+async function narrow(
+  target: ReviewTarget,
+  deps: ResolveReviewScopeDeps,
+): Promise<ReviewScope> {
+  const { client, diff, changedFiles } = deps;
+  const sinceSha = await findBaseline(client, target);
+  if (sinceSha === undefined) {
+    return full("no_baseline", deps);
+  }
+
+  const comparison = await client.compareCommits({
+    owner: target.owner,
+    repo: target.repo,
+    base: sinceSha,
+    head: target.headSha,
+  });
+  // A rebase or force-push leaves a baseline whose commits are gone.
+  if (comparison.status !== "ahead") {
+    return full("head_rewritten", deps);
+  }
+
+  const since = intersectWithPullRequest(comparison.files, changedFiles);
+  return {
+    kind: "incremental",
+    sinceSha,
+    diff: renderDiff(since),
+    changedFiles: since,
+    pullRequest: { diff, changedFiles },
+  };
+}
+
 export async function resolveReviewScope(
   target: ReviewTarget,
   deps: ResolveReviewScopeDeps,
 ): Promise<ReviewScope> {
-  const { client, logger, diff, changedFiles } = deps;
   if (!deps.incremental) {
     return full("not enabled", deps);
   }
 
   let scope: ReviewScope;
   try {
-    const sinceSha = await findBaseline(client, target);
-    if (sinceSha === undefined) {
-      scope = full("no_baseline", deps);
-    } else {
-      const comparison = await client.compareCommits({
-        owner: target.owner,
-        repo: target.repo,
-        base: sinceSha,
-        head: target.headSha,
-      });
-      if (comparison.status !== "ahead") {
-        // A rebase or force-push leaves a baseline describing commits that are gone.
-        scope = full("head_rewritten", deps);
-      } else {
-        const since = intersectWithPullRequest(comparison.files, changedFiles);
-        scope = {
-          kind: "incremental",
-          sinceSha,
-          diff: renderDiff(since),
-          changedFiles: since,
-          pullRequest: { diff, changedFiles },
-        };
-      }
-    }
+    scope = await narrow(target, deps);
   } catch (error) {
-    logger.error("review.scope_unreadable", {
+    deps.logger.error("review.scope_unreadable", {
       ...reviewCorrelation(target),
       reason: errorMessage(error),
       fallback: "reviewing the whole pull request",
@@ -178,10 +169,10 @@ export async function resolveReviewScope(
     scope = full("baseline_unreadable", deps);
   }
 
-  logger.info("review.scope_resolved", {
+  deps.logger.info("review.scope_resolved", {
     ...reviewCorrelation(target),
     kind: scope.kind,
-    pullRequestFileCount: changedFiles.length,
+    pullRequestFileCount: deps.changedFiles.length,
     ...(scope.kind === "incremental"
       ? { sinceSha: scope.sinceSha, incrementalFileCount: scope.changedFiles.length }
       : { reason: scope.reason }),

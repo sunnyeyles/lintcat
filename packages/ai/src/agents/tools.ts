@@ -181,8 +181,7 @@ export function createReviewTools(
   context: ReviewContext,
 ): ToolSet {
   const { owner, repo } = context;
-  // The tools always describe the whole pull request, even when the diff under
-  // review is only the part of it added since an earlier review.
+  // Tools serve the whole pull request, even when the reviewed diff is narrowed.
   const whole = context.incremental ?? context;
   // Commits are immutable, so one fetch per SHA serves every call this run.
   const commitFiles = new Map<string, Promise<string[]>>();

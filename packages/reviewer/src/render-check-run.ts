@@ -85,20 +85,18 @@ function changedFilesNote(changedFiles: readonly string[]): string[] {
   ];
 }
 
-/**
- * Findings an earlier review posted that this one did not read, listed so a
- * narrowed review cannot read as a clean one.
- */
+// Listed so a narrowed review cannot read as a clean one.
 function carriedNotes(carried: readonly PostedFinding[]): string[] {
   if (carried.length === 0) {
     return [];
   }
   return [
     `**${countLabel(carried.length, "finding")} still open from earlier commits**`,
-    ...carried.map(
-      (posted) =>
-        `- ${posted.heading ?? `${categoryLabel(posted.category)}: ${posted.title}`} — \`${posted.file}\``,
-    ),
+    ...carried.map((posted) => {
+      const heading =
+        posted.heading ?? `${categoryLabel(posted.category)}: ${posted.title}`;
+      return `- ${heading} — \`${posted.file}\``;
+    }),
   ];
 }
 
@@ -142,19 +140,25 @@ export function renderCheckRun(
     ...skipped,
     ...(options.scopeNote === undefined ? [] : [options.scopeNote]),
   ];
-  if (findings.length === 0) {
-    const clean = agentFailures.length === 0 && carried.length === 0;
+  if (findings.length === 0 && carried.length > 0) {
     return {
-      conclusion: clean ? "success" : "neutral",
+      conclusion: "neutral",
       output: {
-        title:
-          carried.length === 0
-            ? "No issues found"
-            : `${countLabel(carried.length, "finding")} open from earlier commits`,
+        title: `${countLabel(carried.length, "finding")} open from earlier commits`,
         summary: [
-          carried.length === 0
-            ? "The AI review found no issues in this pull request."
-            : "This review added no findings; these stand from earlier commits.",
+          "This review added no findings; these stand from earlier commits.",
+          ...notes,
+        ].join("\n\n"),
+      },
+    };
+  }
+  if (findings.length === 0) {
+    return {
+      conclusion: agentFailures.length === 0 ? "success" : "neutral",
+      output: {
+        title: "No issues found",
+        summary: [
+          "The AI review found no issues in this pull request.",
           ...notes,
         ].join("\n\n"),
       },

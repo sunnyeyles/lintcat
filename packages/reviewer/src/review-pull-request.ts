@@ -102,18 +102,17 @@ async function listPostedComments(
   }
 }
 
-/**
- * Findings an earlier review posted that are still open. A resolved or
- * outdated thread is one the pull request already answered.
- */
+/** Findings an earlier review posted whose threads are neither resolved nor outdated. */
 async function openEarlierFindings(
   client: GithubInstallationClient,
   target: ReviewTarget,
   logger: StructuredLogger,
 ): Promise<PostedFinding[]> {
-  let threads;
   try {
-    threads = await client.listReviewThreads(target);
+    const threads = await client.listReviewThreads(target);
+    return threads
+      .filter((thread) => !thread.isResolved && !thread.isOutdated)
+      .flatMap((thread) => parsePostedFinding(thread.body) ?? []);
   } catch (error) {
     logger.error("review.carried_forward.unreadable", {
       ...reviewCorrelation(target),
@@ -122,17 +121,6 @@ async function openEarlierFindings(
     });
     return [];
   }
-  const open: PostedFinding[] = [];
-  for (const thread of threads) {
-    if (thread.isResolved || thread.isOutdated) {
-      continue;
-    }
-    const posted = parsePostedFinding(thread.body);
-    if (posted !== undefined) {
-      open.push(posted);
-    }
-  }
-  return open;
 }
 
 /** One memory read serves both readers: the agents and the synthesiser. */
@@ -227,7 +215,7 @@ function logSynthesisOutcome(
   });
 }
 
-/** Earlier findings this run did not report again, so nothing is listed twice. */
+/** Drops earlier findings this run reported again, so none is listed twice. */
 function stillOpen(
   carriedForward: readonly PostedFinding[],
   findings: readonly ReviewFinding[],
@@ -236,7 +224,6 @@ function stillOpen(
   return carriedForward.filter((posted) => !reported.has(posted.key));
 }
 
-/** Says what this review read, so a narrowed one cannot read as a whole one. */
 function incrementalNote(sinceSha: string, fileCount: number): string {
   return `> **Note:** This review read the ${countLabel(fileCount, "file")} changed since \`${sinceSha.slice(0, 7)}\`; earlier commits were reviewed then.`;
 }
@@ -298,8 +285,8 @@ export async function reviewPullRequest(
     logger,
   });
   const whole = wholePullRequest(scope);
-  // The gate, the agents and validation all see the scope; publishing sees the
-  // whole pull request, so a comment can still anchor anywhere in its diff.
+  const publish = publishReview ?? createCheckRunPublisher(client);
+  // Agents see the scope; publishing sees the whole PR, so comments anchor anywhere.
   const filenames = scope.changedFiles.map((file) => file.filename);
   const carriedForward =
     scope.kind === "incremental"
@@ -312,7 +299,7 @@ export async function reviewPullRequest(
       sinceSha: scope.sinceSha,
       carriedForwardCount: carriedForward.length,
     });
-    await (publishReview ?? createCheckRunPublisher(client))(
+    await publish(
       target,
       renderCheckRun([], [], {
         annotate: false,
@@ -342,7 +329,6 @@ export async function reviewPullRequest(
     });
   }
 
-  const publish = publishReview ?? createCheckRunPublisher(client);
   if (active.length === 0) {
     logger.info("review.no_agents_matched", {
       ...fields,
@@ -365,9 +351,10 @@ export async function reviewPullRequest(
       pullRequest,
       changedFiles: scope.changedFiles,
       diff: scope.diff,
-      ...(scope.kind === "incremental"
-        ? { incremental: { sinceSha: scope.sinceSha, ...scope.pullRequest } }
-        : {}),
+      incremental:
+        scope.kind === "incremental"
+          ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
+          : undefined,
     },
     active,
     synthesisHints,
@@ -411,9 +398,10 @@ export async function reviewPullRequest(
         await listPostedComments(client, target, logger),
       ),
       carriedForward: stillOpen(carriedForward, verified.findings),
-      ...(scope.kind === "incremental"
-        ? { scopeNote: incrementalNote(scope.sinceSha, scope.changedFiles.length) }
-        : {}),
+      scopeNote:
+        scope.kind === "incremental"
+          ? incrementalNote(scope.sinceSha, scope.changedFiles.length)
+          : undefined,
     },
     {
       publishCheckRun: publish,
