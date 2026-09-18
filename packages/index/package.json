@@ -11,7 +11,11 @@
   },
   "dependencies": {
     "@pr-review/github": "workspace:*",
+    "protobufjs": "^8.8.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@sourcegraph/scip-typescript": "^0.4.0"
   }
 }

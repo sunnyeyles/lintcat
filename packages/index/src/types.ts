@@ -102,12 +102,16 @@ export interface IndexStatus {
   sha: string;
   builtAt: string;
   coverage: LayerACoverage;
+  /** Per-language Layer B coverage; empty when no indexer ran. */
+  languages: readonly LanguageCoverage[];
 }
 
 /** The read seam the tools use. Absent mode is a missing RepositoryIndex, not a method. */
 export interface RepositoryIndex {
   status(): Promise<IndexStatus>;
   describeArea(path: string): Promise<AreaDescription>;
+  getSymbol(path: string, name: string): Promise<SymbolDescription>;
+  findReferences(path: string, name?: string): Promise<ReferencesResult>;
 }
 
 /** Other files listed by `describeArea`, per directory. */
@@ -118,3 +122,97 @@ export interface OwnerRule {
   pattern: string;
   owners: readonly string[];
 }
+
+// ---- Layer B: symbols and resolved references (phase 2) ----
+
+export type SymbolKind =
+  | "function"
+  | "method"
+  | "class"
+  | "interface"
+  | "type"
+  | "enum"
+  | "variable"
+  | "property"
+  | "module"
+  | "unknown";
+
+/** One definition; `id` is stable only within the index that holds it. */
+export interface SymbolRecord {
+  id: number;
+  file: string;
+  name: string;
+  kind: SymbolKind;
+  line: number;
+  endLine: number;
+  exported: boolean;
+}
+
+/** One occurrence of a symbol outside its definition. */
+export interface ReferenceRecord {
+  /** SymbolRecord.id */
+  symbol: number;
+  file: string;
+  line: number;
+}
+
+/** A resolved file-level import: `from` imports something defined in `to`. */
+export interface ImportEdge {
+  from: string;
+  to: string;
+}
+
+export interface LanguageCoverage {
+  language: string;
+  files: number;
+  /** An indexer ran for this language. */
+  indexed: boolean;
+  /** Resolved import edges ÷ import statements seen; 0 when not indexed. */
+  resolutionRate: number;
+}
+
+export interface LayerBIndex {
+  symbols: readonly SymbolRecord[];
+  references: readonly ReferenceRecord[];
+  imports: readonly ImportEdge[];
+  coverage: readonly LanguageCoverage[];
+}
+
+/** Everything an index holds: Layer A always, Layer B when an indexer ran. */
+export interface RepositoryIndexData extends LayerAIndex {
+  layerB?: LayerBIndex | undefined;
+}
+
+/** What `get_symbol` returns; `candidates` are same-named symbols elsewhere. */
+export interface SymbolDescription {
+  path: string;
+  name: string;
+  known: boolean;
+  symbol: SymbolRecord | null;
+  candidates: readonly SymbolRecord[];
+  inboundReferences: number;
+  referencingFiles: number;
+}
+
+export interface FileReferences {
+  file: string;
+  lines: readonly number[];
+}
+
+/** What `find_references` returns; counts are exact, lists are capped. */
+export interface ReferencesResult {
+  path: string;
+  name: string | null;
+  known: boolean;
+  /** Without a name: files that import `path`. */
+  importers: readonly string[];
+  totalImporters: number;
+  /** With a name: references grouped by file. */
+  references: readonly FileReferences[];
+  totalReferences: number;
+  totalFiles: number;
+}
+
+export const MAX_SYMBOL_CANDIDATES = 10;
+export const MAX_REFERENCE_FILES = 50;
+export const MAX_REFERENCES = 200;
