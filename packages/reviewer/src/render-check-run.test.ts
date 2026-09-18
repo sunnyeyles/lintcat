@@ -270,6 +270,68 @@ describe("renderCheckRun with skipped agents", () => {
   });
 });
 
+describe("renderCheckRun with findings carried from earlier commits", () => {
+  const carried = [
+    {
+      key: "src/auth.ts|missing tenant scope",
+      file: "src/auth.ts",
+      title: "missing tenant scope",
+      category: "security",
+      heading: "HIGH — Security: Missing tenant scope",
+    },
+  ];
+
+  it("is never a success, even with nothing new to report", () => {
+    const rendered = renderCheckRun([], [], {
+      annotate: false,
+      carriedForward: carried,
+    });
+
+    expect(rendered.conclusion).toBe("neutral");
+    expect(rendered.output.title).toBe("1 finding open from earlier commits");
+  });
+
+  it("names each one where it stands", () => {
+    const rendered = renderCheckRun([], [], {
+      annotate: false,
+      carriedForward: carried,
+    });
+
+    expect(rendered.output.summary).toContain(
+      "HIGH — Security: Missing tenant scope",
+    );
+    expect(rendered.output.summary).toContain("src/auth.ts");
+  });
+
+  it("falls back to the marker's title when the comment had no heading", () => {
+    const rendered = renderCheckRun([], [], {
+      annotate: false,
+      carriedForward: [{ ...carried[0]!, heading: undefined }],
+    });
+
+    expect(rendered.output.summary).toContain("Security: missing tenant scope");
+  });
+
+  it("lists them alongside this run's own findings", () => {
+    const rendered = renderCheckRun([finding()], [], {
+      annotate: false,
+      carriedForward: carried,
+    });
+
+    expect(rendered.output.title).toBe("1 finding");
+    expect(rendered.output.summary).toContain("still open from earlier commits");
+  });
+
+  it("carries the scope note last, so what was read is on the record", () => {
+    const rendered = renderCheckRun([], [], {
+      annotate: false,
+      scopeNote: "> **Note:** read only what changed since `abc1234`.",
+    });
+
+    expect(rendered.output.summary).toContain("since `abc1234`");
+  });
+});
+
 describe("renderNoAgentMatched", () => {
   const skipped = [
     { agent: "security", paths: ["packages/github/**"] },

@@ -9,6 +9,9 @@ import type {
   CreateCheckRunInput,
   CreateCommitInput,
   CreateReviewInput,
+  CheckRunSummary,
+  CheckRunsRequest,
+  CommitComparison,
   ExistingReviewComment,
   GithubInstallationClient,
   PullRequestDetails,
@@ -94,6 +97,13 @@ function makeClient() {
     listCommitShas: vi.fn(async () => []),
     listCommitFiles: vi.fn(async () => []),
     listReviewComments: vi.fn(async (): Promise<ExistingReviewComment[]> => []),
+    listPullRequestCommitShas: vi.fn(async (): Promise<string[]> => [target.headSha]),
+    listCheckRuns: vi.fn(
+      async (_request: CheckRunsRequest): Promise<CheckRunSummary[]> => [],
+    ),
+    compareCommits: vi.fn(
+      async (): Promise<CommitComparison> => ({ status: "ahead", files: [] }),
+    ),
     getBranchTip: vi.fn(async () => target.headSha),
     getCommitMessage: vi.fn(async () => "Rate limit sessions"),
     listReviewThreads: vi.fn(async (): Promise<ReviewThread[]> => []),
@@ -145,6 +155,7 @@ interface DepsOptions {
   publishReview?: PublishReview;
   memoryStore?: MemoryStore;
   now?: () => Date;
+  incremental?: boolean;
 }
 
 function makeDeps(
@@ -463,6 +474,138 @@ describe("reviewPullRequest inline comments", () => {
 
     expect(client.createReview).not.toHaveBeenCalled();
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+function postedThread(
+  posted: ReviewFinding,
+  flags: { isResolved?: boolean; isOutdated?: boolean } = {},
+): ReviewThread {
+  return {
+    body: `**HIGH — Correctness: ${posted.title}**\n\n${findingMarker(posted)}\n<!-- pr-review-category: ${posted.category} -->`,
+    isResolved: flags.isResolved ?? false,
+    isOutdated: flags.isOutdated ?? false,
+  };
+}
+
+function incrementalClient(
+  client: ReturnType<typeof makeClient>,
+  since: ChangedFile[],
+): void {
+  client.listPullRequestCommitShas.mockResolvedValue(["old111", target.headSha]);
+  client.listCheckRuns.mockImplementation(async ({ sha }) =>
+    sha === "old111"
+      ? [{ name: "AI PR Review", status: "completed" }]
+      : [],
+  );
+  client.compareCommits.mockResolvedValue({ status: "ahead", files: since });
+}
+
+describe("reviewPullRequest, narrowed to the commits since the last review", () => {
+  const sinceFile: ChangedFile = {
+    filename: "src/sessions.ts",
+    status: "modified",
+    additions: 1,
+    deletions: 0,
+    patch: "@@ -2 +2,3 @@\n+const limit = 0;\n",
+  };
+
+  it("hands the agents the narrowed diff, and the whole pull request beside it", async () => {
+    const { deps, client, runReviewPipeline } = makeDeps(reviewResult(), {
+      incremental: true,
+    });
+    incrementalClient(client, [sinceFile]);
+
+    await reviewPullRequest(target, deps);
+
+    const context = runReviewPipeline.mock.calls[0]?.[1];
+    expect(context).toMatchObject({
+      changedFiles: [sinceFile],
+      incremental: { sinceSha: "old111", diff, changedFiles },
+    });
+    expect(context?.diff).toContain("+const limit = 0;");
+  });
+
+  it("reviews the whole pull request when no earlier commit was reviewed", async () => {
+    const { deps, client, runReviewPipeline } = makeDeps(reviewResult(), {
+      incremental: true,
+    });
+    client.listPullRequestCommitShas.mockResolvedValue([target.headSha]);
+
+    await reviewPullRequest(target, deps);
+
+    expect(runReviewPipeline.mock.calls[0]?.[1]).toMatchObject({
+      changedFiles,
+      diff,
+    });
+    expect(runReviewPipeline.mock.calls[0]?.[1].incremental).toBeUndefined();
+  });
+
+  it("runs no agent when nothing this pull request changed has moved", async () => {
+    const { deps, client, runReviewPipeline, entries } = makeDeps(
+      reviewResult(),
+      { incremental: true },
+    );
+    incrementalClient(client, []);
+
+    await reviewPullRequest(target, deps);
+
+    expect(runReviewPipeline).not.toHaveBeenCalled();
+    expect(client.createCheckRun).toHaveBeenCalledTimes(1);
+    expect(entries).toContainEqual(
+      expect.objectContaining({ event: "review.incremental.no_changes" }),
+    );
+  });
+
+  it("lists an open finding from an earlier commit on the check run", async () => {
+    const { deps, client } = makeDeps(reviewResult(), { incremental: true });
+    incrementalClient(client, []);
+    client.listReviewThreads.mockResolvedValue([postedThread(finding)]);
+
+    await reviewPullRequest(target, deps);
+
+    const published = client.createCheckRun.mock.calls[0]?.[0];
+    expect(published).toMatchObject({ conclusion: "neutral" });
+    expect(published?.output.title).toBe("1 finding open from earlier commits");
+    expect(published?.output.summary).toContain(finding.title);
+  });
+
+  it("leaves out a finding the pull request already resolved", async () => {
+    const { deps, client } = makeDeps(reviewResult(), { incremental: true });
+    incrementalClient(client, []);
+    client.listReviewThreads.mockResolvedValue([
+      postedThread(finding, { isResolved: true }),
+    ]);
+
+    await reviewPullRequest(target, deps);
+
+    expect(client.createCheckRun.mock.calls[0]?.[0]).toMatchObject({
+      conclusion: "success",
+    });
+  });
+
+  it("does not list a finding this run reported again", async () => {
+    const { deps, client } = makeDeps(reviewResult({ candidates: [finding] }), {
+      incremental: true,
+    });
+    incrementalClient(client, [sinceFile]);
+    client.listReviewThreads.mockResolvedValue([postedThread(finding)]);
+
+    await reviewPullRequest(target, deps);
+
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(summary).not.toContain("still open from earlier commits");
+  });
+
+  it("says on the check run that it read less than the whole pull request", async () => {
+    const { deps, client } = makeDeps(reviewResult(), { incremental: true });
+    incrementalClient(client, [sinceFile]);
+
+    await reviewPullRequest(target, deps);
+
+    expect(client.createCheckRun.mock.calls[0]?.[0].output.summary).toContain(
+      "changed since `old111`",
+    );
   });
 });
 

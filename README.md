@@ -233,6 +233,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `agents` | no (default `all`) | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides any [path filters](#path-filters). |
 | `agent-config` | no (default `.github/pr-review-agents.yml`) | Path to the YAML file naming the agents. Required — nothing runs until a repository names it. |
+| `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
 | `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
 | `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agents and cut first by the synthesiser; shapes the repository acted on are the ones the synthesiser keeps. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompts from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
@@ -430,6 +431,52 @@ three input counters are reported separately on `agent.completed` and
 warmed-up review `cacheReadInputTokens` should dominate `inputTokens`; if it
 collapses to zero, something above a breakpoint started varying between turns.
 
+### Incremental review
+
+Off by default. Turning it on narrows what the agents read on a push to a pull
+request they have already reviewed:
+
+```yaml
+        with:
+          api-key: ${{ secrets.OPENAI_API_KEY }}
+          incremental: "true"
+```
+
+**The baseline is the check run itself.** `AI PR Review` is written against each
+head commit, so the newest earlier commit carrying a completed one is the commit
+the last review read. Nothing extra is stored, and nothing new is granted.
+
+Every way of not finding one widens back to a whole-pull-request review rather
+than failing, each logged on `review.scope_resolved` as its `reason`:
+
+| Situation | `reason` |
+| --- | --- |
+| No earlier commit carries our check run | `no_baseline` — the first review, or `checks: write` was absent |
+| The commits or check runs could not be read | `baseline_unreadable` |
+| The baseline is not an ancestor of the head | `head_rewritten` — a force-push or a rebase |
+
+The files reviewed are those the comparison reports **intersected with the pull
+request's own changed files**. A merge of the base branch into the branch under
+review otherwise drags in files the pull request never touched. When that
+intersection is empty, no agent runs at all.
+
+The agents are handed the narrowed diff; `list_changed_files` and `get_diff`
+keep describing the whole pull request, so an agent that needs the full picture
+asks for it and pays for it then. Validation is unchanged — its existing rule
+that a finding must sit on an added line in the diff now confines findings to
+lines added since the baseline, with no new rule.
+
+Findings an earlier review posted are still on the pull request as comments.
+Any whose thread is neither resolved nor outdated, and which this run did not
+report again, are listed on the check run under *still open from earlier
+commits*, and hold the conclusion at `neutral`. A narrowed review that found
+nothing new must not read as a clean one.
+
+**What it costs you:** a bug introduced in an earlier commit but only visible
+given the newest commit's context is outside the diff the agents are handed.
+`get_diff` means they can still reach it; nothing makes them. That is the trade
+the input buys, which is why it ships off.
+
 ### Selecting agents
 
 Each agent is an independent tool-calling loop, so a review costs essentially
@@ -602,6 +649,7 @@ under event names, grouped by what they trace:
 | Stage | Events |
 | --- | --- |
 | Review | `review.skipped`, `review.started`, `review.model_selected`, `review.agents_selected`, `review.loaded`, `review.no_agents_matched`, `review.failed` |
+| Scope | `review.scope_resolved`, `review.scope_unreadable`, `review.incremental.no_changes`, `review.carried_forward.unreadable` |
 | Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.skipped` |
 | Synthesis | `synthesis.started`, `synthesis.skipped`, `synthesis.completed`, `synthesis.failed` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
@@ -622,6 +670,9 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 - **[Propose, Refine, Decide](https://sunnyeyles.github.io/pr-review-agents/)**
   — the pipeline traced stage by stage, with a diagram, the file that owns each
   step, and the failure modes. Source: [`docs/index.html`](docs/index.html).
+- **[Incremental review](docs/incremental-review.md)** — the design behind the
+  `incremental` input: where the baseline comes from, every way it widens back
+  to a full review, and what recall it costs.
 
 ## Out of scope
 

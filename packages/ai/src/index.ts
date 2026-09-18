@@ -14,7 +14,10 @@ export {
   type ModelProvider,
   type ReviewModel,
 } from "#src/model";
-export type { ReviewAgent, ReviewContext } from "#src/agent-contract";
+export type {
+  ReviewAgent,
+  ReviewContext,
+} from "#src/agent-contract";
 export { emptyTokenUsage, type TokenUsage } from "#src/usage";
 export { createReviewAgent } from "#src/agents/runtime";
 export {

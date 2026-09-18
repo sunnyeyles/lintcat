@@ -18,6 +18,7 @@ import {
 } from "#src/render-check-run";
 import {
   renderReview,
+  type PostedFinding,
   type RenderedReview,
   type ReviewNotes,
 } from "#src/render-review";
@@ -61,6 +62,8 @@ interface ReviewDeliveryInput
   findings: readonly ReviewFinding[];
   /** Verified patches: committed when a publisher can, offered otherwise. */
   patches?: FixInput | undefined;
+  carriedForward?: readonly PostedFinding[] | undefined;
+  scopeNote?: string | undefined;
 }
 
 interface ReviewDeliveryDeps {
@@ -186,12 +189,15 @@ export async function deliverReview(
     renderCheckRun(input.findings, input.agentFailures, {
       annotate: annotated,
       skippedAgents: input.skippedAgents,
+      carriedForward: input.carriedForward,
+      scopeNote: input.scopeNote,
     }),
   );
 
   deps.logger.info("review.published", {
     ...fields,
     findingCount: input.findings.length,
+    carriedForwardCount: input.carriedForward?.length ?? 0,
     skippedAgents: input.skippedAgents.map((skip) => skip.agent),
     comments,
     annotated,
