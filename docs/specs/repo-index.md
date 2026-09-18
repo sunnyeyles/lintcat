@@ -11,6 +11,7 @@ tier has that the self-hosted action does not.
   *who imports this*, *where is this defined*, *what breaks if this changes*.
 - Zero customer setup beyond installing the App and selecting repositories.
 - Never persist customer source. Store positions and names, read bodies live.
+  Layer C relaxes this to *store a vector per symbol*; see its section.
 - No new infrastructure. The existing Neon database holds the index.
 - Degrade honestly: a missing or partial index is reported as such, never as
   "nothing references this".
@@ -19,7 +20,7 @@ tier has that the self-hosted action does not.
 
 - A general knowledge graph (PRs, authors, review outcomes). That layer can
   hang off these node IDs later; it is not this spec.
-- Semantic or embedding search.
+- Semantic search before phase 5; and never as a substitute for resolution.
 - Indexing pull request heads. The default branch only.
 - Replacing `search_repository`. Text search stays; this adds resolution.
 
@@ -96,6 +97,35 @@ indexer contributes Layer A only and is listed in `coverage` as
 `resolution_rate` per language = resolved import edges ÷ import statements
 seen. Reported to the agents on every tool result.
 
+### Layer C — embeddings
+
+One vector per symbol, for the two questions the graph cannot answer:
+*is this pattern used elsewhere* and *where is the code for X*. Phase 5,
+behind a per-team flag, because it changes the data promise.
+
+- **Unit**: a symbol from Layer B — one function, class, or top-level const
+  — never a file, never a fixed-size chunk. The text embedded is the
+  symbol's source, capped at 2 000 tokens; longer bodies embed their first
+  2 000.
+- **Model**: the team's configured provider's embedding model; for the
+  Anthropic path, Voyage's code model, since Anthropic ships none. Model
+  name and dimension are recorded per build; a change re-embeds everything.
+- **Storage**: `pgvector` on Neon (already available — no new
+  infrastructure). `halfvec` at the model's native dimension.
+- **Incremental by content hash**: `sha256(symbol source)` is stored beside
+  the vector. On rebuild only symbols whose hash changed are re-embedded, so
+  a push costs vectors proportional to the diff, not the repository. This is
+  cheaper churn than `index_edges`.
+- **What is stored**: the vector and the hash. Not the text. A vector is a
+  lossy representation of the symbol's source, and it can be partially
+  inverted; the security page must say "we store a numeric representation of
+  each function's code", not "positions only", for teams with this on.
+- **Scope**: every query is filtered by `index_id` *before* the vector
+  distance, so a search never crosses tenants.
+
+Coverage for Layer C is reported as `embedded / symbols` per language, the
+same way `resolution_rate` is for Layer B.
+
 ### Schema (Postgres)
 
 Drizzle tables in `@pr-review/db`, alongside the existing ones. A build writes
@@ -124,10 +154,14 @@ index_packages   (id, index_id FK, name, root, entry_points jsonb)
 index_files      (id, index_id FK, path, package_id, role, language, loc, owners text[])
 index_symbols    (id, index_id FK, file_id, name, kind, line, end_line, exported bool)
 index_edges      (index_id FK, src int, dst int, kind, line)
+index_embeddings (index_id FK, symbol_id FK, content_hash text, model text,
+                  embedding halfvec(N))      -- Layer C only
 
 indexes: index_files(index_id, path) unique
          index_symbols(index_id, file_id), index_symbols(index_id, name)
          index_edges(index_id, src, kind), index_edges(index_id, dst, kind)
+         index_embeddings(index_id, content_hash)
+         index_embeddings USING hnsw (embedding halfvec_cosine_ops)  -- Layer C only
 ```
 
 `src` / `dst` are symbol IDs for `references` and `calls`, file IDs for
@@ -193,6 +227,23 @@ Transitive dependents to `depth` (max 4), as `{path, via, distance}` rows
 plus `total_dependents`, `total_files_reached`, and `tests_reached`. Depth
 bounded and capped at 500 rows; the counts are always exact.
 
+### `find_similar(path, start_line, end_line)` — Layer C
+
+Embeds the given range of the pull request's HEAD file at review time and
+returns the nearest symbols in the repository: `{path, name, kind, line,
+similarity}`, capped at 20, with a similarity floor of 0.75. The range must
+be in a changed file. The agent reads a hit's body with `get_file`. Intended
+for "this same pattern exists elsewhere — is it wrong there too?"
+
+### `search_semantic(query)` — Layer C
+
+Natural-language query over the same vectors, capped at 20. Intended for
+"where is the code that handles X?" when a name search would not find it.
+Returns locations only.
+
+Both report `embedded_symbols / total_symbols` so the agent knows what a
+miss means.
+
 ### Absent mode
 
 Every tool returns
@@ -235,6 +286,11 @@ Absent: the block says so in one line.
 - **Untrusted input**: index rows are data the indexer wrote from customer
   code. Every string read from them is treated the same as a tool result
   today.
+- **Layer C is opt-in per team** and sends symbol source to the embedding
+  provider at index time and changed hunks at review time — the same
+  provider the review already sends the diff to, so no new party sees the
+  code. The stored vectors are the one thing in the index that is a
+  representation of the code rather than a location in it.
 
 ## Limits
 
@@ -246,6 +302,8 @@ Absent: the block says so in one line.
 | Build time | 15 min | killed; previous index kept |
 | Builds per repo | 1 per 5 min, 1 in flight | queued builds collapse to the newest SHA |
 | `impact_of` rows | 500 | counts stay exact |
+| Embedded symbols per index | 1M | Layer C skipped; `embedded: false` |
+| Embedding tokens per build | per plan | remaining symbols embed on the next build |
 
 Per-plan overrides live on the team, not the repository.
 
@@ -271,6 +329,10 @@ The index can make a review better. It must never make one fail.
 3. **`impact_of`; Python and Go indexers.**
 4. Dashboard: index status, coverage, "most-depended-on files" — all
    queries over tables that already exist by then.
+5. **Layer C**: `find_similar`, `search_semantic`, per-team flag, security
+   page updated. Gate: eval fixtures where the bug is a repeated pattern
+   across files; if `find_similar` does not lift them, it stays off by
+   default.
 
 ## Open questions
 
@@ -278,6 +340,9 @@ The index can make a review better. It must never make one fail.
   hosted-only feature.
 - Data residency for customers who ask; today the answer is "wherever Neon
   is".
+- Layer C's embedding model per provider, and whether one model for every
+  team (simpler, one vector space) beats the team's own provider (no new
+  data-processor). Leaning one model for every team.
 - Monorepos with several `tsconfig.json`: one `scip-typescript` run per
   project, or one at the root with `--infer-tsconfig`. Decide on the first
   real customer monorepo.
