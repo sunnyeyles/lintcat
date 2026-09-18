@@ -21,6 +21,8 @@ export interface AgentDefinition {
    * running agent reviews, and never reaches a prompt.
    */
   paths?: readonly string[];
+  /** Covers every category itself, so running alone it skips synthesis. */
+  standalone?: boolean;
   /** Deprioritisation sentences attached per run; never read from config. */
   repositoryHints?: readonly string[];
 }

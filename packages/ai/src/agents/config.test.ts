@@ -34,8 +34,9 @@ function categories(source: string): string[] {
 }
 
 describe("the built-in agents", () => {
-  it("ships the specialists the configuration may name", () => {
+  it("ships the agents the configuration may name", () => {
     expect([...BUILT_IN_AGENT_NAMES]).toEqual([
+      "general",
       "security",
       "correctness",
       "performance",
@@ -209,14 +210,18 @@ describe("loadAgentDefinitions", () => {
     expect(paths).toEqual(["config/agents.yml"]);
   });
 
-  it("fails with an actionable message when no config exists", async () => {
-    // Nothing ships by default, so this must never quietly review nothing.
-    await expect(loadAgentDefinitions({ readFile: async () => undefined })).rejects.toThrow(
-      /No review agents are configured/,
-    );
-    await expect(loadAgentDefinitions({ readFile: async () => undefined })).rejects.toThrow(
-      /agents:/,
-    );
+  it("reviews with the general agent alone when no config exists", async () => {
+    const agents = await loadAgentDefinitions({ readFile: async () => undefined });
+
+    expect(agents.map((agent) => agent.category)).toEqual(["general"]);
+  });
+
+  it("runs specialists only when the config names them", async () => {
+    const agents = await loadAgentDefinitions({
+      readFile: async () => "agents:\n  - security\n  - general\n",
+    });
+
+    expect(agents.map((agent) => agent.category)).toEqual(["security", "general"]);
   });
 
   it("throws rather than reviewing with the wrong agents", async () => {

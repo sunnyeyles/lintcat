@@ -1,20 +1,22 @@
 # pr-review-agents
 
-Reviews pull requests with the AI agents *you* choose, and publishes the
-result as inline pull request review comments, alongside an `AI PR Review`
-check run carrying the full summary.
+Reviews pull requests with AI agents, and publishes the result as inline pull
+request review comments, alongside an `AI PR Review` check run carrying the
+full summary.
 
-The agents ship with the action, in
-[`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists) —
-Security, Correctness, Performance, Test coverage and Docs drift. None runs by
-default. A repository names the ones it wants in
-[`.github/pr-review-agents.yml`](#choosing-your-agents), and a review runs
-exactly those, in the order that file lists them; with no such file the step
-fails rather than guessing. Any subset can be selected per run.
+By default one **general** agent reviews the pull request for correctness,
+security, performance, test and documentation problems in a single pass. No
+configuration is needed.
 
-This repository's own [`.github/pr-review-agents.yml`](.github/pr-review-agents.yml) names
-all five and is a working starting point to copy — but it is configuration, not
-a default.
+Specialist agents are opt-in. They ship with the action, in
+[`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists):
+Security, Correctness, Performance, Test coverage and Docs drift. A repository
+that names them in [`.github/pr-review-agents.yml`](#choosing-your-agents) gets
+a review from exactly those, run in parallel and merged by a synthesiser. Any
+subset can be selected per run.
+
+This repository's own [`.github/pr-review-agents.yml`](.github/pr-review-agents.yml)
+opts into all five specialists and is a working starting point to copy.
 
 The agents never touch GitHub. They propose structured findings; deterministic
 application code decides what actually gets published.
@@ -196,6 +198,10 @@ together with `Promise.all`, so they run concurrently. Inside one agent, the
 tool-calling loop is one `generateText` call
 (`packages/ai/src/agents/runtime.ts`), capped at 12 steps.
 
+When the general agent runs alone (the default), `synthesise` is skipped and
+reported as `synthesis.outcome: "skipped"` with reason `standalone agent`:
+there is nothing to merge, and `validate` still removes duplicates.
+
 ### Partial failure
 
 One failed agent does not fail the review. `join` collects outcomes in the
@@ -232,7 +238,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-haiku-4-5`) | Default model id, as the provider spells it. An agent may [override it](#per-agent-models); the synthesiser always uses this one. |
 | `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `agents` | no (default `all`) | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides any [path filters](#path-filters). |
-| `agent-config` | no (default `.github/pr-review-agents.yml`) | Path to the YAML file naming the agents. Required — nothing runs until a repository names it. |
+| `agent-config` | no (default `.github/pr-review-agents.yml`) | Path to the YAML file naming the agents. Optional — without it the general agent reviews alone; create it to opt into specialists. |
 | `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
 | `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
 | `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agents and cut first by the synthesiser; shapes the repository acted on are the ones the synthesiser keeps. Needs `contents: write` and `closed` in the workflow's `types`. |
@@ -267,19 +273,26 @@ at zero; that is expected, not a regression.
 
 ### Choosing your agents
 
-Five specialists ship with the action, one file each in
+With no configuration file, the `general` agent
+([`packages/ai/src/agents/general-agent.ts`](packages/ai/src/agents/general-agent.ts))
+reviews every pull request on its own, and its findings carry the `general`
+category.
+
+Five opt-in specialists ship alongside it, one file each in
 [`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists):
 
 | Name | Reviews for |
 | --- | --- |
+| `general` | The default: all of the below in one pass |
 | `security` | Auth, cross-tenant access, injection, secret leakage, privilege |
 | `correctness` | Logic errors, wrong bounds, unhandled null, broken error handling |
 | `performance` | N+1 queries, unbounded reads, quadratic scans, blocking I/O |
 | `test-coverage` | Branches this change adds or changes and leaves untested |
 | `docs-drift` | Documentation this change made wrong |
 
-A repository names the ones it wants in `.github/pr-review-agents.yml` (or
-wherever `agent-config` points):
+To opt in, a repository names the agents it wants in
+`.github/pr-review-agents.yml` (or wherever `agent-config` points). Once the
+file exists, it replaces the default: `general` runs only if it is listed.
 
 ```yaml
 agents:
@@ -385,9 +398,10 @@ request cannot choose the agents that review it. A head-ref read would let the
 branch under review drop an agent, or gate every one of them away with
 `paths`.
 
-A missing file, a malformed one, or one that names no agents fails the step
-before any model call — a review with the wrong agents, or none, looks exactly
-like a clean bill of health, so it must never happen quietly.
+A missing file means the general agent reviews alone. A malformed file, or one
+that names no agents, fails the step before any model call — a review with the
+wrong agents, or none, looks exactly like a clean bill of health, so it must
+never happen quietly.
 
 `pnpm seed-prompts` reads the same file (`--config` to point elsewhere), so
 the prompts published to Langfuse always match the agents configured.
@@ -490,9 +504,9 @@ the sum of its agents, and narrowing the set cuts that roughly in proportion:
 
 An unrecognised name fails the step **before any model call**, rather than
 quietly running a narrower review whose empty result is indistinguishable from
-a clean one. Synthesis still runs for a single agent, deliberately: a narrowed
-run must exercise the same path a full review does, or it is useless for
-iterating on a prompt.
+a clean one. Synthesis still runs for a single specialist, deliberately: a
+narrowed run must exercise the same path a full review does, or it is useless
+for iterating on a prompt. Only the general agent running alone skips it.
 
 Nothing is read from a secrets store at runtime — the workflow token and the
 `api-key` input are the only credentials involved, and neither ever needs to be
