@@ -140,13 +140,20 @@ erDiagram
   `repo_index.current_index_id` to it and deletes the repository's older
   builds, so a review never reads a half-built index. That needs a driver with
   real transactions, which `db()` over neon-http is not — pass `dbSession()`,
-  the WebSocket pool over `drizzle-orm/neon-serverless`, to `writeLayerA`. The
-  read path stays on `db()`: it only selects. Node 22 supplies the WebSocket
-  the pool needs, so nothing configures one.
-- `index_edges.src`/`dst` are file ids for `imports` and `tests`, symbol ids
-  otherwise; `kind` says which. No source text is stored anywhere.
-- `index_symbols` is Layer B: created with the rest so the migration is one
-  step, empty until the SCIP indexers land.
+  the WebSocket pool over `drizzle-orm/neon-serverless`, to `writeIndex`
+  (`writeLayerA` is the old name, kept as an alias). The read path stays on
+  `db()`: it only selects. Node 22 supplies the WebSocket the pool needs, so
+  nothing configures one.
+- `index_edges` direction: for `references`, `src` is the file holding the
+  reference and `dst` is the `index_symbols` row referred to, so the inbound
+  count for a symbol is a `dst` lookup. `imports` and `tests` are file ids on
+  both sides. No source text is stored anywhere.
+- `index_builds.coverage` holds `{ layerA, languages }` — Layer A's file and
+  language counts plus one `LanguageCoverage` per language from Layer B. A
+  build written before Layer B stored a bare `LayerACoverage`;
+  `readStoredCoverage` reads both, and reports the old shape as no languages.
+- `index_symbols` is Layer B: `writeIndex` fills it from
+  `RepositoryIndexData.layerB`, and leaves it empty when no indexer ran.
 
 ## Commands
 

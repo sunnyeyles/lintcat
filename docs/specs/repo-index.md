@@ -164,8 +164,9 @@ indexes: index_files(index_id, path) unique
          index_embeddings USING hnsw (embedding halfvec_cosine_ops)  -- Layer C only
 ```
 
-`src` / `dst` are symbol IDs for `references` and `calls`, file IDs for
-`imports` and `tests`; `kind` disambiguates. No source text anywhere.
+`src` is the referencing file, `dst` the symbol, for `references`; file IDs
+both sides for `imports` and `tests`. `kind` disambiguates. No source text
+anywhere.
 
 Loads use `COPY`, not row inserts: a large repository is millions of edges.
 Every query is scoped by `index_id`, which is the tenant boundary.

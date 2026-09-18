@@ -11,7 +11,8 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import type { FileRole, LayerACoverage } from "@pr-review/index";
+import type { FileRole } from "@pr-review/index";
+import type { StoredCoverage } from "./index-rows.js";
 
 export const severityEnum = pgEnum("severity", ["low", "medium", "high"]);
 export const roleEnum = pgEnum("role", ["owner", "admin", "member"]);
@@ -123,7 +124,7 @@ export const indexBuilds = pgTable("index_builds", {
     .references(() => repos.id, { onDelete: "cascade" }),
   sha: text("sha").notNull(),
   schemaVersion: integer("schema_version").notNull().default(1),
-  coverage: jsonb("coverage").$type<LayerACoverage>().notNull(),
+  coverage: jsonb("coverage").$type<StoredCoverage>().notNull(),
   builtAt: timestampNow("built_at"),
   buildMs: integer("build_ms").notNull().default(0),
 });
@@ -194,7 +195,7 @@ export const indexSymbols = pgTable(
   ],
 );
 
-// src/dst are file ids for "imports" and "tests", symbol ids otherwise; kind says which.
+// "references" runs file -> symbol; "imports" and "tests" are file ids both sides.
 export const indexEdges = pgTable(
   "index_edges",
   {

@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_REFERENCE_FILES,
+  MAX_REFERENCES,
+  MAX_SYMBOL_CANDIDATES,
+} from "@pr-review/index";
+import {
   batchRows,
   directoryOf,
   escapeLike,
   packageForPath,
+  readStoredCoverage,
   toAreaDescription,
+  toImportersResult,
+  toReferencesResult,
+  toSymbolDescription,
+  toSymbolRecord,
   type AreaRows,
+  type SymbolRow,
 } from "./index-rows.js";
 
 describe("batchRows", () => {
@@ -135,5 +146,215 @@ describe("toAreaDescription", () => {
     expect(area.covers).toEqual([]);
     expect(area.package?.name).toBe("@pr-review/db");
     expect(area.siblingsTotal).toBe(4);
+  });
+});
+
+describe("readStoredCoverage", () => {
+  const layerA = {
+    files: 12,
+    truncated: false,
+    languages: { typescript: 12 },
+    manifests: ["pnpm-workspace"],
+  };
+
+  it("reads the Layer B shape back", () => {
+    const languages = [
+      { language: "typescript", files: 12, indexed: true, resolutionRate: 0.9 },
+    ];
+    expect(readStoredCoverage({ layerA, languages })).toEqual({
+      layerA,
+      languages,
+    });
+  });
+
+  it("reads a build written before Layer B as no languages", () => {
+    expect(readStoredCoverage(layerA)).toEqual({ layerA, languages: [] });
+  });
+});
+
+const symbolRow = (over: Partial<SymbolRow> = {}): SymbolRow => ({
+  id: 1,
+  path: SOURCE_FILE,
+  name: "writeIndex",
+  kind: "function",
+  line: 40,
+  endLine: 90,
+  exported: true,
+  ...over,
+});
+
+describe("toSymbolRecord", () => {
+  it("maps the row onto the contract's field names", () => {
+    expect(toSymbolRecord(symbolRow())).toEqual({
+      id: 1,
+      file: SOURCE_FILE,
+      name: "writeIndex",
+      kind: "function",
+      line: 40,
+      endLine: 90,
+      exported: true,
+    });
+  });
+
+  it("falls back to unknown for a kind no indexer of ours writes", () => {
+    expect(toSymbolRecord(symbolRow({ kind: "trait" })).kind).toBe("unknown");
+  });
+});
+
+describe("toSymbolDescription", () => {
+  it("returns the symbol with its counts", () => {
+    const described = toSymbolDescription({
+      path: SOURCE_FILE,
+      name: "writeIndex",
+      symbol: symbolRow(),
+      candidates: [symbolRow({ id: 2, path: TEST_FILE })],
+      inboundReferences: 7,
+      referencingFiles: 3,
+    });
+    expect(described.known).toBe(true);
+    expect(described.symbol?.file).toBe(SOURCE_FILE);
+    expect(described.candidates.map((c) => c.file)).toEqual([TEST_FILE]);
+    expect(described.inboundReferences).toBe(7);
+    expect(described.referencingFiles).toBe(3);
+  });
+
+  it("keeps candidates for an unknown path and zeroes the counts", () => {
+    const described = toSymbolDescription({
+      path: "packages/db/src/gone.ts",
+      name: "writeIndex",
+      symbol: null,
+      candidates: [symbolRow()],
+      inboundReferences: 7,
+      referencingFiles: 3,
+    });
+    expect(described.known).toBe(false);
+    expect(described.symbol).toBeNull();
+    expect(described.candidates.map((c) => c.file)).toEqual([SOURCE_FILE]);
+    expect(described.inboundReferences).toBe(0);
+    expect(described.referencingFiles).toBe(0);
+  });
+
+  it("drops a candidate in the asked-for file and caps the rest", () => {
+    const candidates = [
+      symbolRow({ id: 99 }),
+      ...Array.from({ length: MAX_SYMBOL_CANDIDATES + 5 }, (_, i) =>
+        symbolRow({ id: 100 + i, path: `packages/db/src/other-${i}.ts` }),
+      ),
+    ];
+    const described = toSymbolDescription({
+      path: SOURCE_FILE,
+      name: "writeIndex",
+      symbol: symbolRow(),
+      candidates,
+      inboundReferences: 0,
+      referencingFiles: 0,
+    });
+    expect(described.candidates).toHaveLength(MAX_SYMBOL_CANDIDATES);
+    expect(described.candidates.every((c) => c.file !== SOURCE_FILE)).toBe(true);
+  });
+});
+
+describe("toImportersResult", () => {
+  it("deduplicates and caps the list while the total stays exact", () => {
+    const importers = Array.from(
+      { length: MAX_REFERENCE_FILES + 10 },
+      (_, i) => `packages/db/src/importer-${i}.ts`,
+    );
+    const result = toImportersResult({
+      path: SOURCE_FILE,
+      known: true,
+      importers: [...importers, importers[0] as string],
+      totalImporters: 312,
+    });
+    expect(result.name).toBeNull();
+    expect(result.importers).toHaveLength(MAX_REFERENCE_FILES);
+    expect(result.totalImporters).toBe(312);
+    expect(result.references).toEqual([]);
+  });
+
+  it("marks a path the index does not hold", () => {
+    const result = toImportersResult({
+      path: "packages/db/src/gone.ts",
+      known: false,
+      importers: [],
+      totalImporters: 0,
+    });
+    expect(result.known).toBe(false);
+    expect(result.importers).toEqual([]);
+  });
+});
+
+describe("toReferencesResult", () => {
+  const base = {
+    path: SOURCE_FILE,
+    name: "writeIndex",
+    known: true,
+    totalReferences: 4,
+    totalFiles: 2,
+  };
+
+  it("groups by file in row order and drops a repeated line", () => {
+    const result = toReferencesResult({
+      ...base,
+      references: [
+        { path: OTHER_TEST_FILE, line: 3 },
+        { path: OTHER_TEST_FILE, line: 3 },
+        { path: OTHER_TEST_FILE, line: 9 },
+        { path: TEST_FILE, line: 12 },
+      ],
+    });
+    expect(result.references).toEqual([
+      { file: OTHER_TEST_FILE, lines: [3, 9] },
+      { file: TEST_FILE, lines: [12] },
+    ]);
+    expect(result.totalReferences).toBe(4);
+    expect(result.totalFiles).toBe(2);
+    expect(result.importers).toEqual([]);
+  });
+
+  it("keeps a file whose edge carries no line", () => {
+    const result = toReferencesResult({
+      ...base,
+      references: [{ path: TEST_FILE, line: null }],
+    });
+    expect(result.references).toEqual([{ file: TEST_FILE, lines: [] }]);
+  });
+
+  it("caps the files it returns", () => {
+    const references = Array.from(
+      { length: MAX_REFERENCE_FILES + 10 },
+      (_, i) => ({ path: `packages/db/src/user-${i}.ts`, line: 1 }),
+    );
+    const result = toReferencesResult({ ...base, references });
+    expect(result.references).toHaveLength(MAX_REFERENCE_FILES);
+  });
+
+  it("caps the references it returns while the totals stay exact", () => {
+    const references = Array.from({ length: MAX_REFERENCES + 50 }, (_, i) => ({
+      path: TEST_FILE,
+      line: i + 1,
+    }));
+    const result = toReferencesResult({
+      ...base,
+      references,
+      totalReferences: 4000,
+      totalFiles: 1,
+    });
+    expect(result.references[0]?.lines).toHaveLength(MAX_REFERENCES);
+    expect(result.totalReferences).toBe(4000);
+    expect(result.totalFiles).toBe(1);
+  });
+
+  it("returns nothing for a symbol the index does not hold", () => {
+    const result = toReferencesResult({
+      ...base,
+      known: false,
+      references: [],
+      totalReferences: 0,
+      totalFiles: 0,
+    });
+    expect(result.known).toBe(false);
+    expect(result.references).toEqual([]);
+    expect(result.name).toBe("writeIndex");
   });
 });
