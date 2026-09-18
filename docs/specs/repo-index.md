@@ -11,6 +11,7 @@ tier has that the self-hosted action does not.
   *who imports this*, *where is this defined*, *what breaks if this changes*.
 - Zero customer setup beyond installing the App and selecting repositories.
 - Never persist customer source. Store positions and names, read bodies live.
+- No new infrastructure. The existing Neon database holds the index.
 - Degrade honestly: a missing or partial index is reported as such, never as
   "nothing references this".
 
@@ -34,22 +35,20 @@ tier has that the self-hosted action does not.
 ## Architecture
 
 ```
-GitHub ──webhook──▶ receiver ──▶ index queue ──▶ indexer worker
-                        │                             │
-                        │                             ├─▶ object storage  (graph.sqlite per repo)
-                        │                             └─▶ Postgres        (repo_index row)
-                        │
-                        └──▶ review worker ──▶ fetch graph.sqlite ──▶ tools ──▶ agents
+GitHub ──webhook──▶ receiver ──▶ index queue ──▶ indexer worker ──▶ Postgres
+                        │                                               ▲
+                        └──▶ review worker ──▶ tools ──query───────────┘
+                                                 │
+                                                 └──▶ agents
 ```
 
 | Component | Responsibility |
 |---|---|
 | Receiver | Existing webhook endpoint. Enqueues index jobs; runs reviews. |
 | Index queue | One job per `(repo, sha)`, deduplicated and debounced per repo. |
-| Indexer worker | Ephemeral container. Clone → Layer A → Layer B → write blob → delete clone. |
-| Object storage | S3/R2. One `graph.sqlite` per repository, overwritten per successful build. |
-| Postgres | `repo_index` rows: status, sha, coverage, timings. Never the graph itself. |
-| Review worker | Existing. Fetches the blob at review start and binds the four new tools. |
+| Indexer worker | Ephemeral container. Clone → Layer A → Layer B → bulk-load Postgres → delete clone. |
+| Postgres | The existing Neon database. The graph tables below plus one `repo_index` row per repository. |
+| Review worker | Existing. Binds the four new tools; each one is a query. |
 
 ## Lifecycle
 
@@ -58,8 +57,8 @@ GitHub ──webhook──▶ receiver ──▶ index queue ──▶ indexer w
 | `installation.created`, `installation_repositories.added` | Enqueue a full index for each repository. First review should already have it. |
 | `push` to the default branch | Enqueue. Debounce: at most one build per repository per `INDEX_DEBOUNCE_SECONDS` (default 300); a newer push supersedes a queued one. |
 | `repository.edited` (default branch changed) | Enqueue a full index. |
-| `installation_repositories.removed`, `installation.deleted` | Delete the blob and the `repo_index` row within 24h. |
-| Build failure | Row → `failed` with the reason; the previous blob stays and remains served, flagged `stale`. Retry with backoff, max 3. |
+| `installation_repositories.removed`, `installation.deleted` | Delete the repository's index rows within 24h (cascade from `repo_index`). |
+| Build failure | Row → `failed` with the reason; the previous index stays and remains served, flagged `stale`. Retry with backoff, max 3. |
 
 Status transitions: `building → ready | failed | unsupported`. `unsupported`
 means no language extractor matched anything; the row still records Layer A.
@@ -97,59 +96,64 @@ indexer contributes Layer A only and is listed in `coverage` as
 `resolution_rate` per language = resolved import edges ÷ import statements
 seen. Reported to the agents on every tool result.
 
-### Schema (`graph.sqlite`)
+### Schema (Postgres)
 
-```sql
-CREATE TABLE meta      (key TEXT PRIMARY KEY, value TEXT);          -- sha, built_at, schema_version
-CREATE TABLE packages  (id INTEGER PRIMARY KEY, name TEXT, root TEXT, entry_points TEXT);
-CREATE TABLE files     (id INTEGER PRIMARY KEY, path TEXT UNIQUE, package_id INTEGER,
-                        role TEXT, language TEXT, loc INTEGER, owners TEXT);
-CREATE TABLE symbols   (id INTEGER PRIMARY KEY, file_id INTEGER, name TEXT, kind TEXT,
-                        line INTEGER, end_line INTEGER, exported INTEGER);
-CREATE TABLE edges     (src INTEGER, dst INTEGER, kind TEXT, line INTEGER);
-CREATE TABLE coverage  (language TEXT PRIMARY KEY, files INTEGER, indexed INTEGER,
-                        resolution_rate REAL);
-
-CREATE INDEX symbols_file ON symbols(file_id);
-CREATE INDEX symbols_name ON symbols(name);
-CREATE INDEX edges_src    ON edges(src, kind);
-CREATE INDEX edges_dst    ON edges(dst, kind);
-```
-
-`edges.src` / `edges.dst` are symbol IDs for `references` and `calls`, file IDs
-for `imports` and `tests`; `kind` disambiguates. No source text anywhere.
-
-`schema_version` is bumped on any incompatible change; the review worker
-refuses a blob whose version it does not know and treats it as missing.
-
-### Postgres
+Drizzle tables in `@pr-review/db`, alongside the existing ones. A build writes
+into a fresh `index_id`; `repo_index.current_index_id` flips only when the
+build succeeds, and the previous index's rows are deleted afterwards. A review
+never sees a half-built index.
 
 ```
 repo_index
-  repo_id           int  FK repos.id, PK
-  status            enum building | ready | failed | unsupported
-  sha               text     -- commit indexed
-  default_branch    text
-  blob_key          text     -- object storage key
-  blob_bytes        int
-  schema_version    int
-  coverage          jsonb    -- [{language, files, indexed, resolution_rate}]
-  built_at          timestamptz
-  build_ms          int
-  failure_reason    text
+  repo_id            int  FK repos.id, PK
+  current_index_id   int  FK index_builds.id, null until the first success
+  status             enum building | ready | failed | unsupported
+  default_branch     text
+  failure_reason     text
+
+index_builds
+  id                 serial PK
+  repo_id            int  FK repos.id
+  sha                text
+  schema_version     int
+  coverage           jsonb    -- [{language, files, indexed, resolution_rate}]
+  built_at           timestamptz
+  build_ms           int
+
+index_packages   (id, index_id FK, name, root, entry_points jsonb)
+index_files      (id, index_id FK, path, package_id, role, language, loc, owners text[])
+index_symbols    (id, index_id FK, file_id, name, kind, line, end_line, exported bool)
+index_edges      (index_id FK, src int, dst int, kind, line)
+
+indexes: index_files(index_id, path) unique
+         index_symbols(index_id, file_id), index_symbols(index_id, name)
+         index_edges(index_id, src, kind), index_edges(index_id, dst, kind)
 ```
+
+`src` / `dst` are symbol IDs for `references` and `calls`, file IDs for
+`imports` and `tests`; `kind` disambiguates. No source text anywhere.
+
+Loads use `COPY`, not row inserts: a large repository is millions of edges.
+Every query is scoped by `index_id`, which is the tenant boundary.
+
+**When this outgrows one table.** `index_edges` for a very large monorepo is
+tens of millions of rows and churns on every default-branch push. If that
+becomes the storage or vacuum cost that matters, move `index_edges` (and only
+that) to one blob per repository in object storage, keyed by `index_id`; the
+schema is unchanged and the tools do not notice. Not before it hurts.
 
 ## Read path
 
 At review start the worker:
 
-1. Reads `repo_index` for the repository. Missing, `building` with no prior
-   blob, or unknown `schema_version` → tools are bound in **absent** mode.
-2. Fetches `graph.sqlite` from object storage; opens it read-only with
-   `node:sqlite`.
-3. Computes **stale paths**: files changed between `meta.sha` and the pull
-   request's base SHA (compare API, capped at 300 files; beyond that every
-   result is marked `stale: true`).
+1. Reads `repo_index` for the repository. No `current_index_id`, or a
+   `schema_version` it does not know → tools are bound in **absent** mode.
+2. Computes **stale paths**: files changed between the index's `sha` and the
+   pull request's base SHA (compare API, capped at 300 files; beyond that
+   every result is marked `stale: true`).
+
+Each tool is one or two indexed queries scoped by `index_id`. Nothing is
+downloaded; nothing is held in memory across a review.
 
 Every tool result carries:
 
@@ -220,15 +224,17 @@ Absent: the block says so in one line.
   download only). A package that needs a build step resolves worse; the
   `resolution_rate` shows it.
 - **Default branch only.** Never a pull request head, never a fork.
-- **No source persisted.** The clone is deleted on exit; the blob holds
+- **No source persisted.** The clone is deleted on exit; the index holds
   paths, names, kinds, and line numbers. Nothing else. This is the sentence
   on the security page.
 - **Installation token scope**: `contents: read`, `metadata: read`. The
   index needs nothing the review does not already have.
-- **Tenant isolation**: blob keys are `{installation_id}/{repo_id}/graph.sqlite`;
-  the review worker only ever reads the key from its own `repo_index` row.
-- **Untrusted input**: the blob is data the indexer wrote from customer code.
-  Every string read from it is treated the same as a tool result today.
+- **Tenant isolation**: every query is scoped by `index_id`, which the
+  review worker reads from its own repository's `repo_index` row. No query
+  takes a path or name without that scope.
+- **Untrusted input**: index rows are data the indexer wrote from customer
+  code. Every string read from them is treated the same as a tool result
+  today.
 
 ## Limits
 
@@ -236,8 +242,8 @@ Absent: the block says so in one line.
 |---|---|---|
 | Repository size | 2 GB clone | `failed: too_large`; Layer A still attempted |
 | Files | 200k | Layer B skipped; `unsupported` per language |
-| Blob size | 250 MB | build fails; raise the ceiling per plan |
-| Build time | 15 min | killed; previous blob kept |
+| Edges per index | 20M | build fails; raise the ceiling per plan |
+| Build time | 15 min | killed; previous index kept |
 | Builds per repo | 1 per 5 min, 1 in flight | queued builds collapse to the newest SHA |
 | `impact_of` rows | 500 | counts stay exact |
 
@@ -248,10 +254,10 @@ Per-plan overrides live on the team, not the repository.
 | Situation | Behaviour |
 |---|---|
 | Index building on the first PR | absent mode; the review runs on the eight existing tools |
-| Build failed | previous blob served as stale; dashboard shows the reason |
+| Build failed | previous index served as stale; dashboard shows the reason |
 | Language not covered | Layer A answers; Layer B tools say `indexed: false` for it |
-| Blob corrupt / wrong version | absent mode; alert; rebuild enqueued |
-| Object storage down | absent mode; the review is never blocked on the index |
+| Unknown `schema_version` | absent mode; rebuild enqueued |
+| Database unreachable | absent mode; the review is never blocked on the index |
 
 The index can make a review better. It must never make one fail.
 
@@ -263,14 +269,15 @@ The index can make a review better. It must never make one fail.
    `find_importers`. Gate: eval findings improve on fixtures whose answers
    depend on cross-file resolution; if they do not, stop here.
 3. **`impact_of`; Python and Go indexers.**
-4. Dashboard: index status, coverage, "most-depended-on files" if wanted
-   (would need edges mirrored to Postgres; not before there is a use).
+4. Dashboard: index status, coverage, "most-depended-on files" — all
+   queries over tables that already exist by then.
 
 ## Open questions
 
-- Object storage provider and region policy for customers who ask.
-- Whether the self-hosted action gets a read-only path to a customer-supplied
-  blob, or stays without an index entirely.
+- Whether the self-hosted action gets any index at all, or it stays a
+  hosted-only feature.
+- Data residency for customers who ask; today the answer is "wherever Neon
+  is".
 - Monorepos with several `tsconfig.json`: one `scip-typescript` run per
   project, or one at the root with `--infer-tsconfig`. Decide on the first
   real customer monorepo.
