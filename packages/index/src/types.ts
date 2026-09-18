@@ -112,3 +112,9 @@ export interface RepositoryIndex {
 
 /** Other files listed by `describeArea`, per directory. */
 export const MAX_SIBLINGS = 30;
+
+/** One CODEOWNERS line: a gitignore-like pattern and the owners it grants. */
+export interface OwnerRule {
+  pattern: string;
+  owners: readonly string[];
+}
