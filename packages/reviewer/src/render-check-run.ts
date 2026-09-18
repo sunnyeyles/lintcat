@@ -18,6 +18,7 @@ import {
   skipNotes,
   summarise,
 } from "./finding-format.js";
+import type { PostedFinding } from "./render-review.js";
 import type { AgentFailure } from "./review-pipeline.js";
 import { compareFindingStrength } from "./validate-findings.js";
 
@@ -37,6 +38,8 @@ interface RenderCheckRunOptions {
   annotate: boolean;
   /** Agents whose paths no changed file matched, named in the summary. */
   skippedAgents?: readonly SkippedAgent[] | undefined;
+  carriedForward?: readonly PostedFinding[] | undefined;
+  scopeNote?: string | undefined;
 }
 
 const annotationLevelBySeverity: Record<
@@ -80,6 +83,21 @@ function changedFilesNote(changedFiles: readonly string[]): string[] {
   ];
 }
 
+// Listed so a narrowed review cannot read as a clean one.
+function carriedNotes(carried: readonly PostedFinding[]): string[] {
+  if (carried.length === 0) {
+    return [];
+  }
+  return [
+    `**${countLabel(carried.length, "finding")} still open from earlier commits**`,
+    ...carried.map((posted) => {
+      const heading =
+        posted.heading ?? `${categoryLabel(posted.category)}: ${posted.title}`;
+      return `- ${heading} — \`${posted.file}\``;
+    }),
+  ];
+}
+
 /**
  * The check run for a pull request no agent's paths matched. Never "success":
  * a green check reads as a clean bill of health.
@@ -87,6 +105,7 @@ function changedFilesNote(changedFiles: readonly string[]): string[] {
 export function renderNoAgentMatched(
   skippedAgents: readonly SkippedAgent[],
   changedFiles: readonly string[],
+  carriedForward: readonly PostedFinding[] = [],
 ): RenderedCheckRun {
   return {
     conclusion: "neutral",
@@ -99,6 +118,7 @@ export function renderNoAgentMatched(
             `- ${categoryLabel(skipped.agent)} — waiting on ${pathList(skipped.paths)}`,
         ),
         ...changedFilesNote(changedFiles),
+        ...carriedNotes(carriedForward),
       ].join("\n\n"),
     },
   };
@@ -111,6 +131,25 @@ export function renderCheckRun(
   options: RenderCheckRunOptions,
 ): RenderedCheckRun {
   const skipped = skipNotes(options.skippedAgents ?? []);
+  const carried = options.carriedForward ?? [];
+  const notes = [
+    ...carriedNotes(carried),
+    ...failureNotes(agentFailures),
+    ...skipped,
+    ...(options.scopeNote === undefined ? [] : [options.scopeNote]),
+  ];
+  if (findings.length === 0 && carried.length > 0) {
+    return {
+      conclusion: "neutral",
+      output: {
+        title: `${countLabel(carried.length, "finding")} open from earlier commits`,
+        summary: [
+          "This review added no findings; these stand from earlier commits.",
+          ...notes,
+        ].join("\n\n"),
+      },
+    };
+  }
   if (findings.length === 0) {
     return {
       conclusion: agentFailures.length === 0 ? "success" : "neutral",
@@ -118,8 +157,7 @@ export function renderCheckRun(
         title: "No issues found",
         summary: [
           "The AI review found no issues in this pull request.",
-          ...failureNotes(agentFailures),
-          ...skipped,
+          ...notes,
         ].join("\n\n"),
       },
     };
@@ -131,8 +169,7 @@ export function renderCheckRun(
     `**${title}**`,
     "",
     ...ordered.map(summarise),
-    ...failureNotes(agentFailures),
-    ...skipped,
+    ...notes,
   ].join("\n\n");
 
   const output: CheckRunOutput = { title, summary };

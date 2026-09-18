@@ -80,6 +80,18 @@ inputs:
       one fails the step rather than running a review nobody configured.
     required: false
     default: .github/pr-review-agents.yml
+  incremental:
+    description: >-
+      Whether a review reads only the commits added since this pull request was
+      last reviewed, rather than its whole diff. Set to `true` to turn it on;
+      any other value leaves it off. The baseline is the newest earlier commit
+      carrying a completed `AI PR Review` check run, so nothing extra is
+      stored; a first review, an unreadable one, or a force-push that leaves
+      the baseline off the branch all fall back to reviewing the whole pull
+      request. Findings an earlier review posted and nobody has resolved are
+      listed on the check run, so a narrowed review never reads as a clean one.
+    required: false
+    default: "false"
   memory-branch:
     description: >-
       Branch this action stores its review memory on — one JSON file recording

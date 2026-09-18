@@ -175,6 +175,30 @@ export interface CommitMessageRequest {
   sha: string;
 }
 
+export interface CheckRunsRequest {
+  owner: string;
+  repo: string;
+  sha: string;
+}
+
+export interface CheckRunSummary {
+  name: string;
+  status: string;
+}
+
+export interface CompareCommitsRequest {
+  owner: string;
+  repo: string;
+  base: string;
+  head: string;
+}
+
+/** `files` is capped at 300 by GitHub. */
+export interface CommitComparison {
+  status: "ahead" | "behind" | "identical" | "diverged";
+  files: ChangedFile[];
+}
+
 /**
  * One commit fast-forwarded onto `branch`. `baseSha` is both the parent and
  * the tip the update requires, so a concurrent push is rejected, not overwritten.
@@ -225,6 +249,11 @@ export interface GithubInstallationClient {
   listCommitShas(request: CommitHistoryRequest): Promise<string[]>;
   /** Paths one commit changed; GitHub caps this at 300, so a sweep comes back short. */
   listCommitFiles(request: CommitFilesRequest): Promise<string[]>;
+  /** Oldest first. */
+  listPullRequestCommitShas(ref: PullRequestRef): Promise<string[]>;
+  /** From every app, not only ours. */
+  listCheckRuns(request: CheckRunsRequest): Promise<CheckRunSummary[]>;
+  compareCommits(request: CompareCommitsRequest): Promise<CommitComparison>;
   /** Every inline review comment already on the pull request. */
   listReviewComments(ref: PullRequestRef): Promise<ExistingReviewComment[]>;
   /** The commit one branch currently points at. */
