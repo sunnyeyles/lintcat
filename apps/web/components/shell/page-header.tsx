@@ -1,6 +1,5 @@
+import { cn } from "@pr-review/design";
 import type { ReactNode } from "react";
-
-import { cn } from "@/lib/utils";
 
 export type PageHeaderProps = {
   eyebrow: string;
@@ -26,11 +25,11 @@ export function PageHeader({
     >
       <div className="min-w-0 flex-1 basis-[18rem]">
         <p className="eyebrow">{eyebrow}</p>
-        <h1 className="mt-1.5 font-sans text-[clamp(1.6rem,1.3rem+1.1vw,2.2rem)] font-medium tracking-[-0.015em] text-ink">
+        <h1 className="mt-1.5 font-display text-h1 font-medium tracking-display text-ink">
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-[62ch] font-mono text-[0.74rem] leading-relaxed text-slate">
+          <p className="mt-2 max-w-measure font-mono text-body leading-relaxed text-slate">
             {description}
           </p>
         ) : null}

@@ -1,6 +1,7 @@
+import { Card, EmptyState } from "@pr-review/design";
+
 import { RepoTable } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { Card, EmptyState } from "@/components/ui";
 import { data } from "@/lib/data";
 import { formatNumber } from "@/lib/format";
 
@@ -22,7 +23,7 @@ export default async function ReposPage() {
 
       <div className="mt-8">
         {repos.length > 0 ? (
-          <Card className="px-4 py-3 sm:px-5">
+          <Card padding="table">
             <RepoTable
               repos={repos}
               caption="All connected repositories, most recently reviewed first."

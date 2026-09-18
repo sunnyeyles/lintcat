@@ -1,8 +1,0 @@
-/* `@theme inline` bakes a literal stack into these two utilities; re-point them at the next/font variables. */
-.font-sans {
-  font-family: var(--font-sans);
-}
-
-.font-mono {
-  font-family: var(--font-mono);
-}

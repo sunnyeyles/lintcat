@@ -1,6 +1,7 @@
+import { Chip, cn } from "@pr-review/design";
+
 import { AgentChip } from "@/components/ui";
 import { AGENTS, type AgentName } from "@/lib/data";
-import { cn } from "@/lib/utils";
 
 const KNOWN = new Set<string>(AGENTS);
 
@@ -16,7 +17,7 @@ export function AgentChips({ agents, max = 3, className }: AgentChipsProps) {
   const hidden = named.slice(max);
 
   if (named.length === 0) {
-    return <span className="font-mono text-[0.68rem] text-slate-dim">—</span>;
+    return <span className="font-mono text-caption text-slate">—</span>;
   }
 
   return (
@@ -25,13 +26,10 @@ export function AgentChips({ agents, max = 3, className }: AgentChipsProps) {
         <AgentChip key={agent} agent={agent} />
       ))}
       {hidden.length > 0 ? (
-        <span
-          title={hidden.join(", ")}
-          className="inline-flex items-center rounded-[2px] border border-rule-soft bg-surface-2 px-1.5 py-[0.2rem] font-mono text-[0.66rem] leading-none text-slate"
-        >
+        <Chip variant="soft" title={hidden.join(", ")}>
           +{hidden.length}
           <span className="sr-only"> more: {hidden.join(", ")}</span>
-        </span>
+        </Chip>
       ) : null}
     </span>
   );

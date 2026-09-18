@@ -1,14 +1,13 @@
+import { TooltipProvider } from "@pr-review/design";
 import type { Metadata } from "next";
 import { JetBrains_Mono, Newsreader } from "next/font/google";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { Sidebar } from "@/components/shell/sidebar";
 import { ThemeProvider } from "@/components/shell/theme-provider";
 import { Topbar } from "@/components/shell/topbar";
-import { TooltipProvider } from "@/components/ui/tooltip";
 
 import "./globals.css";
-import "@/components/shell/fonts.css";
 
 const newsreader = Newsreader({
   subsets: ["latin"],
@@ -34,12 +33,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       suppressHydrationWarning
       className={`${newsreader.variable} ${jetbrainsMono.variable}`}
-      style={
-        {
-          "--font-sans": `var(--font-newsreader), "Iowan Old Style", Georgia, serif`,
-          "--font-mono": `var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace`,
-        } as CSSProperties
-      }
     >
       <body>
         <ThemeProvider>

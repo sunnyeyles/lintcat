@@ -1,3 +1,4 @@
+import { EmptyState, Stat, StatGrid } from "@pr-review/design";
 import type { Metadata } from "next";
 
 import {
@@ -12,7 +13,6 @@ import {
   TokenCompositionChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
-import { EmptyState, Stat, StatGrid } from "@/components/ui";
 import { costOf, data } from "@/lib/data";
 import type { TokenCounts } from "@/lib/data/types";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
@@ -63,7 +63,7 @@ export default async function UsagePage({
   return (
     <>
       <PageHeader
-        eyebrow="USAGE"
+        eyebrow="Usage"
         title="Tokens & cost"
         description={`What the agents spent in ${phrase}. Cost uses the fixed price table in lib/data/mock.ts, so the figures are illustrative rather than billed.`}
       />

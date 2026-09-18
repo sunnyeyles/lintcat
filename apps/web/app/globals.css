@@ -1,93 +1,9 @@
 @import "tailwindcss";
+@import "@pr-review/design/tokens.css";
+@import "@pr-review/design/theme.css";
 
+@source "../../../packages/design/src";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-/* Palette lifted from docs/index.html so the dashboard matches the project site. */
-:root {
-  --paper: #f3f5f7;
-  --surface: #ffffff;
-  --surface-2: #eaeef2;
-  --ink: #10151c;
-  --slate: #5a6878;
-  --slate-dim: #8c99a7;
-  --rule: #cfd8e1;
-  --rule-soft: #e1e7ed;
-  --accent: #b4133f;
-  --accent-ink: #ffffff;
-  --accent-wash: #fbe9ee;
-
-  --agent-docs: #12666a;
-  --agent-security: #b4133f;
-  --agent-correctness: #7e5a12;
-  --agent-performance: #2f4ba0;
-  --agent-tests: #6b2c87;
-
-  --sev-low: #5a6878;
-  --sev-medium: #8a6010;
-  --sev-high: #b4133f;
-
-  --ok: #12666a;
-  --warn: #8a6010;
-  --stop: #b4133f;
-  --shadow: 0 1px 2px rgb(16 21 28 / 0.05), 0 9px 27px -13px rgb(16 21 28 / 0.18);
-}
-
-[data-theme="dark"] {
-  --paper: #0c1116;
-  --surface: #141b23;
-  --surface-2: #1b242e;
-  --ink: #dfe6ed;
-  --slate: #93a2b2;
-  --slate-dim: #6c7b8b;
-  --rule: #2a3642;
-  --rule-soft: #202a34;
-  --accent: #ff5b80;
-  --accent-ink: #1a0710;
-  --accent-wash: #2a1119;
-
-  --agent-docs: #4fbdb6;
-  --agent-security: #ff5b80;
-  --agent-correctness: #d9a94a;
-  --agent-performance: #8ca0ee;
-  --agent-tests: #c18fe2;
-
-  --sev-low: #93a2b2;
-  --sev-medium: #d9a94a;
-  --sev-high: #ff5b80;
-
-  --ok: #4fbdb6;
-  --warn: #d9a94a;
-  --stop: #ff5b80;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 9px 27px -13px rgb(0 0 0 / 0.7);
-}
-
-@theme inline {
-  --color-paper: var(--paper);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-ink: var(--ink);
-  --color-slate: var(--slate);
-  --color-slate-dim: var(--slate-dim);
-  --color-rule: var(--rule);
-  --color-rule-soft: var(--rule-soft);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-accent-wash: var(--accent-wash);
-  --color-ok: var(--ok);
-  --color-warn: var(--warn);
-  --color-stop: var(--stop);
-  --color-sev-low: var(--sev-low);
-  --color-sev-medium: var(--sev-medium);
-  --color-sev-high: var(--sev-high);
-  --color-agent-docs: var(--agent-docs);
-  --color-agent-security: var(--agent-security);
-  --color-agent-correctness: var(--agent-correctness);
-  --color-agent-performance: var(--agent-performance);
-  --color-agent-tests: var(--agent-tests);
-  --font-sans: "Newsreader", "Iowan Old Style", Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --shadow-card: var(--shadow);
-}
 
 * {
   border-color: var(--rule-soft);
@@ -96,25 +12,17 @@
 body {
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-mono);
+  font-family: --theme(--font-mono);
   -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
 h3 {
-  font-family: var(--font-sans);
+  font-family: --theme(--font-display);
   text-wrap: balance;
   line-height: 1.15;
   font-weight: 600;
-}
-
-.eyebrow {
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--slate-dim);
-  font-weight: 500;
 }
 
 @media (prefers-reduced-motion: reduce) {

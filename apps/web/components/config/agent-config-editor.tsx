@@ -1,9 +1,9 @@
 "use client";
 
+import { Button, Label, Separator, Switch } from "@pr-review/design";
 import { RotateCcw, TriangleAlert } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
-import { Button, Label, Separator, Switch } from "@/components/ui";
 import {
   AGENT_CONFIG_PATH,
   pathPatterns,
@@ -23,7 +23,7 @@ export type AgentConfigEditorProps = {
 
 function Warning({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-1.5 flex items-start gap-1.5 font-mono text-[0.68rem] leading-relaxed text-warn">
+    <p className="mt-1.5 flex items-start gap-1.5 font-mono text-caption leading-relaxed text-warn">
       <TriangleAlert aria-hidden className="mt-px size-3 shrink-0" />
       <span>{children}</span>
     </p>
@@ -93,7 +93,7 @@ export function AgentConfigEditor({ loaded, repoLabel }: AgentConfigEditorProps)
                     memoryBranch: event.target.value === "" ? null : event.target.value,
                   })
                 }
-                className="mt-1.5 h-8 w-full rounded-[3px] border border-rule bg-surface px-2 font-mono text-[0.72rem] text-ink transition-colors outline-none placeholder:text-slate-dim hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+                className="mt-1.5 h-8 w-full rounded-sm border border-rule bg-surface px-2 font-mono text-label text-ink transition-colors outline-none placeholder:text-slate hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
               />
               <Warning>
                 Stores review memory on this branch. Needs <code>contents: write</code>{" "}
@@ -108,7 +108,7 @@ export function AgentConfigEditor({ loaded, repoLabel }: AgentConfigEditorProps)
 
         <div className="min-w-0">
           <p className="eyebrow">Path gate</p>
-          <p className="mt-1.5 font-mono text-[0.7rem] leading-relaxed text-slate">
+          <p className="mt-1.5 font-mono text-caption leading-relaxed text-slate">
             A gate, not a narrowing: one matching file wakes the agent, which then
             reviews the whole pull request. Patterns are repository-relative.
           </p>
@@ -153,7 +153,7 @@ export function AgentConfigEditor({ loaded, repoLabel }: AgentConfigEditorProps)
             <RotateCcw aria-hidden />
             Reset to loaded config
           </Button>
-          <span className="font-mono text-[0.68rem] text-slate-dim">
+          <span className="font-mono text-caption text-slate">
             {dirty
               ? "Edited here only. Copy the YAML to keep these changes."
               : `Matches the configuration loaded for ${repoLabel}.`}

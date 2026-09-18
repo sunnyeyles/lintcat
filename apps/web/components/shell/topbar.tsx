@@ -1,9 +1,15 @@
+import {
+  ChipDot,
+  chipVariants,
+  cn,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@pr-review/design";
 import Link from "next/link";
 
 import { SidebarDrawer } from "@/components/shell/sidebar";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 
 function DemoDataBadge({ className }: { className?: string }) {
   return (
@@ -11,11 +17,12 @@ function DemoDataBadge({ className }: { className?: string }) {
       <TooltipTrigger
         type="button"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-[2px] border border-warn/60 bg-warn/10 px-1.5 py-[0.2rem] font-mono text-[0.62rem] leading-none font-semibold tracking-[0.14em] text-warn uppercase outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+          chipVariants({ tone: "warn", caps: true }),
+          "outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
           className,
         )}
       >
-        <span aria-hidden className="size-1.5 rounded-full bg-warn" />
+        <ChipDot />
         Demo data
       </TooltipTrigger>
       <TooltipContent side="bottom">
@@ -38,13 +45,13 @@ export function Topbar({ className }: { className?: string }) {
         <SidebarDrawer />
         <Link
           href="/"
-          className="flex min-w-0 items-center gap-2 rounded-[2px] outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+          className="flex min-w-0 items-center gap-2 rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
         >
-          <span aria-hidden className="size-2 shrink-0 bg-accent" />
-          <span className="truncate font-mono text-[0.8rem] font-semibold tracking-[0.02em] text-ink">
+          <span aria-hidden className="size-2 shrink-0 bg-brand" />
+          <span className="truncate font-mono text-body font-semibold tracking-ui text-ink">
             pr-review-agents
           </span>
-          <span className="hidden font-mono text-[0.68rem] text-slate-dim sm:inline">
+          <span className="hidden font-mono text-caption text-slate sm:inline">
             / dashboard
           </span>
         </Link>

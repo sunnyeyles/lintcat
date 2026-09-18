@@ -1,7 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 import {
   Table,
   TableBody,
@@ -9,7 +7,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui";
+} from "@pr-review/design";
+import type { ReactNode } from "react";
 
 export type ChartDataRow = { key: string; cells: ReactNode[] };
 
@@ -23,7 +22,7 @@ export type ChartDataTableProps = {
 export function ChartDataTable({ caption, columns, rows }: ChartDataTableProps) {
   return (
     <details className="mt-3 border-t border-rule-soft pt-2">
-      <summary className="cursor-pointer font-mono text-[0.64rem] tracking-[0.12em] text-slate-dim uppercase outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent">
+      <summary className="cursor-pointer font-mono text-caption tracking-caps text-slate uppercase outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent">
         {caption}
       </summary>
       <div className="mt-2">

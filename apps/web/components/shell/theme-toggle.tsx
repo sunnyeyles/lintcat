@@ -1,11 +1,9 @@
 "use client";
 
+import { cn, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 
 const ORDER = ["system", "light", "dark"] as const;
 
@@ -16,7 +14,7 @@ const META = {
 } as const;
 
 const TRIGGER_CLASS =
-  "inline-flex size-8 items-center justify-center rounded-[3px] border border-rule bg-surface text-slate transition-colors outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+  "inline-flex size-8 items-center justify-center rounded-sm border border-rule bg-surface text-slate transition-colors outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();

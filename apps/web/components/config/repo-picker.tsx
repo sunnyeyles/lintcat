@@ -1,8 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-
 import {
   Label,
   Select,
@@ -10,7 +7,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui";
+} from "@pr-review/design";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 
 export type RepoOption = { id: number; owner: string; name: string };
 

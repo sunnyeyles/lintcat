@@ -1,3 +1,4 @@
+import { Button, EmptyState } from "@pr-review/design";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -10,7 +11,6 @@ import {
   ReviewSummaryPanel,
 } from "@/components/review";
 import { PageHeader } from "@/components/shell";
-import { Button, EmptyState } from "@/components/ui";
 import { data } from "@/lib/data";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 
@@ -51,7 +51,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         title={`${review.repo.owner}/${review.repo.name} #${review.prNumber}`}
         description={
           <>
-            <code className="rounded-[2px] border border-rule-soft bg-surface-2 px-1 py-0.5 text-ink">
+            <code className="rounded-xs border border-rule-soft bg-surface-2 px-1 py-0.5 text-ink">
               {shortSha(review.headSha)}
             </code>{" "}
             · ran{" "}

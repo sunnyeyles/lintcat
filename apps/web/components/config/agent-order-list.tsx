@@ -1,9 +1,10 @@
 "use client";
 
+import { Button, Label, Switch } from "@pr-review/design";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { AgentChip, Button, Label, Switch } from "@/components/ui";
+import { AgentChip } from "@/components/ui";
 import { describeAgent, moveAgent, toggleAgent } from "@/lib/agent-config";
 import { AGENTS, type AgentName } from "@/lib/data/types";
 
@@ -49,7 +50,7 @@ export function AgentOrderList({ agents, onChange }: AgentOrderListProps) {
   return (
     <div className="min-w-0">
       <p className="eyebrow">Agents, in the order they run</p>
-      <p className="mt-1.5 font-mono text-[0.7rem] leading-relaxed text-slate">
+      <p className="mt-1.5 font-mono text-caption leading-relaxed text-slate">
         Order is the order findings reach the synthesiser. Reorder with the arrow
         buttons.
       </p>
@@ -59,18 +60,18 @@ export function AgentOrderList({ agents, onChange }: AgentOrderListProps) {
           {agents.map((agent, index) => (
             <li
               key={agent}
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[3px] border border-rule-soft bg-surface px-2.5 py-2"
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-rule-soft bg-surface px-2.5 py-2"
             >
               <span
                 aria-hidden
-                className="w-4 shrink-0 font-mono text-[0.7rem] text-slate-dim"
+                className="w-4 shrink-0 font-mono text-caption text-slate"
               >
                 {index + 1}
               </span>
 
               <div className="flex min-w-0 flex-1 basis-[14rem] flex-col gap-1">
                 <AgentChip agent={agent} className="self-start" />
-                <span className="font-mono text-[0.68rem] leading-relaxed text-slate">
+                <span className="font-mono text-caption leading-relaxed text-slate">
                   {describeAgent(agent)}
                 </span>
               </div>
@@ -120,7 +121,7 @@ export function AgentOrderList({ agents, onChange }: AgentOrderListProps) {
           ))}
         </ol>
       ) : (
-        <p className="mt-3 rounded-[3px] border border-dashed border-rule px-3 py-4 font-mono text-[0.7rem] text-warn">
+        <p className="mt-3 rounded-sm border border-dashed border-rule px-3 py-4 font-mono text-caption text-warn">
           No agents selected. The action fails the step rather than reporting a clean
           review.
         </p>
@@ -133,11 +134,11 @@ export function AgentOrderList({ agents, onChange }: AgentOrderListProps) {
             {disabled.map((agent) => (
               <li
                 key={agent}
-                className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[3px] border border-dashed border-rule-soft px-2.5 py-2 opacity-80"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-dashed border-rule-soft px-2.5 py-2 opacity-80"
               >
                 <div className="flex min-w-0 flex-1 basis-[14rem] flex-col gap-1">
                   <AgentChip agent={agent} className="self-start" />
-                  <span className="font-mono text-[0.68rem] leading-relaxed text-slate">
+                  <span className="font-mono text-caption leading-relaxed text-slate">
                     {describeAgent(agent)}
                   </span>
                 </div>

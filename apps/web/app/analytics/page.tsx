@@ -1,3 +1,4 @@
+import { EmptyState, Stat, StatGrid } from "@pr-review/design";
 import type { Metadata } from "next";
 
 import {
@@ -10,7 +11,6 @@ import {
   SeverityTrendChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
-import { EmptyState, Stat, StatGrid } from "@/components/ui";
 import { data } from "@/lib/data";
 import { formatDuration, formatNumber } from "@/lib/format";
 
@@ -33,7 +33,7 @@ export default async function AnalyticsPage({
   return (
     <>
       <PageHeader
-        eyebrow="ANALYTICS"
+        eyebrow="Analytics"
         title="Trends"
         description={`What the agents found in ${phrase}, and where it came from.`}
       />

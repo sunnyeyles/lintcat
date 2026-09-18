@@ -14,7 +14,7 @@ function tokenTotal(run: AgentRun): number {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-[0.64rem] tracking-[0.1em] text-slate-dim uppercase">
+      <dt className="text-caption tracking-caps text-slate uppercase">
         {label}
       </dt>
       <dd className="tabular-nums text-slate">{value}</dd>
@@ -40,14 +40,14 @@ export function AgentRunStrip({ runs }: { runs: readonly AgentRun[] }) {
           >
             <AgentChip agent={run.agent} className="self-start" />
             <p className="flex items-baseline gap-1.5">
-              <span className="font-mono text-2xl leading-none font-semibold tabular-nums text-ink">
+              <span className="font-mono text-h2 leading-none font-semibold tabular-nums text-ink">
                 {run.findingCount}
               </span>
-              <span className="font-mono text-[0.64rem] tracking-[0.1em] text-slate-dim uppercase">
+              <span className="font-mono text-caption tracking-caps text-slate uppercase">
                 {run.findingCount === 1 ? "finding" : "findings"}
               </span>
             </p>
-            <dl className="flex flex-col gap-0.5 border-t border-rule-soft pt-2 font-mono text-[0.66rem]">
+            <dl className="flex flex-col gap-0.5 border-t border-rule-soft pt-2 font-mono text-caption">
               <Metric label="time" value={formatDuration(run.durationMs)} />
               <Metric label="tokens" value={formatTokens(tokenTotal(run))} />
               <Metric label="cost" value={formatUsd(costOf(run))} />

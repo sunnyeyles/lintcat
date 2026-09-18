@@ -1,3 +1,4 @@
+import { Button, Card, EmptyState, Stat, StatGrid } from "@pr-review/design";
 import Link from "next/link";
 
 import {
@@ -7,7 +8,6 @@ import {
   Sparkline,
 } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { Button, Card, EmptyState, Stat, StatGrid } from "@/components/ui";
 import { data } from "@/lib/data";
 import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
 
@@ -66,8 +66,8 @@ export default async function OverviewPage() {
         />
       </StatGrid>
 
-      <Section eyebrow="Latest" title="Recent reviews">
-        <Card className="px-4 py-3 sm:px-5">
+      <Section title="Recent reviews">
+        <Card padding="table">
           {reviews.length > 0 ? (
             <ReviewsTable
               reviews={reviews}
@@ -83,18 +83,17 @@ export default async function OverviewPage() {
       </Section>
 
       <Section
-        eyebrow="Coverage"
         title="Repositories at a glance"
         action={
           <Link
             href="/repos"
-            className="font-mono text-[0.7rem] text-accent no-underline hover:underline"
+            className="font-mono text-caption text-accent no-underline hover:underline"
           >
             View all →
           </Link>
         }
       >
-        <Card className="px-4 py-3 sm:px-5">
+        <Card padding="table">
           {repos.length > 0 ? (
             <RepoTable
               repos={repos}

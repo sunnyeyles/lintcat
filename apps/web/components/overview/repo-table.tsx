@@ -1,4 +1,5 @@
 import {
+  cn,
   Table,
   TableBody,
   TableCaption,
@@ -6,10 +7,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui";
+} from "@pr-review/design";
+
 import type { RepoSummary } from "@/lib/data";
 import { formatNumber, formatRelative, formatUsd } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 import { RowLink } from "./row-link";
 
@@ -52,7 +53,7 @@ export function RepoTable({ repos, caption, limit }: RepoTableProps) {
           <TableRow key={repo.id} className="group relative">
             <TableCell className="whitespace-nowrap">
               <RowLink href={`/repos/${repo.owner}/${repo.name}`}>
-                <span className="text-slate-dim">{repo.owner}/</span>
+                <span className="text-slate">{repo.owner}/</span>
                 {repo.name}
               </RowLink>
             </TableCell>
@@ -65,7 +66,7 @@ export function RepoTable({ repos, caption, limit }: RepoTableProps) {
             <TableCell
               className={cn(
                 "text-right font-semibold tabular-nums",
-                repo.openHighSeverity > 0 ? "text-sev-high" : "text-slate-dim",
+                repo.openHighSeverity > 0 ? "text-sev-high" : "text-slate",
               )}
             >
               {formatNumber(repo.openHighSeverity)}
@@ -76,7 +77,7 @@ export function RepoTable({ repos, caption, limit }: RepoTableProps) {
                   {formatRelative(repo.lastReviewedAt)}
                 </time>
               ) : (
-                <span className="text-slate-dim">never</span>
+                <span className="text-slate">never</span>
               )}
             </TableCell>
             <TableCell className="text-right tabular-nums">

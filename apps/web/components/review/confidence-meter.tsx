@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@pr-review/design";
 
 function clamp01(n: number): number {
   return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0;
@@ -18,7 +18,7 @@ export function ConfidenceMeter({
   labelled = true,
 }: ConfidenceMeterProps) {
   const pct = Math.round(clamp01(value) * 100);
-  const tone = pct >= 85 ? "bg-ok" : pct >= 70 ? "bg-accent" : "bg-slate-dim";
+  const tone = pct >= 85 ? "bg-ok" : "bg-slate";
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <span
@@ -29,17 +29,17 @@ export function ConfidenceMeter({
         aria-valuenow={pct}
         aria-valuetext={`${pct}% confidence`}
         className={cn(
-          "block h-1.5 w-full min-w-10 overflow-hidden rounded-[1px] bg-surface-2 ring-1 ring-rule-soft ring-inset",
+          "block h-1.5 w-full min-w-10 overflow-hidden rounded-xs bg-surface-2 ring-1 ring-rule-soft ring-inset",
           barClassName,
         )}
       >
         <span
-          className={cn("block h-full rounded-[1px]", tone)}
+          className={cn("block h-full rounded-xs", tone)}
           style={{ width: `${pct}%` }}
         />
       </span>
       {labelled ? (
-        <span className="shrink-0 font-mono text-[0.68rem] tabular-nums text-slate">
+        <span className="shrink-0 font-mono text-caption tabular-nums text-slate">
           {pct}%
         </span>
       ) : null}

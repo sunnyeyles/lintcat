@@ -1,13 +1,13 @@
 import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "#src/cn";
 
 export function Table({ className, ...props }: ComponentProps<"table">) {
   return (
     <div className="w-full overflow-x-auto">
       <table
         className={cn(
-          "w-full min-w-[28rem] border-collapse font-mono text-[0.78rem]",
+          "w-full min-w-[28rem] border-collapse font-mono text-body",
           className,
         )}
         {...props}
@@ -40,7 +40,7 @@ export function TableHead({ className, ...props }: ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "border-b border-rule pr-3 pb-2 text-left text-[0.64rem] font-medium tracking-[0.12em] text-slate-dim uppercase last:pr-0",
+        "border-b border-rule pr-3 pb-2 text-left text-caption font-medium tracking-caps text-slate uppercase last:pr-0",
         className,
       )}
       {...props}
@@ -63,7 +63,7 @@ export function TableCell({ className, ...props }: ComponentProps<"td">) {
 export function TableCaption({ className, ...props }: ComponentProps<"caption">) {
   return (
     <caption
-      className={cn("caption-bottom pt-3 text-[0.68rem] text-slate-dim", className)}
+      className={cn("caption-bottom pt-3 text-caption text-slate", className)}
       {...props}
     />
   );

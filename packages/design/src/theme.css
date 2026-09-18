@@ -1,0 +1,56 @@
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-slate: var(--slate);
+  --color-slate-dim: var(--slate-dim);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-wash: var(--accent-wash);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-wash: var(--brand-wash);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-stop: var(--stop);
+  --color-sev-low: var(--sev-low);
+  --color-sev-medium: var(--sev-medium);
+  --color-sev-high: var(--sev-high);
+  --color-agent-docs: var(--agent-docs);
+  --color-agent-security: var(--agent-security);
+  --color-agent-correctness: var(--agent-correctness);
+  --color-agent-performance: var(--agent-performance);
+  --color-agent-tests: var(--agent-tests);
+  --font-display: var(--font-newsreader, "Newsreader"), "Iowan Old Style", Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono, "JetBrains Mono"), ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow-card: var(--shadow);
+
+  --text-caption: 0.75rem;
+  --text-label: 0.8125rem;
+  --text-body: 0.875rem;
+  --text-lede: 1.0625rem;
+  --text-h3: 1.25rem;
+  --text-h2: 1.625rem;
+  --text-h1: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 6px;
+
+  --tracking-display: -0.015em;
+  --tracking-ui: 0.04em;
+  --tracking-caps: 0.1em;
+
+  --container-measure: var(--measure);
+}
+
+@utility eyebrow {
+  font-size: --theme(--text-caption);
+  letter-spacing: --theme(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--slate);
+  font-weight: 500;
+}

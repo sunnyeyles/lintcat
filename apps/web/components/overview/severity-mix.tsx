@@ -1,6 +1,7 @@
+import { cn } from "@pr-review/design";
+
 import { SeverityBadge } from "@/components/ui";
 import type { Severity } from "@/lib/data";
-import { cn } from "@/lib/utils";
 
 const ORDER: readonly Severity[] = ["high", "medium", "low"];
 
@@ -13,7 +14,7 @@ export function SeverityMix({ bySeverity, className }: SeverityMixProps) {
   const present = ORDER.filter((severity) => bySeverity[severity] > 0);
 
   if (present.length === 0) {
-    return <span className="font-mono text-[0.68rem] text-slate-dim">no findings</span>;
+    return <span className="font-mono text-caption text-slate">no findings</span>;
   }
 
   return (

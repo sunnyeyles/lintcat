@@ -1,9 +1,8 @@
 "use client";
 
+import { Button } from "@pr-review/design";
 import { Plus, X } from "lucide-react";
 import { useId } from "react";
-
-import { Button } from "@/components/ui";
 
 export type GlobListProps = {
   legend: string;
@@ -29,7 +28,7 @@ export function GlobList({
   return (
     <fieldset className="min-w-0">
       <legend className="eyebrow">{legend}</legend>
-      <p id={hintId} className="mt-1.5 font-mono text-[0.7rem] leading-relaxed text-slate">
+      <p id={hintId} className="mt-1.5 font-mono text-caption leading-relaxed text-slate">
         {hint}
       </p>
 
@@ -55,7 +54,7 @@ export function GlobList({
                     next[index] = event.target.value;
                     onChange(next);
                   }}
-                  className="h-8 min-w-0 flex-1 rounded-[3px] border border-rule bg-surface px-2 font-mono text-[0.72rem] text-ink transition-colors outline-none placeholder:text-slate-dim hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+                  className="h-8 min-w-0 flex-1 rounded-sm border border-rule bg-surface px-2 font-mono text-label text-ink transition-colors outline-none placeholder:text-slate hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
                 />
                 <Button
                   type="button"
@@ -72,7 +71,7 @@ export function GlobList({
           })}
         </ul>
       ) : (
-        <p className="mt-3 font-mono text-[0.7rem] text-slate-dim">
+        <p className="mt-3 font-mono text-caption text-slate">
           None — every changed file passes this way.
         </p>
       )}

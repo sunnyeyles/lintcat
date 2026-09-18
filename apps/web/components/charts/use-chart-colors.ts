@@ -1,5 +1,6 @@
 "use client";
 
+import { type ColorToken, colors } from "@pr-review/design/tokens";
 import { useEffect, useLayoutEffect, useState } from "react";
 
 export const CHART_TOKENS = {
@@ -24,25 +25,13 @@ export const CHART_TOKENS = {
 export type ChartColorKey = keyof typeof CHART_TOKENS;
 export type ChartColors = Record<ChartColorKey, string>;
 
-// Light values from globals.css, used for SSR and if getComputedStyle yields nothing.
-const FALLBACK_COLORS: ChartColors = {
-  agentSecurity: "#b4133f",
-  agentCorrectness: "#7e5a12",
-  agentPerformance: "#2f4ba0",
-  agentTests: "#6b2c87",
-  agentDocs: "#12666a",
-  sevLow: "#5a6878",
-  sevMedium: "#8a6010",
-  sevHigh: "#b4133f",
-  accent: "#b4133f",
-  ink: "#10151c",
-  slate: "#5a6878",
-  slateDim: "#8c99a7",
-  rule: "#cfd8e1",
-  ruleSoft: "#e1e7ed",
-  surface: "#ffffff",
-  surface2: "#eaeef2",
-};
+// Light values, used for SSR and if getComputedStyle yields nothing.
+const FALLBACK_COLORS = Object.fromEntries(
+  Object.entries(CHART_TOKENS).map(([key, token]) => [
+    key,
+    colors[token.slice(2) as ColorToken].light,
+  ]),
+) as ChartColors;
 
 const KEYS = Object.keys(CHART_TOKENS) as ChartColorKey[];
 

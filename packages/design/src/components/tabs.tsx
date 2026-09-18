@@ -3,7 +3,7 @@
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "#src/cn";
 
 export const Tabs = TabsPrimitive.Root;
 
@@ -29,7 +29,7 @@ export function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "-mb-px shrink-0 border-b-2 border-transparent pb-2 font-mono text-[0.68rem] tracking-[0.12em] whitespace-nowrap text-slate-dim uppercase transition-colors outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:pointer-events-none disabled:opacity-45 data-[state=active]:border-accent data-[state=active]:font-semibold data-[state=active]:text-accent",
+        "-mb-px shrink-0 border-b-2 border-transparent pb-2 font-mono text-caption tracking-caps whitespace-nowrap text-slate uppercase transition-colors outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:pointer-events-none disabled:opacity-45 data-[state=active]:border-accent data-[state=active]:font-semibold data-[state=active]:text-accent",
         className,
       )}
       {...props}
