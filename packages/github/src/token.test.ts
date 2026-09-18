@@ -162,6 +162,10 @@ interface StubOptions {
   reviewData?: unknown;
   reviewCommentPages?: unknown[][];
   commitListData?: unknown;
+  /** pulls.listCommits pages, oldest first, as GitHub orders them. */
+  pullCommitPages?: unknown[][];
+  checkRunPages?: unknown[][];
+  comparisonData?: unknown;
   commitData?: unknown;
   treeData?: unknown;
   newCommitData?: unknown;
@@ -176,6 +180,8 @@ function makeOctokit(options: StubOptions = {}) {
   const commentPages = options.reviewCommentPages ?? [[]];
   const graphqlPages = options.graphqlPages ?? [threadPage([])];
   const refShas = options.refShas ?? { "heads/main": defaultBranchSha };
+  const pullCommitPages = options.pullCommitPages ?? [[]];
+  const checkRunPages = options.checkRunPages ?? [[]];
   let graphqlCalls = 0;
   const octokit = {
     rest: {
@@ -207,6 +213,11 @@ function makeOctokit(options: StubOptions = {}) {
             >[0],
           ) => ({ data: commentPages[params.page - 1] ?? [] }),
         ),
+        listCommits: vi.fn(
+          async (
+            params: Parameters<OctokitLike["rest"]["pulls"]["listCommits"]>[0],
+          ) => ({ data: pullCommitPages[params.page - 1] ?? [] }),
+        ),
         createReview: vi.fn(
           async (
             _params: Parameters<OctokitLike["rest"]["pulls"]["createReview"]>[0],
@@ -233,6 +244,13 @@ function makeOctokit(options: StubOptions = {}) {
         getCommit: vi.fn(
           async (_params: Parameters<OctokitLike["rest"]["repos"]["getCommit"]>[0]) => ({
             data: options.commitData ?? commitResponse,
+          }),
+        ),
+        compareCommits: vi.fn(
+          async (
+            _params: Parameters<OctokitLike["rest"]["repos"]["compareCommits"]>[0],
+          ) => ({
+            data: options.comparisonData ?? { status: "ahead", files: [] },
           }),
         ),
         createOrUpdateFileContents: vi.fn(
@@ -281,6 +299,13 @@ function makeOctokit(options: StubOptions = {}) {
         })),
       },
       checks: {
+        listForRef: vi.fn(
+          async (
+            params: Parameters<OctokitLike["rest"]["checks"]["listForRef"]>[0],
+          ) => ({
+            data: { check_runs: checkRunPages[params.page - 1] ?? [] },
+          }),
+        ),
         create: vi.fn(
           async (
             _params: Parameters<OctokitLike["rest"]["checks"]["create"]>[0],
@@ -821,6 +846,136 @@ function makeComment(index: number) {
     user: { login: "github-actions[bot]" },
   };
 }
+
+describe("listPullRequestCommitShas", () => {
+  it("keeps the SHAs in GitHub's order, dropping everything else", async () => {
+    const { octokit, client } = makeClient({
+      pullCommitPages: [[{ sha: "old111", commit: { message: "first" } }, { sha: "head999" }]],
+    });
+
+    expect(await client.listPullRequestCommitShas(ref)).toEqual([
+      "old111",
+      "head999",
+    ]);
+    expect(octokit.rest.pulls.listCommits).toHaveBeenCalledWith(
+      expect.objectContaining({ pull_number: 42, per_page: 100, page: 1 }),
+    );
+  });
+
+  it("paginates until a short page is returned", async () => {
+    const pageOne = Array.from({ length: 100 }, (_, index) => ({
+      sha: `sha${index}`,
+    }));
+    const { octokit, client } = makeClient({
+      pullCommitPages: [pageOne, [{ sha: "last" }]],
+    });
+
+    const shas = await client.listPullRequestCommitShas(ref);
+
+    expect(shas).toHaveLength(101);
+    expect(shas[100]).toBe("last");
+    expect(octokit.rest.pulls.listCommits).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("listCheckRuns", () => {
+  it("unwraps the check_runs envelope and keeps name, status and conclusion", async () => {
+    const { octokit, client } = makeClient({
+      checkRunPages: [
+        [
+          {
+            id: 1,
+            name: "AI PR Review",
+            status: "completed",
+            conclusion: "neutral",
+          },
+        ],
+      ],
+    });
+
+    expect(
+      await client.listCheckRuns({
+        owner: "octo-org",
+        repo: "example-service",
+        sha: "old111",
+      }),
+    ).toEqual([
+      { name: "AI PR Review", status: "completed", conclusion: "neutral" },
+    ]);
+    expect(octokit.rest.checks.listForRef).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: "old111", per_page: 100, page: 1 }),
+    );
+  });
+
+  it("accepts a run that has not concluded", async () => {
+    const { client } = makeClient({
+      checkRunPages: [
+        [{ name: "AI PR Review", status: "in_progress", conclusion: null }],
+      ],
+    });
+
+    expect(
+      (
+        await client.listCheckRuns({
+          owner: "octo-org",
+          repo: "example-service",
+          sha: "old111",
+        })
+      )[0]?.conclusion,
+    ).toBeNull();
+  });
+});
+
+describe("compareCommits", () => {
+  it("returns the status and the files, oldest commit first", async () => {
+    const { octokit, client } = makeClient({
+      comparisonData: {
+        status: "ahead",
+        ahead_by: 1,
+        files: [
+          {
+            filename: "src/sessions.ts",
+            status: "modified",
+            additions: 2,
+            deletions: 0,
+            patch: "@@ -1 +1,2 @@",
+          },
+        ],
+      },
+    });
+
+    const comparison = await client.compareCommits({
+      owner: "octo-org",
+      repo: "example-service",
+      base: "old111",
+      head: "head999",
+    });
+
+    expect(comparison.status).toBe("ahead");
+    expect(comparison.files.map((file) => file.filename)).toEqual([
+      "src/sessions.ts",
+    ]);
+    expect(octokit.rest.repos.compareCommits).toHaveBeenCalledWith({
+      owner: "octo-org",
+      repo: "example-service",
+      base: "old111",
+      head: "head999",
+    });
+  });
+
+  it("reads a comparison GitHub returned with no files array", async () => {
+    const { client } = makeClient({ comparisonData: { status: "identical" } });
+
+    const comparison = await client.compareCommits({
+      owner: "octo-org",
+      repo: "example-service",
+      base: "head999",
+      head: "head999",
+    });
+
+    expect(comparison).toEqual({ status: "identical", files: [] });
+  });
+});
 
 describe("listReviewComments", () => {
   it("keeps only the comment body, and drops the fields we do not consume", async () => {

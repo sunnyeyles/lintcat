@@ -1,6 +1,7 @@
 export { httpStatus, isPermissionError } from "./errors.js";
 export { createTokenClient, type GithubTokenConfig } from "./token.js";
 export {
+  CHECK_RUN_NAME,
   type AnnotationLevel,
   type BranchTipRequest,
   type ChangedFile,
@@ -8,6 +9,11 @@ export {
   type CheckRunAnnotation,
   type CheckRunConclusion,
   type CheckRunOutput,
+  type CheckRunSummary,
+  type CheckRunsRequest,
+  type CommitComparison,
+  type ComparisonStatus,
+  type CompareCommitsRequest,
   type CodeSearchMatch,
   type CodeSearchResult,
   type CommitFileChange,

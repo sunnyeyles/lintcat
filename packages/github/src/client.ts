@@ -168,6 +168,37 @@ export interface BranchTipRequest {
   branch: string;
 }
 
+/** A request for the check runs recorded against one commit. */
+export interface CheckRunsRequest {
+  owner: string;
+  repo: string;
+  sha: string;
+}
+
+/** One check run on a commit; `conclusion` is null until it completes. */
+export interface CheckRunSummary {
+  name: string;
+  status: string;
+  conclusion: string | null;
+}
+
+/** How `head` stands relative to `base`, as GitHub's compare API reports it. */
+export type ComparisonStatus = "ahead" | "behind" | "identical" | "diverged";
+
+/** A request to compare two commits, oldest first. */
+export interface CompareCommitsRequest {
+  owner: string;
+  repo: string;
+  base: string;
+  head: string;
+}
+
+/** Two commits compared. `files` is capped at 300 by GitHub. */
+export interface CommitComparison {
+  status: ComparisonStatus;
+  files: ChangedFile[];
+}
+
 /** A request for one commit's message. */
 export interface CommitMessageRequest {
   owner: string;
@@ -225,6 +256,12 @@ export interface GithubInstallationClient {
   listCommitShas(request: CommitHistoryRequest): Promise<string[]>;
   /** Paths one commit changed; GitHub caps this at 300, so a sweep comes back short. */
   listCommitFiles(request: CommitFilesRequest): Promise<string[]>;
+  /** Every commit on the pull request, oldest first. */
+  listPullRequestCommitShas(ref: PullRequestRef): Promise<string[]>;
+  /** Check runs recorded against one commit, from every app. */
+  listCheckRuns(request: CheckRunsRequest): Promise<CheckRunSummary[]>;
+  /** Compares two commits; the diff is rebuilt from the files it reports. */
+  compareCommits(request: CompareCommitsRequest): Promise<CommitComparison>;
   /** Every inline review comment already on the pull request. */
   listReviewComments(ref: PullRequestRef): Promise<ExistingReviewComment[]>;
   /** The commit one branch currently points at. */

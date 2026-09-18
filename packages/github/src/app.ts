@@ -6,6 +6,10 @@ import {
   type ChangedFile,
   type CheckRun,
   type CheckRunAnnotation,
+  type CheckRunSummary,
+  type CheckRunsRequest,
+  type CommitComparison,
+  type CompareCommitsRequest,
   type CodeSearchRequest,
   type CodeSearchResult,
   type CommitFilesRequest,
@@ -53,6 +57,13 @@ export interface OctokitLike {
         per_page: number;
         page: number;
       }): Promise<{ data: unknown }>;
+      listCommits(params: {
+        owner: string;
+        repo: string;
+        pull_number: number;
+        per_page: number;
+        page: number;
+      }): Promise<{ data: unknown }>;
       createReview(params: {
         owner: string;
         repo: string;
@@ -88,6 +99,12 @@ export interface OctokitLike {
         owner: string;
         repo: string;
         ref: string;
+      }): Promise<{ data: unknown }>;
+      compareCommits(params: {
+        owner: string;
+        repo: string;
+        base: string;
+        head: string;
       }): Promise<{ data: unknown }>;
       createOrUpdateFileContents(params: {
         owner: string;
@@ -145,6 +162,13 @@ export interface OctokitLike {
       }): Promise<{ data: unknown }>;
     };
     checks: {
+      listForRef(params: {
+        owner: string;
+        repo: string;
+        ref: string;
+        per_page: number;
+        page: number;
+      }): Promise<{ data: unknown }>;
       create(params: {
         owner: string;
         repo: string;
@@ -270,6 +294,21 @@ const commitMessageSchema = z.object({
 /** An empty commit (a merge with no conflicts) carries no files array. */
 const commitFilesSchema = z.object({
   files: z.array(z.object({ filename: z.string() })).optional(),
+});
+
+const comparisonSchema = z.object({
+  status: z.enum(["ahead", "behind", "identical", "diverged"]),
+  files: changedFilesSchema.optional(),
+});
+
+const checkRunsSchema = z.object({
+  check_runs: z.array(
+    z.object({
+      name: z.string(),
+      status: z.string(),
+      conclusion: z.string().nullable(),
+    }),
+  ),
 });
 
 const codeSearchSchema = z.object({
@@ -549,6 +588,48 @@ export function createInstallationClient(
         output,
       });
       return checkRunResponseSchema.parse(response.data);
+    },
+
+    listPullRequestCommitShas(ref: PullRequestRef): Promise<string[]> {
+      return paginate(
+        (page) =>
+          octokit.rest.pulls.listCommits({
+            owner: ref.owner,
+            repo: ref.repo,
+            pull_number: ref.pullRequestNumber,
+            per_page: PAGE_SIZE,
+            page,
+          }),
+        (data) => commitListSchema.parse(data).map((commit) => commit.sha),
+      );
+    },
+
+    listCheckRuns(request: CheckRunsRequest): Promise<CheckRunSummary[]> {
+      // check_runs pages like a list, but arrives wrapped in a total_count object.
+      return paginate(
+        (page) =>
+          octokit.rest.checks.listForRef({
+            owner: request.owner,
+            repo: request.repo,
+            ref: request.sha,
+            per_page: PAGE_SIZE,
+            page,
+          }),
+        (data) => checkRunsSchema.parse(data).check_runs,
+      );
+    },
+
+    async compareCommits(
+      request: CompareCommitsRequest,
+    ): Promise<CommitComparison> {
+      const response = await octokit.rest.repos.compareCommits({
+        owner: request.owner,
+        repo: request.repo,
+        base: request.base,
+        head: request.head,
+      });
+      const data = comparisonSchema.parse(response.data);
+      return { status: data.status, files: data.files ?? [] };
     },
 
     listReviewComments(ref: PullRequestRef): Promise<ExistingReviewComment[]> {

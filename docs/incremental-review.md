@@ -1,6 +1,7 @@
 # Incremental review
 
-*Status: proposed. Nothing below is implemented.*
+*Status: implemented, behind the `incremental` action input, which ships off.
+The eval described at the end is the one part still outstanding.*
 
 A review today reads `base...head` every time. A pull request pushed to ten
 times is reviewed ten times over its whole diff, and the ninth run re-reads
@@ -40,14 +41,18 @@ and `behind` both fall back.
 
 ## Resolving the scope
 
-A new module, `packages/reviewer/src/review-scope.ts`, owns the decision and
-hands the pipeline one value:
+`packages/reviewer/src/review-scope.ts` owns the decision and hands the
+pipeline one value:
 
 ```ts
 type ReviewScope =
-  | { kind: "full"; reason: string; diff: string; changedFiles: ChangedFile[] }
-  | { kind: "incremental"; sinceSha: string; diff: string; changedFiles: ChangedFile[] };
+  | { kind: "full"; reason: string; diff; changedFiles }
+  | { kind: "incremental"; sinceSha: string; diff; changedFiles; pullRequest };
 ```
+
+`pullRequest` carries the whole diff and file list beside the narrowed ones, so
+one value serves both readers: the agents get the narrowed pair, publishing
+gets the whole pair.
 
 `reviewPullRequest` calls it in place of today's `getDiff` / `listChangedFiles`
 pair, and reads `scope.diff` and `scope.changedFiles` from then on.
@@ -100,14 +105,17 @@ verification still reads the head commit and still quotes-and-checks.
 
 ## Carrying findings forward
 
-An earlier review's findings live on as their inline comments, and
-`listReviewComments` already reads them for the dedupe in `postedFindingKeys`.
-The check-run summary must render them too, under a heading naming them as open
-from earlier commits.
+An earlier review's findings live on as their inline comments. `listReviewThreads`
+is what reads them, not `listReviewComments`: only a thread that is neither
+resolved nor outdated is still open, and a comment on its own cannot say which.
+Findings this run reported again are filtered out, and the rest render on the
+check run under a heading naming them as open from earlier commits.
 
 Without that, an incremental run reads as though the pull request came back
 clean when its earlier findings are all still there. The conclusion stays
-`neutral` while either set is non-empty.
+`neutral` while either set is non-empty. A GraphQL read that fails logs
+`review.carried_forward.unreadable` and lists nothing, rather than failing the
+review.
 
 ## Configuration
 
@@ -123,19 +131,23 @@ does.
 
 ## Observability
 
-Two events, alongside the existing set:
+Four events, alongside the existing set:
 
 - `review.scope_resolved` — `kind`, `sinceSha`, `incrementalFileCount`,
   `pullRequestFileCount`, and `reason` on a fallback.
+- `review.scope_unreadable` — the baseline lookup threw; the reason it gave.
 - `review.incremental.no_changes` — the empty-intersection case.
+- `review.carried_forward.unreadable` — the review threads could not be read.
 
 `reviewCorrelation` is unchanged: `headSha` still greps one run end to end.
 
 ## Client additions
 
 Three read-only methods on `GithubInstallationClient`:
-`listPullRequestCommits`, `listCheckRunsForRef`, `compareCommits`. Nothing
-gains a write.
+`listPullRequestCommitShas`, `listCheckRuns`, `compareCommits`. Nothing gains a
+write. The narrowed diff is rebuilt from the comparison's file patches rather
+than fetched: the intersection has to happen anyway, and a raw compare diff
+would carry the base-branch files back in.
 
 ## Testing
 
@@ -143,9 +155,11 @@ Unit, over `review-scope.ts`: the first review, a clean increment, a
 force-push, a base merge that must be intersected away, an empty increment, and
 unreadable check runs.
 
-Eval: a fixture pull request with a bug introduced in its second commit.
-Run one reviews both commits, run two only the second. Run two must still
-report the bug, and must spend materially fewer input tokens.
+Eval — **not yet built**: the fixtures are single-commit snapshots, so a
+two-commit fixture is a change to the fixture format before it is a test. A
+fixture pull request with a bug introduced in its second commit, reviewed whole
+and then incrementally: run two must still report the bug, and must spend
+materially fewer input tokens.
 
 ## The trade
 

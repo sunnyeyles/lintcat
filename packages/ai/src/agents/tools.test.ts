@@ -41,6 +41,47 @@ function run(tools: ToolSet, name: string, input: unknown): Promise<unknown> {
   return Promise.resolve(execute(input, executeOptions));
 }
 
+/** A narrowed review: the tools must still describe the whole pull request. */
+const narrowed = {
+  ...context,
+  diff: "@@ -2 +2 @@\n+const limit = 0;\n",
+  changedFiles: [changedFiles[0]!],
+  incremental: {
+    sinceSha: "old111",
+    diff: context.diff,
+    changedFiles: [
+      ...changedFiles,
+      { filename: "docs/sessions.md", status: "modified", additions: 1, deletions: 0, patch: "@@ -1 +1 @@\n+docs\n" },
+    ],
+  },
+};
+
+describe("createReviewTools on a narrowed review", () => {
+  it("lists every file the pull request changed, not only the narrowed set", async () => {
+    const tools = createReviewTools(makeGithub(), narrowed);
+
+    const listed = JSON.parse(
+      String(await run(tools, "list_changed_files", {})),
+    ) as { filename: string }[];
+
+    expect(listed.map((file) => file.filename)).toContain("docs/sessions.md");
+  });
+
+  it("serves the whole pull request's diff, so an agent can widen", async () => {
+    const tools = createReviewTools(makeGithub(), narrowed);
+
+    expect(await run(tools, "get_diff", {})).toBe(context.diff);
+  });
+
+  it("serves a patch for a file the narrowed diff does not cover", async () => {
+    const tools = createReviewTools(makeGithub(), narrowed);
+
+    expect(await run(tools, "get_diff", { path: "docs/sessions.md" })).toContain(
+      "+docs",
+    );
+  });
+});
+
 describe("createReviewTools", () => {
   it("exposes exactly the eight read-only tools from the spec", () => {
     expect(Object.keys(createReviewTools(makeGithub(), scope)).sort()).toEqual(

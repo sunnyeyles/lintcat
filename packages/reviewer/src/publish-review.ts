@@ -18,6 +18,7 @@ import {
 } from "./render-check-run.js";
 import {
   renderReview,
+  type PostedFinding,
   type RenderedReview,
   type ReviewNotes,
 } from "./render-review.js";
@@ -61,6 +62,10 @@ interface ReviewDeliveryInput
   findings: readonly ReviewFinding[];
   /** Verified patches: committed when a publisher can, offered otherwise. */
   patches?: FixInput | undefined;
+  /** Earlier findings still open, which this run's diff may not cover. */
+  carriedForward?: readonly PostedFinding[] | undefined;
+  /** One sentence on what this review read, when it read less than the whole. */
+  scopeNote?: string | undefined;
 }
 
 interface ReviewDeliveryDeps {
@@ -186,12 +191,15 @@ export async function deliverReview(
     renderCheckRun(input.findings, input.agentFailures, {
       annotate: annotated,
       skippedAgents: input.skippedAgents,
+      carriedForward: input.carriedForward,
+      scopeNote: input.scopeNote,
     }),
   );
 
   deps.logger.info("review.published", {
     ...fields,
     findingCount: input.findings.length,
+    carriedForwardCount: input.carriedForward?.length ?? 0,
     skippedAgents: input.skippedAgents.map((skip) => skip.agent),
     comments,
     annotated,

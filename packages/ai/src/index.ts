@@ -14,7 +14,11 @@ export {
   type ModelProvider,
   type ReviewModel,
 } from "./model.js";
-export type { ReviewAgent, ReviewContext } from "./agent-contract.js";
+export type {
+  IncrementalReview,
+  ReviewAgent,
+  ReviewContext,
+} from "./agent-contract.js";
 export { emptyTokenUsage, type TokenUsage } from "./usage.js";
 export { createReviewAgent } from "./agents/runtime.js";
 export {

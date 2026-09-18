@@ -390,6 +390,7 @@ export async function runAction(
       applyFixes,
       client,
       agents,
+      incremental: getInput(env, "incremental") === "true",
       // `activeAgents` is the subset the path gate woke, decided once the
       // changed files are known.
       runReviewPipeline: (reviewClient, context, activeAgents, hints) =>

@@ -28,7 +28,7 @@ export interface RenderedReview {
  * Identifies a finding across pushes. File and title, not line: a later push
  * shifts line numbers.
  */
-function findingKey(finding: ReviewFinding): string {
+export function findingKey(finding: ReviewFinding): string {
   return `${finding.file}|${normaliseTitle(finding.title)}`;
 }
 
@@ -62,9 +62,14 @@ export function postedFindingKeys(
 export interface PostedFinding {
   key: string;
   file: string;
+  /** Normalised: the marker carries no punctuation or case. */
   title: string;
   category: string;
+  /** The comment's own heading, when it has one: the title as it was written. */
+  heading?: string | undefined;
 }
+
+const HEADING = /^\*\*(.+?)\*\*$/m;
 
 /** undefined for a comment predating either marker, or written by a human. */
 export function parsePostedFinding(body: string): PostedFinding | undefined {
@@ -77,11 +82,13 @@ export function parsePostedFinding(body: string): PostedFinding | undefined {
   if (separator === -1) {
     return undefined;
   }
+  const heading = HEADING.exec(body)?.[1];
   return {
     key,
     file: key.slice(0, separator),
     title: key.slice(separator + 1),
     category,
+    ...(heading === undefined ? {} : { heading }),
   };
 }
 

@@ -54,6 +54,7 @@ export {
 } from "./memory.js";
 export {
   categoryMarker,
+  findingKey,
   findingMarker,
   parsePostedFinding,
   postedFindingKeys,
@@ -63,3 +64,12 @@ export {
   type ReviewNotes,
 } from "./render-review.js";
 export { reviewCorrelation, type ReviewTarget } from "./review-target.js";
+export {
+  intersectWithPullRequest,
+  renderDiff,
+  resolveReviewScope,
+  wholePullRequest,
+  type FullReviewScope,
+  type IncrementalReviewScope,
+  type ReviewScope,
+} from "./review-scope.js";
