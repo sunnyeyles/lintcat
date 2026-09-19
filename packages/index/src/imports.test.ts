@@ -195,6 +195,32 @@ describe("relative resolution", () => {
     expect(built.importers.size).toBe(0);
   });
 
+  it("leaves an unresolved asset import out of the resolution rate", () => {
+    const built = index({
+      "src/Logo.tsx": `import logo from "./logo.png";\nimport { x } from "./x";\n`,
+      "src/x.ts": "export const x = 1;\n",
+    });
+    const typescript = built.coverage.find(
+      (entry) => entry.language === "typescript",
+    );
+
+    expect(built.edges).toHaveLength(2);
+    expect(typescript?.resolution).toEqual({
+      internal: 1,
+      resolved: 1,
+      rate: 1,
+    });
+  });
+
+  it("counts an asset import that is in the tree like any other", () => {
+    const built = index({
+      "src/a.ts": `import styles from "./a.css";\n`,
+      "src/a.css": ".a { color: red }\n",
+    });
+
+    expect(built.edges[0]?.to).toBe("src/a.css");
+  });
+
   it("counts unresolved edges alongside resolved ones", () => {
     const built = index({
       "src/a.ts": `import "./b";\nimport "zod";\nimport "#src/b";\n`,

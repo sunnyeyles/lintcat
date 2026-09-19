@@ -6,6 +6,7 @@ import {
   extensionOf,
   joinPath,
   MODULE_EXTENSIONS,
+  SOURCE_EXTENSIONS,
 } from "#src/paths";
 import { nearestFor, type WorkspaceModel } from "#src/workspace";
 
@@ -46,6 +47,12 @@ export function isRelativeSpecifier(specifier: string): boolean {
   return specifier.startsWith(".");
 }
 
+/** False for `./logo.png` and its kind: an extension no source file carries. */
+function namesSource(specifier: string): boolean {
+  const extension = extensionOf(specifier);
+  return extension === "" || SOURCE_EXTENSIONS.includes(extension);
+}
+
 /** The file `specifier` names, or undefined when nothing in the tree matches. */
 export function resolveRelativeImport(
   fromPath: string,
@@ -73,6 +80,9 @@ export interface ResolvedImport {
 const THIRD_PARTY: ResolvedImport = { internal: false };
 
 const UNRESOLVED: ResolvedImport = { internal: true };
+
+/** An import of a bundler asset the archive never carried; not the index's to place. */
+const OUTSIDE_SOURCE: ResolvedImport = { internal: false };
 
 function resolved(path: string | undefined): ResolvedImport {
   return path === undefined ? UNRESOLVED : { path, internal: true };
@@ -159,7 +169,11 @@ export function createImportResolver(
 
   return (fromPath, specifier) => {
     if (isRelativeSpecifier(specifier)) {
-      return resolved(resolveRelativeImport(fromPath, specifier, exists));
+      const path = resolveRelativeImport(fromPath, specifier, exists);
+      if (path === undefined && !namesSource(specifier)) {
+        return OUTSIDE_SOURCE;
+      }
+      return resolved(path);
     }
 
     if (specifier.startsWith("#")) {
