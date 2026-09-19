@@ -11,9 +11,8 @@ import {
   SeverityTrendChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
-import { demoData } from "@/lib/data";
+import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber } from "@/lib/format";
-import { requireOrganization } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Trends" };
 
@@ -26,9 +25,9 @@ export default async function AnalyticsPage({
   params: Promise<{ slug: string }>;
   searchParams: SearchParams;
 }) {
-  await requireOrganization((await params).slug);
+  const source = await data((await params).slug);
   const range = parseRange((await searchParams).range);
-  const trends = await demoData().getTrends(range);
+  const trends = await source.getTrends(range);
   const phrase = RANGE_PHRASE[range];
   const { totals } = trends;
   const highShare =

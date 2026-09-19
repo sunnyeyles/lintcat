@@ -122,7 +122,7 @@ describe("createDbSource", () => {
       name: "widgets",
       reviewCount: 2,
       findingCount: 2,
-      openHighSeverity: 1,
+      highSeverity: 1,
     });
     expect(repos[0]!.lastReviewedAt).toBeInstanceOf(Date);
     expect(repos[0]!.costUsd).toBeCloseTo(perRun * 3, 10);

@@ -218,12 +218,10 @@ const reviews = await (await data(slug)).listReviews({ repoId, limit: 20 });
   query (lists, totals, trends, usage, a repo, a review and its siblings) is
   scoped through the review's repo to the repos `authorize` returned, so another
   organization's row, or a private repo the viewer cannot read, is a 404.
-  Overview, Repositories, a repository, and the review pages use it.
-- `demoData()` (`lib/data/index.ts`) is the seeded fixture in `lib/data/mock.ts`.
-  Analytics, Usage and Agents still use it, and show a **DEMO DATA** chip.
+  Every page uses it.
 
 Trends and usage are computed by the same functions in `lib/data/aggregate.ts`
-for both sources. Agents the UI has no colour for (such as `general`) are left
+from the database rows. Agents the UI has no colour for (such as `general`) are left
 out of agent chips and run strips; their tokens still count toward cost.
 
 ## Cost figures
@@ -242,9 +240,8 @@ app/
     page.tsx            overview
     repos/              repo list, and per-repo review history
     reviews/            recent reviews; [id]/ one review
-    analytics/          trends over time (fixture)
-    usage/              tokens and spend (fixture)
-    settings/agents/    agent config editor (fixture)
+    analytics/          trends over time
+    usage/              tokens and spend
   api/ingest/           the action's endpoint
   api/github/webhook/   the GitHub App's webhook
 components/

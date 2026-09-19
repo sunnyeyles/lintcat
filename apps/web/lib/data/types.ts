@@ -46,7 +46,7 @@ export type ReviewDetail = ReviewSummary & {
 export type RepoSummary = Repo & {
   reviewCount: number;
   findingCount: number;
-  openHighSeverity: number;
+  highSeverity: number;
   lastReviewedAt: Date | null;
   costUsd: number;
 };
@@ -97,17 +97,9 @@ export type Usage = {
   totals: TokenCounts & { costUsd: number; reviewCount: number };
 };
 
-export type AgentConfig = {
-  agents: AgentName[];
-  fix: boolean;
-  memoryBranch: string | null;
-  paths: { include: string[]; exclude: string[] };
-};
-
 export type Range = "7d" | "30d" | "90d";
 
 export type DataSource = {
-  isDemo: boolean;
   organization: Organization;
   listRepos(): Promise<RepoSummary[]>;
   getRepo(owner: string, name: string): Promise<RepoSummary | null>;
@@ -115,5 +107,4 @@ export type DataSource = {
   getReview(id: number): Promise<ReviewDetail | null>;
   getTrends(range: Range, repoId?: number): Promise<Trends>;
   getUsage(range: Range, repoId?: number): Promise<Usage>;
-  getAgentConfig(repoId: number): Promise<AgentConfig>;
 };

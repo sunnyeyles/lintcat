@@ -10,7 +10,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@pr-review/design";
-import { Bot, ChartLine, Coins, FolderGit2, LayoutDashboard, Menu } from "lucide-react";
+import { ChartLine, Coins, FolderGit2, LayoutDashboard, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
@@ -26,7 +26,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
   { href: "/analytics", label: "Analytics", icon: ChartLine },
   { href: "/usage", label: "Usage", icon: Coins },
-  { href: "/settings/agents", label: "Agents", icon: Bot },
 ];
 
 // On a subdomain the browser path has no `/o/<slug>` prefix, so compare without it.

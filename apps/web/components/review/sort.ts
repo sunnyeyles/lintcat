@@ -1,6 +1,6 @@
 import type { Finding } from "@pr-review/db";
 
-import { AGENTS, agentForCategory, type AgentName, type Severity } from "@/lib/data";
+import { AGENTS, isAgentName, type AgentName, type Severity } from "@/lib/data";
 
 export const SEVERITIES: readonly Severity[] = ["high", "medium", "low"];
 
@@ -20,7 +20,8 @@ export function sortFindings(findings: readonly Finding[]): Finding[] {
 }
 
 export function agentKeyOf(finding: Finding): AgentFilterKey {
-  return agentForCategory(finding.agent ?? finding.category) ?? OTHER_AGENT;
+  const name = finding.agent ?? finding.category;
+  return isAgentName(name) ? name : OTHER_AGENT;
 }
 
 export function agentKeysOf(findings: readonly Finding[]): AgentFilterKey[] {
