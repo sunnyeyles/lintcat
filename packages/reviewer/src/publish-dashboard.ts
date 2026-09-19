@@ -18,7 +18,7 @@ export type PublishToDashboard = (
 export interface DashboardPublisherConfig {
   /** Dashboard base URL; `/api/ingest` is appended to it. */
   baseUrl: string;
-  /** The team's ingest secret, sent as a bearer token. */
+  /** The organization's ingest secret, sent as a bearer token. */
   token: string;
   fetch?: typeof globalThis.fetch | undefined;
   logger: StructuredLogger;

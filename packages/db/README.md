@@ -5,8 +5,9 @@ tables are exported from `src/schema.ts`.
 
 ```mermaid
 erDiagram
-  teams |o--o{ users : "has"
-  teams ||--o{ repos : "owns"
+  organizations ||--o{ memberships : "has"
+  users ||--o{ memberships : "holds"
+  organizations ||--o{ repos : "owns"
   repos ||--o{ reviews : "collects"
   reviews ||--o{ findings : "holds"
   reviews ||--o{ agent_runs : "times"
@@ -18,19 +19,27 @@ erDiagram
     text name
     text email
     text avatar_url
-    int team_id FK
-    role role "owner admin member"
   }
-  teams {
+  organizations {
     serial id PK
-    text slug UK "subdomain"
+    int github_account_id UK
+    account_type account_type "organization user"
+    text slug UK "lowercased login, subdomain"
     text name
-    text github_org
+    int installation_id UK
+    timestamptz suspended_at
     text ingest_token UK "sha-256 hex"
+  }
+  memberships {
+    serial id PK
+    int user_id FK
+    int organization_id FK
+    membership_role role "owner member"
+    timestamptz synced_at
   }
   repos {
     serial id PK
-    int team_id FK
+    int organization_id FK
     text owner
     text name
   }
@@ -69,20 +78,22 @@ erDiagram
   }
 ```
 
-- `teams.slug` is the subdomain: `acme` → `acme.<app-domain>`.
+- An organization is one GitHub account, an organization or a user.
+  `github_account_id` is the durable key; `slug` is the lowercased login and the
+  subdomain: `acme` → `acme.<app-domain>`.
 - `agent_runs` is one row per agent per review, carrying the four token counters
   the logging events already emit. `ingestReviewRecord` writes it from the
   record's `agentRuns`.
-- `teams.ingest_token` holds the SHA-256 hex of the team's ingest secret, never
+- `organizations.ingest_token` holds the SHA-256 hex of the ingest secret, never
   the secret. `hashIngestToken` in `src/ingest.ts` computes it.
 - `reviews (repo_id, pr_number, head_sha)` is unique: the ingest upsert's
   conflict target, so a rerun of one commit replaces its runs and findings.
 - `findings.agent` records which review agent produced the finding; `category`
   stays the finding's own classification.
-- One team per user: `users.team_id`, null until they create or join one.
-  Many teams per user later means moving that column into a join table.
-- Deleting a team cascades to its repos, reviews and findings; its users stay
-  and get `team_id = null`.
+- `memberships` is unique on `(user_id, organization_id)`: one role per user
+  per organization, and a user may belong to any number of organizations.
+- Deleting an organization cascades to its memberships, repos, reviews and
+  findings; its users stay.
 
 ## Commands
 

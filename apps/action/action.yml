@@ -127,7 +127,7 @@ inputs:
     default: production
   dashboard-token:
     description: >-
-      The team's ingest secret for the review dashboard. Supply this and
+      The organization's ingest secret for the review dashboard. Supply this and
       dashboard-url to record every review there. Store it as a repository or
       organisation secret; never inline it. Leave both unset and the review is
       published to GitHub only, which is the default.

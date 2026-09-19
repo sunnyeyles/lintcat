@@ -27,17 +27,19 @@ prerendered.
 ## Ingest
 
 `POST /api/ingest` takes a `reviewRecordSchema` body (`@pr-review/schemas`)
-with `Authorization: Bearer <team ingest secret>`. The team's row stores only
-the secret's SHA-256 (`hashIngestToken`). A missing or unknown token is a 401
+with `Authorization: Bearer <organization ingest secret>`. The organization's
+row stores only the secret's SHA-256 (`hashIngestToken`). The record's owner
+must be the organization's login, or it is a 404. A missing or unknown token is a 401
 and writes nothing; a rerun of the same commit replaces that review's agent
 runs and findings.
 
 ## Sign-in
 
 GitHub OAuth through Auth.js v5 (`auth.ts`), with JWT sessions and no auth
-tables. The sign-in pass upserts the `users` row by GitHub id. A user sees one
-team, from `users.team_id`; `requireTeam()` in `lib/session.ts` sends anyone
-signed out or teamless to `/sign-in`.
+tables. The sign-in pass upserts the `users` row by GitHub id. A user can have
+memberships in several organizations (`lib/organization.ts`); the pages show the
+oldest one. `requireMembership()` in `lib/session.ts` sends anyone signed out or
+without a membership to `/sign-in`.
 
 ## The seam
 
@@ -49,9 +51,10 @@ import { data } from "@/lib/data/server";
 const reviews = await (await data()).listReviews({ repoId, limit: 20 });
 ```
 
-- `data()` (`lib/data/server.ts`) is the signed-in user's team, read from
-  Postgres by `createDbSource` in `lib/data/db.ts`. Every query is scoped by the
-  team through the review's repo, so another team's row is a 404, not a leak.
+- `data()` (`lib/data/server.ts`) is the signed-in user's organization, read
+  from Postgres by `createDbSource` in `lib/data/db.ts`. Every query is scoped
+  by the organization through the review's repo, so another organization's row
+  is a 404, not a leak.
   Overview, Repositories, a repository, and the review pages use it.
 - `demoData()` (`lib/data/index.ts`) is the seeded fixture in `lib/data/mock.ts`.
   Analytics, Usage and Agents still use it, and show a **DEMO DATA** chip.
@@ -76,13 +79,14 @@ app/
   analytics/            trends over time (fixture)
   usage/                tokens and spend (fixture)
   settings/agents/      agent config editor (fixture)
-  sign-in/              sign-in and no-team state
+  sign-in/              sign-in and no-organization state
   api/ingest/           the action's endpoint
 components/
   ui/ shell/ charts/ overview/ review/ config/
 lib/
   data/                 the seam above
-  session.ts            session and team helpers
+  session.ts            session and membership helpers
+  organization.ts       a user's memberships
   format.ts             number, duration and date formatting
   agent-config.ts       pr-review-agents.yml serialisation
 ```
