@@ -17,6 +17,7 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `AUTH_GITHUB_ID`     | GitHub OAuth app client id                             |
 | `AUTH_GITHUB_SECRET` | GitHub OAuth app client secret                         |
 | `AUTH_TRUST_HOST`    | `true` for `next start` outside Vercel                 |
+| `APP_DOMAIN`         | Apex domain organizations are subdomains of; default `localhost` |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
 lists them. Register the OAuth app with the callback URL
@@ -49,6 +50,42 @@ same not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
 every organization layout and page calls: a signed-out visitor goes to
 `/sign-in?callbackUrl=<the page>` (the path comes from `middleware.ts`), and a
 not-found renders the 404.
+
+## Subdomains
+
+Each organization is also served at `<slug>.<APP_DOMAIN>`. `middleware.ts`
+rewrites `acme.example.com/repos` onto `/o/acme/repos`; the mapping is
+`organizationSlugFromHost` in `lib/host.ts`. The apex, the reserved names
+`www app api auth admin docs status mail`, and every other host (Vercel preview
+URLs included) pass through, so previews keep using `/o/` paths. `/api/*` and
+`/_next/*` are never rewritten. Links inside an organization still use
+`/o/<slug>/...`, and on a subdomain that form is served as is, so both work;
+`acme.example.com/o/globex/...` is a 404.
+
+Sign-in and the OAuth callback stay on the apex. The session cookie gets
+`Domain=<APP_DOMAIN>`, so one sign-in covers every subdomain. A signed-out
+visitor to `acme.example.com/usage` goes to
+`https://example.com/sign-in?callbackUrl=https://acme.example.com/usage` and is
+returned there; `safeCallbackUrl` accepts only paths and URLs on the app domain
+or its subdomains.
+
+Locally, `acme.localhost:3000` serves `acme`, but browsers do not share a
+`localhost` cookie with its subdomains, so the cookie stays host-only and
+sign-in returns to `/o/acme/...` on the apex instead. To exercise the shared
+session, set `APP_DOMAIN=lvh.me` (public DNS pointing `*.lvh.me` at 127.0.0.1)
+and use `http://lvh.me:3000` and `http://acme.lvh.me:3000`; register
+`http://lvh.me:3000/api/auth/callback/github` on the OAuth app.
+
+### Vercel
+
+1. Move the domain's nameservers to Vercel (`ns1.vercel-dns.com`,
+   `ns2.vercel-dns.com`); a wildcard domain needs them for its certificate.
+2. Add both `example.com` and `*.example.com` to the project's domains.
+3. Set `APP_DOMAIN=example.com` for Production only. Leave it unset for
+   Preview: a browser rejects a `Domain=example.com` cookie on a `*.vercel.app`
+   host, so sign-in there would never stick. Unset, the cookie is host-only.
+4. The OAuth callback URL is registered once, on the apex:
+   `https://example.com/api/auth/callback/github`.
 
 ## The seam
 
@@ -99,6 +136,7 @@ lib/
   authorize.ts          slug + session -> organization and role, or not-found
   session.ts            session and the requireOrganization guard
   organization.ts       a user's memberships
+  host.ts               request host -> organization slug, cookie domain
   paths.ts              /o/<slug> paths and callbackUrl checks
   format.ts             number, duration and date formatting
   agent-config.ts       pr-review-agents.yml serialisation
