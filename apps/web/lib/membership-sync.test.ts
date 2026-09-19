@@ -1,6 +1,8 @@
 import {
   memberships,
   organizations,
+  repoAccess,
+  repos,
   users,
   type Database,
   type GithubAccount,
@@ -35,6 +37,12 @@ const github: GithubAppClient = {
     const listed = githubMembers[org];
     if (!listed) throw new Error(`GitHub is down for ${org}`);
     return listed.find((member) => member.login === username) ?? null;
+  },
+  async getRepositoryPermission() {
+    throw new Error("membership sync never reads repository permissions");
+  },
+  async listRepositoryCollaborators() {
+    throw new Error("membership sync never lists collaborators");
   },
 };
 
@@ -140,6 +148,30 @@ describe("syncSignInMemberships", () => {
 
     expect(await roles()).toEqual([{ organization: "acme", role: "owner" }]);
     expect(await authorize(database, mona, "globex")).toEqual({ status: "not-found" });
+  });
+
+  it("drops the repo access of an organization the user left, keeping the others'", async () => {
+    const acme = await install("acme");
+    const globex = await install("globex");
+    githubMembers = { acme: [monaAs("member")], globex: [monaAs("member")] };
+    await sync();
+    const [user] = await database.select().from(users).where(eq(users.githubId, mona.githubId));
+    const repoIds = await database
+      .insert(repos)
+      .values([
+        { organizationId: acme.id, owner: "acme", name: "vault", private: true },
+        { organizationId: globex.id, owner: "globex", name: "vault", private: true },
+      ])
+      .returning({ id: repos.id });
+    await database
+      .insert(repoAccess)
+      .values(repoIds.map(({ id }) => ({ userId: user!.id, repoId: id, permission: "read" as const })));
+
+    githubMembers = { acme: [monaAs("member")], globex: [] };
+    await sync();
+
+    const left = await database.select({ repoId: repoAccess.repoId }).from(repoAccess);
+    expect(left).toEqual([{ repoId: repoIds[0]!.id }]);
   });
 
   it("makes a personal account's own user its owner, with no GitHub call", async () => {

@@ -13,6 +13,7 @@ import type {
   GithubAppClient,
   InstallationRepository,
   OrganizationMember,
+  RepositoryCollaborator,
 } from "@pr-review/github";
 import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging";
 import { asc, eq, sql } from "drizzle-orm";
@@ -59,6 +60,8 @@ let listed: InstallationRepository[];
 let listCalls: number;
 let members: OrganizationMember[];
 let githubCalls: number;
+// "owner/name" (lowercased) -> who can read it on GitHub; a missing repo makes a listing fail.
+let collaborators: Record<string, RepositoryCollaborator[]>;
 let log: CapturedLogEvent[];
 
 // GitHub's current truth; tests change `members` to simulate edits made on GitHub.
@@ -78,6 +81,22 @@ const github: GithubAppClient = {
     expect([installationId, org.toLowerCase()]).toEqual([INSTALLATION_ID, "acme"]);
     return members.find((member) => member.login === username) ?? null;
   },
+  async getRepositoryPermission(installationId, owner, repo, username) {
+    githubCalls += 1;
+    expect(installationId).toBe(INSTALLATION_ID);
+    return (
+      collaborators[`${owner}/${repo}`.toLowerCase()]?.find(
+        (collaborator) => collaborator.login === username,
+      ) ?? null
+    );
+  },
+  async listRepositoryCollaborators(installationId, owner, repo) {
+    githubCalls += 1;
+    expect(installationId).toBe(INSTALLATION_ID);
+    const listed = collaborators[`${owner}/${repo}`.toLowerCase()];
+    if (!listed) throw new Error(`GitHub is down for ${owner}/${repo}`);
+    return listed;
+  },
 };
 
 beforeEach(async () => {
@@ -86,6 +105,7 @@ beforeEach(async () => {
   listCalls = 0;
   members = [octocat, hubot];
   githubCalls = 0;
+  collaborators = {};
   log = [];
 });
 

@@ -20,6 +20,14 @@ export interface OrganizationMember {
   role: OrganizationRole;
 }
 
+export type RepositoryPermission = "admin" | "maintain" | "write" | "triage" | "read";
+
+export interface RepositoryCollaborator {
+  id: number;
+  login: string;
+  permission: RepositoryPermission;
+}
+
 /** What the dashboard asks GitHub as the App; tests pass a fake. */
 export interface GithubAppClient {
   listInstallationRepositories(
@@ -36,6 +44,54 @@ export interface GithubAppClient {
     org: string,
     username: string,
   ): Promise<OrganizationMember | null>;
+  /** Null when `username` cannot read the repo. */
+  getRepositoryPermission(
+    installationId: number,
+    owner: string,
+    repo: string,
+    username: string,
+  ): Promise<RepositoryCollaborator | null>;
+  /** Everyone who can read the repo, through any grant: direct, team, organization base role. */
+  listRepositoryCollaborators(
+    installationId: number,
+    owner: string,
+    repo: string,
+  ): Promise<RepositoryCollaborator[]>;
+}
+
+const PERMISSIONS: readonly RepositoryPermission[] = [
+  "admin",
+  "maintain",
+  "write",
+  "triage",
+  "read",
+];
+
+// role_name carries maintain and triage; a custom role falls back to the legacy base permission.
+function repositoryPermission(
+  roleName: string | null | undefined,
+  permission: string | null | undefined,
+): RepositoryPermission | null {
+  for (const candidate of [roleName, permission]) {
+    const match = PERMISSIONS.find((known) => known === candidate);
+    if (match) return match;
+  }
+  return null;
+}
+
+const FLAG_PERMISSIONS: readonly [string, RepositoryPermission][] = [
+  ["admin", "admin"],
+  ["maintain", "maintain"],
+  ["push", "write"],
+  ["triage", "triage"],
+  ["pull", "read"],
+];
+
+// For a custom role: the highest permission flag set wins.
+function highestFlag(
+  flags: Record<string, boolean> | null | undefined,
+): RepositoryPermission | null {
+  return FLAG_PERMISSIONS.find(([flag]) => flags?.[flag])?.[1] ?? null;
 }
 
 export interface GithubAppConfig {
@@ -57,6 +113,21 @@ const memberSchema = z.object({
   id: z.number(),
   login: z.string(),
   avatar_url: z.string().nullish(),
+});
+
+const permissionFlagsSchema = z.record(z.string(), z.boolean()).nullish();
+
+const collaboratorSchema = z.object({
+  id: z.number(),
+  login: z.string(),
+  role_name: z.string().nullish(),
+  permissions: permissionFlagsSchema,
+});
+
+const permissionLevelSchema = z.object({
+  permission: z.string(),
+  role_name: z.string().nullish(),
+  user: collaboratorSchema.nullable(),
 });
 
 const membershipSchema = z.object({
@@ -139,6 +210,46 @@ export function createGithubAppClient(config: GithubAppConfig): GithubAppClient 
         avatarUrl: membership.user.avatar_url ?? null,
         role: membership.role === "admin" ? "admin" : "member",
       };
+    },
+
+    async getRepositoryPermission(installationId, owner, repo, username) {
+      let data: unknown;
+      try {
+        ({ data } = await installation(
+          installationId,
+        ).rest.repos.getCollaboratorPermissionLevel({ owner, repo, username }));
+      } catch (error) {
+        if (httpStatus(error) === 404) return null;
+        throw error;
+      }
+      const level = permissionLevelSchema.parse(data);
+      const permission =
+        level.permission === "none"
+          ? null
+          : repositoryPermission(level.role_name, level.permission);
+      if (!permission || !level.user) return null;
+      return { id: level.user.id, login: level.user.login, permission };
+    },
+
+    async listRepositoryCollaborators(installationId, owner, repo) {
+      const octokit = installation(installationId);
+      const data = await octokit.paginate(octokit.rest.repos.listCollaborators, {
+        owner,
+        repo,
+        affiliation: "all",
+        per_page: 100,
+      });
+      return z
+        .array(collaboratorSchema)
+        .parse(data)
+        .flatMap((collaborator) => {
+          const permission =
+            repositoryPermission(collaborator.role_name, null) ??
+            highestFlag(collaborator.permissions);
+          return permission
+            ? [{ id: collaborator.id, login: collaborator.login, permission }]
+            : [];
+        });
     },
   };
 }

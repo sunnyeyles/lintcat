@@ -1,5 +1,6 @@
 import {
   deleteMembership,
+  deleteOrganizationRepoAccess,
   listInstalledOrganizations,
   listOrganizationMembers,
   upsertAccountUser,
@@ -140,6 +141,7 @@ export async function applyMembership(
     return;
   }
   const removed = await deleteMembership(database, organization.id, account.githubId);
+  await deleteOrganizationRepoAccess(database, organization.id, account.githubId);
   logger.info("membership.revoked", { ...fields, removed });
 }
 
