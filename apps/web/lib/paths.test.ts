@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  authRedirect,
   organizationPath,
+  returnUrl,
   safeCallbackUrl,
-  signInPath,
+  signInUrl,
   withinOrganization,
 } from "@/lib/paths";
 
@@ -22,23 +24,97 @@ describe("withinOrganization", () => {
   });
 });
 
+const DOMAIN = "prreview.dev";
+
 describe("safeCallbackUrl", () => {
   it("keeps a same-origin path", () => {
-    expect(safeCallbackUrl("/o/acme/reviews/3?x=1")).toBe("/o/acme/reviews/3?x=1");
+    expect(safeCallbackUrl("/o/acme/reviews/3?x=1", DOMAIN)).toBe("/o/acme/reviews/3?x=1");
+  });
+
+  it("keeps an absolute URL on the app domain or one of its subdomains", () => {
+    expect(safeCallbackUrl("https://acme.prreview.dev/repos?x=1", DOMAIN)).toBe(
+      "https://acme.prreview.dev/repos?x=1",
+    );
+    expect(safeCallbackUrl("https://prreview.dev/", DOMAIN)).toBe("https://prreview.dev/");
+    expect(safeCallbackUrl("http://acme.localhost:3000/usage", "localhost")).toBe(
+      "http://acme.localhost:3000/usage",
+    );
   });
 
   it("falls back to the apex for anything that could leave the site", () => {
-    const unsafe = ["https://evil.test", "//evil.test", "/\\evil.test", "", undefined, ["/o/a"]];
+    const unsafe = [
+      "https://evil.test",
+      "https://prreview.dev.evil.test/",
+      "https://evilprreview.dev/",
+      "https://acme.prreview.dev@evil.test/",
+      "https://user:pw@acme.prreview.dev/",
+      "javascript://acme.prreview.dev/%0aalert(1)",
+      "ftp://acme.prreview.dev/",
+      "//evil.test",
+      "/\\evil.test",
+      "not a url",
+      "",
+      undefined,
+      ["/o/a"],
+    ];
     for (const value of unsafe) {
-      expect(safeCallbackUrl(value)).toBe("/");
+      expect(safeCallbackUrl(value, DOMAIN)).toBe("/");
     }
   });
 });
 
-describe("signInPath", () => {
+describe("authRedirect", () => {
+  const base = "https://prreview.dev";
+
+  it("resolves a path against the apex", () => {
+    expect(authRedirect("/o/acme", base, DOMAIN)).toBe("https://prreview.dev/o/acme");
+  });
+
+  it("returns to an organization subdomain", () => {
+    expect(authRedirect("https://acme.prreview.dev/repos", base, DOMAIN)).toBe(
+      "https://acme.prreview.dev/repos",
+    );
+  });
+
+  it("keeps the current origin when it is not the app domain, as on a preview", () => {
+    const preview = "https://x-git-branch-team.vercel.app";
+    expect(authRedirect(`${preview}/o/acme`, preview, DOMAIN)).toBe(`${preview}/o/acme`);
+  });
+
+  it("sends anything else to the apex", () => {
+    expect(authRedirect("https://evil.test/", base, DOMAIN)).toBe(base);
+    expect(authRedirect("//evil.test", base, DOMAIN)).toBe(base);
+  });
+});
+
+describe("returnUrl", () => {
+  it("returns to the subdomain when the session cookie reaches it", () => {
+    const url = "https://acme.prreview.dev/usage";
+    expect(returnUrl(url, DOMAIN)).toBe(url);
+    expect(returnUrl("/o/acme", DOMAIN)).toBe("/o/acme");
+  });
+
+  it("on localhost, returns to the subdomain's /o/ path on the apex instead", () => {
+    expect(returnUrl("http://acme.localhost:3000/usage?r=7d", "localhost")).toBe(
+      "/o/acme/usage?r=7d",
+    );
+    expect(returnUrl("http://localhost:3000/", "localhost")).toBe("http://localhost:3000/");
+  });
+});
+
+describe("signInUrl", () => {
   it("carries the page to return to", () => {
-    expect(signInPath("/o/acme/usage?range=7d")).toBe(
+    expect(signInUrl("/o/acme/usage?range=7d", DOMAIN)).toBe(
       "/sign-in?callbackUrl=%2Fo%2Facme%2Fusage%3Frange%3D7d",
+    );
+  });
+
+  it("signs a subdomain visitor in on the apex", () => {
+    expect(signInUrl("https://acme.prreview.dev/usage", DOMAIN)).toBe(
+      "https://prreview.dev/sign-in?callbackUrl=https%3A%2F%2Facme.prreview.dev%2Fusage",
+    );
+    expect(signInUrl("http://acme.localhost:3000/", "localhost")).toBe(
+      "http://localhost:3000/sign-in?callbackUrl=http%3A%2F%2Facme.localhost%3A3000%2F",
     );
   });
 });
