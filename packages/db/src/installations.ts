@@ -141,12 +141,22 @@ export async function findRepoByGithubId(
 /** Follows a rename or visibility change of a repo the installation already reported. */
 export async function updateRepository(
   database: Database,
-  repository: RepositoryInput,
+  githubRepoId: number,
+  changes: Partial<Pick<RepositoryInput, "owner" | "name" | "private">>,
 ): Promise<void> {
-  await database
-    .update(repos)
-    .set({ owner: repository.owner, name: repository.name, private: repository.private })
-    .where(eq(repos.githubRepoId, repository.githubRepoId));
+  await database.update(repos).set(changes).where(eq(repos.githubRepoId, githubRepoId));
+}
+
+export async function findOrganizationById(
+  database: Database,
+  id: number,
+): Promise<Organization | undefined> {
+  const [row] = await database
+    .select()
+    .from(organizations)
+    .where(eq(organizations.id, id))
+    .limit(1);
+  return row;
 }
 
 export async function removeRepository(

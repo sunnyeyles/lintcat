@@ -53,8 +53,11 @@ a 401 and writes nothing.
 | `installation`              | `deleted`                        | Set `uninstalled_at` and clear `installation_id`; nothing is deleted          |
 | `installation_repositories` | `added`, `removed`               | Upsert those repos (clearing `removed_at`), or set their `removed_at`          |
 | `organization`              | `member_added`, `member_removed` | Re-check that user's membership with GitHub                                    |
-| `member`                    | `added`, `edited`, `removed`     | Same, when the repository belongs to an organization                           |
+| `member`                    | `added`, `edited`, `removed`     | Same, when the repository belongs to an organization; then re-check that user's permission on the repo |
 | `membership`                | `added`, `removed`               | Same                                                                           |
+| `repository`                | `renamed`                        | Update the repo's owner and name                                               |
+| `repository`                | `privatized`, `publicized`       | Flip `repos.private`; `privatized` also sets `repo_access` from the repo's collaborators |
+| `repository`                | `deleted`, `transferred`         | Set `removed_at` (a transfer within the same account only updates owner/name)  |
 
 Anything else gets a 204. The slug is the account's lowercased login; a
 personal account becomes an organization of type `user`.
@@ -94,6 +97,28 @@ and sign-in share.
 - Every decision is logged: `membership.granted`, `membership.revoked` (with
   `removed`) or `membership.skipped`, each with a `reason` and `source`.
 
+### Repository access
+
+`repo_access` holds a user's GitHub permission (`admin`, `maintain`, `write`,
+`triage`, `read`) on a repo. A member reads public repos, plus private ones they
+have a row for; an organization owner reads every repo. A **repository owner** is
+an organization owner, or `admin`/`maintain` on the repo. `lib/repo-access-sync.ts`
+holds the lookups the webhook and sign-in share.
+
+- A collaborator `member` event asks GitHub for that user's current permission
+  (`GET /repos/{owner}/{repo}/collaborators/{username}/permission`), one call.
+- `privatized` lists the repo's collaborators (`affiliation=all`, which covers
+  teams and the organization's base role), one paginated call, and makes the
+  repo's rows exactly that list. If GitHub fails the repo is still made private
+  and existing rows stay.
+- `repository` events carry no event time, so each action writes only its own
+  field; a `privatized` and `publicized` delivered out of order can still
+  settle on the older visibility.
+- Leaving an organization deletes the user's rows on its repos.
+- Team changes (`team_add`, team membership) are not subscribed, so they land
+  with the user's next sign-in.
+- Logged as `repo_access.granted`, `repo_access.revoked` or `repo_access.skipped`.
+
 ### Registering the App
 
 - Permissions, all read-only: repository **Metadata**, organization
@@ -101,7 +126,8 @@ and sign-in share.
 - Webhook URL `https://<app-domain>/api/github/webhook`, secret in
   `GITHUB_APP_WEBHOOK_SECRET`. Subscribe to `installation`,
   `installation_repositories`, `organization`, `member`, `membership` and
-  `repository`. `repository` is not acted on yet and gets a 204.
+  `repository`. Repository permissions need nothing beyond **Metadata**: both
+  collaborator endpoints are listed under it with installation tokens.
 - User authorization: callback URL as under Environment; its client id and
   secret are `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`. There is no separate
   OAuth app.
@@ -123,12 +149,20 @@ a warm instance mints each one about once an hour. A failed lookup or a
 suspended installation keeps what was stored, and a failed refresh never blocks
 sign-in. The user's OAuth token is not kept.
 
+Repository permissions are refreshed next, the same way: one
+`GET /repos/{owner}/{repo}/collaborators/{username}/permission` per live private
+repo in each installed, unsuspended organization where the user is a plain
+member, up to eight at a time. Owners, public repos and personal accounts need
+no call. A failed lookup keeps that repo's stored row.
+
 ## Organizations and access
 
 Every organization page lives under `/o/<slug>/`. `authorize` (`lib/authorize.ts`)
-reads only the database and returns the organization and the user's role, or
-not-found. An unknown slug, a suspended or uninstalled organization and a
-non-member get the same not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
+reads only the database and returns the organization, the user's role and the
+repos they may read (each with whether they own it), or not-found. Given a repo,
+it also returns that repo. An unknown slug, a suspended or uninstalled
+organization, a non-member and an unreadable or unknown repo get the same
+not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
 every organization layout and page calls: a signed-out visitor goes to
 `/sign-in?callbackUrl=<the page>` (the path comes from `middleware.ts`), and a
 not-found renders the 404.
@@ -180,9 +214,10 @@ const reviews = await (await data(slug)).listReviews({ repoId, limit: 20 });
 ```
 
 - `data(slug)` (`lib/data/server.ts`) is the organization `authorize` let the
-  user into, read from Postgres by `createDbSource` in `lib/data/db.ts`. Every query is scoped
-  by the organization through the review's repo, so another organization's row
-  is a 404, not a leak.
+  user into, read from Postgres by `createDbSource` in `lib/data/db.ts`. Every
+  query (lists, totals, trends, usage, a repo, a review and its siblings) is
+  scoped through the review's repo to the repos `authorize` returned, so another
+  organization's row, or a private repo the viewer cannot read, is a 404.
   Overview, Repositories, a repository, and the review pages use it.
 - `demoData()` (`lib/data/index.ts`) is the seeded fixture in `lib/data/mock.ts`.
   Analytics, Usage and Agents still use it, and show a **DEMO DATA** chip.
@@ -216,10 +251,11 @@ components/
   ui/ shell/ charts/ overview/ review/ config/
 lib/
   data/                 the seam above
-  authorize.ts          slug + session -> organization and role, or not-found
+  authorize.ts          slug + session -> organization, role, readable repos, or not-found
   session.ts            session and the requireOrganization guard
   sign-in.ts            the sign-in pass: user row, then membership refresh
   membership-sync.ts    GitHub role -> membership, shared by webhook and sign-in
+  repo-access-sync.ts   GitHub repo permission -> repo_access, same
   organization.ts       a user's memberships
   github-app.ts         the GitHub App's env and client
   host.ts               request host -> organization slug, cookie domain

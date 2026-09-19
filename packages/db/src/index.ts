@@ -8,6 +8,7 @@ export {
   type IngestResult,
 } from "./ingest";
 export {
+  findOrganizationById,
   findRepoByGithubId,
   markUninstalled,
   removeRepositories,

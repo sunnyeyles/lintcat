@@ -716,6 +716,173 @@ describe("handleGithubWebhook organization members", () => {
   });
 });
 
+function repositoryEvent(
+  action: string,
+  repo: InstallationRepository,
+  ownerId = ACCOUNT_ID,
+) {
+  return delivery("repository", {
+    action,
+    repository: {
+      id: repo.id,
+      name: repo.name,
+      full_name: `${repo.owner}/${repo.name}`,
+      private: repo.private,
+      owner: { id: ownerId, login: repo.owner },
+    },
+    organization: acme,
+    installation: { id: INSTALLATION_ID },
+  });
+}
+
+async function readableBy(member: OrganizationMember): Promise<string[] | "not-found"> {
+  const result = await authorize(database, { githubId: member.id }, "acme");
+  if (result.status !== "allowed") return result.status;
+  const rows = await database.select({ id: repos.id, name: repos.name }).from(repos);
+  return result.readableRepos
+    .map((entry) => rows.find((row) => row.id === entry.id)!.name)
+    .sort();
+}
+
+const readAs = (member: OrganizationMember, permission: RepositoryCollaborator["permission"]) => ({
+  id: member.id,
+  login: member.login,
+  permission,
+});
+
+describe("handleGithubWebhook repository", () => {
+  beforeEach(async () => {
+    await deliver(created());
+  });
+
+  it("follows a rename, keeping the repository's reviews", async () => {
+    await seedReview(widgets);
+    const response = await deliver(
+      repositoryEvent("renamed", { ...widgets, owner: "Acme", name: "gizmos" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect((await state()).repos).toContainEqual(
+      expect.objectContaining({ githubRepoId: widgets.id, owner: "Acme", name: "gizmos" }),
+    );
+    expect(await database.select().from(reviews)).toHaveLength(1);
+  });
+
+  it("hides a repository made private from members without access", async () => {
+    expect(await readableBy(hubot)).toEqual(["widgets"]);
+    collaborators = { "acme/widgets": [readAs(octocat, "admin")] };
+
+    const response = await deliver(repositoryEvent("privatized", { ...widgets, private: true }));
+
+    expect(response.status).toBe(200);
+    expect(await readableBy(hubot)).toEqual([]);
+    expect(await readableBy(octocat)).toEqual(["secrets", "widgets"]);
+  });
+
+  it("keeps a repository made private readable by the members GitHub lets read it", async () => {
+    collaborators = { "acme/widgets": [readAs(octocat, "admin"), readAs(hubot, "maintain")] };
+
+    await deliver(repositoryEvent("privatized", { ...widgets, private: true }));
+
+    expect(await readableBy(hubot)).toEqual(["widgets"]);
+    const access = await authorize(database, { githubId: hubot.id }, "acme", {
+      owner: "Acme",
+      name: "widgets",
+    });
+    expect(access).toMatchObject({ status: "allowed", repo: { isOwner: true } });
+  });
+
+  it("still hides a repository made private when GitHub cannot list who reads it", async () => {
+    const response = await deliver(repositoryEvent("privatized", { ...widgets, private: true }));
+
+    expect(response.status).toBe(200);
+    expect(await readableBy(hubot)).toEqual([]);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "repo_access.skipped", reason: "github_lookup_failed" }),
+    );
+  });
+
+  it("shows a repository made public to every member", async () => {
+    const response = await deliver(repositoryEvent("publicized", { ...secrets, private: false }));
+
+    expect(response.status).toBe(200);
+    expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
+  });
+
+  it("marks a deleted repository removed, keeping its reviews", async () => {
+    await seedReview(secrets);
+    await deliver(repositoryEvent("deleted", secrets));
+
+    expect((await state()).repos).toContainEqual(
+      expect.objectContaining({ githubRepoId: secrets.id, removed: true }),
+    );
+    expect(await database.select().from(reviews)).toHaveLength(1);
+    expect(await readableBy(octocat)).toEqual(["widgets"]);
+  });
+
+  it("marks a repository transferred to another account removed", async () => {
+    await deliver(repositoryEvent("transferred", { ...widgets, owner: "Globex" }, 2_000));
+
+    expect(await readableBy(octocat)).toEqual(["secrets"]);
+  });
+
+  it("converges when the same rename arrives twice", async () => {
+    const request = repositoryEvent("renamed", { ...widgets, name: "gizmos" });
+    await deliver(request.clone());
+    const once = await state();
+    await deliver(request);
+    expect(await state()).toEqual(once);
+  });
+
+  it("204s a repository the installation never reported, and actions it does not act on", async () => {
+    const unknown = { ...widgets, id: 1 };
+    expect((await deliver(repositoryEvent("renamed", unknown))).status).toBe(204);
+    expect((await deliver(repositoryEvent("archived", widgets))).status).toBe(204);
+  });
+});
+
+describe("handleGithubWebhook repository collaborators", () => {
+  beforeEach(async () => {
+    await deliver(created());
+  });
+
+  function collaboratorEvent(action: string, member: OrganizationMember, repo: InstallationRepository) {
+    return delivery("member", {
+      action,
+      member: payloadUser(member),
+      repository: { id: repo.id, name: repo.name, full_name: `${repo.owner}/${repo.name}` },
+      organization: acme,
+      installation: { id: INSTALLATION_ID },
+    });
+  }
+
+  it("grants, changes and revokes a member's access to a private repository", async () => {
+    collaborators = { "acme/secrets": [readAs(hubot, "write")] };
+    await deliver(collaboratorEvent("added", hubot, secrets));
+    expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
+
+    collaborators = { "acme/secrets": [readAs(hubot, "admin")] };
+    await deliver(collaboratorEvent("edited", hubot, secrets));
+    expect(
+      await authorize(database, { githubId: hubot.id }, "acme", { owner: "Acme", name: "secrets" }),
+    ).toMatchObject({ repo: { isOwner: true } });
+
+    collaborators = { "acme/secrets": [] };
+    const response = await deliver(collaboratorEvent("removed", hubot, secrets));
+    expect(response.status).toBe(200);
+    expect(await readableBy(hubot)).toEqual(["widgets"]);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "repo_access.revoked", source: "member.removed" }),
+    );
+  });
+
+  it("asks GitHub, not the payload, so a stale removal leaves current access", async () => {
+    collaborators = { "acme/secrets": [readAs(hubot, "read")] };
+    await deliver(collaboratorEvent("removed", hubot, secrets));
+    expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
+  });
+});
+
 describe("handleGithubWebhook other deliveries", () => {
   it("204s an event it does not act on", async () => {
     const response = await deliver(delivery("push", { ref: "refs/heads/main" }));
