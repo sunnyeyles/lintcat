@@ -7,6 +7,7 @@ import type {
   ExistingReviewComment,
   GithubInstallationClient,
   PullRequestDetails,
+  RepositoryArchiveRequest,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -33,6 +34,11 @@ function makeClient() {
       matches: [],
       totalCount: 0,
       incompleteResults: false,
+    })),
+    getRepositoryArchive: vi.fn(async (request: RepositoryArchiveRequest) => ({
+      sha: request.ref,
+      files: new Map<string, string>(),
+      truncated: false,
     })),
     listCommitShas: vi.fn(async () => []),
     listCommitFiles: vi.fn(async () => []),

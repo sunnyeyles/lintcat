@@ -1,3 +1,9 @@
+export {
+  ArchiveTooLargeError,
+  DEFAULT_ARCHIVE_LIMITS,
+  readRepositoryTarball,
+  type TarballContents,
+} from "#src/archive";
 export { httpStatus, isPermissionError } from "#src/errors";
 export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
@@ -27,6 +33,9 @@ export {
   type PullRequestDetails,
   type PullRequestRef,
   type PullRequestReview,
+  type RepositoryArchive,
+  type RepositoryArchiveLimits,
+  type RepositoryArchiveRequest,
   type ReviewComment,
   type ReviewThread,
   type WriteFileRequest,

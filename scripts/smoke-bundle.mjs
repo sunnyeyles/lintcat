@@ -20,6 +20,11 @@ const actionManifest = path.join(actionDir, "action.yml");
  */
 const requiredExport = "runEntrypoint";
 
+/** Tool names the bundle must still carry, and ones it must no longer carry. */
+const requiredToolNames = ["find_references"];
+
+const retiredToolNames = ["find_importers"];
+
 const failures = [];
 
 function fail(message) {
@@ -92,14 +97,32 @@ function runProbe(label, extraEnv) {
 
 try {
   // --- the bundle exists at all ------------------------------------------
+  let bundleSource;
   try {
-    readFileSync(bundlePath);
+    bundleSource = readFileSync(bundlePath, "utf8");
   } catch {
     console.error(
       `Bundle not found at ${path.relative(repoRoot, bundlePath)}.\n` +
         "Build it first: pnpm --filter @pr-review/action build",
     );
     process.exit(1);
+  }
+
+  // --- the shipped tool set ----------------------------------------------
+  heading("Tool names in the bundle");
+  for (const name of requiredToolNames) {
+    if (bundleSource.includes(name)) {
+      console.log(`  carries ${name}`);
+    } else {
+      fail(`The bundle does not mention ${name}; the tool did not ship.`);
+    }
+  }
+  for (const name of retiredToolNames) {
+    if (bundleSource.includes(name)) {
+      fail(`The bundle still mentions ${name}, a retired tool.`);
+    } else {
+      console.log(`  no trace of the retired ${name}`);
+    }
   }
 
   // --- Node major matches what the action declares ------------------------

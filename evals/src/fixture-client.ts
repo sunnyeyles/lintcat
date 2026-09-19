@@ -2,6 +2,8 @@
  * Serves a fixture repository through the real GithubInstallationClient
  * interface. Nothing talks to GitHub, and every write method throws.
  */
+import process from "node:process";
+
 import type {
   ChangedFile,
   CheckRun,
@@ -20,6 +22,8 @@ import type {
   PullRequestDetails,
   PullRequestRef,
   PullRequestReview,
+  RepositoryArchive,
+  RepositoryArchiveRequest,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -28,6 +32,14 @@ import type { LoadedFixture } from "#src/fixture";
 
 /** At most this many search matches come back from one query. */
 const MAX_SEARCH_MATCHES = 25;
+
+/** Set to `off` for the control arm: the archive is unavailable, so no index is built. */
+export const INDEX_ENV = "EVAL_INDEX";
+
+/** The control arm runs the identical suite with the index absent. */
+export function indexEnabled(env: Record<string, string | undefined>): boolean {
+  return (env[INDEX_ENV] ?? "").trim().toLowerCase() !== "off";
+}
 
 /** Characters of context either side of a match, as GitHub's fragments have. */
 const FRAGMENT_PADDING = 120;
@@ -164,6 +176,29 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
         matches: matches.slice(0, MAX_SEARCH_MATCHES),
         totalCount: matches.length,
         incompleteResults: false,
+      };
+    },
+
+    async getRepositoryArchive(
+      request: RepositoryArchiveRequest,
+    ): Promise<RepositoryArchive> {
+      const { owner, repo } = fixture.context;
+      if (request.owner !== owner || request.repo !== repo) {
+        throw new FixtureNotFoundError(
+          `fixture ${fixture.name} serves ${owner}/${repo}, not ${request.owner}/${request.repo}`,
+        );
+      }
+      record("getRepositoryArchive", request.ref);
+      if (!indexEnabled(process.env)) {
+        throw new FixtureNotFoundError(
+          `${INDEX_ENV}=off: the archive of ${owner}/${repo} is unavailable for this run`,
+        );
+      }
+      // The index is always built at the base commit, so that is what it serves.
+      return {
+        sha: request.ref,
+        files: new Map(fixture.baseFiles),
+        truncated: false,
       };
     },
 

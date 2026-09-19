@@ -69,6 +69,29 @@ export const evalCases: EvalCase[] = [
     ],
   },
   {
+    fixture: "correctness-cross-file-caller",
+    expectations: [
+      agentsCompleted,
+      {
+        kind: "finding",
+        description:
+          "reports a correctness finding on the quote whose total changed from a formatted string to a Money value, which an untouched caller still renders straight into an email",
+        category: "correctness",
+        anchors: [
+          {
+            file: "src/pricing/quote.ts",
+            startMarker: "export interface ShippingQuote",
+            endMarker: "export async function quoteShipment",
+          },
+          {
+            file: "src/pricing/quote.ts",
+            startMarker: "export async function quoteShipment",
+          },
+        ],
+      },
+    ],
+  },
+  {
     fixture: "test-coverage-untested-branch",
     expectations: [
       agentsCompleted,
