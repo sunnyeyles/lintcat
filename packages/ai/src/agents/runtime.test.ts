@@ -13,7 +13,9 @@ import {
 import {
   AgentRunError,
   createReviewAgent,
+  type AgentUsageReport,
 } from "#src/agents/runtime";
+import { emptyTokenUsage } from "#src/usage";
 import {
   REVIEW_TOOL_NAMES,
   context,
@@ -570,6 +572,83 @@ describe("lifecycle events (spec §26)", () => {
       outputTokens: 8,
     });
     expect(failed?.["error"]).toMatch(/turn/i);
+  });
+});
+
+describe("the onUsage callback", () => {
+  function makeCollecting(responses: ScriptedResponse[]) {
+    const { model, doGenerate } = makeModel(responses);
+    const reports: AgentUsageReport[] = [];
+    const agent = createReviewAgent(securityAgent, {
+      model,
+      github: makeGithub(),
+      logger: createCapturingLogger().logger,
+      onUsage: (report) => reports.push(report),
+    });
+    return { agent, doGenerate, reports };
+  }
+
+  it("reports the agent's usage summed across turns when the run succeeds", async () => {
+    const { agent, reports } = makeCollecting([
+      message([toolUseBlock("toolu_1", "get_diff", {})], "tool_use", {
+        inputTokens: 100,
+        outputTokens: 10,
+        cacheCreationInputTokens: 4_000,
+      }),
+      message([textBlock(finalJson)], "end_turn", {
+        inputTokens: 250,
+        outputTokens: 25,
+        cacheReadInputTokens: 4_000,
+      }),
+    ]);
+
+    await agent.run(context);
+
+    expect(reports).toEqual([
+      {
+        agent: "security",
+        durationMs: expect.any(Number),
+        usage: {
+          inputTokens: 350,
+          cacheCreationInputTokens: 4_000,
+          cacheReadInputTokens: 4_000,
+          outputTokens: 35,
+        },
+      },
+    ]);
+  });
+
+  it("reports the usage burned so far when the run fails", async () => {
+    const { agent, reports } = makeCollecting([
+      message([textBlock("prose, not JSON")], "end_turn", {
+        inputTokens: 80,
+        outputTokens: 8,
+      }),
+    ]);
+
+    await expect(agent.run(context)).rejects.toThrow(AgentRunError);
+
+    expect(reports).toEqual([
+      {
+        agent: "security",
+        durationMs: expect.any(Number),
+        usage: {
+          inputTokens: 80,
+          cacheCreationInputTokens: 0,
+          cacheReadInputTokens: 0,
+          outputTokens: 8,
+        },
+      },
+    ]);
+  });
+
+  it("reports zero usage when the first model call rejects", async () => {
+    const { agent, doGenerate, reports } = makeCollecting([]);
+    doGenerate.mockRejectedValueOnce(new Error("529 overloaded"));
+
+    await expect(agent.run(context)).rejects.toThrow("529 overloaded");
+
+    expect(reports.map((report) => report.usage)).toEqual([emptyTokenUsage()]);
   });
 });
 
