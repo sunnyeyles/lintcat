@@ -882,6 +882,23 @@ describe("the repository block", () => {
     );
   });
 
+  it("caps the package list and says how many it left out", async () => {
+    const files = new Map([["pnpm-workspace.yaml", "packages:\n  - packages/*\n"]]);
+    for (let at = 0; at < 52; at += 1) {
+      files.set(
+        `packages/p${String(at).padStart(3, "0")}/package.json`,
+        JSON.stringify({ name: `@acme/p${at}` }),
+      );
+    }
+    const opening = await openingWith(
+      buildRepositoryIndex({ sha: baseSha, files }),
+    );
+
+    expect(opening).toContain("Packages (52):");
+    expect(opening).toContain("- [... 2 more packages]");
+    expect(opening).not.toContain("@acme/p51 —");
+  });
+
   it("names the package a changed file belongs to", async () => {
     const { agent, calls } = makeAgent(scripted, { index: monorepoIndex() });
 

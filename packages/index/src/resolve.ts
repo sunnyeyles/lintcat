@@ -138,10 +138,8 @@ function matchAlias(
     : { targets: best.targets, capture: best.capture };
 }
 
-/**
- * Resolves the way the repository's own tooling does, in the spec's order:
- * relative, `#` import map, tsconfig `paths`, workspace package, unresolved.
- */
+/** Tried in one order: relative path, `#` import map, tsconfig `paths`,
+ * workspace package name, then nothing. A bare miss is third-party. */
 export function createImportResolver(
   workspace: WorkspaceModel,
   exists: (path: string) => boolean,
