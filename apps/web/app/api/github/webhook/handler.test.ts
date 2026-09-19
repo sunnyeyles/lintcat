@@ -1,0 +1,376 @@
+import { createHmac } from "node:crypto";
+
+import {
+  organizations,
+  repos,
+  reviews,
+  type Database,
+} from "@pr-review/db";
+import { createTestDatabase } from "@pr-review/db/test-database";
+import type { GithubAppClient, InstallationRepository } from "@pr-review/github";
+import { asc, sql } from "drizzle-orm";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { handleGithubWebhook } from "./handler";
+
+const SECRET = "webhook-secret";
+const INSTALLATION_ID = 555;
+const ACCOUNT_ID = 1_000;
+const SUSPENDED_AT = "2026-09-01T12:00:00Z";
+
+const widgets: InstallationRepository = {
+  id: 2_900_000_001,
+  owner: "Acme",
+  name: "widgets",
+  private: false,
+};
+const secrets: InstallationRepository = {
+  id: 2_900_000_002,
+  owner: "Acme",
+  name: "secrets",
+  private: true,
+};
+
+let database: Database;
+let listed: InstallationRepository[];
+let listCalls: number;
+
+const github: GithubAppClient = {
+  async listInstallationRepositories(installationId) {
+    listCalls += 1;
+    expect(installationId).toBe(INSTALLATION_ID);
+    return listed;
+  },
+};
+
+beforeEach(async () => {
+  database = await createTestDatabase();
+  listed = [widgets, secrets];
+  listCalls = 0;
+});
+
+function installation(
+  type: "Organization" | "User" = "Organization",
+  login = "Acme",
+  suspendedAt: string | null = null,
+) {
+  return {
+    id: INSTALLATION_ID,
+    account: { id: ACCOUNT_ID, login, type },
+    suspended_at: suspendedAt,
+  };
+}
+
+function payloadRepo(repo: InstallationRepository) {
+  return {
+    id: repo.id,
+    name: repo.name,
+    full_name: `${repo.owner}/${repo.name}`,
+    private: repo.private,
+  };
+}
+
+function delivery(
+  event: string,
+  payload: unknown,
+  sign: (body: string) => string | undefined = (body) => signature(SECRET, body),
+): Request {
+  const body = JSON.stringify(payload);
+  const signed = sign(body);
+  return new Request("https://example.test/api/github/webhook", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-github-event": event,
+      ...(signed ? { "x-hub-signature-256": signed } : {}),
+    },
+    body,
+  });
+}
+
+function signature(secret: string, body: string): string {
+  return `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+}
+
+function deliver(request: Request): Promise<Response> {
+  return handleGithubWebhook(request, {
+    database,
+    github,
+    webhookSecret: SECRET,
+  });
+}
+
+const created = (type: "Organization" | "User" = "Organization", login = "Acme") =>
+  delivery("installation", { action: "created", installation: installation(type, login) });
+
+function repositoriesChanged(
+  action: "added" | "removed",
+  changed: InstallationRepository[],
+) {
+  return delivery("installation_repositories", {
+    action,
+    installation: installation(),
+    repositories_added: action === "added" ? changed.map(payloadRepo) : [],
+    repositories_removed: action === "removed" ? changed.map(payloadRepo) : [],
+  });
+}
+
+async function state() {
+  const orgs = await database
+    .select({
+      githubAccountId: organizations.githubAccountId,
+      accountType: organizations.accountType,
+      slug: organizations.slug,
+      name: organizations.name,
+      installationId: organizations.installationId,
+      suspendedAt: organizations.suspendedAt,
+    })
+    .from(organizations)
+    .orderBy(asc(organizations.id));
+  const repoRows = await database
+    .select({
+      githubRepoId: repos.githubRepoId,
+      owner: repos.owner,
+      name: repos.name,
+      private: repos.private,
+    })
+    .from(repos)
+    .orderBy(asc(repos.githubRepoId));
+  return { organizations: orgs, repos: repoRows };
+}
+
+const empty = { organizations: [], repos: [] };
+
+function repoRow(repo: InstallationRepository) {
+  return {
+    githubRepoId: repo.id,
+    owner: repo.owner,
+    name: repo.name,
+    private: repo.private,
+  };
+}
+
+describe("handleGithubWebhook signature", () => {
+  it("401s a delivery with no signature and writes nothing", async () => {
+    const response = await deliver(
+      delivery(
+        "installation",
+        { action: "created", installation: installation() },
+        () => undefined,
+      ),
+    );
+    expect(response.status).toBe(401);
+    expect(await state()).toEqual(empty);
+    expect(listCalls).toBe(0);
+  });
+
+  it("401s a delivery signed with another secret", async () => {
+    const response = await deliver(
+      delivery(
+        "installation",
+        { action: "created", installation: installation() },
+        (body) => signature("not-the-secret", body),
+      ),
+    );
+    expect(response.status).toBe(401);
+    expect(await state()).toEqual(empty);
+  });
+
+  it("401s a body that does not match its signature", async () => {
+    const response = await deliver(
+      delivery(
+        "installation",
+        { action: "created", installation: installation() },
+        () => signature(SECRET, "{}"),
+      ),
+    );
+    expect(response.status).toBe(401);
+    expect(await state()).toEqual(empty);
+  });
+
+  it("401s everything when no secret is configured", async () => {
+    const response = await handleGithubWebhook(
+      delivery("installation", { action: "created", installation: installation() }, (body) =>
+        signature("", body),
+      ),
+      { database, github, webhookSecret: "" },
+    );
+    expect(response.status).toBe(401);
+    expect(await state()).toEqual(empty);
+  });
+});
+
+describe("handleGithubWebhook installation", () => {
+  it("creates an organization and its repositories on an organization install", async () => {
+    const response = await deliver(created());
+    expect(response.status).toBe(200);
+    expect(await state()).toEqual({
+      organizations: [
+        {
+          githubAccountId: ACCOUNT_ID,
+          accountType: "organization",
+          slug: "acme",
+          name: "Acme",
+          installationId: INSTALLATION_ID,
+          suspendedAt: null,
+        },
+      ],
+      repos: [repoRow(widgets), repoRow(secrets)],
+    });
+  });
+
+  it("creates a user-type organization on a personal account install", async () => {
+    listed = [{ ...widgets, owner: "Mona" }];
+    const response = await deliver(created("User", "Mona"));
+    expect(response.status).toBe(200);
+    const { organizations: orgs, repos: repoRows } = await state();
+    expect(orgs).toMatchObject([{ accountType: "user", slug: "mona", name: "Mona" }]);
+    expect(repoRows).toEqual([{ ...repoRow(widgets), owner: "Mona" }]);
+  });
+
+  it("claims a repository ingest already recorded, keeping its reviews", async () => {
+    const [org] = await database
+      .insert(organizations)
+      .values({
+        githubAccountId: ACCOUNT_ID,
+        accountType: "organization",
+        slug: "acme",
+        name: "Acme",
+      })
+      .returning();
+    const [repo] = await database
+      .insert(repos)
+      .values({ organizationId: org!.id, owner: "Acme", name: "widgets" })
+      .returning();
+    await database.insert(reviews).values({
+      repoId: repo!.id,
+      prNumber: 1,
+      headSha: "abc",
+      agents: ["security"],
+      summary: "ok",
+    });
+
+    await deliver(created());
+
+    expect((await state()).repos).toEqual([repoRow(widgets), repoRow(secrets)]);
+    expect(await database.select().from(reviews)).toHaveLength(1);
+  });
+
+  it("drops repositories the installation no longer lists when it is created again", async () => {
+    await deliver(created());
+    listed = [secrets];
+    await deliver(created());
+    expect((await state()).repos).toEqual([repoRow(secrets)]);
+  });
+
+  it("sets and clears suspended_at on suspend and unsuspend", async () => {
+    await deliver(created());
+
+    const suspend = await deliver(
+      delivery("installation", {
+        action: "suspend",
+        installation: installation("Organization", "Acme", SUSPENDED_AT),
+      }),
+    );
+    expect(suspend.status).toBe(200);
+    expect((await state()).organizations[0]?.suspendedAt).toEqual(new Date(SUSPENDED_AT));
+
+    const unsuspend = await deliver(
+      delivery("installation", { action: "unsuspend", installation: installation() }),
+    );
+    expect(unsuspend.status).toBe(200);
+    expect((await state()).organizations[0]?.suspendedAt).toBeNull();
+  });
+
+  it("removes the organization and its repositories on uninstall", async () => {
+    await deliver(created());
+    const response = await deliver(
+      delivery("installation", { action: "deleted", installation: installation() }),
+    );
+    expect(response.status).toBe(200);
+    expect(await state()).toEqual(empty);
+  });
+
+  it("leaves state unchanged when the same delivery arrives twice", async () => {
+    const request = created();
+    await deliver(request.clone());
+    const once = await state();
+    const again = await deliver(request);
+    expect(again.status).toBe(200);
+    expect(await state()).toEqual(once);
+  });
+});
+
+describe("handleGithubWebhook installation_repositories", () => {
+  beforeEach(async () => {
+    listed = [widgets];
+    await deliver(created());
+  });
+
+  it("adds repositories", async () => {
+    const response = await deliver(repositoriesChanged("added", [secrets]));
+    expect(response.status).toBe(200);
+    expect((await state()).repos).toEqual([repoRow(widgets), repoRow(secrets)]);
+  });
+
+  it("removes repositories", async () => {
+    const response = await deliver(repositoriesChanged("removed", [widgets]));
+    expect(response.status).toBe(200);
+    expect((await state()).repos).toEqual([]);
+  });
+
+  it("converges when an add is delivered twice", async () => {
+    const request = repositoriesChanged("added", [secrets]);
+    await deliver(request.clone());
+    const once = await state();
+    await deliver(request);
+    expect(await state()).toEqual(once);
+  });
+
+  it("creates the organization when an add arrives before the install", async () => {
+    database = await createTestDatabase();
+    await deliver(repositoriesChanged("added", [secrets]));
+    const { organizations: orgs, repos: repoRows } = await state();
+    expect(orgs).toMatchObject([{ slug: "acme", installationId: INSTALLATION_ID }]);
+    expect(repoRows).toEqual([repoRow(secrets)]);
+  });
+});
+
+describe("handleGithubWebhook other deliveries", () => {
+  it("204s an event it does not act on", async () => {
+    const response = await deliver(delivery("push", { ref: "refs/heads/main" }));
+    expect(response.status).toBe(204);
+    expect(await state()).toEqual(empty);
+  });
+
+  it("204s an installation action it does not act on", async () => {
+    const response = await deliver(
+      delivery("installation", {
+        action: "new_permissions_accepted",
+        installation: installation(),
+      }),
+    );
+    expect(response.status).toBe(204);
+    expect(await state()).toEqual(empty);
+  });
+
+  it("400s a malformed installation payload", async () => {
+    const response = await deliver(delivery("installation", { action: "created" }));
+    expect(response.status).toBe(400);
+    expect(await state()).toEqual(empty);
+  });
+
+  it("writes nothing when the delivery fails halfway", async () => {
+    await database.execute(sql`
+      create function fail_repo_insert() returns trigger language plpgsql as $$
+      begin raise exception 'repo insert failed'; end $$;
+    `);
+    await database.execute(sql`
+      create trigger fail_repo_insert before insert on repos
+      for each row execute function fail_repo_insert();
+    `);
+
+    await expect(deliver(created())).rejects.toThrow();
+    expect(await state()).toEqual(empty);
+  });
+});

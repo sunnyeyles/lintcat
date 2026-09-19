@@ -147,8 +147,10 @@ function build(now: Date, ceiling: number): World {
   const repos: Repo[] = REPOS.map(([owner, name], i) => ({
     id: i + 1,
     organizationId: organization.id,
+    githubRepoId: null,
     owner,
     name,
+    private: false,
     createdAt: new Date(now.getTime() - (DAYS - i) * 864e5),
   }));
 
