@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { organizationPath } from "@/lib/paths";
+import { organizationPath, withinOrganization } from "@/lib/paths";
 
 // `href` is relative to the organization, e.g. "/repos" under `/o/<slug>`.
 export type NavItem = { href: string; label: string; icon: LucideIcon };
@@ -29,8 +29,10 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/settings/agents", label: "Agents", icon: Bot },
 ];
 
-function isActive(pathname: string, root: string, href: string): boolean {
-  return href === "/" ? pathname === root : pathname.startsWith(root + href);
+// On a subdomain the browser path has no `/o/<slug>` prefix, so compare without it.
+function isActive(pathname: string, href: string): boolean {
+  const page = withinOrganization(pathname);
+  return href === "/" ? page === "/" : page.startsWith(href);
 }
 
 const LINK_CLASS =
@@ -42,7 +44,7 @@ function NavLinks({ slug, onNavigate }: { slug: string; onNavigate?: () => void 
   return (
     <nav aria-label="Primary" className="flex flex-col gap-0.5">
       {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, root, href);
+        const active = isActive(pathname, href);
         return (
           <Link
             key={href}
