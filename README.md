@@ -175,6 +175,8 @@ Reinforcing rules:
 ```text
 apps/
   action/     Event parsing → review pipeline → check run (or job summary)
+  mcp/        Local MCP server: the same pipeline over a working tree,
+              plus index lookups and review history, for coding agents
 packages/
   ai/         Provider selection (model.ts), prompts, agent
               configuration, and agents/: agent definition, runtime loop,
@@ -643,8 +645,8 @@ external, since the Actions runner provides nothing beyond the Node runtime
 itself.
 
 Put local secret values in `.env.local` (gitignored) when exercising the
-handler outside Actions. `scripts/seed-prompts.mjs` reads it; nothing else
-does.
+handler outside Actions. `scripts/seed-prompts.mjs`, the MCP server and
+`packages/db` read it.
 
 ### Seeding the managed prompts
 
@@ -671,6 +673,30 @@ and is superseded, not erased, the next time the seeder runs. A prompt that
 would fail the contract guard in `packages/ai/src/prompts.ts` is never
 published, since installing one would mean every review silently falling back
 from it.
+
+---
+
+## MCP server
+
+[`apps/mcp`](apps/mcp) runs the reviewer inside a coding agent such as Claude
+Code, over local stdio. The repository's [`.mcp.json`](.mcp.json) registers it
+as `pr-review`, so opening this repo in Claude Code offers it; any other client
+runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
+
+| Tool | What it does |
+| --- | --- |
+| `review_local_changes` | Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed |
+| `review_pull_request` | Reviews a GitHub pull request; a dry run unless `publish: true`, which posts the check run and comments as the Action would |
+| `repository_overview`, `find_references`, `describe_file` | The [repository index](#repository-index), built from the working tree, with no network |
+| `list_reviews`, `get_review`, `review_trends` | Stored review history, scoped by the dashboard's own access rules to your GitHub account |
+
+A local review takes the same path as the Action, with a git-backed client in
+place of GitHub's, so the [trust boundary](#the-trust-boundary) is unchanged:
+the agent configuration is read at the base commit, and only validated findings
+come back. It needs an `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`; GitHub access
+uses `GITHUB_TOKEN` or the `gh` login. Configuration, and the MCP Bundle path
+for shipping it beyond this checkout, are in
+[`apps/mcp/README.md`](apps/mcp/README.md).
 
 ---
 
