@@ -16,9 +16,11 @@ import type {
   GithubInstallationClient,
   PullRequestDetails,
   PullRequestRef,
+  RepositoryArchiveRequest,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
+import type { RepositoryIndex } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import {
   reviewMemorySchema,
@@ -67,6 +69,12 @@ const changedFiles: ChangedFile[] = [
 
 const diff = "diff --git a/src/sessions.ts b/src/sessions.ts\n";
 
+/** The tree the fake archive serves at the base commit. */
+const baseFiles = new Map<string, string>([
+  ["src/sessions.ts", "export const sessions = [];\n"],
+  ["src/sessions.test.ts", "import './sessions';\n"],
+]);
+
 const finding: ReviewFinding = {
   file: "src/sessions.ts",
   line: 2,
@@ -93,6 +101,11 @@ function makeClient() {
       matches: [],
       totalCount: 0,
       incompleteResults: false,
+    })),
+    getRepositoryArchive: vi.fn(async (request: RepositoryArchiveRequest) => ({
+      sha: request.ref,
+      files: new Map(baseFiles),
+      truncated: false,
     })),
     listCommitShas: vi.fn(async () => []),
     listCommitFiles: vi.fn(async () => []),
@@ -156,6 +169,7 @@ interface DepsOptions {
   memoryStore?: MemoryStore;
   now?: () => Date;
   incremental?: boolean;
+  index?: boolean;
 }
 
 function makeDeps(
@@ -169,6 +183,7 @@ function makeDeps(
       _context: ReviewContext,
       _agents: readonly AgentDefinition[],
       _hints: SynthesisHints,
+      _index: RepositoryIndex | undefined,
     ) => review,
   );
   const { logger, entries } = createCapturingLogger();
@@ -214,6 +229,7 @@ describe("reviewPullRequest", () => {
       },
       agents,
       { keep: [], drop: [] },
+      expect.objectContaining({ sha: pullRequest.baseSha }),
     );
   });
 
@@ -265,6 +281,7 @@ describe("reviewPullRequest", () => {
 
     expect(entries.map((entry) => entry["event"])).toEqual([
       "review.loaded",
+      "index.built",
       "synthesis.started",
       "synthesis.completed",
       "findings.validated",
@@ -986,5 +1003,88 @@ describe("reviewPullRequest: orchestrator memory", () => {
     await reviewPullRequest(target, deps);
 
     expect(runReviewPipeline.mock.calls[0]?.[3]).toEqual({ keep: [], drop: [] });
+  });
+});
+
+describe("the repository index", () => {
+  /** The index the pipeline was handed, if any. */
+  function indexPassedTo(
+    runReviewPipeline: ReturnType<typeof makeDeps>["runReviewPipeline"],
+  ): RepositoryIndex | undefined {
+    return runReviewPipeline.mock.calls[0]?.[4];
+  }
+
+  function entry(entries: ReturnType<typeof makeDeps>["entries"], event: string) {
+    return entries.find((logged) => logged["event"] === event);
+  }
+
+  it("builds it from the base commit, never the head", async () => {
+    const { deps, client, runReviewPipeline, entries } = makeDeps();
+
+    await reviewPullRequest(target, deps);
+
+    expect(client.getRepositoryArchive).toHaveBeenCalledExactlyOnceWith({
+      owner: target.owner,
+      repo: target.repo,
+      ref: pullRequest.baseSha,
+    });
+    expect(indexPassedTo(runReviewPipeline)?.sha).toBe(pullRequest.baseSha);
+    expect(entry(entries, "index.built")).toMatchObject({
+      sha: pullRequest.baseSha,
+      files: baseFiles.size,
+      truncated: false,
+    });
+  });
+
+  it("pairs the changed source file with its test", async () => {
+    const { deps, runReviewPipeline } = makeDeps();
+
+    await reviewPullRequest(target, deps);
+
+    expect(
+      indexPassedTo(runReviewPipeline)?.files.get("src/sessions.ts")?.coveredBy,
+    ).toBe("src/sessions.test.ts");
+  });
+
+  it("skips the archive entirely when the index is off", async () => {
+    const { deps, client, runReviewPipeline, entries } = makeDeps(
+      reviewResult(),
+      { index: false },
+    );
+
+    await reviewPullRequest(target, deps);
+
+    expect(client.getRepositoryArchive).not.toHaveBeenCalled();
+    expect(indexPassedTo(runReviewPipeline)).toBeUndefined();
+    expect(entry(entries, "index.skipped")).toBeDefined();
+    expect(entry(entries, "index.built")).toBeUndefined();
+  });
+
+  it("completes the review when the archive fails", async () => {
+    const { deps, client, runReviewPipeline, entries } = makeDeps();
+    client.getRepositoryArchive.mockRejectedValue(new Error("archive too large"));
+
+    await expect(reviewPullRequest(target, deps)).resolves.toBeDefined();
+
+    expect(runReviewPipeline).toHaveBeenCalledTimes(1);
+    expect(indexPassedTo(runReviewPipeline)).toBeUndefined();
+    expect(entry(entries, "index.failed")).toMatchObject({
+      reason: "archive too large",
+      level: "error",
+    });
+  });
+
+  it("carries the archive's truncation through to the index", async () => {
+    const { deps, client, runReviewPipeline, entries } = makeDeps();
+    client.getRepositoryArchive.mockResolvedValue({
+      sha: pullRequest.baseSha,
+      files: new Map(baseFiles),
+      truncated: true,
+    });
+
+    await reviewPullRequest(target, deps);
+
+    expect(indexPassedTo(runReviewPipeline)?.truncated).toBe(true);
+    expect(entry(entries, "index.built")).toMatchObject({ truncated: true });
   });
 });
