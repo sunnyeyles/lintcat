@@ -10,17 +10,19 @@ import {
 
 import type { ReviewSummary } from "@/lib/data";
 import { formatDuration, formatRelative } from "@/lib/format";
+import { organizationPath } from "@/lib/paths";
 
 import { AgentChips } from "./agent-chips";
 import { RowLink } from "./row-link";
 import { SeverityMix } from "./severity-mix";
 
 export type ReviewsTableProps = {
+  slug: string;
   reviews: ReviewSummary[];
   caption: string;
 };
 
-export function ReviewsTable({ reviews, caption }: ReviewsTableProps) {
+export function ReviewsTable({ slug, reviews, caption }: ReviewsTableProps) {
   return (
     <Table className="min-w-[38rem]">
       <TableCaption className="sr-only">{caption}</TableCaption>
@@ -47,7 +49,7 @@ export function ReviewsTable({ reviews, caption }: ReviewsTableProps) {
             </TableCell>
             <TableCell className="whitespace-nowrap">
               <RowLink
-                href={`/reviews/${review.id}`}
+                href={organizationPath(slug, `/reviews/${review.id}`)}
                 aria-label={`Review of ${review.repo.owner}/${review.repo.name} pull request ${review.prNumber}`}
               >
                 #{review.prNumber}

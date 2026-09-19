@@ -37,9 +37,18 @@ runs and findings.
 
 GitHub OAuth through Auth.js v5 (`auth.ts`), with JWT sessions and no auth
 tables. The sign-in pass upserts the `users` row by GitHub id. A user can have
-memberships in several organizations (`lib/organization.ts`); the pages show the
-oldest one. `requireMembership()` in `lib/session.ts` sends anyone signed out or
-without a membership to `/sign-in`.
+memberships in several organizations, each with its own role; `/` lists them
+(`lib/organization.ts`).
+
+## Organizations and access
+
+Every organization page lives under `/o/<slug>/`. `authorize` (`lib/authorize.ts`)
+reads only the database and returns the organization and the user's role, or
+not-found. An unknown slug, a suspended organization and a non-member get the
+same not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
+every organization layout and page calls: a signed-out visitor goes to
+`/sign-in?callbackUrl=<the page>` (the path comes from `middleware.ts`), and a
+not-found renders the 404.
 
 ## The seam
 
@@ -48,11 +57,11 @@ Pages never touch Drizzle. They ask for a `DataSource` (`lib/data/types.ts`):
 ```ts
 import { data } from "@/lib/data/server";
 
-const reviews = await (await data()).listReviews({ repoId, limit: 20 });
+const reviews = await (await data(slug)).listReviews({ repoId, limit: 20 });
 ```
 
-- `data()` (`lib/data/server.ts`) is the signed-in user's organization, read
-  from Postgres by `createDbSource` in `lib/data/db.ts`. Every query is scoped
+- `data(slug)` (`lib/data/server.ts`) is the organization `authorize` let the
+  user into, read from Postgres by `createDbSource` in `lib/data/db.ts`. Every query is scoped
   by the organization through the review's repo, so another organization's row
   is a 404, not a leak.
   Overview, Repositories, a repository, and the review pages use it.
@@ -73,20 +82,24 @@ are illustrative.
 
 ```text
 app/
-  page.tsx              overview
-  repos/                repo list, and per-repo review history
-  reviews/              recent reviews; [id]/ one review
-  analytics/            trends over time (fixture)
-  usage/                tokens and spend (fixture)
-  settings/agents/      agent config editor (fixture)
-  sign-in/              sign-in and no-organization state
+  (apex)/page.tsx       the signed-in user's organizations
+  (apex)/sign-in/       sign-in, returning to callbackUrl
+  o/[slug]/             one organization, guarded by requireOrganization
+    page.tsx            overview
+    repos/              repo list, and per-repo review history
+    reviews/            recent reviews; [id]/ one review
+    analytics/          trends over time (fixture)
+    usage/              tokens and spend (fixture)
+    settings/agents/    agent config editor (fixture)
   api/ingest/           the action's endpoint
 components/
   ui/ shell/ charts/ overview/ review/ config/
 lib/
   data/                 the seam above
-  session.ts            session and membership helpers
+  authorize.ts          slug + session -> organization and role, or not-found
+  session.ts            session and the requireOrganization guard
   organization.ts       a user's memberships
+  paths.ts              /o/<slug> paths and callbackUrl checks
   format.ts             number, duration and date formatting
   agent-config.ts       pr-review-agents.yml serialisation
 ```

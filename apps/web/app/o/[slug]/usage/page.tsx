@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/shell";
 import { costOf, demoData } from "@/lib/data";
 import type { TokenCounts } from "@/lib/data/types";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
+import { requireOrganization } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Tokens & cost" };
 
@@ -44,10 +45,13 @@ function costPerClass(totals: TokenCounts): Record<TokenKey, number> {
 }
 
 export default async function UsagePage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ slug: string }>;
   searchParams: SearchParams;
 }) {
+  await requireOrganization((await params).slug);
   const range = parseRange((await searchParams).range);
   const usage = await demoData().getUsage(range);
   const phrase = RANGE_PHRASE[range];

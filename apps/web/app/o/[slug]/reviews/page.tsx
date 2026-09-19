@@ -17,11 +17,17 @@ import { PageHeader } from "@/components/shell";
 import { AgentChip, SeverityBadge } from "@/components/ui";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
+import { organizationPath } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "Reviews" };
 
-export default async function ReviewsIndexPage() {
-  const reviews = await (await data()).listReviews({ limit: 50 });
+export default async function ReviewsIndexPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const reviews = await (await data(slug)).listReviews({ limit: 50 });
 
   return (
     <div className="flex flex-col gap-8">
@@ -56,7 +62,7 @@ export default async function ReviewsIndexPage() {
                 <TableRow key={review.id}>
                   <TableCell>
                     <Link
-                      href={`/reviews/${review.id}`}
+                      href={organizationPath(slug, `/reviews/${review.id}`)}
                       className="text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                     >
                       {review.repo.owner}/{review.repo.name} #{review.prNumber}

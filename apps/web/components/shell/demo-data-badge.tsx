@@ -10,12 +10,15 @@ import {
 } from "@pr-review/design";
 import { usePathname } from "next/navigation";
 
+import { withinOrganization } from "@/lib/paths";
+
 // These pages still read the generated fixture; the rest read the database.
 export const DEMO_PATHS = ["/analytics", "/usage", "/settings"];
 
 export function DemoDataBadge({ className }: { className?: string }) {
   const pathname = usePathname();
-  if (!DEMO_PATHS.some((path) => pathname.startsWith(path))) return null;
+  const page = withinOrganization(pathname);
+  if (!DEMO_PATHS.some((path) => page.startsWith(path))) return null;
   return (
     <Tooltip>
       <TooltipTrigger

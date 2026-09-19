@@ -7,9 +7,10 @@ import {
   type Organization,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { currentMembershipForUser, membershipsForUser } from "@/lib/organization";
+import { membershipsForUser } from "@/lib/organization";
 
 let database: Database;
 
@@ -78,25 +79,20 @@ describe("membershipsForUser", () => {
     expect(await membershipsForUser(database, 4)).toEqual([]);
     expect(await membershipsForUser(database, 3)).toHaveLength(1);
   });
-});
 
-describe("currentMembershipForUser", () => {
-  it("picks the oldest membership", async () => {
+  it("leaves out a suspended organization", async () => {
     const acme = await insertOrganization(10, "acme");
     const globex = await insertOrganization(20, "globex");
     const mona = await insertUser(1, "mona");
-    await join(mona, globex, "member");
     await join(mona, acme, "owner");
+    await join(mona, globex, "member");
+    await database
+      .update(organizations)
+      .set({ suspendedAt: new Date() })
+      .where(eq(organizations.id, acme.id));
 
-    expect(await currentMembershipForUser(database, 1)).toEqual({
-      organization: globex,
-      role: "member",
-    });
-  });
-
-  it("is undefined without a membership", async () => {
-    await insertUser(2, "hubot");
-
-    expect(await currentMembershipForUser(database, 2)).toBeUndefined();
+    expect(await membershipsForUser(database, 1)).toEqual([
+      { organization: globex, role: "member" },
+    ]);
   });
 });

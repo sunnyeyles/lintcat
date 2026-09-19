@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Newsreader } from "next/font/google";
 import type { ReactNode } from "react";
 
-import { Sidebar } from "@/components/shell/sidebar";
 import { ThemeProvider } from "@/components/shell/theme-provider";
 import { Topbar } from "@/components/shell/topbar";
 
@@ -39,14 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <TooltipProvider>
             <div className="min-h-dvh">
               <Topbar />
-              <div className="flex">
-                <Sidebar />
-                <main className="min-w-0 flex-1">
-                  <div className="mx-auto w-full max-w-[74rem] px-3 py-6 sm:px-6 sm:py-8">
-                    {children}
-                  </div>
-                </main>
-              </div>
+              {children}
             </div>
           </TooltipProvider>
         </ThemeProvider>

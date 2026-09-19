@@ -6,14 +6,14 @@ import {
   type MembershipRole,
   type Organization,
 } from "@pr-review/db";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 
 export type OrganizationMembership = {
   organization: Organization;
   role: MembershipRole;
 };
 
-/** Every organization the user belongs to, oldest membership first. */
+/** Every live organization the user belongs to, oldest membership first. */
 export async function membershipsForUser(
   database: Database,
   githubId: number,
@@ -23,15 +23,6 @@ export async function membershipsForUser(
     .from(users)
     .innerJoin(memberships, eq(memberships.userId, users.id))
     .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
-    .where(eq(users.githubId, githubId))
+    .where(and(eq(users.githubId, githubId), isNull(organizations.suspendedAt)))
     .orderBy(asc(memberships.id));
-}
-
-// The oldest membership wins until pages are addressed by organization slug.
-export async function currentMembershipForUser(
-  database: Database,
-  githubId: number,
-): Promise<OrganizationMembership | undefined> {
-  const [first] = await membershipsForUser(database, githubId);
-  return first;
 }

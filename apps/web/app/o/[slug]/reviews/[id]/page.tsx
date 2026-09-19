@@ -13,8 +13,9 @@ import {
 import { PageHeader } from "@/components/shell";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
+import { organizationPath } from "@/lib/paths";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = { params: Promise<{ slug: string; id: string }> };
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -22,19 +23,19 @@ function parseId(raw: string): number | null {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id } = await params;
+  const { slug, id } = await params;
   const parsed = parseId(id);
-  const review = parsed === null ? null : await (await data()).getReview(parsed);
+  const review = parsed === null ? null : await (await data(slug)).getReview(parsed);
   if (!review) return { title: "Review not found" };
   return { title: `${review.repo.owner}/${review.repo.name} #${review.prNumber}` };
 }
 
 export default async function ReviewDetailPage({ params }: PageProps) {
-  const { id } = await params;
+  const { slug, id } = await params;
+  const source = await data(slug);
   const parsed = parseId(id);
   if (parsed === null) notFound();
 
-  const source = await data();
   const review = await source.getReview(parsed);
   if (!review) notFound();
 
@@ -43,7 +44,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   const newer = at > 0 ? (siblings[at - 1] ?? null) : null;
   const older = at >= 0 ? (siblings[at + 1] ?? null) : null;
 
-  const repoHref = `/repos/${review.repo.owner}/${review.repo.name}`;
+  const repoHref = organizationPath(slug, `/repos/${review.repo.owner}/${review.repo.name}`);
 
   return (
     <div className="flex flex-col gap-8">
@@ -87,7 +88,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         <FindingsTable findings={review.findings} />
       )}
 
-      <ReviewPager newer={newer} older={older} />
+      <ReviewPager slug={slug} newer={newer} older={older} />
     </div>
   );
 }

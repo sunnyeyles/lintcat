@@ -3,16 +3,20 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 import type { ReviewSummary } from "@/lib/data";
+import { organizationPath } from "@/lib/paths";
 
 export type ReviewPagerProps = {
+  slug: string;
   newer: ReviewSummary | null;
   older: ReviewSummary | null;
 };
 
 function PagerLink({
+  slug,
   review,
   direction,
 }: {
+  slug: string;
   review: ReviewSummary;
   direction: "newer" | "older";
 }) {
@@ -20,7 +24,7 @@ function PagerLink({
   const Icon = newer ? ArrowLeft : ArrowRight;
   return (
     <Link
-      href={`/reviews/${review.id}`}
+      href={organizationPath(slug, `/reviews/${review.id}`)}
       className={cn(
         "group flex min-w-0 flex-1 basis-56 items-center gap-2.5 rounded-sm border border-rule bg-surface px-3.5 py-3 transition-colors outline-none hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
         newer ? "" : "flex-row-reverse text-right",
@@ -37,12 +41,12 @@ function PagerLink({
   );
 }
 
-export function ReviewPager({ newer, older }: ReviewPagerProps) {
+export function ReviewPager({ slug, newer, older }: ReviewPagerProps) {
   if (!newer && !older) return null;
   return (
     <nav aria-label="Adjacent reviews" className="flex flex-wrap gap-3">
-      {newer ? <PagerLink review={newer} direction="newer" /> : <span className="flex-1 basis-56" />}
-      {older ? <PagerLink review={older} direction="older" /> : <span className="flex-1 basis-56" />}
+      {newer ? <PagerLink slug={slug} review={newer} direction="newer" /> : <span className="flex-1 basis-56" />}
+      {older ? <PagerLink slug={slug} review={older} direction="older" /> : <span className="flex-1 basis-56" />}
     </nav>
   );
 }

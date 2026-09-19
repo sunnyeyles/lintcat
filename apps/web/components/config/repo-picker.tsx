@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@pr-review/design";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 export type RepoOption = { id: number; owner: string; name: string };
@@ -20,6 +20,7 @@ export type RepoPickerProps = {
 
 export function RepoPicker({ repos, selectedId }: RepoPickerProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [pending, startTransition] = useTransition();
 
   return (
@@ -30,7 +31,7 @@ export function RepoPicker({ repos, selectedId }: RepoPickerProps) {
         disabled={pending}
         onValueChange={(value) => {
           startTransition(() => {
-            router.push(`/settings/agents?repo=${value}`);
+            router.push(`${pathname}?repo=${value}`);
           });
         }}
       >
