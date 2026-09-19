@@ -1,20 +1,20 @@
 "use client";
 
 import type { Finding } from "@pr-review/db";
-import type { ReactNode } from "react";
-
 import {
-  Badge,
+  Chip,
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SeverityBadge,
-} from "@/components/ui";
+} from "@pr-review/design";
+import type { ReactNode } from "react";
 
 import { ConfidenceMeter } from "./confidence-meter";
 import { FilePath } from "./file-path";
+
+import { SeverityBadge } from "@/components/ui";
 
 export type FindingSheetProps = {
   finding: Finding | null;
@@ -39,14 +39,14 @@ export function FindingSheet({ finding, onClose }: FindingSheetProps) {
             <SheetHeader className="shrink-0">
               <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
                 <SeverityBadge severity={finding.severity} />
-                <Badge variant="soft">{finding.category}</Badge>
+                <Chip variant="soft" caps>{finding.category}</Chip>
               </div>
               <SheetTitle>{finding.title}</SheetTitle>
               <SheetDescription asChild>
                 <FilePath
                   file={finding.file}
                   line={finding.line}
-                  className="mt-2 text-[0.72rem]"
+                  className="mt-2 text-label"
                 />
               </SheetDescription>
             </SheetHeader>
@@ -57,14 +57,14 @@ export function FindingSheet({ finding, onClose }: FindingSheetProps) {
               </Section>
 
               <Section title="Why it matters">
-                <p className="max-w-[58ch] font-sans text-[0.98rem] leading-relaxed text-ink">
+                <p className="max-w-measure font-display text-lede leading-relaxed text-ink">
                   {finding.explanation}
                 </p>
               </Section>
 
               {finding.suggestedFix ? (
                 <Section title="Suggested fix">
-                  <pre className="overflow-x-auto rounded-[3px] border border-rule bg-surface-2 px-3.5 py-3 font-mono text-[0.72rem] leading-relaxed whitespace-pre-wrap text-ink">
+                  <pre className="overflow-x-auto rounded-sm border border-rule bg-surface-2 px-3.5 py-3 font-mono text-label leading-relaxed whitespace-pre-wrap text-ink">
                     <code>{finding.suggestedFix}</code>
                   </pre>
                 </Section>

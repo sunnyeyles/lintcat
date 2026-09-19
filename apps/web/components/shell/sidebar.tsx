@@ -1,12 +1,7 @@
 "use client";
 
-import { Bot, ChartLine, Coins, FolderGit2, LayoutDashboard, Menu } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-
 import {
+  cn,
   Sheet,
   SheetClose,
   SheetContent,
@@ -14,8 +9,12 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
+} from "@pr-review/design";
+import { Bot, ChartLine, Coins, FolderGit2, LayoutDashboard, Menu } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 
@@ -32,7 +31,7 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 const LINK_CLASS =
-  "group flex items-center gap-2.5 rounded-[3px] border border-transparent px-2.5 py-1.5 font-mono text-[0.72rem] tracking-[0.04em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+  "group flex items-center gap-2.5 rounded-sm border border-transparent px-2.5 py-1.5 font-mono text-label tracking-ui transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -87,7 +86,7 @@ export function SidebarDrawer({ className }: { className?: string }) {
       <SheetTrigger
         aria-label="Open navigation"
         className={cn(
-          "inline-flex size-8 items-center justify-center rounded-[3px] border border-rule bg-surface text-slate transition-colors outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper md:hidden",
+          "inline-flex size-8 items-center justify-center rounded-sm border border-rule bg-surface text-slate transition-colors outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper md:hidden",
           className,
         )}
       >

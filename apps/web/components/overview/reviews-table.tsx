@@ -6,7 +6,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui";
+} from "@pr-review/design";
+
 import type { ReviewSummary } from "@/lib/data";
 import { formatDuration, formatRelative } from "@/lib/format";
 
@@ -41,7 +42,7 @@ export function ReviewsTable({ reviews, caption }: ReviewsTableProps) {
         {reviews.map((review) => (
           <TableRow key={review.id} className="group relative">
             <TableCell className="whitespace-nowrap">
-              <span className="text-slate-dim">{review.repo.owner}/</span>
+              <span className="text-slate">{review.repo.owner}/</span>
               <span className="text-ink">{review.repo.name}</span>
             </TableCell>
             <TableCell className="whitespace-nowrap">

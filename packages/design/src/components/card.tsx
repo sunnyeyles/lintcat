@@ -1,17 +1,22 @@
+import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "#src/cn";
 
-export function Card({ className, ...props }: ComponentProps<"div">) {
-  return (
-    <div
-      className={cn(
-        "rounded-[3px] border border-rule bg-surface shadow-card",
-        className,
-      )}
-      {...props}
-    />
-  );
+export const cardVariants = cva("rounded-sm border border-rule bg-surface shadow-card", {
+  variants: {
+    padding: {
+      none: "",
+      table: "px-4 py-3 sm:px-5",
+    },
+  },
+  defaultVariants: { padding: "none" },
+});
+
+export type CardProps = ComponentProps<"div"> & VariantProps<typeof cardVariants>;
+
+export function Card({ className, padding, ...props }: CardProps) {
+  return <div className={cn(cardVariants({ padding }), className)} {...props} />;
 }
 
 export function CardHeader({ className, ...props }: ComponentProps<"div">) {
@@ -29,7 +34,7 @@ export function CardHeader({ className, ...props }: ComponentProps<"div">) {
 export function CardTitle({ className, ...props }: ComponentProps<"h3">) {
   return (
     <h3
-      className={cn("font-sans text-lg leading-tight font-medium text-ink", className)}
+      className={cn("font-display text-h3 leading-tight font-medium text-ink", className)}
       {...props}
     />
   );
@@ -38,7 +43,7 @@ export function CardTitle({ className, ...props }: ComponentProps<"h3">) {
 export function CardDescription({ className, ...props }: ComponentProps<"p">) {
   return (
     <p
-      className={cn("mt-1 font-mono text-[0.72rem] leading-relaxed text-slate", className)}
+      className={cn("mt-1 font-mono text-label leading-relaxed text-slate", className)}
       {...props}
     />
   );

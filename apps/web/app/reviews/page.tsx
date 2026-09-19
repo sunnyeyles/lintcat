@@ -1,20 +1,20 @@
-import { GitPullRequest } from "lucide-react";
-import type { Metadata } from "next";
-import Link from "next/link";
-
-import { SEVERITIES } from "@/components/review";
-import { PageHeader } from "@/components/shell";
 import {
-  AgentChip,
+  Card,
   EmptyState,
-  SeverityBadge,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui";
+} from "@pr-review/design";
+import { GitPullRequest } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { SEVERITIES } from "@/components/review";
+import { PageHeader } from "@/components/shell";
+import { AgentChip, SeverityBadge } from "@/components/ui";
 import { data } from "@/lib/data";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 
@@ -38,7 +38,7 @@ export default async function ReviewsIndexPage() {
           description="Once a pull request event reaches the pipeline, its review lands here."
         />
       ) : (
-        <div className="rounded-[3px] border border-rule bg-surface px-4 py-3 sm:px-5">
+        <Card padding="table">
           <Table className="min-w-[48rem]">
             <TableHeader>
               <TableRow>
@@ -57,12 +57,12 @@ export default async function ReviewsIndexPage() {
                   <TableCell>
                     <Link
                       href={`/reviews/${review.id}`}
-                      className="text-ink underline-offset-2 outline-none hover:text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                      className="text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                     >
                       {review.repo.owner}/{review.repo.name} #{review.prNumber}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-slate-dim">
+                  <TableCell className="text-slate">
                     {shortSha(review.headSha)}
                   </TableCell>
                   <TableCell>
@@ -98,7 +98,7 @@ export default async function ReviewsIndexPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       )}
     </div>
   );

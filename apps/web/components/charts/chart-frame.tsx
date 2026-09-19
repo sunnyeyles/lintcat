@@ -1,16 +1,15 @@
 "use client";
 
-import { type ReactElement, type ReactNode, useId } from "react";
-import { ResponsiveContainer } from "recharts";
-
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui";
-import { cn } from "@/lib/utils";
+  cn,
+} from "@pr-review/design";
+import { type ReactElement, type ReactNode, useId } from "react";
+import { ResponsiveContainer } from "recharts";
 
 import { ChartLegend, type ChartLegendItem } from "./chart-legend";
 
@@ -65,14 +64,14 @@ export function ChartFrame({
           </div>
           <figcaption
             id={captionId}
-            className="mt-3 font-mono text-[0.68rem] leading-relaxed text-slate"
+            className="mt-3 font-mono text-caption leading-relaxed text-slate"
           >
             {summary}
           </figcaption>
         </figure>
         {table}
         {footer ? (
-          <div className="mt-3 font-mono text-[0.66rem] leading-relaxed text-slate-dim">
+          <div className="mt-3 font-mono text-caption leading-relaxed text-slate">
             {footer}
           </div>
         ) : null}

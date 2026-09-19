@@ -4,7 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "#src/cn";
 
 export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;
@@ -50,7 +50,7 @@ export function SheetContent({
         {children}
         <DialogPrimitive.Close
           aria-label="Close"
-          className="absolute top-3 right-3 rounded-[2px] p-1 text-slate-dim transition-colors outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          className="absolute top-3 right-3 rounded-xs p-1 text-slate-dim transition-colors outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         >
           <X className="size-4" />
         </DialogPrimitive.Close>
@@ -74,7 +74,7 @@ export function SheetTitle({
 }: ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      className={cn("font-sans text-xl leading-tight font-medium text-ink", className)}
+      className={cn("font-display text-h3 leading-tight font-medium text-ink", className)}
       {...props}
     />
   );
@@ -86,7 +86,7 @@ export function SheetDescription({
 }: ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={cn("mt-1 font-mono text-[0.72rem] text-slate", className)}
+      className={cn("mt-1 font-mono text-label text-slate", className)}
       {...props}
     />
   );

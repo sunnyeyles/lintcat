@@ -1,6 +1,7 @@
+import { EmptyState } from "@pr-review/design";
+
 import { AgentConfigEditor, RepoPicker } from "@/components/config";
 import { PageHeader } from "@/components/shell";
-import { EmptyState } from "@/components/ui";
 import { AGENT_CONFIG_PATH } from "@/lib/agent-config";
 import { data } from "@/lib/data";
 
@@ -20,7 +21,7 @@ export default async function AgentSettingsPage({
   if (repos.length === 0) {
     return (
       <>
-        <PageHeader eyebrow="CONFIGURATION" title="Agents" />
+        <PageHeader eyebrow="Configuration" title="Agents" />
         <div className="mt-8">
           <EmptyState
             title="No repositories yet"
@@ -41,7 +42,7 @@ export default async function AgentSettingsPage({
   return (
     <>
       <PageHeader
-        eyebrow="CONFIGURATION"
+        eyebrow="Configuration"
         title="Agents"
         description={
           <>

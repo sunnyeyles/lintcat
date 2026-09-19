@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "#src/cn";
 
 export type StatDelta = {
   value: string;
@@ -38,15 +38,15 @@ export function Stat({ label, value, delta, hint, children, className }: StatPro
         className,
       )}
     >
-      <span className="eyebrow truncate">{label}</span>
+      <span className="truncate text-caption text-slate">{label}</span>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="font-mono text-2xl leading-none font-semibold tabular-nums text-ink">
+        <span className="font-mono text-h2 leading-none font-semibold tabular-nums text-ink">
           {value}
         </span>
         {delta ? (
           <span
             className={cn(
-              "font-mono text-[0.68rem] tabular-nums",
+              "font-mono text-caption tabular-nums",
               DELTA_TONE[delta.tone ?? "neutral"],
             )}
           >
@@ -56,7 +56,7 @@ export function Stat({ label, value, delta, hint, children, className }: StatPro
         ) : null}
       </div>
       {hint ? (
-        <span className="font-mono text-[0.66rem] leading-relaxed text-slate-dim">
+        <span className="font-mono text-caption leading-relaxed text-slate">
           {hint}
         </span>
       ) : null}

@@ -1,10 +1,8 @@
 "use client";
 
+import { Button, cn } from "@pr-review/design";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useId, useState } from "react";
-
-import { Button } from "@/components/ui";
-import { cn } from "@/lib/utils";
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -63,14 +61,14 @@ export function YamlPreview({
   return (
     <section
       aria-labelledby={titleId}
-      className={cn("min-w-0 rounded-[3px] border border-rule bg-surface", className)}
+      className={cn("min-w-0 rounded-sm border border-rule bg-surface", className)}
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-rule-soft px-3 py-2">
         <div className="min-w-0">
-          <h3 id={titleId} className="font-mono text-[0.72rem] text-ink">
+          <h3 id={titleId} className="font-mono text-label text-ink">
             {filename}
           </h3>
-          <p className="mt-0.5 font-mono text-[0.66rem] text-slate-dim">{caption}</p>
+          <p className="mt-0.5 font-mono text-caption text-slate">{caption}</p>
         </div>
         <Button
           type="button"
@@ -88,7 +86,7 @@ export function YamlPreview({
       <pre
         tabIndex={0}
         aria-label={`${filename} contents`}
-        className="max-h-[26rem] overflow-auto px-3 py-3 font-mono text-[0.7rem] leading-relaxed whitespace-pre text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+        className="max-h-[26rem] overflow-auto px-3 py-3 font-mono text-caption leading-relaxed whitespace-pre text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
       >
         {yaml}
       </pre>
@@ -97,7 +95,7 @@ export function YamlPreview({
         {summary}
       </p>
       {state === "failed" ? (
-        <p role="alert" className="border-t border-rule-soft px-3 py-2 font-mono text-[0.68rem] text-warn">
+        <p role="alert" className="border-t border-rule-soft px-3 py-2 font-mono text-caption text-warn">
           Could not reach the clipboard. Select the text above and copy it.
         </p>
       ) : null}

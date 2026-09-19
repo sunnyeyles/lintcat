@@ -51,13 +51,13 @@ export function TokenCompositionChart({
       }))}
       footer={
         <div>
-          <p className="mb-1.5 tracking-[0.1em] uppercase">Share of spend</p>
-          <div className="flex h-2.5 w-full gap-[2px] rounded-[2px]">
+          <p className="mb-1.5 tracking-caps uppercase">Share of spend</p>
+          <div className="flex h-2.5 w-full gap-[2px] rounded-xs">
             {TOKEN_SERIES.map((series) => (
               <span
                 key={series.key}
                 aria-hidden
-                className="h-full min-w-0 grow-0 rounded-[1px]"
+                className="h-full min-w-0 grow-0 rounded-xs"
                 style={{
                   flexBasis: `${pct(costByClass[series.key], costTotal)}%`,
                   backgroundColor: colors[series.color],

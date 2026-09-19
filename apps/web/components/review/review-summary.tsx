@@ -1,4 +1,6 @@
-import { Card, CardContent, SeverityBadge } from "@/components/ui";
+import { Card, CardContent } from "@pr-review/design";
+
+import { SeverityBadge } from "@/components/ui";
 import type { Severity } from "@/lib/data";
 
 import { SEVERITIES } from "./sort";
@@ -15,7 +17,7 @@ export function ReviewSummaryPanel({ summary, bySeverity }: ReviewSummaryPanelPr
     <Card className="border-l-2 border-l-accent">
       <CardContent className="py-5">
         <h2 className="eyebrow mb-2.5 font-mono">Synthesiser summary</h2>
-        <p className="max-w-[62ch] font-sans text-[1.06rem] leading-[1.62] text-ink">
+        <p className="max-w-measure font-display text-lede leading-[1.62] text-ink">
           {summary}
         </p>
         {present.length > 0 ? (

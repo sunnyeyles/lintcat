@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@pr-review/design";
 
 export type FilePathProps = {
   file: string;
@@ -21,13 +21,13 @@ export function FilePath({ file, line, className }: FilePathProps) {
       <span className="sr-only">{full}</span>
       {dir ? (
         // RTL clips the head of the path, so the file name survives the squeeze.
-        <span dir="rtl" aria-hidden className="min-w-0 truncate text-slate-dim">
+        <span dir="rtl" aria-hidden className="min-w-0 truncate text-slate">
           {dir}
         </span>
       ) : null}
       <span aria-hidden className="shrink-0 text-ink">
         {base}
-        {suffix ? <span className="text-slate-dim">{suffix}</span> : null}
+        {suffix ? <span className="text-slate">{suffix}</span> : null}
       </span>
     </span>
   );

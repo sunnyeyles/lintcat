@@ -1,11 +1,10 @@
 "use client";
 
+import { cn, Tabs, TabsList, TabsTrigger } from "@pr-review/design";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useTransition } from "react";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui";
 import type { Range } from "@/lib/data/types";
-import { cn } from "@/lib/utils";
 
 import { RANGE_LABEL, RANGES } from "./range";
 

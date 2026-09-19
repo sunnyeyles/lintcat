@@ -12,7 +12,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui";
+} from "@pr-review/design";
+
 import type { Usage } from "@/lib/data/types";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
 
@@ -87,10 +88,10 @@ export function CostByRepoTable({
                         <span className="tabular-nums">{share.toFixed(1)}%</span>
                         <span
                           aria-hidden
-                          className="h-1.5 w-12 shrink-0 rounded-[1px] bg-accent/15"
+                          className="h-1.5 w-12 shrink-0 rounded-xs bg-accent/15"
                         >
                           <span
-                            className="block h-full rounded-[1px] bg-accent"
+                            className="block h-full rounded-xs bg-accent"
                             style={{ width: `${share}%` }}
                           />
                         </span>

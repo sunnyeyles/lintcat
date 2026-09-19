@@ -52,9 +52,9 @@ export function ChartTooltip({
   const total = rows.reduce((sum, row) => sum + row.value, 0);
 
   return (
-    <div className="pointer-events-none min-w-[10rem] rounded-[3px] border border-rule bg-surface px-3 py-2 font-mono text-[0.7rem] shadow-card">
+    <div className="pointer-events-none min-w-[10rem] rounded-sm border border-rule bg-surface px-3 py-2 font-mono text-caption shadow-card">
       {heading ? (
-        <p className="mb-1.5 text-[0.64rem] tracking-[0.1em] text-slate-dim uppercase">
+        <p className="mb-1.5 text-caption tracking-caps text-slate uppercase">
           {formatHeading ? formatHeading(heading) : heading}
         </p>
       ) : null}
@@ -84,7 +84,7 @@ export function ChartTooltip({
         </p>
       ) : null}
       {note ? (
-        <p className="mt-1.5 max-w-[16rem] text-[0.64rem] leading-relaxed text-slate-dim">
+        <p className="mt-1.5 max-w-[16rem] text-caption leading-relaxed text-slate">
           {note}
         </p>
       ) : null}

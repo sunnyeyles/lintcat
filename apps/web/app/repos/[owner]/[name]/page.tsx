@@ -1,10 +1,7 @@
-import { notFound } from "next/navigation";
-
-import { AgentChips, RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
-import { PageHeader } from "@/components/shell";
 import {
-  Badge,
   Card,
+  Chip,
+  cn,
   EmptyState,
   Stat,
   StatGrid,
@@ -15,7 +12,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui";
+} from "@pr-review/design";
+import { notFound } from "next/navigation";
+
+import { AgentChips, RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
+import { PageHeader } from "@/components/shell";
 import { data, type ReviewSummary } from "@/lib/data";
 import {
   formatDuration,
@@ -24,7 +25,6 @@ import {
   formatUsd,
   shortSha,
 } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 type PrGroup = { prNumber: number; reviews: ReviewSummary[] };
 
@@ -64,7 +64,7 @@ export default async function RepoDetailPage({
         eyebrow="Repository"
         title={
           <span className="font-mono text-[0.85em]">
-            <span className="text-slate-dim">{repo.owner}/</span>
+            <span className="text-slate">{repo.owner}/</span>
             {repo.name}
           </span>
         }
@@ -107,17 +107,16 @@ export default async function RepoDetailPage({
       </StatGrid>
 
       <Section
-        eyebrow="History"
         title="Review history"
         action={
           revisited > 0 ? (
-            <span className="font-mono text-[0.68rem] text-slate-dim">
+            <span className="font-mono text-caption text-slate">
               Grouped by pull request
             </span>
           ) : undefined
         }
       >
-        <Card className="px-4 py-3 sm:px-5">
+        <Card padding="table">
           {reviews.length > 0 ? (
             <Table className="min-w-[40rem]">
               <TableCaption className="sr-only">
@@ -151,12 +150,12 @@ export default async function RepoDetailPage({
                         <th
                           scope="rowgroup"
                           colSpan={6}
-                          className="pt-4 pb-1.5 text-left font-mono text-[0.72rem] font-medium text-ink"
+                          className="pt-4 pb-1.5 text-left font-mono text-label font-medium text-ink"
                         >
                           PR #{group.prNumber}{" "}
-                          <Badge variant="soft" className="ml-1.5 tracking-normal normal-case">
+                          <Chip variant="soft" className="ml-1.5">
                             {total} reviews
-                          </Badge>
+                          </Chip>
                         </th>
                       </tr>
                     ) : null}
@@ -182,7 +181,7 @@ export default async function RepoDetailPage({
                             </RowLink>
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            <code className="rounded-[2px] border border-rule-soft bg-surface-2 px-1 py-0.5 text-[0.72rem]">
+                            <code className="rounded-xs border border-rule-soft bg-surface-2 px-1 py-0.5 text-label">
                               {shortSha(review.headSha)}
                             </code>
                           </TableCell>
