@@ -46,6 +46,9 @@ interface TarEntry {
   body: Uint8Array;
 }
 
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+/** Numeric and flag fields only: every byte is one Latin-1 character. */
 function trimmedAscii(bytes: Uint8Array): string {
   let text = "";
   for (const byte of bytes) {
@@ -57,6 +60,17 @@ function trimmedAscii(bytes: Uint8Array): string {
   return text.trim();
 }
 
+/** A NUL-terminated header name, which tar writes as UTF-8. */
+function trimmedName(bytes: Uint8Array): string {
+  const nul = bytes.indexOf(0);
+  const body = nul < 0 ? bytes : bytes.subarray(0, nul);
+  try {
+    return utf8.decode(body).trim();
+  } catch {
+    return trimmedAscii(body);
+  }
+}
+
 function octal(bytes: Uint8Array): number {
   const digits = trimmedAscii(bytes);
   const value = Number.parseInt(digits, 8);
@@ -64,8 +78,8 @@ function octal(bytes: Uint8Array): number {
 }
 
 function headerName(header: Uint8Array): string {
-  const name = trimmedAscii(header.subarray(...NAME));
-  const prefix = trimmedAscii(header.subarray(...PREFIX));
+  const name = trimmedName(header.subarray(...NAME));
+  const prefix = trimmedName(header.subarray(...PREFIX));
   return prefix === "" ? name : `${prefix}/${name}`;
 }
 
@@ -96,7 +110,7 @@ function* tarEntries(bytes: Uint8Array): Generator<TarEntry> {
     offset += BLOCK_SIZE + Math.ceil(size / BLOCK_SIZE) * BLOCK_SIZE;
 
     if (typeFlag === "L") {
-      overrideName = trimmedAscii(body);
+      overrideName = trimmedName(body);
       continue;
     }
     if (typeFlag === "x" || typeFlag === "X") {
@@ -132,8 +146,6 @@ function isSkipped(path: string): boolean {
     .slice(0, -1)
     .some((segment) => SKIPPED_DIRECTORIES.has(segment));
 }
-
-const utf8 = new TextDecoder("utf-8", { fatal: true });
 
 /** undefined for anything that is not decodable UTF-8 text. */
 function decodeText(body: Uint8Array): string | undefined {

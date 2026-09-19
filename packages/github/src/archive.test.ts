@@ -26,7 +26,7 @@ function tarEntry(
   typeFlag = "0",
 ): Uint8Array {
   const header = new Uint8Array(BLOCK_SIZE);
-  writeAscii(header, 0, name);
+  header.set(new TextEncoder().encode(name), 0);
   writeAscii(header, 100, octalField(0o644, 8));
   writeAscii(header, 108, octalField(0, 8));
   writeAscii(header, 116, octalField(0, 8));
@@ -120,6 +120,14 @@ describe("readRepositoryTarball", () => {
 
     expect([...archive.files.keys()]).toEqual(["src/keep.ts"]);
     expect(archive.truncated).toBe(false);
+  });
+
+  it("keys a non-ASCII path by the name tar wrote, decoded as UTF-8", () => {
+    const archive = readRepositoryTarball(
+      repositoryTarball({ "src/über.ts": "export {};\n" }),
+    );
+
+    expect([...archive.files.keys()]).toEqual(["src/über.ts"]);
   });
 
   it("drops binary files without truncating", () => {
