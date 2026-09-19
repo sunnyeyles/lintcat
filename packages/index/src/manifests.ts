@@ -198,20 +198,21 @@ function selectCondition(value: unknown): string | undefined {
   return undefined;
 }
 
-interface SubpathMatch {
-  readonly value: unknown;
+interface SubpathMatch<Value = unknown> {
+  readonly value: Value;
+  /** What the key's `*` stood for, absent when the key matched exactly. */
   readonly capture?: string | undefined;
 }
 
 /** The exact key, else the `*` key with the longest literal prefix. */
-function matchSubpathKey(
-  map: Record<string, unknown>,
+export function matchSubpathKey<Value>(
+  map: Record<string, Value>,
   subject: string,
-): SubpathMatch | undefined {
+): SubpathMatch<Value> | undefined {
   if (subject in map) {
-    return { value: map[subject] };
+    return { value: map[subject]! };
   }
-  let best: { value: unknown; capture: string; head: number } | undefined;
+  let best: { value: Value; capture: string; head: number } | undefined;
   for (const [key, value] of Object.entries(map)) {
     const star = key.indexOf("*");
     if (star < 0) {

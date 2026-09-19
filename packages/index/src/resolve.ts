@@ -1,6 +1,10 @@
 /** Where an import specifier points: a relative path, a `#` import map, a
  * tsconfig alias, a workspace package, or nothing this index understands. */
-import { resolveExportsField, resolveImportsField } from "#src/manifests";
+import {
+  matchSubpathKey,
+  resolveExportsField,
+  resolveImportsField,
+} from "#src/manifests";
 import {
   directoryOf,
   extensionOf,
@@ -105,48 +109,21 @@ function splitBare(
   };
 }
 
-/** The alias whose pattern matches longest, with what its `*` captured. */
-function matchAlias(
-  aliases: readonly { pattern: string; targets: readonly string[] }[],
-  specifier: string,
-): { targets: readonly string[]; capture: string } | undefined {
-  let best: { targets: readonly string[]; capture: string; head: number } | undefined;
-  for (const { pattern, targets } of aliases) {
-    const star = pattern.indexOf("*");
-    if (star < 0) {
-      if (pattern === specifier && (best === undefined || pattern.length > best.head)) {
-        best = { targets, capture: "", head: pattern.length };
-      }
-      continue;
-    }
-    const head = pattern.slice(0, star);
-    const tail = pattern.slice(star + 1);
-    if (
-      !specifier.startsWith(head) ||
-      !specifier.endsWith(tail) ||
-      specifier.length < head.length + tail.length
-    ) {
-      continue;
-    }
-    if (best === undefined || head.length > best.head) {
-      best = {
-        targets,
-        capture: specifier.slice(head.length, specifier.length - tail.length),
-        head: head.length,
-      };
-    }
-  }
-  return best === undefined
-    ? undefined
-    : { targets: best.targets, capture: best.capture };
-}
-
 /** Tried in one order: relative path, `#` import map, tsconfig `paths`,
  * workspace package name, then nothing. A bare miss is third-party. */
 export function createImportResolver(
   workspace: WorkspaceModel,
   exists: (path: string) => boolean,
 ): (fromPath: string, specifier: string) => ResolvedImport {
+  const aliasesByDirectory = new Map(
+    [...workspace.aliases].map(([directory, declared]) => [
+      directory,
+      Object.fromEntries(
+        declared.map(({ pattern, targets }) => [pattern, targets]),
+      ) as Record<string, readonly string[]>,
+    ]),
+  );
+
   const firstExisting = (
     base: string,
     targets: readonly string[],
@@ -189,11 +166,11 @@ export function createImportResolver(
       );
     }
 
-    const aliases = nearestFor(workspace.aliases, fromPath);
+    const aliases = nearestFor(aliasesByDirectory, fromPath);
     const matched =
-      aliases === undefined ? undefined : matchAlias(aliases, specifier);
+      aliases === undefined ? undefined : matchSubpathKey(aliases, specifier);
     if (matched !== undefined) {
-      return resolved(firstExisting("", matched.targets, matched.capture));
+      return resolved(firstExisting("", matched.value, matched.capture));
     }
 
     const bare = splitBare(specifier);
