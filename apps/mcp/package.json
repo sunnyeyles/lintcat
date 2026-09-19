@@ -1,0 +1,27 @@
+{
+  "name": "@pr-review/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#src/*": "./src/*.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node ../../scripts/build-bundle.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@pr-review/ai": "workspace:*",
+    "@pr-review/db": "workspace:*",
+    "@pr-review/github": "workspace:*",
+    "@pr-review/index": "workspace:*",
+    "@pr-review/logging": "workspace:*",
+    "@pr-review/reviewer": "workspace:*",
+    "@pr-review/schemas": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

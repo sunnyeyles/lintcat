@@ -1,0 +1,256 @@
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import path from "node:path";
+
+import {
+  collectRepositoryFiles,
+  DEFAULT_ARCHIVE_LIMITS,
+  readRepositoryTarball,
+  type ChangedFile,
+  type CodeSearchMatch,
+  type GithubInstallationClient,
+  type PullRequestDetails,
+  type RepositoryArchive,
+  type RepositoryFileEntry,
+} from "@pr-review/github";
+import type { ReviewTarget } from "@pr-review/reviewer";
+
+import { assertRef, git, gitBuffer, GitError } from "#src/git";
+import { parseUnifiedDiff } from "#src/unified-diff";
+
+/** The head "commit" of a local review: files as they are on disk now. */
+export const WORKING_TREE = "WORKING_TREE";
+
+const MAX_SEARCH_FILES = 30;
+const MAX_SNIPPETS_PER_FILE = 3;
+
+/** One local checkout, reviewed as if its uncommitted state were a pull request. */
+export interface LocalRepository {
+  root: string;
+  owner: string;
+  repo: string;
+  baseRef: string;
+  baseSha: string;
+  branch: string;
+  target: ReviewTarget;
+  client: GithubInstallationClient;
+}
+
+class LocalClientUnsupported extends Error {
+  constructor(operation: string) {
+    super(`${operation} is not available on a local checkout`);
+    this.name = "LocalClientUnsupported";
+  }
+}
+
+async function tryGit(root: string, args: readonly string[]): Promise<string | undefined> {
+  try {
+    return (await git(root, args)).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function defaultBaseRef(root: string): Promise<string> {
+  const remoteHead = await tryGit(root, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  if (remoteHead !== undefined) {
+    return remoteHead;
+  }
+  for (const candidate of ["origin/main", "origin/master", "main", "master"]) {
+    if ((await tryGit(root, ["rev-parse", "--verify", "--quiet", `${candidate}^{commit}`])) !== undefined) {
+      return candidate;
+    }
+  }
+  throw new GitError("no default branch found; pass `base` explicitly");
+}
+
+function ownerAndRepo(remoteUrl: string | undefined, root: string): { owner: string; repo: string } {
+  const match = remoteUrl && /github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(remoteUrl);
+  return match ? { owner: match[1]!, repo: match[2]! } : { owner: "local", repo: path.basename(root) };
+}
+
+/** Resolves `repoPath` to its checkout and the base the working tree is compared against. */
+export async function openLocalRepository(
+  repoPath: string,
+  base?: string | undefined,
+): Promise<LocalRepository> {
+  const root = realpathSync(
+    (await git(repoPath, ["rev-parse", "--show-toplevel"])).trim(),
+  );
+  const baseRef = assertRef(base ?? (await defaultBaseRef(root)));
+  const baseSha = (await git(root, ["merge-base", baseRef, "HEAD"])).trim();
+  const branch = (await tryGit(root, ["branch", "--show-current"])) ?? "HEAD";
+  const { owner, repo } = ownerAndRepo(await tryGit(root, ["remote", "get-url", "origin"]), root);
+  const target: ReviewTarget = { owner, repo, pullRequestNumber: 0, headSha: WORKING_TREE };
+  const repository = { root, owner, repo, baseRef, baseSha, branch, target };
+  return { ...repository, client: createLocalGitClient(repository) };
+}
+
+/** A path inside the checkout, with symlinks resolved; anything else is a 404. */
+function resolveInside(root: string, file: string): string {
+  const resolved = path.resolve(root, file);
+  let real: string;
+  try {
+    real = realpathSync(resolved);
+  } catch {
+    throw new GitError(`${file} does not exist in the working tree`, 404);
+  }
+  if (real !== root && !real.startsWith(root + path.sep)) {
+    throw new GitError(`${file} is outside the repository`, 404);
+  }
+  return real;
+}
+
+function searchTerms(query: string): string[] {
+  return query
+    .split(/\s+/)
+    .map((term) => term.replace(/^"|"$/g, ""))
+    .filter((term) => term !== "");
+}
+
+function groupMatches(output: string): CodeSearchMatch[] {
+  const byPath = new Map<string, string[]>();
+  for (const line of output.split("\n")) {
+    const match = /^(.+?):(\d+):(.*)$/.exec(line);
+    if (!match) continue;
+    const snippets = byPath.get(match[1]!) ?? [];
+    if (snippets.length < MAX_SNIPPETS_PER_FILE) snippets.push(match[3]!.trim());
+    byPath.set(match[1]!, snippets);
+  }
+  return [...byPath].map(([file, snippets]) => ({
+    path: file,
+    name: path.posix.basename(file),
+    snippets,
+  }));
+}
+
+function* workingTreeFiles(root: string, paths: readonly string[]): Generator<RepositoryFileEntry> {
+  for (const file of paths) {
+    const absolute = path.join(root, file);
+    let size: number;
+    try {
+      const stat = statSync(absolute);
+      if (!stat.isFile()) continue;
+      size = stat.size;
+    } catch {
+      continue;
+    }
+    yield { path: file, size, read: () => readFileSync(absolute) };
+  }
+}
+
+function createLocalGitClient(
+  repository: Omit<LocalRepository, "client">,
+): GithubInstallationClient {
+  const { root, baseSha, baseRef, branch } = repository;
+
+  let snapshot: Promise<{ diff: string; files: ChangedFile[] }> | undefined;
+  // Taken once, so every reader of one review sees the same working tree.
+  const changes = () => {
+    snapshot ??= (async () => {
+      const tracked = await git(root, ["diff", "--no-color", "--no-ext-diff", "--no-renames", baseSha]);
+      const untracked = (await git(root, ["ls-files", "-z", "--others", "--exclude-standard"]))
+        .split("\0")
+        .filter((file) => file !== "");
+      const added = await Promise.all(
+        untracked.map((file) =>
+          git(root, ["diff", "--no-color", "--no-index", "--", "/dev/null", file], {
+            okExitCodes: [1],
+          }),
+        ),
+      );
+      const diff = [tracked, ...added].filter((part) => part !== "").join("");
+      return { diff, files: parseUnifiedDiff(diff) };
+    })();
+    return snapshot;
+  };
+
+  const readAt = async (ref: string, file: string): Promise<string> => {
+    if (ref === WORKING_TREE) {
+      return readFileSync(resolveInside(root, file), "utf8");
+    }
+    try {
+      return await git(root, ["show", `${assertRef(ref)}:${file}`]);
+    } catch (error) {
+      throw new GitError(`${file} does not exist at ${ref}: ${(error as Error).message}`, 404);
+    }
+  };
+
+  return {
+    async getPullRequest(): Promise<PullRequestDetails> {
+      const subjects = await git(root, ["log", "--format=- %s", `${baseSha}..HEAD`]);
+      return {
+        number: 0,
+        title: `Local changes on ${branch}`,
+        body: subjects.trim() === "" ? null : `Commits since ${baseRef}:\n${subjects.trim()}`,
+        author: (await tryGit(root, ["config", "user.name"])) ?? null,
+        baseRef,
+        baseSha,
+        headRef: branch,
+        headSha: WORKING_TREE,
+      };
+    },
+    async listChangedFiles() {
+      return (await changes()).files;
+    },
+    async getDiff() {
+      return (await changes()).diff;
+    },
+    getFileContents: ({ path: file, ref }) => readAt(ref, file),
+    async searchCode({ query }) {
+      const terms = searchTerms(query);
+      if (terms.length === 0) {
+        return { matches: [], totalCount: 0, incompleteResults: false };
+      }
+      const output = await git(
+        root,
+        ["grep", "-I", "-n", "-i", "-F", "--untracked", "--all-match", ...terms.flatMap((term) => ["-e", term])],
+        { okExitCodes: [1] },
+      );
+      const matches = groupMatches(output);
+      return {
+        matches: matches.slice(0, MAX_SEARCH_FILES),
+        totalCount: matches.length,
+        incompleteResults: false,
+      };
+    },
+    async getRepositoryArchive({ ref, limits }): Promise<RepositoryArchive> {
+      if (ref === WORKING_TREE) {
+        const listed = (await git(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]))
+          .split("\0")
+          .filter((file) => file !== "");
+        return { sha: WORKING_TREE, ...collectRepositoryFiles(workingTreeFiles(root, listed), limits) };
+      }
+      const sha = (await git(root, ["rev-parse", `${assertRef(ref)}^{commit}`])).trim();
+      const tarball = await gitBuffer(root, ["archive", "--format=tar", "--prefix=repository/", sha], {
+        maxBuffer: limits?.maxInflatedBytes ?? DEFAULT_ARCHIVE_LIMITS.maxInflatedBytes,
+      });
+      return { sha, ...readRepositoryTarball(new Uint8Array(tarball), limits) };
+    },
+    async listCommitShas({ path: file, limit }) {
+      const output = await git(root, ["log", "--format=%H", "-n", String(limit), "HEAD", "--", file]);
+      return output.split("\n").filter((sha) => sha !== "");
+    },
+    async listCommitFiles({ sha }) {
+      const output = await git(root, ["show", "--name-only", "--format=", "--no-renames", assertRef(sha)]);
+      return output.split("\n").filter((file) => file !== "");
+    },
+    async listPullRequestCommitShas() {
+      const output = await git(root, ["rev-list", "--reverse", `${baseSha}..HEAD`]);
+      return output.split("\n").filter((sha) => sha !== "");
+    },
+    listCheckRuns: async () => [],
+    listReviewComments: async () => [],
+    listReviewThreads: async () => [],
+    async getBranchTip({ branch: name }) {
+      return (await git(root, ["rev-parse", `refs/heads/${assertRef(name)}`])).trim();
+    },
+    async getCommitMessage({ sha }) {
+      return git(root, ["log", "-1", "--format=%B", assertRef(sha)]);
+    },
+    compareCommits: () => Promise.reject(new LocalClientUnsupported("compareCommits")),
+    createCheckRun: () => Promise.reject(new LocalClientUnsupported("createCheckRun")),
+    createReview: () => Promise.reject(new LocalClientUnsupported("createReview")),
+    createCommitOnBranch: () => Promise.reject(new LocalClientUnsupported("createCommitOnBranch")),
+    writeFileOnBranch: () => Promise.reject(new LocalClientUnsupported("writeFileOnBranch")),
+  };
+}
