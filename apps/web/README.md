@@ -33,8 +33,9 @@ prerendered.
 `POST /api/ingest` takes a `reviewRecordSchema` body (`@pr-review/schemas`)
 with `Authorization: Bearer <organization ingest secret>`. The organization's
 row stores only the secret's SHA-256 (`hashIngestToken`). The record's owner
-must be the organization's login, or it is a 404. A missing or unknown token is a 401
-and writes nothing; a rerun of the same commit replaces that review's agent
+must be the organization's login, and the repo must not have been removed from
+the installation, or it is a 404. A missing or unknown token, or an uninstalled
+organization's, is a 401 and writes nothing; a rerun of the same commit replaces that review's agent
 runs and findings.
 
 ## GitHub App webhook
@@ -44,19 +45,26 @@ Each delivery's `X-Hub-Signature-256` is checked against
 `GITHUB_APP_WEBHOOK_SECRET` before the body is parsed; a missing or wrong one is
 a 401 and writes nothing.
 
-| Event                       | Action                 | Effect                                                    |
-| --------------------------- | ---------------------- | --------------------------------------------------------- |
-| `installation`              | `created`              | Upsert the organization; its repos become exactly what GitHub lists |
-| `installation`              | `suspend`, `unsuspend` | Set or clear `organizations.suspended_at`                 |
-| `installation`              | `deleted`              | Delete the organization; memberships, repos and reviews cascade |
-| `installation_repositories` | `added`, `removed`     | Upsert or delete those repos (their reviews go with them) |
-| `organization`              | `member_added`, `member_removed` | Re-check that user's membership with GitHub     |
-| `member`                    | `added`, `edited`, `removed`     | Same, when the repository belongs to an organization |
-| `membership`                | `added`, `removed`     | Same                                                      |
+| Event                       | Action                           | Effect                                                                         |
+| --------------------------- | -------------------------------- | ------------------------------------------------------------------------------ |
+| `installation`              | `created`                        | Upsert the organization; its live repos and members become what GitHub lists  |
+| `installation`              | `suspend`, `unsuspend`           | Set or clear `organizations.suspended_at`; `unsuspend` re-lists the members    |
+| `installation`              | `deleted`                        | Set `uninstalled_at` and clear `installation_id`; nothing is deleted          |
+| `installation_repositories` | `added`, `removed`               | Upsert those repos (clearing `removed_at`), or set their `removed_at`          |
+| `organization`              | `member_added`, `member_removed` | Re-check that user's membership with GitHub                                    |
+| `member`                    | `added`, `edited`, `removed`     | Same, when the repository belongs to an organization                           |
+| `membership`                | `added`, `removed`               | Same                                                                           |
 
 Anything else gets a 204. The slug is the account's lowercased login; a
-personal account becomes an organization of type `user`. Uninstalling is a hard
-delete, not a soft one: reinstalling starts the organization afresh. Writes are
+personal account becomes an organization of type `user`.
+
+Uninstalling and removing repositories are soft: memberships, repos and reviews
+stay, but an uninstalled organization is not-found to everyone, removed repos
+and their reviews are left out of every page and total, and ingest for either is
+rejected. Reinstalling (a `created` for the same account) clears
+`uninstalled_at`, and the repos it lists come back with their history; ones it
+does not list are marked removed. Only `created` revives an uninstalled
+organization, so a late `installation_repositories` delivery cannot. Writes are
 keyed on GitHub ids, so a redelivery converges, and each delivery's writes run
 in one transaction over Neon's WebSocket pool (`withWriteDatabase`), since the
 HTTP driver behind `db()` cannot run one. Pages keep reading over HTTP.
@@ -118,8 +126,8 @@ sign-in. The user's OAuth token is not kept.
 
 Every organization page lives under `/o/<slug>/`. `authorize` (`lib/authorize.ts`)
 reads only the database and returns the organization and the user's role, or
-not-found. An unknown slug, a suspended organization and a non-member get the
-same not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
+not-found. An unknown slug, a suspended or uninstalled organization and a
+non-member get the same not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
 every organization layout and page calls: a signed-out visitor goes to
 `/sign-in?callbackUrl=<the page>` (the path comes from `middleware.ts`), and a
 not-found renders the 404.

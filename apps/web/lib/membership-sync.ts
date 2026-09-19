@@ -45,7 +45,7 @@ export interface InstalledAccount {
 export function installedAccount(
   organization: Organization,
 ): InstalledAccount | undefined {
-  if (organization.installationId === null) return undefined;
+  if (organization.installationId === null || organization.uninstalledAt) return undefined;
   return {
     accountType: organization.accountType,
     accountId: organization.githubAccountId,

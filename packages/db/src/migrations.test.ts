@@ -61,6 +61,7 @@ describe("migrations applied in order to an empty database", () => {
       "name",
       "slug",
       "suspended_at",
+      "uninstalled_at",
     ]);
     expect(await columns("memberships")).toEqual([
       "id",
@@ -84,6 +85,7 @@ describe("migrations applied in order to an empty database", () => {
       "organization_id",
       "owner",
       "private",
+      "removed_at",
     ]);
   });
 

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "./client";
 import { organizations, repos, type Organization } from "./schema";
 
@@ -22,6 +22,7 @@ export interface RepositoryInput {
 export async function upsertInstallation(
   database: Database,
   installation: InstallationInput,
+  { reinstall = false }: { reinstall?: boolean } = {},
 ): Promise<Organization> {
   const values = {
     githubAccountId: installation.accountId,
@@ -30,6 +31,7 @@ export async function upsertInstallation(
     name: installation.login,
     installationId: installation.installationId,
     suspendedAt: installation.suspendedAt,
+    ...(reinstall ? { uninstalledAt: null } : {}),
   };
   const rows = await database
     .insert(organizations)
@@ -41,13 +43,17 @@ export async function upsertInstallation(
   return row;
 }
 
-/** Cascades to the organization's memberships, repos and their reviews. */
-export async function deleteInstallation(
+/** Soft: memberships, repos and reviews stay for a reinstall to bring back. */
+export async function markUninstalled(
   database: Database,
   accountId: number,
 ): Promise<void> {
   await database
-    .delete(organizations)
+    .update(organizations)
+    .set({
+      installationId: null,
+      uninstalledAt: sql`coalesce(${organizations.uninstalledAt}, now())`,
+    })
     .where(eq(organizations.githubAccountId, accountId));
 }
 
@@ -92,6 +98,7 @@ export async function upsertRepositories(
         owner: sql`excluded.owner`,
         name: sql`excluded.name`,
         private: sql`excluded.private`,
+        removedAt: null,
       },
     });
 }
@@ -102,17 +109,24 @@ export async function removeRepositories(
   githubRepoIds: readonly number[],
 ): Promise<void> {
   if (githubRepoIds.length === 0) return;
-  await database
-    .delete(repos)
-    .where(
-      and(
-        eq(repos.organizationId, organizationId),
-        inArray(repos.githubRepoId, [...githubRepoIds]),
-      ),
-    );
+  await markRemoved(
+    database,
+    and(
+      eq(repos.organizationId, organizationId),
+      inArray(repos.githubRepoId, [...githubRepoIds]),
+    ),
+  );
 }
 
-/** Makes the organization's repos exactly `repositories`, deleting any others. */
+// Keeps the first removal time, so a redelivery changes nothing.
+async function markRemoved(database: Database, where: SQL | undefined): Promise<void> {
+  await database
+    .update(repos)
+    .set({ removedAt: sql`now()` })
+    .where(and(where, isNull(repos.removedAt)));
+}
+
+/** Makes the organization's live repos exactly `repositories`, marking any others removed. */
 export async function replaceRepositories(
   database: Database,
   organizationId: number,
@@ -120,14 +134,13 @@ export async function replaceRepositories(
 ): Promise<void> {
   await upsertRepositories(database, organizationId, repositories);
   const keep = repositories.map((repo) => repo.githubRepoId);
-  await database
-    .delete(repos)
-    .where(
-      and(
-        eq(repos.organizationId, organizationId),
-        keep.length === 0
-          ? undefined
-          : or(isNull(repos.githubRepoId), notInArray(repos.githubRepoId, keep)),
-      ),
-    );
+  await markRemoved(
+    database,
+    and(
+      eq(repos.organizationId, organizationId),
+      keep.length === 0
+        ? undefined
+        : or(isNull(repos.githubRepoId), notInArray(repos.githubRepoId, keep)),
+    ),
+  );
 }

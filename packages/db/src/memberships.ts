@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import {
   memberships,
@@ -107,6 +107,8 @@ export async function listInstalledOrganizations(
   return database
     .select()
     .from(organizations)
-    .where(isNotNull(organizations.installationId))
+    .where(
+      and(isNotNull(organizations.installationId), isNull(organizations.uninstalledAt)),
+    )
     .orderBy(asc(organizations.id));
 }

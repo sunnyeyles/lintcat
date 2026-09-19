@@ -27,6 +27,8 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   installationId: bigint("installation_id", { mode: "number" }).unique(),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  // Set on uninstall, which also clears installationId; the rows and history stay.
+  uninstalledAt: timestamp("uninstalled_at", { withTimezone: true }),
   // SHA-256 hex of the ingest secret; the secret itself is never stored.
   ingestToken: text("ingest_token").unique(),
   createdAt: createdAt(),
@@ -77,6 +79,8 @@ export const repos = pgTable(
     owner: text("owner").notNull(),
     name: text("name").notNull(),
     private: boolean("private").notNull().default(false),
+    // Set when the installation stops covering the repo; its reviews stay but are hidden.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [

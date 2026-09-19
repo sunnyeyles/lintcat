@@ -140,6 +140,7 @@ function build(now: Date, ceiling: number): World {
     name: "Acme Engineering",
     installationId: null,
     suspendedAt: null,
+    uninstalledAt: null,
     ingestToken: null,
     createdAt: new Date(now.getTime() - DAYS * 864e5),
   };
@@ -151,6 +152,7 @@ function build(now: Date, ceiling: number): World {
     owner,
     name,
     private: false,
+    removedAt: null,
     createdAt: new Date(now.getTime() - (DAYS - i) * 864e5),
   }));
 

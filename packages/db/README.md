@@ -28,6 +28,7 @@ erDiagram
     text name
     bigint installation_id UK
     timestamptz suspended_at
+    timestamptz uninstalled_at
     text ingest_token UK "sha-256 hex"
   }
   memberships {
@@ -44,6 +45,7 @@ erDiagram
     text owner
     text name
     boolean private
+    timestamptz removed_at
   }
   reviews {
     serial id PK
@@ -97,8 +99,10 @@ erDiagram
 - `repos.github_repo_id` is the key the installation webhook upserts on
   (`src/installations.ts`); a repo ingest recorded first is claimed by owner
   and name, so its reviews stay.
-- Deleting an organization cascades to its memberships, repos, reviews and
-  findings; its users stay.
+- Uninstalling sets `organizations.uninstalled_at` and removing a repository
+  sets `repos.removed_at`; neither deletes a row, so reviews survive a
+  reinstall. A hard delete of an organization still cascades to everything
+  under it.
 
 ## Commands
 

@@ -67,5 +67,8 @@ function failureMessage(
   if (reason === "organization-not-found") {
     return `organization ${organization.slug} no longer exists`;
   }
+  if (reason === "repo-removed") {
+    return `organization ${organization.slug} no longer tracks that repository`;
+  }
   return `organization ${organization.slug} does not own ${owner}`;
 }

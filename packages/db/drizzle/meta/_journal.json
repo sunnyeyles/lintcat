@@ -43,6 +43,13 @@
       "when": 1789783277367,
       "tag": "0005_widen_github_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789783755956,
+      "tag": "0006_soft_uninstall",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,12 @@ export async function membershipsForUser(
     .from(users)
     .innerJoin(memberships, eq(memberships.userId, users.id))
     .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
-    .where(and(eq(users.githubId, githubId), isNull(organizations.suspendedAt)))
+    .where(
+      and(
+        eq(users.githubId, githubId),
+        isNull(organizations.suspendedAt),
+        isNull(organizations.uninstalledAt),
+      ),
+    )
     .orderBy(asc(memberships.id));
 }

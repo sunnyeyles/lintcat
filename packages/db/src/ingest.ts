@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ReviewRecord } from "@pr-review/schemas";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "./client";
 import {
   agentRuns,
@@ -24,13 +24,18 @@ export async function findOrganizationByIngestToken(
   const rows = await database
     .select()
     .from(organizations)
-    .where(eq(organizations.ingestToken, hashIngestToken(token)))
+    .where(
+      and(
+        eq(organizations.ingestToken, hashIngestToken(token)),
+        isNull(organizations.uninstalledAt),
+      ),
+    )
     .limit(1);
   return rows[0];
 }
 
-/** `owner-mismatch` is the 404: the record's repo belongs to another account. */
-export type IngestFailure = "organization-not-found" | "owner-mismatch";
+/** Each is a 404: the organization is gone, or the repo is another account's or was removed. */
+export type IngestFailure = "organization-not-found" | "owner-mismatch" | "repo-removed";
 
 export type IngestResult =
   | { ok: true; reviewId: number }
@@ -48,6 +53,7 @@ export async function ingestReviewRecord(
   }
 
   const repoId = await findOrCreateRepo(database, organizationId, record);
+  if (repoId === undefined) return { ok: false, reason: "repo-removed" };
   const reviewId = await upsertReview(database, repoId, record);
   await replaceAgentRuns(database, reviewId, record);
   await replaceFindings(database, reviewId, record);
@@ -61,7 +67,7 @@ async function findOrganization(
   const rows = await database
     .select()
     .from(organizations)
-    .where(eq(organizations.id, organizationId))
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.uninstalledAt)))
     .limit(1);
   return rows[0];
 }
@@ -75,9 +81,9 @@ async function findOrCreateRepo(
   database: Database,
   organizationId: number,
   record: ReviewRecord,
-): Promise<number> {
-  const found = await selectRepoId(database, organizationId, record);
-  if (found !== undefined) return found;
+): Promise<number | undefined> {
+  const found = await selectRepo(database, organizationId, record);
+  if (found) return found.removedAt ? undefined : found.id;
 
   const inserted = await database
     .insert(repos)
@@ -88,20 +94,20 @@ async function findOrCreateRepo(
   if (created) return created.id;
 
   // No row back means a concurrent first review for this repo won the insert.
-  const winner = await selectRepoId(database, organizationId, record);
-  if (winner === undefined) {
+  const winner = await selectRepo(database, organizationId, record);
+  if (!winner) {
     throw new Error(`could not create repo ${record.owner}/${record.repo}`);
   }
-  return winner;
+  return winner.removedAt ? undefined : winner.id;
 }
 
-async function selectRepoId(
+async function selectRepo(
   database: Database,
   organizationId: number,
   record: ReviewRecord,
-): Promise<number | undefined> {
+): Promise<{ id: number; removedAt: Date | null } | undefined> {
   const rows = await database
-    .select({ id: repos.id })
+    .select({ id: repos.id, removedAt: repos.removedAt })
     .from(repos)
     .where(
       and(
@@ -111,7 +117,7 @@ async function selectRepoId(
       ),
     )
     .limit(1);
-  return rows[0]?.id;
+  return rows[0];
 }
 
 async function upsertReview(

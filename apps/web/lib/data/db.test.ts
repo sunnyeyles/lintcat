@@ -1,11 +1,13 @@
 import {
   ingestReviewRecord,
   organizations,
+  repos,
   type Database,
   type Organization,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import type { ReviewRecord, ReviewRecordAgentRun } from "@pr-review/schemas";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { costOf } from "@/lib/data";
@@ -184,6 +186,27 @@ describe("createDbSource", () => {
     const usage = await source.getUsage("30d");
     expect(usage.totals.reviewCount).toBe(1);
     expect(usage.totals.costUsd).toBeCloseTo(costOf(run("x", 0)) * 2, 10);
+    expect(usage.byRepo.map((row) => row.repo.name)).toEqual(["widgets"]);
+  });
+
+  it("hides a removed repo and its reviews from lists, totals and direct lookups", async () => {
+    await ingest(acme, record());
+    const hidden = await ingest(acme, record({ repo: "gadgets" }));
+    await database
+      .update(repos)
+      .set({ removedAt: new Date() })
+      .where(eq(repos.name, "gadgets"));
+    const source = createDbSource(database, acme);
+
+    expect((await source.listRepos()).map((repo) => repo.name)).toEqual(["widgets"]);
+    expect(await source.getRepo("acme", "gadgets")).toBeNull();
+    expect((await source.listReviews()).map((review) => review.repo.name)).toEqual([
+      "widgets",
+    ]);
+    expect(await source.getReview(hidden)).toBeNull();
+    expect((await source.getTrends("30d")).totals.reviews).toBe(1);
+    const usage = await source.getUsage("30d");
+    expect(usage.totals.reviewCount).toBe(1);
     expect(usage.byRepo.map((row) => row.repo.name)).toEqual(["widgets"]);
   });
 

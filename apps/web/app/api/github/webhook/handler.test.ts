@@ -19,6 +19,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { authorize } from "@/lib/authorize";
+import { membershipsForUser } from "@/lib/organization";
 
 import { handleGithubWebhook } from "./handler";
 
@@ -142,6 +143,23 @@ function deliver(request: Request): Promise<Response> {
   });
 }
 
+const uninstalled = () =>
+  delivery("installation", { action: "deleted", installation: installation() });
+
+async function seedReview(repo: InstallationRepository): Promise<void> {
+  const [row] = await database
+    .select({ id: repos.id })
+    .from(repos)
+    .where(eq(repos.githubRepoId, repo.id));
+  await database.insert(reviews).values({
+    repoId: row!.id,
+    prNumber: 1,
+    headSha: `sha-${repo.name}`,
+    agents: ["security"],
+    summary: "ok",
+  });
+}
+
 const created = (type: "Organization" | "User" = "Organization", login = "Acme") =>
   delivery("installation", { action: "created", installation: installation(type, login) });
 
@@ -166,6 +184,7 @@ async function state() {
       name: organizations.name,
       installationId: organizations.installationId,
       suspendedAt: organizations.suspendedAt,
+      uninstalled: sql<boolean>`${organizations.uninstalledAt} is not null`,
     })
     .from(organizations)
     .orderBy(asc(organizations.id));
@@ -175,6 +194,7 @@ async function state() {
       owner: repos.owner,
       name: repos.name,
       private: repos.private,
+      removed: sql<boolean>`${repos.removedAt} is not null`,
     })
     .from(repos)
     .orderBy(asc(repos.githubRepoId));
@@ -188,12 +208,13 @@ async function state() {
 
 const empty = { organizations: [], repos: [], memberships: [] };
 
-function repoRow(repo: InstallationRepository) {
+function repoRow(repo: InstallationRepository, removed = false) {
   return {
     githubRepoId: repo.id,
     owner: repo.owner,
     name: repo.name,
     private: repo.private,
+    removed,
   };
 }
 
@@ -260,6 +281,7 @@ describe("handleGithubWebhook installation", () => {
           name: "Acme",
           installationId: INSTALLATION_ID,
           suspendedAt: null,
+          uninstalled: false,
         },
       ],
       repos: [repoRow(widgets), repoRow(secrets)],
@@ -333,11 +355,11 @@ describe("handleGithubWebhook installation", () => {
     expect(await database.select().from(reviews)).toHaveLength(1);
   });
 
-  it("drops repositories the installation no longer lists when it is created again", async () => {
+  it("marks removed the repositories the installation no longer lists when created again", async () => {
     await deliver(created());
     listed = [secrets];
     await deliver(created());
-    expect((await state()).repos).toEqual([repoRow(secrets)]);
+    expect((await state()).repos).toEqual([repoRow(widgets, true), repoRow(secrets)]);
   });
 
   it("sets and clears suspended_at on suspend and unsuspend", async () => {
@@ -359,13 +381,67 @@ describe("handleGithubWebhook installation", () => {
     expect((await state()).organizations[0]?.suspendedAt).toBeNull();
   });
 
-  it("removes the organization and its repositories on uninstall", async () => {
+  it("keeps the organization, its repositories and reviews on uninstall, but closes access", async () => {
     await deliver(created());
-    const response = await deliver(
-      delivery("installation", { action: "deleted", installation: installation() }),
-    );
+    await seedReview(widgets);
+    const response = await deliver(uninstalled());
     expect(response.status).toBe(200);
-    expect(await state()).toEqual(empty);
+
+    const after = await state();
+    expect(after.organizations).toMatchObject([
+      { slug: "acme", installationId: null, uninstalled: true },
+    ]);
+    expect(after.repos).toEqual([repoRow(widgets), repoRow(secrets)]);
+    expect(after.memberships).toHaveLength(2);
+    expect(await database.select().from(reviews)).toHaveLength(1);
+    expect(await authorize(database, { githubId: octocat.id }, "acme")).toEqual({
+      status: "not-found",
+    });
+    expect(await membershipsForUser(database, octocat.id)).toEqual([]);
+  });
+
+  it("converges when an uninstall is delivered twice", async () => {
+    await deliver(created());
+    const request = uninstalled();
+    await deliver(request.clone());
+    const [once] = await database.select().from(organizations);
+    await deliver(request);
+    expect(await database.select().from(organizations)).toEqual([once]);
+  });
+
+  it("brings the organization and its re-listed repositories back on reinstall", async () => {
+    await deliver(created());
+    await seedReview(widgets);
+    await seedReview(secrets);
+    await deliver(uninstalled());
+
+    listed = [widgets];
+    members = [octocat];
+    const response = await deliver(created());
+
+    expect(response.status).toBe(200);
+    const after = await state();
+    expect(after.organizations).toMatchObject([
+      { installationId: INSTALLATION_ID, uninstalled: false },
+    ]);
+    expect(after.repos).toEqual([repoRow(widgets), repoRow(secrets, true)]);
+    expect(after.memberships).toEqual([
+      { githubId: octocat.id, login: "octocat", role: "owner" },
+    ]);
+    expect(await database.select().from(reviews)).toHaveLength(2);
+    expect(await authorize(database, { githubId: octocat.id }, "acme")).toMatchObject({
+      status: "allowed",
+    });
+  });
+
+  it("does not revive an uninstalled organization for a late repositories delivery", async () => {
+    await deliver(created());
+    await deliver(uninstalled());
+    const response = await deliver(repositoriesChanged("added", [widgets]));
+    expect(response.status).toBe(204);
+    expect((await state()).organizations).toMatchObject([
+      { installationId: null, uninstalled: true },
+    ]);
   });
 
   it("leaves state unchanged when the same delivery arrives twice", async () => {
@@ -390,10 +466,26 @@ describe("handleGithubWebhook installation_repositories", () => {
     expect((await state()).repos).toEqual([repoRow(widgets), repoRow(secrets)]);
   });
 
-  it("removes repositories", async () => {
+  it("marks repositories removed, keeping their reviews", async () => {
+    await seedReview(widgets);
     const response = await deliver(repositoriesChanged("removed", [widgets]));
     expect(response.status).toBe(200);
-    expect((await state()).repos).toEqual([]);
+    expect((await state()).repos).toEqual([repoRow(widgets, true)]);
+    expect(await database.select().from(reviews)).toHaveLength(1);
+  });
+
+  it("converges when a removal is delivered twice", async () => {
+    const request = repositoriesChanged("removed", [widgets]);
+    await deliver(request.clone());
+    const once = await database.select().from(repos);
+    await deliver(request);
+    expect(await database.select().from(repos)).toEqual(once);
+  });
+
+  it("restores a removed repository added again", async () => {
+    await deliver(repositoriesChanged("removed", [widgets]));
+    await deliver(repositoriesChanged("added", [widgets]));
+    expect((await state()).repos).toEqual([repoRow(widgets)]);
   });
 
   it("converges when an add is delivered twice", async () => {

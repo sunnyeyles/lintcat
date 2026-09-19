@@ -8,7 +8,7 @@ export {
   type IngestResult,
 } from "./ingest";
 export {
-  deleteInstallation,
+  markUninstalled,
   removeRepositories,
   replaceRepositories,
   setInstallationSuspended,

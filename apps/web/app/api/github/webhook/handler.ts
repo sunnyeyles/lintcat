@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
-  deleteInstallation,
   findOrganizationByAccountId,
+  markUninstalled,
   removeRepositories,
   replaceRepositories,
   setInstallationSuspended,
@@ -189,14 +189,16 @@ async function onInstallation(
         }),
       );
       await database.transaction(async (tx) => {
-        const organization = await upsertInstallation(tx, installation);
+        const organization = await upsertInstallation(tx, installation, {
+          reinstall: true,
+        });
         await replaceRepositories(tx, organization.id, repositories);
         await replaceMembers({ ...deps, database: tx }, organization, members, source);
       });
       return true;
     }
     case "deleted":
-      await deleteInstallation(database, installation.accountId);
+      await markUninstalled(database, installation.accountId);
       return true;
     case "suspend":
       await setInstallationSuspended(
@@ -211,7 +213,7 @@ async function onInstallation(
       await database.transaction(async (tx) => {
         await setInstallationSuspended(tx, installation.accountId, null);
         const organization = await findOrganizationByAccountId(tx, installation.accountId);
-        if (organization) {
+        if (organization && !organization.uninstalledAt) {
           await replaceMembers({ ...deps, database: tx }, organization, members, source);
         }
       });
@@ -229,6 +231,9 @@ async function onInstallationRepositories(
   const installation = toInstallation(payload.installation);
   if (!installation) return false;
   if (payload.action !== "added" && payload.action !== "removed") return false;
+  // Only `created` brings an uninstalled organization back, so a late delivery cannot.
+  const existing = await findOrganizationByAccountId(database, installation.accountId);
+  if (existing?.uninstalledAt) return false;
   await database.transaction(async (tx) => {
     const organization = await upsertInstallation(tx, installation);
     await upsertRepositories(

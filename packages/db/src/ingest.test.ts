@@ -248,4 +248,31 @@ describe("ingestReviewRecord", () => {
     const result = await ingestReviewRecord(database, organizationId + 999, record);
     expect(result).toEqual({ ok: false, reason: "organization-not-found" });
   });
+
+  it("treats an uninstalled organization as unknown, by id and by token", async () => {
+    await database
+      .update(organizations)
+      .set({ uninstalledAt: new Date() })
+      .where(eq(organizations.id, organizationId));
+    expect(await findOrganizationByIngestToken(database, "secret-token")).toBeUndefined();
+    expect(await ingestReviewRecord(database, organizationId, record)).toEqual({
+      ok: false,
+      reason: "organization-not-found",
+    });
+    expect(await database.select().from(reviews)).toEqual([]);
+  });
+
+  it("rejects a removed repo and leaves its reviews as they were", async () => {
+    await ingestReviewRecord(database, organizationId, record);
+    await database.update(repos).set({ removedAt: new Date() });
+    const before = await database.select().from(reviews);
+
+    const result = await ingestReviewRecord(database, organizationId, {
+      ...record,
+      headSha: "f".repeat(40),
+    });
+
+    expect(result).toEqual({ ok: false, reason: "repo-removed" });
+    expect(await database.select().from(reviews)).toEqual(before);
+  });
 });

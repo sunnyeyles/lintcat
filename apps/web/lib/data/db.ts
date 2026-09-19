@@ -18,6 +18,7 @@ import {
   eq,
   gte,
   inArray,
+  isNull,
   max,
   sql,
   type SQL,
@@ -96,11 +97,14 @@ export function createDbSource(
   database: Database,
   organization: Organization,
 ): DataSource {
+  // A removed repo and its reviews stay stored but are never shown.
+  const liveRepos = and(eq(repos.organizationId, organization.id), isNull(repos.removedAt))!;
+
   async function organizationRepos(): Promise<Repo[]> {
     return database
       .select()
       .from(repos)
-      .where(eq(repos.organizationId, organization.id))
+      .where(liveRepos)
       .orderBy(asc(repos.owner), asc(repos.name));
   }
 
@@ -109,7 +113,7 @@ export function createDbSource(
     filter: ReviewFilter,
     withFindings: boolean,
   ): Promise<ReviewDetail[]> {
-    const conditions: SQL[] = [eq(repos.organizationId, organization.id)];
+    const conditions: SQL[] = [liveRepos];
     if (filter.id !== undefined) conditions.push(eq(reviews.id, filter.id));
     if (filter.repoId !== undefined) conditions.push(eq(reviews.repoId, filter.repoId));
     if (filter.since !== undefined) conditions.push(gte(reviews.createdAt, filter.since));
@@ -218,12 +222,12 @@ export function createDbSource(
     organization,
 
     listRepos() {
-      return repoSummaries(eq(repos.organizationId, organization.id));
+      return repoSummaries(liveRepos);
     },
 
     async getRepo(owner, name) {
       const [repo] = await repoSummaries(
-        and(eq(repos.organizationId, organization.id), eq(repos.owner, owner), eq(repos.name, name))!,
+        and(liveRepos, eq(repos.owner, owner), eq(repos.name, name))!,
       );
       return repo ?? null;
     },

@@ -14,7 +14,7 @@ export type Authorization =
 
 const NOT_FOUND: Authorization = { status: "not-found" };
 
-/** Unknown slug, suspended organization and non-member all give the same not-found. */
+/** Unknown slug, suspended or uninstalled organization and non-member all give the same not-found. */
 export async function authorize(
   database: Database,
   session: { githubId: number },
@@ -29,6 +29,7 @@ export async function authorize(
       and(
         eq(organizations.slug, slug.toLowerCase()),
         isNull(organizations.suspendedAt),
+        isNull(organizations.uninstalledAt),
         eq(users.githubId, session.githubId),
       ),
     )
