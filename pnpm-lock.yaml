@@ -129,6 +129,9 @@ importers:
       '@pr-review/github':
         specifier: workspace:*
         version: link:../packages/github
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../packages/index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../packages/logging
@@ -159,6 +162,9 @@ importers:
       '@pr-review/github':
         specifier: workspace:*
         version: link:../github
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../logging
@@ -265,6 +271,8 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/index: {}
+
   packages/logging: {}
 
   packages/reviewer:
@@ -275,6 +283,9 @@ importers:
       '@pr-review/github':
         specifier: workspace:*
         version: link:../github
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../logging

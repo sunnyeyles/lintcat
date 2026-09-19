@@ -7,10 +7,12 @@ import type {
   CodeSearchResult,
   GithubInstallationClient,
 } from "@pr-review/github";
+import { referencesTo, type RepositoryIndex } from "@pr-review/index";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
 import type { ReviewContext } from "#src/agent-contract";
+import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import { truncateWithMarker } from "#src/agents/truncate";
 
 /** Tool results larger than this are truncated to bound token usage. */
@@ -37,14 +39,9 @@ function boundSnippets(snippets: readonly string[]): string[] {
     .map((snippet) => truncateWithMarker(snippet, MAX_SNIPPET_CHARS, "…"));
 }
 
-/** `searchedFor` is absent unless the caller derived the query it searched. */
-function renderSearchResult(
-  result: CodeSearchResult,
-  searchedFor?: string,
-): string {
+function renderSearchResult(result: CodeSearchResult): string {
   return JSON.stringify(
     {
-      searchedFor,
       totalCount: result.totalCount,
       incompleteResults: result.incompleteResults,
       matches: result.matches.slice(0, MAX_SEARCH_MATCHES).map((match) => ({
@@ -91,49 +88,25 @@ const searchQuerySchema = z
     'Search terms, e.g. "createSession". Do not include repo:/org:/user: qualifiers.',
   );
 
-// Split by position: a file-name list must not judge a directory slot.
-const GENERIC_FILE_STEMS = new Set(["index", "mod", "main", "__init__"]);
+/** Files reported per find_references call; `total` carries the true count. */
+const MAX_REFERENCE_FILES = 50;
 
-const GENERIC_DIRECTORIES = new Set([
-  "src",
-  "lib",
-  "app",
-  "pkg",
-  "internal",
-  "util",
-  "utils",
-  "common",
-  "core",
-  "components",
-  "packages",
-]);
+/** An exported name, as the target file spells it. */
+const exportedNameSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z_$][\w$]*$/, {
+    message: "name must be a single exported identifier",
+  });
 
-/** A stem safe to quote into a query: no search operators, no qualifiers. */
-const SEARCHABLE_STEM = /^[A-Za-z0-9._-]+$/;
-
-function distinctive(name: string, generic: ReadonlySet<string>): boolean {
-  return !generic.has(name.toLowerCase()) && SEARCHABLE_STEM.test(name);
-}
-
-/** Basename without its final extension, walking up when that stem is generic. */
-function importerSearchStem(path: string): string {
-  const directories = path.split("/");
-  const file = directories.pop() ?? "";
-  const dot = file.lastIndexOf(".");
-  const base = dot > 0 ? file.slice(0, dot) : file;
-  if (distinctive(base, GENERIC_FILE_STEMS)) {
-    return base;
-  }
-  const directory = directories
-    .toReversed()
-    .find((candidate) => distinctive(candidate, GENERIC_DIRECTORIES));
-  if (directory !== undefined) {
-    return directory;
-  }
-  throw new Error(
-    `no distinctive name to search for in "${path}": every segment is a generic ` +
-      "module name. Use search_repository with a symbol from the file instead.",
-  );
+/** What the agent needs to judge an empty result: commit, completeness, languages. */
+function indexHeader(index: RepositoryIndex) {
+  return {
+    sha: index.sha,
+    truncated: index.truncated,
+    languages: index.coverage,
+  };
 }
 
 // Each sampled commit costs its own API call, so this is the request budget.
@@ -175,10 +148,29 @@ function patchFor(changedFiles: readonly ChangedFile[], path: string): string {
   return file.patch;
 }
 
+/** Why the index has no node for a path, or undefined when it has one. */
+function unknownReason(
+  changedFiles: readonly ChangedFile[],
+  index: RepositoryIndex,
+  path: string,
+): string | undefined {
+  const added = changedFiles.some(
+    (file) => file.filename === path && file.status === "added",
+  );
+  if (added) {
+    return "added by this pull request, so the base commit has no node for it";
+  }
+  if (!index.files.has(path)) {
+    return "not in the index at this commit";
+  }
+  return undefined;
+}
+
 /** Exactly the eight read-only tools, bound to one pull request. */
 export function createReviewTools(
   github: GithubInstallationClient,
   context: ReviewContext,
+  index?: RepositoryIndex | undefined,
 ): ToolSet {
   const { owner, repo } = context;
   // Tools serve the whole pull request, even when the reviewed diff is narrowed.
@@ -279,26 +271,52 @@ export function createReviewTools(
         return renderSearchResult(result);
       },
     }),
-    find_importers: tool({
+    find_references: tool({
       description:
-        "Find files that MENTION this file's name — a cheap proxy for \"what imports it\", NOT a " +
-        "resolved import graph. It is a text search for the file's name stem (returned as " +
-        "searchedFor), so it includes unrelated files using the same word and MISSES importers " +
-        "that alias the path or import the directory. An empty result means the search found " +
-        "nothing — never that nothing imports the file.",
-      inputSchema: z.strictObject({ path: repositoryPathSchema }),
-      async execute({ path }) {
-        const stem = importerSearchStem(path);
-        const result = await github.searchCode({ owner, repo, query: `"${stem}"` });
-        const subject = path.toLowerCase();
-        return renderSearchResult(
-          {
-            ...result,
-            matches: result.matches.filter(
-              (match) => match.path.toLowerCase() !== subject,
-            ),
-          },
-          stem,
+        "Find the files that import one file, read from the repository index built at the pull " +
+        "request's BASE commit — the import statements themselves, not a text search. With " +
+        "`name`, only the files importing that exported name; default and namespace (`*`) " +
+        "imports are included and marked as such, since a namespace import reaches every name. " +
+        `At most ${MAX_REFERENCE_FILES} files are returned and \`total\` is the true count. ` +
+        "Every result carries an `index` header: an empty list means nothing imports the path " +
+        "ONLY when that header shows the path's language indexed and truncated false. Each " +
+        "indexed language also carries a `resolution` rate — the share of the repository's own " +
+        "imports the index could place — so a rate below 1 means some importers are missing. A " +
+        "path this pull request added, or one the index does not hold, comes back as known: false.",
+      inputSchema: z.strictObject({
+        path: repositoryPathSchema,
+        name: exportedNameSchema
+          .optional()
+          .describe(
+            'One exported name from `path`, e.g. "createSession"; omit it for every importer of the file.',
+          ),
+      }),
+      async execute({ path, name }) {
+        if (index === undefined) {
+          return INDEX_ABSENT_LINE;
+        }
+        const unknown = unknownReason(whole.changedFiles, index, path);
+        if (unknown !== undefined) {
+          return JSON.stringify(
+            { index: indexHeader(index), path, known: false, reason: unknown },
+            null,
+            2,
+          );
+        }
+        const references = referencesTo(index.importers, path, name);
+        return truncate(
+          JSON.stringify(
+            {
+              index: indexHeader(index),
+              path,
+              ...(name === undefined ? {} : { name }),
+              known: true,
+              total: references.length,
+              references: references.slice(0, MAX_REFERENCE_FILES),
+            },
+            null,
+            2,
+          ),
         );
       },
     }),

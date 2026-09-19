@@ -14,6 +14,7 @@ import type {
   ExistingReviewComment,
   GithubInstallationClient,
 } from "@pr-review/github";
+import type { RepositoryIndex } from "@pr-review/index";
 import {
   createConsoleLogger,
   errorMessage,
@@ -21,6 +22,7 @@ import {
 } from "@pr-review/logging";
 import type { ReviewFinding } from "@pr-review/schemas";
 
+import { buildReviewIndex } from "#src/build-index";
 import { buildDiffLineIndex } from "#src/diff-lines";
 import { countLabel } from "#src/finding-format";
 import {
@@ -65,6 +67,7 @@ interface ReviewPullRequestDeps {
     context: ReviewContext,
     agents: readonly AgentDefinition[],
     hints: SynthesisHints,
+    index: RepositoryIndex | undefined,
   ) => Promise<ReviewPipelineResult>;
   /** Defaults to publishing a check run through `client`. */
   publishReview?: PublishReview | undefined;
@@ -81,6 +84,8 @@ interface ReviewPullRequestDeps {
   /** Injectable clock, so a test can pin what counts as a fresh signal. */
   now?: (() => Date) | undefined;
   incremental?: boolean | undefined;
+  /** Whether the repository index is built for this review; on by default. */
+  index?: boolean | undefined;
 }
 
 /** The comments already on the pull request; none if they cannot be read. */
@@ -260,6 +265,7 @@ export async function reviewPullRequest(
     memoryStore,
     now = () => new Date(),
     incremental = false,
+    index = true,
   }: ReviewPullRequestDeps,
 ): Promise<ReviewOutcome> {
   const fields = reviewCorrelation(target);
@@ -339,6 +345,15 @@ export async function reviewPullRequest(
     return unreviewed();
   }
 
+  // Built once, before any agent starts, and thrown away with this review.
+  const repositoryIndex = await buildReviewIndex({
+    client,
+    target,
+    baseSha: pullRequest.baseSha,
+    enabled: index,
+    logger,
+  });
+
   // The AI boundary: only the validate step's output reaches GitHub.
   const review = await runReviewPipeline(
     client,
@@ -355,6 +370,7 @@ export async function reviewPullRequest(
     },
     active,
     synthesisHints,
+    repositoryIndex,
   );
   logSynthesisOutcome(logger, target, review);
 

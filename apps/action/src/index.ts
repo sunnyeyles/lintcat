@@ -464,9 +464,11 @@ export async function runAction(
       client,
       agents,
       incremental: getInput(env, "incremental") === "true",
+      // On unless it is switched off, which is the opposite of the others.
+      index: getInput(env, "index") !== "false",
       // `activeAgents` is the subset the path gate woke, decided once the
       // changed files are known.
-      runReviewPipeline: (reviewClient, context, activeAgents, hints) =>
+      runReviewPipeline: (reviewClient, context, activeAgents, hints, index) =>
         runReviewPipeline(
           createReviewAgents(
             {
@@ -475,6 +477,7 @@ export async function runAction(
               github: reviewClient,
               onUsage: (report) => usageReports.push(report),
               ...(prompts === undefined ? {} : { systemPrompts: prompts }),
+              ...(index === undefined ? {} : { index }),
             },
             activeAgents,
           ),

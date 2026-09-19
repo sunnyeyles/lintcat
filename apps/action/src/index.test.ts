@@ -1421,3 +1421,51 @@ describe("the fix input", () => {
     expect(applyFixes(entries)).toBe(false);
   });
 });
+
+describe("the index input", () => {
+  /** The index event this run logged, if any. */
+  function indexEvent(entries: Harness["entries"]): string | undefined {
+    return entries
+      .map((entry) => String(entry["event"]))
+      .find((event) => event.startsWith("index."));
+  }
+
+  it("builds the index at the base commit when the input is absent", async () => {
+    const { environment, entries, client } = harness({ ...reviewEnv });
+
+    await runAction(environment);
+
+    expect(client.getRepositoryArchive).toHaveBeenCalledExactlyOnceWith({
+      owner: "octo-org",
+      repo: "example-service",
+      ref: baseSha,
+    });
+    expect(indexEvent(entries)).toBe("index.built");
+  });
+
+  it.each(["true", "yes", "1", ""])(
+    "leaves the index on for the value %s",
+    async (value) => {
+      const { environment, client } = harness({
+        ...reviewEnv,
+        INPUT_INDEX: value,
+      });
+
+      await runAction(environment);
+
+      expect(client.getRepositoryArchive).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("skips the build entirely when the input is false", async () => {
+    const { environment, entries, client } = harness({
+      ...reviewEnv,
+      INPUT_INDEX: "false",
+    });
+
+    await runAction(environment);
+
+    expect(client.getRepositoryArchive).not.toHaveBeenCalled();
+    expect(indexEvent(entries)).toBe("index.skipped");
+  });
+});

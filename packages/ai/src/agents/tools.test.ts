@@ -1,10 +1,13 @@
+import { buildRepositoryIndex } from "@pr-review/index";
 import type { Tool, ToolSet } from "ai";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
+import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import { createReviewTools } from "#src/agents/tools";
 import {
   REVIEW_TOOL_NAMES,
+  archiveFiles,
   baseSha,
   changedFiles,
   context,
@@ -12,6 +15,11 @@ import {
   makeGithub,
   pullRequest,
 } from "#src/agent-test-support";
+
+/** The index the fake archive builds, as the reviewer would build it. */
+function index() {
+  return buildRepositoryIndex({ sha: baseSha, files: archiveFiles });
+}
 
 /** The shared context plus one changed file that carries no patch. */
 const scope = {
@@ -96,21 +104,23 @@ describe("createReviewTools", () => {
 
   /** Descriptions live on the Zod schemas, where a new field is easy to forget. */
   it.each([
-    ["get_file", "path"],
-    ["get_base_file", "path"],
-    ["search_repository", "query"],
-    ["get_diff", "path"],
-    ["find_importers", "path"],
-    ["find_co_changed_files", "path"],
-  ])("describes %s's %s parameter", (name, parameter) => {
+    ["get_file", ["path"]],
+    ["get_base_file", ["path"]],
+    ["search_repository", ["query"]],
+    ["get_diff", ["path"]],
+    ["find_references", ["path", "name"]],
+    ["find_co_changed_files", ["path"]],
+  ])("describes every parameter of %s", (name, parameters) => {
     const tools = createReviewTools(makeGithub(), scope);
     const shape = (
       schemaOf(tools, name) as unknown as {
         shape: Record<string, { description?: string }>;
       }
     ).shape;
-    expect(Object.keys(shape)).toEqual([parameter]);
-    expect(shape[parameter]?.description).toBeTruthy();
+    expect(Object.keys(shape)).toEqual(parameters);
+    for (const parameter of parameters) {
+      expect(shape[parameter]?.description).toBeTruthy();
+    }
   });
 
   it("offers no tool that could write to the repository", () => {
@@ -297,63 +307,174 @@ describe("review tool execution", () => {
     }
   });
 
-  it("names the stem it searched and drops the subject file from its own results", async () => {
-    const github = makeGithub();
+  it("lists every file importing a path, with the line each import sits on", async () => {
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, index()),
+      "find_references",
+      { path: "src/sessions.ts" },
+    )) as string;
 
-    const result = (await run(createReviewTools(github, scope), "find_importers", {
+    expect(JSON.parse(result)).toMatchObject({
       path: "src/sessions.ts",
-    })) as string;
-
-    expect(github.searchCode).toHaveBeenCalledExactlyOnceWith({
-      owner: scope.owner,
-      repo: scope.repo,
-      query: '"sessions"',
+      known: true,
+      total: 4,
+      references: [
+        { path: "src/admin.ts", imports: [{ line: 1, kind: "namespace", name: "*" }] },
+        { path: "src/api.ts", imports: [{ line: 1, kind: "named", name: "createSession" }] },
+        { path: "src/boot.ts", imports: [{ line: 1, kind: "side-effect" }] },
+        { path: "src/sessions.test.ts", imports: [{ line: 1, kind: "named", name: "sessions" }] },
+      ],
     });
+  });
+
+  it("narrows to one name, keeping the namespace importer that can see it", async () => {
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, index()),
+      "find_references",
+      { path: "src/sessions.ts", name: "createSession" },
+    )) as string;
+
     const payload = JSON.parse(result);
-    expect(payload.searchedFor).toBe("sessions");
-    // The stub's only match is the subject file itself.
-    expect(payload.matches).toEqual([]);
+    expect(payload.name).toBe("createSession");
+    expect(payload.total).toBe(2);
+    expect(payload.references.map((reference: { path: string }) => reference.path)).toEqual([
+      "src/admin.ts",
+      "src/api.ts",
+    ]);
   });
 
-  it.each([
-    ["src/sessions.ts", "sessions"],
-    ["src/session/index.ts", "session"],
-    ["pkg/auth/__init__.py", "auth"],
-    ["crates/parser/src/mod.rs", "parser"],
-    ["cmd/server/main.go", "server"],
-    ["types/session.d.ts", "session.d"],
-  ])("derives a distinctive stem for %s", async (path, stem) => {
-    const github = makeGithub();
+  it("carries the index header on every result", async () => {
+    const result = (await run(
+      createReviewTools(makeGithub(), scope, index()),
+      "find_references",
+      { path: "src/sessions.ts" },
+    )) as string;
 
-    await run(createReviewTools(github, scope), "find_importers", { path });
-
-    expect(github.searchCode).toHaveBeenCalledExactlyOnceWith({
-      owner: scope.owner,
-      repo: scope.repo,
-      query: `"${stem}"`,
+    expect(JSON.parse(result).index).toEqual({
+      sha: baseSha,
+      truncated: false,
+      languages: expect.arrayContaining([
+        {
+          language: "typescript",
+          files: 6,
+          indexed: true,
+          resolution: { internal: 5, resolved: 5, rate: 1 },
+        },
+        { language: "markdown", files: 1, indexed: false },
+      ]),
     });
   });
 
-  it.each([
-    ["every segment is generic", "src/index.ts"],
-    ["the stem would carry a qualifier", "org:someone.ts"],
-    ["the stem would carry a space", "a b/index.ts"],
-  ])("rejects find_importers when %s, client untouched", async (_label, path) => {
-    const github = makeGithub();
+  it("shows a rate below one when an alias points outside the tree", async () => {
+    const aliased = new Map<string, string>([
+      [
+        "tsconfig.json",
+        JSON.stringify({ compilerOptions: { paths: { "@/*": ["src/*"] } } }),
+      ],
+      ["src/sessions.ts", "export const sessions = [];\n"],
+      ["src/api.ts", 'import { sessions } from "@/sessions";\n'],
+      ["src/boot.ts", 'import { gone } from "@/gone";\n'],
+    ]);
+    const result = (await run(
+      createReviewTools(
+        makeGithub(),
+        scope,
+        buildRepositoryIndex({ sha: baseSha, files: aliased }),
+      ),
+      "find_references",
+      { path: "src/sessions.ts" },
+    )) as string;
 
-    await expect(
-      run(createReviewTools(github, scope), "find_importers", { path }),
-    ).rejects.toThrow(/no distinctive name/i);
-    expect(github.searchCode).not.toHaveBeenCalled();
+    const payload = JSON.parse(result);
+    expect(payload.index.languages[0].resolution).toEqual({
+      internal: 2,
+      resolved: 1,
+      rate: 0.5,
+    });
+    expect(payload.total).toBe(1);
+  });
+
+  it("reports the true total while returning at most fifty files", async () => {
+    const wide = new Map<string, string>([["src/wide.ts", "export const wide = 1;\n"]]);
+    for (let at = 0; at < 60; at += 1) {
+      wide.set(`src/caller-${at}.ts`, `import { wide } from "./wide";\n`);
+    }
+    const tools = createReviewTools(
+      makeGithub(),
+      scope,
+      buildRepositoryIndex({ sha: baseSha, files: wide }),
+    );
+
+    const payload = JSON.parse(
+      (await run(tools, "find_references", { path: "src/wide.ts" })) as string,
+    );
+    expect(payload.total).toBe(60);
+    expect(payload.references).toHaveLength(50);
+  });
+
+  it("says a path the pull request added has no node at the base commit", async () => {
+    const added = {
+      ...scope,
+      changedFiles: [
+        { filename: "src/new.ts", status: "added", additions: 4, deletions: 0 },
+      ],
+    };
+
+    const payload = JSON.parse(
+      (await run(
+        createReviewTools(makeGithub(), added, index()),
+        "find_references",
+        { path: "src/new.ts" },
+      )) as string,
+    );
+    expect(payload.known).toBe(false);
+    expect(payload.reason).toMatch(/added by this pull request/);
+    expect(payload.index.sha).toBe(baseSha);
+  });
+
+  it("says a path it does not hold is unknown, never that it does not exist", async () => {
+    const payload = JSON.parse(
+      (await run(
+        createReviewTools(makeGithub(), scope, index()),
+        "find_references",
+        { path: "src/elsewhere.ts" },
+      )) as string,
+    );
+    expect(payload.known).toBe(false);
+    expect(payload.reason).toBe("not in the index at this commit");
+    expect(JSON.stringify(payload)).not.toMatch(/does not exist/);
+  });
+
+  it("returns an empty list for an indexed file nothing imports", async () => {
+    const payload = JSON.parse(
+      (await run(
+        createReviewTools(makeGithub(), scope, index()),
+        "find_references",
+        { path: "src/boot.ts" },
+      )) as string,
+    );
+    expect(payload).toMatchObject({ known: true, total: 0, references: [] });
+  });
+
+  it("says so in one line when the review has no index", async () => {
+    const result = await run(
+      createReviewTools(makeGithub(), scope),
+      "find_references",
+      { path: "src/sessions.ts" },
+    );
+
+    expect(result).toBe(INDEX_ABSENT_LINE);
+    expect(String(result).split("\n")).toHaveLength(1);
   });
 
   it.each([
     ["path traversal", { path: "../secrets/config.yml" }],
     ["absolute path", { path: "/etc/passwd" }],
     ["extra properties", { path: "src/sessions.ts", ref: "deadbeef" }],
-  ])("rejects find_importers input with %s", (_label, input) => {
-    const tools = createReviewTools(makeGithub(), scope);
-    expect(schemaOf(tools, "find_importers").safeParse(input).success).toBe(false);
+    ["a name that is not one identifier", { path: "src/sessions.ts", name: "a b" }],
+  ])("rejects find_references input with %s", (_label, input) => {
+    const tools = createReviewTools(makeGithub(), scope, index());
+    expect(schemaOf(tools, "find_references").safeParse(input).success).toBe(false);
   });
 
   it("ranks co-changed files by commit count and excludes the subject file", async () => {

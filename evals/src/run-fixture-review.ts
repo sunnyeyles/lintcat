@@ -11,6 +11,7 @@ import {
   type Synthesiser,
 } from "@pr-review/ai";
 import type { GithubInstallationClient } from "@pr-review/github";
+import type { RepositoryIndex } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
 import {
   reviewPullRequest,
@@ -32,6 +33,7 @@ export interface FixtureReviewDeps {
     github: GithubInstallationClient,
     logger: StructuredLogger,
     agents: readonly AgentDefinition[],
+    index: RepositoryIndex | undefined,
   ) => readonly ReviewAgent[];
   synthesiser: Synthesiser;
   logger: StructuredLogger;
@@ -64,9 +66,9 @@ export function modelBackedDeps(
   const model = createModel(access.model);
   return {
     agents,
-    createAgents: (github, reviewLogger, activeAgents) =>
+    createAgents: (github, reviewLogger, activeAgents, index) =>
       createReviewAgents(
-        { model, createModel, github, logger: reviewLogger },
+        { model, createModel, github, logger: reviewLogger, index },
         activeAgents,
       ),
     synthesiser: createSynthesiser({ model, agents }),
@@ -93,9 +95,9 @@ export async function runFixtureReview(
     {
       client,
       agents: deps.agents,
-      runReviewPipeline: (reviewClient, context, activeAgents) =>
+      runReviewPipeline: (reviewClient, context, activeAgents, _hints, index) =>
         runReviewPipeline(
-          deps.createAgents(reviewClient, logger, activeAgents),
+          deps.createAgents(reviewClient, logger, activeAgents, index),
           deps.synthesiser,
           context,
         ),

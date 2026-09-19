@@ -1,4 +1,10 @@
 export {
+  ArchiveTooLargeError,
+  DEFAULT_ARCHIVE_LIMITS,
+  readRepositoryTarball,
+  type TarballContents,
+} from "#src/archive";
+export {
   createGithubAppClient,
   type GithubAppClient,
   type GithubAppConfig,
@@ -37,6 +43,9 @@ export {
   type PullRequestDetails,
   type PullRequestRef,
   type PullRequestReview,
+  type RepositoryArchive,
+  type RepositoryArchiveLimits,
+  type RepositoryArchiveRequest,
   type ReviewComment,
   type ReviewThread,
   type WriteFileRequest,

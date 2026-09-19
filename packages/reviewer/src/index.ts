@@ -35,6 +35,7 @@ export {
   reviewPullRequest,
   type ReviewOutcome,
 } from "#src/review-pull-request";
+export { buildReviewIndex, type ReviewIndexRequest } from "#src/build-index";
 export {
   learnFromMergedPullRequest,
   type LearnFromMergeDeps,

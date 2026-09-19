@@ -148,6 +148,7 @@ of this action's repository — copy it and edit.
 | `model-base-url` | no | the provider's own host | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `agents` | no | `all` | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides their `paths`. |
 | `agent-config` | no | `.github/pr-review-agents.yml` | Path to the YAML file naming this repository's agents, read from the pull request's base commit. The file itself is required — nothing runs by default, and a missing one fails the step. |
+| `index` | no | `true` | Whether the review builds a repository index from the pull request's base commit before the agents start. One archive request, `contents: read` only, held in memory and discarded. Any failure is logged and the review runs without it. `false` turns it off. |
 | `fix` | no | `false` | Whether verified fixes are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. Off, or when the commit cannot be made, the same fixes are offered as suggested changes on the review comments. |
 | `memory-branch` | no | — | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding, so repeatedly ignored shapes are deprioritised in later reviews. Empty turns the feature off. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | — | Langfuse public key. Set this and the secret key to manage prompts and collect traces. |
@@ -156,6 +157,40 @@ of this action's repository — copy it and edit.
 | `langfuse-prompt-label` | no | `production` | Which labelled version of each prompt to fetch. |
 | `dashboard-token` | no | — | Ingest secret for the review dashboard. Set this and `dashboard-url` to record each review there. Store it as a secret. |
 | `dashboard-url` | no | — | Dashboard base URL, e.g. `https://example.vercel.app`; the action appends `/api/ingest`. |
+
+## Repository index
+
+With `index` on, the review fetches your repository's files at the pull
+request's **base** commit in one archive request and builds an index of them in
+memory before any agent starts. Never the head commit: a pull request must not
+shape what the reviewer believes about the repository. Nothing is stored, no
+service runs, and `contents: read` is the only permission it needs.
+
+The index holds each file's role, which test covers which source file by naming
+convention, and an import graph of every TypeScript and JavaScript `import`,
+`export … from`, dynamic `import()` and `require()`. Specifiers resolve the way
+your own tooling resolves them, in order: a relative path (extensionless,
+through `index` files, `.js` to the `.ts` behind it), a `#` import map, a
+`tsconfig.json` `paths` alias with `extends` followed, then a workspace package
+name through its `exports` map. Workspace packages come from
+`pnpm-workspace.yaml` or `package.json` `workspaces`. A third-party package is
+left unresolved rather than guessed, and a manifest too malformed to read costs
+that file's contribution, not the build. Only TypeScript and JavaScript are
+parsed — every other language is seen for its role and reported as not indexed.
+
+Agents read it through `find_references(path, name?)`: the files importing a
+path, with lines, and optionally only those importing one exported name. Every
+result names the commit it covers, whether the index is truncated, and each
+indexed language's **resolution rate** — the share of your repository's own
+imports the index could place — so an empty answer is never mistaken for
+"nothing depends on this", and an alias scheme this resolver does not
+understand is visible rather than silent. The opening message gets a
+`<repository>` block listing your workspace packages with their roots, and one
+line per changed file with its package, role, covering test and importer count.
+
+Reading the archive is capped, and hitting a cap marks the index truncated
+rather than failing. Any failure at all is logged and the review runs without
+the index.
 
 ## Model providers
 

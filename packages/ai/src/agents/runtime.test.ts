@@ -2,6 +2,7 @@
  * The shared agent-runtime behaviours — loop, tool wiring, output
  * parsing, failure semantics — exercised through the Security agent.
  */
+import { buildRepositoryIndex } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it } from "vitest";
 
@@ -10,6 +11,7 @@ import {
   buildReviewSystemPrompt,
   withRepositoryHints,
 } from "#src/agents/definition";
+import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import {
   AgentRunError,
   createReviewAgent,
@@ -18,6 +20,8 @@ import {
 import { emptyTokenUsage } from "#src/usage";
 import {
   REVIEW_TOOL_NAMES,
+  archiveFiles,
+  baseSha,
   context,
   finalFindingsJson,
   headSha,
@@ -106,9 +110,18 @@ const finding = {
 
 const finalJson = JSON.stringify({ findings: [finding] });
 
+/** The index the fake archive builds, as the reviewer would build it. */
+function fakeIndex() {
+  return buildRepositoryIndex({ sha: baseSha, files: archiveFiles });
+}
+
 function makeAgent(
   responses: ScriptedResponse[],
-  options: { maxTurns?: number; systemPrompts?: ManagedPrompts } = {},
+  options: {
+    maxTurns?: number;
+    systemPrompts?: ManagedPrompts;
+    index?: ReturnType<typeof fakeIndex>;
+  } = {},
 ) {
   const { model, doGenerate: create, calls } = makeModel(responses);
   const github = makeGithub();
@@ -121,6 +134,7 @@ function makeAgent(
     ...(options.systemPrompts !== undefined
       ? { systemPrompts: options.systemPrompts }
       : {}),
+    ...(options.index !== undefined ? { index: options.index } : {}),
   });
   return { agent, create, calls: calls as unknown as Call[], github, entries };
 }
@@ -771,5 +785,272 @@ describe("pre-resolved system prompts", () => {
     await agent.run(context);
 
     expect(systemOf(calls[0])).toBe(buildReviewSystemPrompt(securityAgent));
+  });
+});
+
+describe("the repository index block", () => {
+  const scripted = [message([textBlock(finalJson)], "end_turn")];
+
+  async function openingWith(index?: ReturnType<typeof fakeIndex>) {
+    const { agent, calls } = makeAgent(
+      scripted,
+      index === undefined ? {} : { index },
+    );
+    await agent.run(context);
+    return openingOf(calls[0]);
+  }
+
+  it("says the index is absent when the reviewer built none", async () => {
+    const opening = await openingWith();
+
+    expect(opening).toContain("<repository_index>");
+    expect(opening).toContain(INDEX_ABSENT_LINE);
+    expect(opening).not.toContain("<repository_index sha=");
+  });
+
+  it("carries the commit and the truncation flag", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening).toContain(
+      `<repository_index sha="${baseSha}" truncated="false">`,
+    );
+  });
+
+  it("gives each changed file its role, covering test and importer count", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening).toContain(
+      "- src/sessions.ts — source, covered by src/sessions.test.ts, 4 importers",
+    );
+  });
+
+  it("says so for a changed file with no covering test", async () => {
+    const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        { filename: "src/untested.ts", status: "modified", additions: 1, deletions: 0 },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain(
+      "- src/untested.ts — source, no test, 1 importer",
+    );
+  });
+
+  it("says a file the base commit did not have is not in the index", async () => {
+    const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        { filename: "src/added.ts", status: "added", additions: 9, deletions: 0 },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain(
+      "- src/added.ts — not in the index at this commit",
+    );
+  });
+
+  it("reports a truncated index as truncated", async () => {
+    const opening = await openingWith(
+      buildRepositoryIndex({ sha: baseSha, files: archiveFiles, truncated: true }),
+    );
+
+    expect(opening).toContain(`truncated="true"`);
+  });
+
+  it("sits between the changed files and the diff", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening.indexOf("</changed_files>")).toBeLessThan(
+      opening.indexOf("<repository_index"),
+    );
+    expect(opening.indexOf("</repository_index>")).toBeLessThan(
+      opening.indexOf("<diff>"),
+    );
+  });
+
+  it("caps the list the same way the changed-files block does", async () => {
+    const changedFiles = Array.from({ length: 302 }, (_unused, at) => ({
+      filename: `src/file-${at}.ts`,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+    }));
+    const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
+
+    await agent.run({ ...context, changedFiles });
+
+    expect(openingOf(calls[0])).toContain("- [... 2 more files]");
+  });
+});
+
+describe("the repository block", () => {
+  const scripted = [message([textBlock(finalJson)], "end_turn")];
+
+  /** A monorepo the archive fixture is not, so the block has packages to list. */
+  function monorepoIndex() {
+    return buildRepositoryIndex({
+      sha: baseSha,
+      files: new Map([
+        ["pnpm-workspace.yaml", "packages:\n  - packages/*\n"],
+        [
+          "packages/core/package.json",
+          JSON.stringify({ name: "@acme/core", exports: { ".": "./index.ts" } }),
+        ],
+        ["packages/core/index.ts", "export const core = 1;\n"],
+        ["packages/app/package.json", JSON.stringify({ name: "@acme/app" })],
+        ["packages/app/main.ts", 'import { core } from "@acme/core";\n'],
+        ["README.md", "# Example\n"],
+      ]),
+    });
+  }
+
+  async function openingWith(index?: ReturnType<typeof fakeIndex>) {
+    const { agent, calls } = makeAgent(
+      scripted,
+      index === undefined ? {} : { index },
+    );
+    await agent.run(context);
+    return openingOf(calls[0]);
+  }
+
+  it("lists each workspace package with its root", async () => {
+    const opening = await openingWith(monorepoIndex());
+
+    expect(opening).toContain("Packages (2):");
+    expect(opening).toContain("- @acme/app — packages/app");
+    expect(opening).toContain("- @acme/core — packages/core");
+  });
+
+  it("says so when no workspace manifest declares any package", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening).toContain("Packages: none declared by a workspace manifest.");
+  });
+
+  it("carries the commit, the truncation flag and the coverage summary", async () => {
+    const opening = await openingWith(monorepoIndex());
+
+    expect(opening).toContain(`<repository sha="${baseSha}" truncated="false">`);
+    expect(opening).toContain(
+      "typescript 2 files (indexed, 1/1 internal imports resolved, 100%)",
+    );
+    expect(opening).toContain("Languages: json 2 files (not indexed)");
+    expect(opening).toContain("markdown 1 file (not indexed)");
+  });
+
+  it("renders no block at all when the reviewer built no index", async () => {
+    const opening = await openingWith();
+
+    expect(opening).not.toContain("<repository ");
+    expect(opening).toContain(INDEX_ABSENT_LINE);
+  });
+
+  it("sits between the changed files and the per-file index", async () => {
+    const opening = await openingWith(monorepoIndex());
+
+    expect(opening.indexOf("</changed_files>")).toBeLessThan(
+      opening.indexOf("<repository "),
+    );
+    expect(opening.indexOf("</repository>")).toBeLessThan(
+      opening.indexOf("<repository_index"),
+    );
+  });
+
+  it("caps the package list and says how many it left out", async () => {
+    const files = new Map([["pnpm-workspace.yaml", "packages:\n  - packages/*\n"]]);
+    for (let at = 0; at < 52; at += 1) {
+      files.set(
+        `packages/p${String(at).padStart(3, "0")}/package.json`,
+        JSON.stringify({ name: `@acme/p${at}` }),
+      );
+    }
+    const opening = await openingWith(
+      buildRepositoryIndex({ sha: baseSha, files }),
+    );
+
+    expect(opening).toContain("Packages (52):");
+    expect(opening).toContain("- [... 2 more packages]");
+    expect(opening).not.toContain("@acme/p51 —");
+  });
+
+  it("names the package a changed file belongs to", async () => {
+    const { agent, calls } = makeAgent(scripted, { index: monorepoIndex() });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        {
+          filename: "packages/app/main.ts",
+          status: "modified",
+          additions: 1,
+          deletions: 0,
+        },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain(
+      "- packages/app/main.ts — @acme/app, source, no test, 0 importers",
+    );
+  });
+});
+
+describe("find_references through the agent runtime", () => {
+  const callReferences = (input: unknown): ScriptedResponse[] => [
+    message([toolUseBlock("toolu_1", "find_references", input)], "tool_use"),
+    message([textBlock(finalJson)], "end_turn"),
+  ];
+
+  async function referencesResult(
+    input: unknown,
+    index?: ReturnType<typeof fakeIndex>,
+  ): Promise<string> {
+    const { agent, calls } = makeAgent(
+      callReferences(input),
+      index === undefined ? {} : { index },
+    );
+    await agent.run(context);
+    return String(toolResultsOf(calls[1])[0]?.output.value ?? "");
+  }
+
+  it("answers from the index the reviewer built, with no GitHub call", async () => {
+    const { agent, calls, github } = makeAgent(
+      callReferences({ path: "src/sessions.ts" }),
+      { index: fakeIndex() },
+    );
+
+    await agent.run(context);
+
+    expect(github.searchCode).not.toHaveBeenCalled();
+    const payload = JSON.parse(
+      String(toolResultsOf(calls[1])[0]?.output.value ?? ""),
+    );
+    expect(payload.known).toBe(true);
+    expect(payload.total).toBe(4);
+    expect(payload.index).toMatchObject({ sha: baseSha, truncated: false });
+  });
+
+  it("narrows to one exported name", async () => {
+    const payload = JSON.parse(
+      await referencesResult(
+        { path: "src/sessions.ts", name: "createSession" },
+        fakeIndex(),
+      ),
+    );
+
+    expect(payload.references.map((entry: { path: string }) => entry.path)).toEqual([
+      "src/admin.ts",
+      "src/api.ts",
+    ]);
+  });
+
+  it("returns the absent one-liner when the reviewer built no index", async () => {
+    expect(await referencesResult({ path: "src/sessions.ts" })).toBe(
+      INDEX_ABSENT_LINE,
+    );
   });
 });
