@@ -40,6 +40,27 @@ describe("openLocalRepository", () => {
     expect(await local.client.getDiff(local.target)).toContain("+export const draft = true;");
   });
 
+  it("keeps real paths whatever diff prefix the user's git config sets", async () => {
+    repo.git("config", "diff.mnemonicPrefix", "true");
+    repo.git("config", "diff.noprefix", "true");
+    const local = await openLocalRepository(repo.root, "main");
+
+    const files = await local.client.listChangedFiles(local.target);
+    expect(files.map((file) => file.filename)).toEqual(["src/api.ts", "src/sessions.ts", "src/draft.ts"]);
+  });
+
+  it("skips a nested repository and diffs many untracked files without a process each", async () => {
+    const nested = createTestRepo({ "inner.ts": "export {};\n" });
+    repo.git("clone", "-q", nested.root, "vendor-checkout");
+    nested.remove();
+    for (let i = 0; i < 2000; i++) repo.write(`generated/file-${i}.ts`, `export const n = ${i};\n`);
+    const local = await openLocalRepository(repo.root, "main");
+
+    const files = await local.client.listChangedFiles(local.target);
+    expect(files).toHaveLength(2003);
+    expect(files.some((file) => file.filename.startsWith("vendor-checkout"))).toBe(false);
+  });
+
   it("describes the branch as a pull request with its commits in the body", async () => {
     const local = await openLocalRepository(repo.root, "main");
     const pullRequest = await local.client.getPullRequest(local.target);

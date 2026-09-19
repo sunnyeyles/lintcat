@@ -59,6 +59,27 @@ function fileFromChunk(chunk: string): ChangedFile | undefined {
   return { filename, status, additions, deletions, patch: hunks.join("\n") };
 }
 
+/** The diff git would print for a new file, built in-process so no file needs its own `git diff`. */
+export function addedFileDiff(file: string, body: Uint8Array): string {
+  const header = `diff --git a/${file} b/${file}\nnew file mode 100644\n`;
+  if (body.includes(0)) {
+    return `${header}Binary files /dev/null and b/${file} differ\n`;
+  }
+  const text = new TextDecoder().decode(body);
+  if (text === "") {
+    return header;
+  }
+  const lines = text.endsWith("\n") ? text.slice(0, -1).split("\n") : text.split("\n");
+  const missingNewline = text.endsWith("\n") ? "" : "\\ No newline at end of file\n";
+  const range = lines.length === 1 ? "1" : `1,${lines.length}`;
+  return [
+    header,
+    `--- /dev/null\n+++ b/${file}\n@@ -0,0 +${range} @@\n`,
+    ...lines.map((line) => `+${line}\n`),
+    missingNewline,
+  ].join("");
+}
+
 /** Splits `git diff` output into GitHub-shaped changed files; `patch` starts at the first hunk. */
 export function parseUnifiedDiff(diff: string): ChangedFile[] {
   return diff

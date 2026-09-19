@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -15,7 +15,7 @@ import {
 import type { ReviewTarget } from "@pr-review/reviewer";
 
 import { assertRef, git, gitBuffer, GitError } from "#src/git";
-import { parseUnifiedDiff } from "#src/unified-diff";
+import { addedFileDiff, parseUnifiedDiff } from "#src/unified-diff";
 
 /** The head "commit" of a local review: files as they are on disk now. */
 export const WORKING_TREE = "WORKING_TREE";
@@ -138,6 +138,14 @@ function* workingTreeFiles(root: string, paths: readonly string[]): Generator<Re
   }
 }
 
+/** A symlink's content is its target, as git records it; a read error fails the review. */
+function untrackedContent(root: string, file: string): Uint8Array {
+  const absolute = path.join(root, file);
+  return lstatSync(absolute).isSymbolicLink()
+    ? Buffer.from(readlinkSync(absolute))
+    : readFileSync(absolute);
+}
+
 function createLocalGitClient(
   repository: Omit<LocalRepository, "client">,
 ): GithubInstallationClient {
@@ -147,17 +155,21 @@ function createLocalGitClient(
   // Taken once, so every reader of one review sees the same working tree.
   const changes = () => {
     snapshot ??= (async () => {
-      const tracked = await git(root, ["diff", "--no-color", "--no-ext-diff", "--no-renames", baseSha]);
+      // Fixed prefixes: diff.mnemonicPrefix or diff.noprefix would otherwise rename every path.
+      const tracked = await git(root, [
+        "diff",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-renames",
+        "--src-prefix=a/",
+        "--dst-prefix=b/",
+        baseSha,
+      ]);
+      // A trailing slash is a nested repository, which has no content of its own to diff.
       const untracked = (await git(root, ["ls-files", "-z", "--others", "--exclude-standard"]))
         .split("\0")
-        .filter((file) => file !== "");
-      const added = await Promise.all(
-        untracked.map((file) =>
-          git(root, ["diff", "--no-color", "--no-index", "--", "/dev/null", file], {
-            okExitCodes: [1],
-          }),
-        ),
-      );
+        .filter((file) => file !== "" && !file.endsWith("/"));
+      const added = untracked.map((file) => addedFileDiff(file, untrackedContent(root, file)));
       const diff = [tracked, ...added].filter((part) => part !== "").join("");
       return { diff, files: parseUnifiedDiff(diff) };
     })();

@@ -1,6 +1,27 @@
 import { describe, expect, it } from "vitest";
 
-import { parseUnifiedDiff } from "#src/unified-diff";
+import { addedFileDiff, parseUnifiedDiff } from "#src/unified-diff";
+
+const encode = (text: string) => new TextEncoder().encode(text);
+
+describe("addedFileDiff", () => {
+  it("parses back into an added file with every line added", () => {
+    expect(parseUnifiedDiff(addedFileDiff("src/new.ts", encode("a\nb\n")))).toEqual([
+      { filename: "src/new.ts", status: "added", additions: 2, deletions: 0, patch: "@@ -0,0 +1,2 @@\n+a\n+b" },
+    ]);
+  });
+
+  it("marks a missing final newline as git does", () => {
+    expect(addedFileDiff("x", encode("a"))).toContain("@@ -0,0 +1 @@\n+a\n\\ No newline at end of file\n");
+  });
+
+  it("gives an empty file no hunk and a binary file no patch", () => {
+    expect(parseUnifiedDiff(addedFileDiff("empty", encode("")) + addedFileDiff("logo.png", new Uint8Array([0, 1])))).toEqual([
+      { filename: "empty", status: "added", additions: 0, deletions: 0 },
+      { filename: "logo.png", status: "added", additions: 0, deletions: 0 },
+    ]);
+  });
+});
 
 const diff = `diff --git a/src/a.ts b/src/a.ts
 index 1111111..2222222 100644
