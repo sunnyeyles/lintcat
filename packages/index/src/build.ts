@@ -142,7 +142,12 @@ function readImports(
       };
       edges.push(edge);
       if (to !== undefined && to !== file.path) {
-        importers.set(to, [...(importers.get(to) ?? []), edge]);
+        const pointing = importers.get(to);
+        if (pointing === undefined) {
+          importers.set(to, [edge]);
+        } else {
+          pointing.push(edge);
+        }
       }
     }
   }
