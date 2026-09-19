@@ -39,14 +39,9 @@ function boundSnippets(snippets: readonly string[]): string[] {
     .map((snippet) => truncateWithMarker(snippet, MAX_SNIPPET_CHARS, "…"));
 }
 
-/** `searchedFor` is absent unless the caller derived the query it searched. */
-function renderSearchResult(
-  result: CodeSearchResult,
-  searchedFor?: string,
-): string {
+function renderSearchResult(result: CodeSearchResult): string {
   return JSON.stringify(
     {
-      searchedFor,
       totalCount: result.totalCount,
       incompleteResults: result.incompleteResults,
       matches: result.matches.slice(0, MAX_SEARCH_MATCHES).map((match) => ({
