@@ -14,7 +14,7 @@ erDiagram
 
   users {
     serial id PK
-    int github_id UK
+    bigint github_id UK
     text login
     text name
     text email
@@ -22,11 +22,11 @@ erDiagram
   }
   organizations {
     serial id PK
-    int github_account_id UK
+    bigint github_account_id UK
     account_type account_type "organization user"
     text slug UK "lowercased login, subdomain"
     text name
-    int installation_id UK
+    bigint installation_id UK
     timestamptz suspended_at
     text ingest_token UK "sha-256 hex"
   }

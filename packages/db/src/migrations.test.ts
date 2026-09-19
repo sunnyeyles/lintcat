@@ -87,6 +87,29 @@ describe("migrations applied in order to an empty database", () => {
     ]);
   });
 
+  it("store GitHub ids past the int32 limit", async () => {
+    const big = 2 ** 31 + 7;
+    const [user] = await database
+      .insert(users)
+      .values({ githubId: big, login: "wide" })
+      .returning();
+    const [organization] = await database
+      .insert(organizations)
+      .values({
+        githubAccountId: big,
+        accountType: "user",
+        slug: "wide",
+        name: "wide",
+        installationId: big + 1,
+      })
+      .returning();
+    expect(user!.githubId).toBe(big);
+    expect(organization).toMatchObject({
+      githubAccountId: big,
+      installationId: big + 1,
+    });
+  });
+
   it("allow one membership per user and organization", async () => {
     const [user] = await database
       .insert(users)

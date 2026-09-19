@@ -21,11 +21,11 @@ const createdAt = () =>
 // One GitHub account; `slug` is its lowercased login and its subdomain.
 export const organizations = pgTable("organizations", {
   id: serial("id").primaryKey(),
-  githubAccountId: integer("github_account_id").notNull().unique(),
+  githubAccountId: bigint("github_account_id", { mode: "number" }).notNull().unique(),
   accountType: accountTypeEnum("account_type").notNull(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
-  installationId: integer("installation_id").unique(),
+  installationId: bigint("installation_id", { mode: "number" }).unique(),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   // SHA-256 hex of the ingest secret; the secret itself is never stored.
   ingestToken: text("ingest_token").unique(),
@@ -34,7 +34,7 @@ export const organizations = pgTable("organizations", {
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  githubId: integer("github_id").notNull().unique(),
+  githubId: bigint("github_id", { mode: "number" }).notNull().unique(),
   login: text("login").notNull(),
   name: text("name"),
   email: text("email"),
