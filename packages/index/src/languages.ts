@@ -1,4 +1,5 @@
 /** Which language a path is written in, and what the index saw of each. */
+import { extensionOf } from "#src/paths";
 
 const LANGUAGE_BY_EXTENSION = new Map<string, string>([
   ["c", "c"],
@@ -37,12 +38,11 @@ const LANGUAGE_BY_EXTENSION = new Map<string, string>([
 
 /** "other" for anything with no extension this map knows. */
 export function languageOf(path: string): string {
-  const base = path.slice(path.lastIndexOf("/") + 1);
-  const dot = base.lastIndexOf(".");
-  if (dot <= 0) {
+  const extension = extensionOf(path);
+  if (extension === "") {
     return "other";
   }
-  return LANGUAGE_BY_EXTENSION.get(base.slice(dot + 1).toLowerCase()) ?? "other";
+  return LANGUAGE_BY_EXTENSION.get(extension.toLowerCase()) ?? "other";
 }
 
 /** The languages whose imports the builder parses. Everything else is seen only. */

@@ -1,12 +1,36 @@
 /** Repository-relative path arithmetic, shared by the resolver and the manifests. */
 
+/** Tried in order for an extensionless specifier and for `index` files. */
+export const MODULE_EXTENSIONS: readonly string[] = [
+  "ts",
+  "tsx",
+  "mts",
+  "cts",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+];
+
+/** Every extension this index reads as source, the scripting languages included. */
+export const SOURCE_EXTENSIONS: readonly string[] = [
+  ...MODULE_EXTENSIONS,
+  "py",
+  "go",
+  "rb",
+];
+
+export function basenameOf(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+
 export function directoryOf(path: string): string {
   const slash = path.lastIndexOf("/");
   return slash < 0 ? "" : path.slice(0, slash);
 }
 
 export function extensionOf(path: string): string {
-  const base = path.slice(path.lastIndexOf("/") + 1);
+  const base = basenameOf(path);
   const dot = base.lastIndexOf(".");
   return dot <= 0 ? "" : base.slice(dot + 1);
 }

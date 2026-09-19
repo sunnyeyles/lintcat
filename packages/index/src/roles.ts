@@ -2,6 +2,8 @@
  * What each path in a repository is. Path conventions only: nothing here
  * reads a file's contents.
  */
+import { basenameOf, extensionOf } from "#src/paths";
+import { isTestBasename } from "#src/test-names";
 
 export type FileRole =
   | "vendored"
@@ -139,27 +141,12 @@ const ASSET_EXTENSIONS = new Set([
   "woff2",
 ]);
 
-/** `foo.test.ts`, `foo.spec.tsx`, `review-quality.eval.ts`. */
-const TEST_BASENAME = /\.(test|spec|eval)\.[cm]?[jt]sx?$/;
-
-/** Go, Python and Ruby spell it the other way round. */
-const TEST_BASENAME_OTHER = /(^test_.+\.py|_test\.(go|py|rb))$/;
-
 const GENERATED_BASENAME = /(\.generated\.|\.min\.[cm]?js$|\.d\.[cm]?ts$)/;
 
 const CONFIG_BASENAME = /\.config\.[cm]?[jt]sx?$/;
 
 function directories(path: string): string[] {
   return path.split("/").slice(0, -1);
-}
-
-function basename(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
-}
-
-function extension(base: string): string {
-  const dot = base.lastIndexOf(".");
-  return dot <= 0 ? "" : base.slice(dot + 1).toLowerCase();
 }
 
 /** The base name with every extension stripped, lowercased. */
@@ -171,9 +158,8 @@ function stem(base: string): string {
 /** The role of one repository-relative path, by ROLE_PRECEDENCE. */
 export function classifyFileRole(path: string): FileRole {
   const segments = directories(path);
-  const base = basename(path);
-  const lowered = base.toLowerCase();
-  const ext = extension(base);
+  const lowered = basenameOf(path).toLowerCase();
+  const ext = extensionOf(path).toLowerCase();
   const inside = (names: ReadonlySet<string>): boolean =>
     segments.some((segment) => names.has(segment));
 
@@ -190,11 +176,7 @@ export function classifyFileRole(path: string): FileRole {
   if (inside(MIGRATION_DIRECTORIES)) {
     return "migration";
   }
-  if (
-    inside(TEST_DIRECTORIES) ||
-    TEST_BASENAME.test(lowered) ||
-    TEST_BASENAME_OTHER.test(lowered)
-  ) {
+  if (inside(TEST_DIRECTORIES) || isTestBasename(lowered)) {
     return "test";
   }
   if (

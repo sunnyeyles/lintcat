@@ -1,20 +1,13 @@
 /** Where an import specifier points: a relative path, a `#` import map, a
  * tsconfig alias, a workspace package, or nothing this index understands. */
 import { resolveExportsField, resolveImportsField } from "#src/manifests";
-import { directoryOf, extensionOf, joinPath } from "#src/paths";
+import {
+  directoryOf,
+  extensionOf,
+  joinPath,
+  MODULE_EXTENSIONS,
+} from "#src/paths";
 import { nearestFor, type WorkspaceModel } from "#src/workspace";
-
-/** Tried in order for an extensionless specifier and for `index` files. */
-const SOURCE_EXTENSIONS = [
-  "ts",
-  "tsx",
-  "mts",
-  "cts",
-  "js",
-  "jsx",
-  "mjs",
-  "cjs",
-];
 
 /** A written `.js` is a TypeScript source on disk under NodeNext. */
 const TYPESCRIPT_FOR = new Map<string, readonly string[]>([
@@ -39,11 +32,11 @@ function candidates(base: string): string[] {
   const typescript = TYPESCRIPT_FOR.get(extension);
   if (typescript !== undefined) {
     paths.push(...typescript.map((swap) => withExtension(base, swap)));
-  } else if (!SOURCE_EXTENSIONS.includes(extension)) {
-    paths.push(...SOURCE_EXTENSIONS.map((suffix) => `${base}.${suffix}`));
+  } else if (!MODULE_EXTENSIONS.includes(extension)) {
+    paths.push(...MODULE_EXTENSIONS.map((suffix) => `${base}.${suffix}`));
   }
   paths.push(
-    ...SOURCE_EXTENSIONS.map((suffix) => join(base, `index.${suffix}`)),
+    ...MODULE_EXTENSIONS.map((suffix) => join(base, `index.${suffix}`)),
   );
   return paths;
 }

@@ -121,6 +121,19 @@ describe("test to source pairing", () => {
     );
   });
 
+  it.each([
+    ["src/review-quality.ts", "src/review-quality.eval.ts"],
+    ["cmd/server/main.go", "cmd/server/main_test.go"],
+    ["lib/parser.rb", "lib/parser_test.rb"],
+    ["app/handler.py", "app/test_handler.py"],
+    ["app/loader.py", "app/loader_test.py"],
+  ])("pairs %s with %s", (source, test) => {
+    const built = index([source, test]);
+
+    expect(built.files.get(source)?.coveredBy).toBe(test);
+    expect(built.files.get(test)?.covers).toBe(source);
+  });
+
   it("pairs a .test.ts with a .tsx source when no .ts exists", () => {
     const built = index(["src/Card.tsx", "src/Card.test.ts"]);
 

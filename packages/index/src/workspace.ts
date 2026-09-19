@@ -8,7 +8,7 @@ import {
   type PackageManifest,
   type PathAlias,
 } from "#src/manifests";
-import { ancestorDirectories, directoryOf } from "#src/paths";
+import { ancestorDirectories, basenameOf, directoryOf } from "#src/paths";
 
 /** A package the workspace config claims, as the repository overview lists it. */
 export interface WorkspacePackage {
@@ -71,10 +71,6 @@ function matcherFor(patterns: readonly string[]): (root: string) => boolean {
   return (root) =>
     include.some((expression) => expression.test(root)) &&
     !exclude.some((expression) => expression.test(root));
-}
-
-function basenameOf(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
 }
 
 /** The workspace patterns, from pnpm's manifest first and npm's `workspaces` after. */
