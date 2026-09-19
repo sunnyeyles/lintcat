@@ -1,4 +1,9 @@
-import { ingestReviewRecord, teams, type Database, type Team } from "@pr-review/db";
+import {
+  ingestReviewRecord,
+  organizations,
+  type Database,
+  type Organization,
+} from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import type { ReviewRecord, ReviewRecordAgentRun } from "@pr-review/schemas";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -54,31 +59,37 @@ function record(overrides: Partial<ReviewRecord> = {}): ReviewRecord {
 }
 
 let database: Database;
-let acme: Team;
-let globex: Team;
+let acme: Organization;
+let globex: Organization;
 
-async function insertTeam(slug: string): Promise<Team> {
-  const [team] = await database
-    .insert(teams)
-    .values({ slug, name: slug, githubOrg: slug })
+async function insertOrganization(
+  githubAccountId: number,
+  slug: string,
+): Promise<Organization> {
+  const [organization] = await database
+    .insert(organizations)
+    .values({ githubAccountId, accountType: "organization", slug, name: slug })
     .returning();
-  return team!;
+  return organization!;
 }
 
-async function ingest(team: Team, value: ReviewRecord): Promise<number> {
-  const result = await ingestReviewRecord(database, team.id, value);
+async function ingest(
+  organization: Organization,
+  value: ReviewRecord,
+): Promise<number> {
+  const result = await ingestReviewRecord(database, organization.id, value);
   if (!result.ok) throw new Error(result.reason);
   return result.reviewId;
 }
 
 beforeEach(async () => {
   database = await createTestDatabase();
-  acme = await insertTeam("acme");
-  globex = await insertTeam("globex");
+  acme = await insertOrganization(10, "acme");
+  globex = await insertOrganization(20, "globex");
 });
 
 describe("createDbSource", () => {
-  it("lists only the team's repos, with totals from reviews, findings and runs", async () => {
+  it("lists only the organization's repos, with totals from reviews, findings and runs", async () => {
     await ingest(acme, record());
     await ingest(acme, record({ headSha: "b".repeat(40), findings: [], agentRuns: [run("security", 0)] }));
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
@@ -98,7 +109,7 @@ describe("createDbSource", () => {
     expect(repos[0]!.costUsd).toBeCloseTo(perRun * 3, 10);
   });
 
-  it("finds a repo by owner and name only within the team", async () => {
+  it("finds a repo by owner and name only within the organization", async () => {
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
 
     expect(await createDbSource(database, acme).getRepo("globex", "secret")).toBeNull();
@@ -129,7 +140,7 @@ describe("createDbSource", () => {
     expect(await createDbSource(database, acme).listReviews({ limit: 1 })).toHaveLength(1);
   });
 
-  it("returns a review with its findings and runs, and not another team's", async () => {
+  it("returns a review with its findings and runs, and not another organization's", async () => {
     const mine = await ingest(acme, record());
     const theirs = await ingest(globex, record({ owner: "globex", repo: "secret" }));
     const source = createDbSource(database, acme);
@@ -154,7 +165,7 @@ describe("createDbSource", () => {
     expect(review?.outputTokens).toBe(400);
   });
 
-  it("aggregates trends and usage over the team's recent reviews", async () => {
+  it("aggregates trends and usage over the organization's recent reviews", async () => {
     await ingest(acme, record());
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
     const source = createDbSource(database, acme);
@@ -176,7 +187,7 @@ describe("createDbSource", () => {
     expect(usage.byRepo.map((row) => row.repo.name)).toEqual(["widgets"]);
   });
 
-  it("is empty for a team with nothing recorded", async () => {
+  it("is empty for an organization with nothing recorded", async () => {
     const source = createDbSource(database, acme);
     expect(await source.listRepos()).toEqual([]);
     expect(await source.listReviews()).toEqual([]);

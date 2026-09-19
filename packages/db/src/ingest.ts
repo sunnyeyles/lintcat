@@ -7,30 +7,30 @@ import {
   findings,
   repos,
   reviews,
-  teams,
-  type Team,
+  organizations,
+  type Organization,
 } from "./schema";
 
-/** What `teams.ingestToken` stores; the secret itself is never persisted. */
+/** What `organizations.ingestToken` stores; the secret itself is never persisted. */
 export function hashIngestToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
-export async function findTeamByIngestToken(
+export async function findOrganizationByIngestToken(
   database: Database,
   token: string,
-): Promise<Team | undefined> {
+): Promise<Organization | undefined> {
   if (!token) return undefined;
   const rows = await database
     .select()
-    .from(teams)
-    .where(eq(teams.ingestToken, hashIngestToken(token)))
+    .from(organizations)
+    .where(eq(organizations.ingestToken, hashIngestToken(token)))
     .limit(1);
   return rows[0];
 }
 
-/** `owner-mismatch` is the 404: no team owns the repo the record names. */
-export type IngestFailure = "team-not-found" | "owner-mismatch";
+/** `owner-mismatch` is the 404: the record's repo belongs to another account. */
+export type IngestFailure = "organization-not-found" | "owner-mismatch";
 
 export type IngestResult =
   | { ok: true; reviewId: number }
@@ -38,57 +38,57 @@ export type IngestResult =
 
 export async function ingestReviewRecord(
   database: Database,
-  teamId: number,
+  organizationId: number,
   record: ReviewRecord,
 ): Promise<IngestResult> {
-  const team = await findTeam(database, teamId);
-  if (!team) return { ok: false, reason: "team-not-found" };
-  if (!sameOrg(team.githubOrg, record.owner)) {
+  const organization = await findOrganization(database, organizationId);
+  if (!organization) return { ok: false, reason: "organization-not-found" };
+  if (!ownsRepo(organization, record.owner)) {
     return { ok: false, reason: "owner-mismatch" };
   }
 
-  const repoId = await findOrCreateRepo(database, teamId, record);
+  const repoId = await findOrCreateRepo(database, organizationId, record);
   const reviewId = await upsertReview(database, repoId, record);
   await replaceAgentRuns(database, reviewId, record);
   await replaceFindings(database, reviewId, record);
   return { ok: true, reviewId };
 }
 
-async function findTeam(
+async function findOrganization(
   database: Database,
-  teamId: number,
-): Promise<Team | undefined> {
+  organizationId: number,
+): Promise<Organization | undefined> {
   const rows = await database
     .select()
-    .from(teams)
-    .where(eq(teams.id, teamId))
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
     .limit(1);
   return rows[0];
 }
 
-// GitHub org names are case-insensitive; a team with no org owns no repo.
-function sameOrg(githubOrg: string | null, owner: string): boolean {
-  return githubOrg !== null && githubOrg.toLowerCase() === owner.toLowerCase();
+// The slug is the lowercased GitHub login, and logins are case-insensitive.
+function ownsRepo(organization: Organization, owner: string): boolean {
+  return organization.slug === owner.toLowerCase();
 }
 
 async function findOrCreateRepo(
   database: Database,
-  teamId: number,
+  organizationId: number,
   record: ReviewRecord,
 ): Promise<number> {
-  const found = await selectRepoId(database, teamId, record);
+  const found = await selectRepoId(database, organizationId, record);
   if (found !== undefined) return found;
 
   const inserted = await database
     .insert(repos)
-    .values({ teamId, owner: record.owner, name: record.repo })
+    .values({ organizationId, owner: record.owner, name: record.repo })
     .onConflictDoNothing()
     .returning({ id: repos.id });
   const created = inserted[0];
   if (created) return created.id;
 
   // No row back means a concurrent first review for this repo won the insert.
-  const winner = await selectRepoId(database, teamId, record);
+  const winner = await selectRepoId(database, organizationId, record);
   if (winner === undefined) {
     throw new Error(`could not create repo ${record.owner}/${record.repo}`);
   }
@@ -97,7 +97,7 @@ async function findOrCreateRepo(
 
 async function selectRepoId(
   database: Database,
-  teamId: number,
+  organizationId: number,
   record: ReviewRecord,
 ): Promise<number | undefined> {
   const rows = await database
@@ -105,7 +105,7 @@ async function selectRepoId(
     .from(repos)
     .where(
       and(
-        eq(repos.teamId, teamId),
+        eq(repos.organizationId, organizationId),
         eq(repos.owner, record.owner),
         eq(repos.name, record.repo),
       ),

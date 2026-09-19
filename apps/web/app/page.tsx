@@ -29,7 +29,7 @@ export default async function OverviewPage() {
       <PageHeader
         eyebrow="Dashboard"
         title="Overview"
-        description={`${source.team.name} — every review the agents published in the last 30 days, newest first.`}
+        description={`${source.organization.name} — every review the agents published in the last 30 days, newest first.`}
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href="/repos">All repositories</Link>
@@ -98,7 +98,7 @@ export default async function OverviewPage() {
             <RepoTable
               repos={repos}
               limit={6}
-              caption="Repositories connected to this team, most recently reviewed first."
+              caption="Repositories connected to this organization, most recently reviewed first."
             />
           ) : (
             <EmptyState

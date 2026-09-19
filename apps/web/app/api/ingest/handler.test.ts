@@ -3,8 +3,8 @@ import {
   findings,
   hashIngestToken,
   repos,
+  organizations,
   reviews,
-  teams,
   type Database,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
@@ -58,10 +58,11 @@ let database: Database;
 
 beforeEach(async () => {
   database = await createTestDatabase();
-  await database.insert(teams).values({
+  await database.insert(organizations).values({
+    githubAccountId: 100,
+    accountType: "organization",
     slug: "acme",
     name: "Acme",
-    githubOrg: "acme",
     ingestToken: hashIngestToken("secret-token"),
   });
 });
@@ -129,7 +130,7 @@ describe("handleIngest", () => {
     expect(response.status).toBe(400);
   });
 
-  it("404s when the owner is not the team's github org", async () => {
+  it("404s when the organization does not own the repo", async () => {
     const response = await handleIngest(
       post({ ...record, owner: "someone-else" }, "secret-token"),
       database,

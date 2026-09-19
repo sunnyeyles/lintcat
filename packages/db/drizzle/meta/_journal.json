@@ -22,6 +22,13 @@
       "when": 1789781208376,
       "tag": "0002_wealthy_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789782193793,
+      "tag": "0003_organizations_memberships",
+      "breakpoints": true
     }
   ]
 }

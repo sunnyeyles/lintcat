@@ -1,4 +1,4 @@
-import type { Finding, Repo, Team } from "@pr-review/db";
+import type { Finding, Organization, Repo } from "@pr-review/db";
 
 import {
   addTokens,
@@ -125,25 +125,28 @@ function severityFor(r: () => number, agent: AgentName): Severity {
 }
 
 type World = {
-  team: Team;
+  organization: Organization;
   repos: Repo[];
   reviews: ReviewDetail[];
 };
 
 function build(now: Date, ceiling: number): World {
   const r = rng(SEED);
-  const team: Team = {
+  const organization: Organization = {
     id: 1,
+    githubAccountId: 1,
+    accountType: "organization",
     slug: "acme",
     name: "Acme Engineering",
-    githubOrg: "acme",
+    installationId: null,
+    suspendedAt: null,
     ingestToken: null,
     createdAt: new Date(now.getTime() - DAYS * 864e5),
   };
 
   const repos: Repo[] = REPOS.map(([owner, name], i) => ({
     id: i + 1,
-    teamId: team.id,
+    organizationId: organization.id,
     owner,
     name,
     createdAt: new Date(now.getTime() - (DAYS - i) * 864e5),
@@ -237,7 +240,7 @@ function build(now: Date, ceiling: number): World {
   }
 
   reviews.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  return { team, repos, reviews };
+  return { organization, repos, reviews };
 }
 
 let cached: World | null = null;
@@ -266,11 +269,11 @@ function strip(review: ReviewDetail): ReviewSummary {
 }
 
 export function createMockSource(): DataSource {
-  const { team, repos, reviews } = world();
+  const { organization, repos, reviews } = world();
 
   return {
     isDemo: true,
-    team,
+    organization,
 
     async listRepos(): Promise<RepoSummary[]> {
       return repos.map((repo) => {

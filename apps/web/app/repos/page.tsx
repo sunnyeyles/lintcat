@@ -17,7 +17,7 @@ export default async function ReposPage() {
         description={
           repos.length > 0
             ? `${formatNumber(repos.length)} connected repositories, ${formatNumber(reviewCount)} reviews all time. Most recently reviewed first.`
-            : "No repositories are connected to this team yet."
+            : "No repositories are connected to this organization yet."
         }
       />
 

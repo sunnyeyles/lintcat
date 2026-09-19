@@ -1,6 +1,10 @@
-import { teams, users, type Database } from "@pr-review/db";
+import {
+  memberships,
+  organizations,
+  users,
+  type Database,
+} from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
-import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { upsertGithubUser } from "@/lib/users";
@@ -20,7 +24,7 @@ beforeEach(async () => {
 });
 
 describe("upsertGithubUser", () => {
-  it("inserts a user with no team", async () => {
+  it("inserts a user with no membership", async () => {
     const user = await upsertGithubUser(database, profile);
 
     expect(user).toMatchObject({
@@ -29,9 +33,8 @@ describe("upsertGithubUser", () => {
       name: "Mona Lisa",
       email: "mona@example.test",
       avatarUrl: "https://avatars.example.test/octocat.png",
-      teamId: null,
-      role: "member",
     });
+    expect(await database.select().from(memberships)).toEqual([]);
   });
 
   it("updates the github fields on a second sign-in", async () => {
@@ -55,20 +58,26 @@ describe("upsertGithubUser", () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("keeps the team and role the user already had", async () => {
-    const inserted = await database
-      .insert(teams)
-      .values({ slug: "acme", name: "Acme" })
-      .returning({ id: teams.id });
-    const teamId = inserted[0]!.id;
+  it("keeps the memberships the user already had", async () => {
+    const [organization] = await database
+      .insert(organizations)
+      .values({
+        githubAccountId: 100,
+        accountType: "organization",
+        slug: "acme",
+        name: "Acme",
+      })
+      .returning({ id: organizations.id });
     const user = await upsertGithubUser(database, profile);
     await database
-      .update(users)
-      .set({ teamId, role: "owner" })
-      .where(eq(users.id, user.id));
+      .insert(memberships)
+      .values({ userId: user.id, organizationId: organization!.id, role: "owner" });
 
     const again = await upsertGithubUser(database, { ...profile, name: "Mona" });
 
-    expect(again).toMatchObject({ teamId, role: "owner", name: "Mona" });
+    expect(again).toMatchObject({ id: user.id, name: "Mona" });
+    expect(await database.select().from(memberships)).toEqual([
+      expect.objectContaining({ userId: user.id, role: "owner" }),
+    ]);
   });
 });

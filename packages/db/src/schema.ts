@@ -10,23 +10,26 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const severityEnum = pgEnum("severity", ["low", "medium", "high"]);
-export const roleEnum = pgEnum("role", ["owner", "admin", "member"]);
+export const accountTypeEnum = pgEnum("account_type", ["organization", "user"]);
+export const membershipRoleEnum = pgEnum("membership_role", ["owner", "member"]);
 
 const createdAt = () =>
   timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 
-// `slug` is the subdomain: acme -> acme.<app-domain>.
-export const teams = pgTable("teams", {
+// One GitHub account; `slug` is its lowercased login and its subdomain.
+export const organizations = pgTable("organizations", {
   id: serial("id").primaryKey(),
+  githubAccountId: integer("github_account_id").notNull().unique(),
+  accountType: accountTypeEnum("account_type").notNull(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
-  githubOrg: text("github_org"),
-  // SHA-256 hex of the team's ingest secret; the secret itself is never stored.
+  installationId: integer("installation_id").unique(),
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  // SHA-256 hex of the ingest secret; the secret itself is never stored.
   ingestToken: text("ingest_token").unique(),
   createdAt: createdAt(),
 });
 
-// One team per user; teamId is null until the user creates or joins one.
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   githubId: integer("github_id").notNull().unique(),
@@ -34,25 +37,50 @@ export const users = pgTable("users", {
   name: text("name"),
   email: text("email"),
   avatarUrl: text("avatar_url"),
-  teamId: integer("team_id").references(() => teams.id, {
-    onDelete: "set null",
-  }),
-  role: roleEnum("role").notNull().default("member"),
   createdAt: createdAt(),
 });
+
+export const memberships = pgTable(
+  "memberships",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: integer("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    role: membershipRoleEnum("role").notNull(),
+    syncedAt: timestamp("synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("memberships_user_organization_idx").on(
+      t.userId,
+      t.organizationId,
+    ),
+  ],
+);
 
 export const repos = pgTable(
   "repos",
   {
     id: serial("id").primaryKey(),
-    teamId: integer("team_id")
+    organizationId: integer("organization_id")
       .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
+      .references(() => organizations.id, { onDelete: "cascade" }),
     owner: text("owner").notNull(),
     name: text("name").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("repos_team_owner_name_idx").on(t.teamId, t.owner, t.name)],
+  (t) => [
+    uniqueIndex("repos_organization_owner_name_idx").on(
+      t.organizationId,
+      t.owner,
+      t.name,
+    ),
+  ],
 );
 
 // The unique index is the ingest upsert's conflict target: one row per commit.
@@ -115,8 +143,11 @@ export const findings = pgTable("findings", {
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
-export type Team = typeof teams.$inferSelect;
-export type NewTeam = typeof teams.$inferInsert;
+export type Organization = typeof organizations.$inferSelect;
+export type NewOrganization = typeof organizations.$inferInsert;
+export type Membership = typeof memberships.$inferSelect;
+export type NewMembership = typeof memberships.$inferInsert;
+export type MembershipRole = Membership["role"];
 export type Repo = typeof repos.$inferSelect;
 export type NewRepo = typeof repos.$inferInsert;
 export type Review = typeof reviews.$inferSelect;

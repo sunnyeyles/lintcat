@@ -1,9 +1,9 @@
 import {
-  findTeamByIngestToken,
+  findOrganizationByIngestToken,
   ingestReviewRecord,
   type Database,
   type IngestFailure,
-  type Team,
+  type Organization,
 } from "@pr-review/db";
 import { reviewRecordSchema } from "@pr-review/schemas";
 
@@ -20,8 +20,8 @@ export async function handleIngest(
     );
   }
 
-  const team = await findTeamByIngestToken(database, token);
-  if (!team) {
+  const organization = await findOrganizationByIngestToken(database, token);
+  if (!organization) {
     return Response.json({ error: "unknown ingest token" }, { status: 401 });
   }
 
@@ -40,10 +40,14 @@ export async function handleIngest(
     );
   }
 
-  const result = await ingestReviewRecord(database, team.id, parsed.data);
+  const result = await ingestReviewRecord(
+    database,
+    organization.id,
+    parsed.data,
+  );
   if (!result.ok) {
     return Response.json(
-      { error: failureMessage(result.reason, team, parsed.data.owner) },
+      { error: failureMessage(result.reason, organization, parsed.data.owner) },
       { status: 404 },
     );
   }
@@ -57,12 +61,11 @@ function bearerToken(header: string | null): string | undefined {
 
 function failureMessage(
   reason: IngestFailure,
-  team: Team,
+  organization: Organization,
   owner: string,
 ): string {
-  if (reason === "team-not-found") {
-    return `team ${team.slug} no longer exists`;
+  if (reason === "organization-not-found") {
+    return `organization ${organization.slug} no longer exists`;
   }
-  const org = team.githubOrg ?? "(unset)";
-  return `no team owns ${owner}: team ${team.slug} has github org ${org}`;
+  return `organization ${organization.slug} does not own ${owner}`;
 }

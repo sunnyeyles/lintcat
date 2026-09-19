@@ -7,8 +7,8 @@ import {
   type Database,
   type Finding,
   type Repo,
+  type Organization,
   type Review,
-  type Team,
 } from "@pr-review/db";
 import {
   and,
@@ -91,13 +91,16 @@ function strip(review: ReviewDetail): ReviewSummary {
   return rest;
 }
 
-/** Every read is scoped to the team through the review's repo. */
-export function createDbSource(database: Database, team: Team): DataSource {
-  async function teamRepos(): Promise<Repo[]> {
+/** Every read is scoped to the organization through the review's repo. */
+export function createDbSource(
+  database: Database,
+  organization: Organization,
+): DataSource {
+  async function organizationRepos(): Promise<Repo[]> {
     return database
       .select()
       .from(repos)
-      .where(eq(repos.teamId, team.id))
+      .where(eq(repos.organizationId, organization.id))
       .orderBy(asc(repos.owner), asc(repos.name));
   }
 
@@ -106,7 +109,7 @@ export function createDbSource(database: Database, team: Team): DataSource {
     filter: ReviewFilter,
     withFindings: boolean,
   ): Promise<ReviewDetail[]> {
-    const conditions: SQL[] = [eq(repos.teamId, team.id)];
+    const conditions: SQL[] = [eq(repos.organizationId, organization.id)];
     if (filter.id !== undefined) conditions.push(eq(reviews.id, filter.id));
     if (filter.repoId !== undefined) conditions.push(eq(reviews.repoId, filter.repoId));
     if (filter.since !== undefined) conditions.push(gte(reviews.createdAt, filter.since));
@@ -212,15 +215,15 @@ export function createDbSource(database: Database, team: Team): DataSource {
 
   return {
     isDemo: false,
-    team,
+    organization,
 
     listRepos() {
-      return repoSummaries(eq(repos.teamId, team.id));
+      return repoSummaries(eq(repos.organizationId, organization.id));
     },
 
     async getRepo(owner, name) {
       const [repo] = await repoSummaries(
-        and(eq(repos.teamId, team.id), eq(repos.owner, owner), eq(repos.name, name))!,
+        and(eq(repos.organizationId, organization.id), eq(repos.owner, owner), eq(repos.name, name))!,
       );
       return repo ?? null;
     },
@@ -254,7 +257,7 @@ export function createDbSource(database: Database, team: Team): DataSource {
       const since = new Date(windowStart(range));
       const [scoped, repoRows] = await Promise.all([
         loadReviews({ since, ...(repoId === undefined ? {} : { repoId }) }, false),
-        teamRepos(),
+        organizationRepos(),
       ]);
       return computeUsage(scoped, repoRows, range);
     },

@@ -1,8 +1,11 @@
-import { db, type Team } from "@pr-review/db";
+import { db } from "@pr-review/db";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { teamForUser } from "@/lib/team";
+import {
+  currentMembershipForUser,
+  type OrganizationMembership,
+} from "@/lib/organization";
 
 /** What a page needs about the signed-in user; `githubId` keys the `users` row. */
 export type AppSession = {
@@ -25,20 +28,19 @@ export async function currentSession(): Promise<AppSession | undefined> {
   };
 }
 
-export async function currentTeam(
+export async function currentMembership(
   session: AppSession,
-): Promise<Team | undefined> {
-  return teamForUser(db(), session.githubId);
+): Promise<OrganizationMembership | undefined> {
+  return currentMembershipForUser(db(), session.githubId);
 }
 
-/** `/sign-in` explains both the signed-out and the no-team state. */
-export async function requireTeam(): Promise<{
-  session: AppSession;
-  team: Team;
-}> {
+/** `/sign-in` explains both the signed-out and the no-organization state. */
+export async function requireMembership(): Promise<
+  OrganizationMembership & { session: AppSession }
+> {
   const session = await currentSession();
   if (!session) redirect("/sign-in");
-  const team = await currentTeam(session);
-  if (!team) redirect("/sign-in");
-  return { session, team };
+  const membership = await currentMembership(session);
+  if (!membership) redirect("/sign-in");
+  return { session, ...membership };
 }

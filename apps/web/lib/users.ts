@@ -9,7 +9,7 @@ export type GithubUserProfile = {
   avatar_url?: string | null;
 };
 
-/** Upserts by `githubId`, leaving `teamId` and `role` as the team set them. */
+/** Upserts by `githubId`; memberships are left untouched. */
 export async function upsertGithubUser(
   database: Database,
   profile: GithubUserProfile,

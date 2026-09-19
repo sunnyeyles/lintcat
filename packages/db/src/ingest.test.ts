@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Database } from "./client";
 import {
-  findTeamByIngestToken,
+  findOrganizationByIngestToken,
   hashIngestToken,
   ingestReviewRecord,
 } from "./ingest";
-import { agentRuns, findings, repos, reviews, teams } from "./schema";
+import { agentRuns, findings, organizations, repos, reviews } from "./schema";
 import { createTestDatabase } from "./test-database";
 
 const securityRun = {
@@ -64,20 +64,21 @@ const record: ReviewRecord = {
 };
 
 let database: Database;
-let teamId: number;
+let organizationId: number;
 
 beforeEach(async () => {
   database = await createTestDatabase();
   const inserted = await database
-    .insert(teams)
+    .insert(organizations)
     .values({
+      githubAccountId: 100,
+      accountType: "organization",
       slug: "acme",
       name: "Acme",
-      githubOrg: "acme",
       ingestToken: hashIngestToken("secret-token"),
     })
-    .returning({ id: teams.id });
-  teamId = inserted[0]!.id;
+    .returning({ id: organizations.id });
+  organizationId = inserted[0]!.id;
 });
 
 describe("hashIngestToken", () => {
@@ -90,28 +91,31 @@ describe("hashIngestToken", () => {
   });
 });
 
-describe("findTeamByIngestToken", () => {
-  it("finds the team whose stored hash matches the secret", async () => {
-    const team = await findTeamByIngestToken(database, "secret-token");
-    expect(team?.id).toBe(teamId);
+describe("findOrganizationByIngestToken", () => {
+  it("finds the organization whose stored hash matches the secret", async () => {
+    const organization = await findOrganizationByIngestToken(
+      database,
+      "secret-token",
+    );
+    expect(organization?.id).toBe(organizationId);
   });
 
   it("returns undefined for an unknown or empty token", async () => {
-    expect(await findTeamByIngestToken(database, "nope")).toBeUndefined();
-    expect(await findTeamByIngestToken(database, "")).toBeUndefined();
+    expect(await findOrganizationByIngestToken(database, "nope")).toBeUndefined();
+    expect(await findOrganizationByIngestToken(database, "")).toBeUndefined();
   });
 });
 
 describe("ingestReviewRecord", () => {
   it("creates the repo, the review, one agent run per agent and the findings", async () => {
-    const result = await ingestReviewRecord(database, teamId, record);
+    const result = await ingestReviewRecord(database, organizationId, record);
     expect(result).toEqual({ ok: true, reviewId: expect.any(Number) });
     if (!result.ok) return;
 
     const repoRows = await database.select().from(repos);
     expect(repoRows).toHaveLength(1);
     expect(repoRows[0]).toMatchObject({
-      teamId,
+      organizationId,
       owner: "acme",
       name: "widgets",
     });
@@ -164,7 +168,7 @@ describe("ingestReviewRecord", () => {
   });
 
   it("updates rather than duplicates on a rerun of the same commit", async () => {
-    const first = await ingestReviewRecord(database, teamId, record);
+    const first = await ingestReviewRecord(database, organizationId, record);
     const rerun: ReviewRecord = {
       ...record,
       agents: ["performance"],
@@ -173,7 +177,7 @@ describe("ingestReviewRecord", () => {
       agentRuns: [{ ...performanceRun, outputTokens: 400 }],
       findings: [record.findings[1]!],
     };
-    const second = await ingestReviewRecord(database, teamId, rerun);
+    const second = await ingestReviewRecord(database, organizationId, rerun);
 
     expect(first.ok && second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
@@ -199,8 +203,8 @@ describe("ingestReviewRecord", () => {
   });
 
   it("keeps a different head sha as its own review", async () => {
-    await ingestReviewRecord(database, teamId, record);
-    await ingestReviewRecord(database, teamId, {
+    await ingestReviewRecord(database, organizationId, record);
+    await ingestReviewRecord(database, organizationId, {
       ...record,
       headSha: "aaaabbbbccccddddeeeeffff00001111222233334",
     });
@@ -209,8 +213,8 @@ describe("ingestReviewRecord", () => {
     expect(await database.select().from(repos)).toHaveLength(1);
   });
 
-  it("reports owner-mismatch when the owner is not the team's github org", async () => {
-    const result = await ingestReviewRecord(database, teamId, {
+  it("reports owner-mismatch when the owner is not the organization's login", async () => {
+    const result = await ingestReviewRecord(database, organizationId, {
       ...record,
       owner: "someone-else",
     });
@@ -218,25 +222,30 @@ describe("ingestReviewRecord", () => {
     expect(await database.select().from(repos)).toHaveLength(0);
   });
 
-  it("matches the github org case-insensitively", async () => {
-    const result = await ingestReviewRecord(database, teamId, {
+  it("matches the login case-insensitively", async () => {
+    const result = await ingestReviewRecord(database, organizationId, {
       ...record,
       owner: "AcMe",
     });
     expect(result.ok).toBe(true);
   });
 
-  it("reports owner-mismatch when the team has no github org", async () => {
+  it("reports owner-mismatch for another organization's repo", async () => {
     const inserted = await database
-      .insert(teams)
-      .values({ slug: "orgless", name: "Orgless" })
-      .returning({ id: teams.id });
+      .insert(organizations)
+      .values({
+        githubAccountId: 200,
+        accountType: "user",
+        slug: "octocat",
+        name: "Octocat",
+      })
+      .returning({ id: organizations.id });
     const result = await ingestReviewRecord(database, inserted[0]!.id, record);
     expect(result).toEqual({ ok: false, reason: "owner-mismatch" });
   });
 
-  it("reports team-not-found for an unknown team", async () => {
-    const result = await ingestReviewRecord(database, teamId + 999, record);
-    expect(result).toEqual({ ok: false, reason: "team-not-found" });
+  it("reports organization-not-found for an unknown organization", async () => {
+    const result = await ingestReviewRecord(database, organizationId + 999, record);
+    expect(result).toEqual({ ok: false, reason: "organization-not-found" });
   });
 });
