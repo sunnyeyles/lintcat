@@ -1,9 +1,7 @@
 import { db } from "@pr-review/db";
+import { createDbSource, type DataSource } from "@pr-review/db/dashboard";
 
 import { requireOrganization } from "@/lib/session";
-
-import { createDbSource } from "./db";
-import type { DataSource } from "./types";
 
 /** The organization's data, only once `requireOrganization` has let the user in. */
 export async function data(slug: string): Promise<DataSource> {

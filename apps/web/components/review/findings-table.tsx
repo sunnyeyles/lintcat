@@ -21,7 +21,7 @@ import {
 import { useId, useMemo, useState } from "react";
 
 import { AGENT_LABELS, SeverityBadge } from "@/components/ui";
-import type { Severity } from "@/lib/data";
+import type { Severity } from "@pr-review/db/dashboard";
 
 import { ConfidenceMeter } from "./confidence-meter";
 import { FilePath } from "./file-path";

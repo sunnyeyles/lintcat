@@ -3,7 +3,7 @@
 import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 
 import { formatUsd } from "@/lib/format";
-import type { UsagePoint } from "@/lib/data/types";
+import type { UsagePoint } from "@pr-review/db/dashboard";
 
 import { axisLineProps, cursorProps, gridProps, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";

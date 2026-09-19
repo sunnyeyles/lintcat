@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AGENTS } from "@/lib/data";
+import { AGENTS } from "@pr-review/db/dashboard";
 
 // Guards the vitest alias: without it this import fails to resolve.
 describe("@/ alias", () => {

@@ -1,4 +1,4 @@
-import type { Range } from "@/lib/data/types";
+import type { Range } from "@pr-review/db/dashboard";
 
 export const RANGES: readonly Range[] = ["7d", "30d", "90d"];
 

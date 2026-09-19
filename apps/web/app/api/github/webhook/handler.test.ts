@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 
 import {
+  authorize,
   memberships,
   organizationSlugRedirects,
   organizations,
@@ -20,7 +21,6 @@ import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging
 import { asc, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { authorize } from "@/lib/authorize";
 import { membershipsForUser } from "@/lib/organization";
 
 import { handleGithubWebhook } from "./handler";

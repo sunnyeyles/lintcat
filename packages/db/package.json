@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./dashboard": "./src/dashboard/index.ts",
     "./test-database": "./src/test-database.ts"
   },
   "scripts": {

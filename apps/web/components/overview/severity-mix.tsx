@@ -1,7 +1,7 @@
 import { cn } from "@pr-review/design";
 
 import { SeverityBadge } from "@/components/ui";
-import type { Severity } from "@/lib/data";
+import type { Severity } from "@pr-review/db/dashboard";
 
 const ORDER: readonly Severity[] = ["high", "medium", "low"];
 

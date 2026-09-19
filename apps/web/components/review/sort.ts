@@ -1,6 +1,6 @@
 import type { Finding } from "@pr-review/db";
 
-import { AGENTS, isAgentName, type AgentName, type Severity } from "@/lib/data";
+import { AGENTS, isAgentName, type AgentName, type Severity } from "@pr-review/db/dashboard";
 
 export const SEVERITIES: readonly Severity[] = ["high", "medium", "low"];
 

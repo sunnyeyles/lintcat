@@ -157,7 +157,7 @@ no call. A failed lookup keeps that repo's stored row.
 
 ## Organizations and access
 
-Every organization page lives under `/o/<slug>/`. `authorize` (`lib/authorize.ts`)
+Every organization page lives under `/o/<slug>/`. `authorize` (`packages/db/src/authorize.ts`)
 reads only the database and returns the organization, the user's role and the
 repos they may read (each with whether they own it), or not-found. Given a repo,
 it also returns that repo. An unknown slug, a suspended or uninstalled
@@ -205,7 +205,7 @@ and use `http://lvh.me:3000` and `http://acme.lvh.me:3000`; register
 
 ## The seam
 
-Pages never touch Drizzle. They ask for a `DataSource` (`lib/data/types.ts`):
+Pages never touch Drizzle. They ask for a `DataSource` (`packages/db/src/dashboard/types.ts`):
 
 ```ts
 import { data } from "@/lib/data/server";
@@ -214,19 +214,19 @@ const reviews = await (await data(slug)).listReviews({ repoId, limit: 20 });
 ```
 
 - `data(slug)` (`lib/data/server.ts`) is the organization `authorize` let the
-  user into, read from Postgres by `createDbSource` in `lib/data/db.ts`. Every
+  user into, read from Postgres by `createDbSource` in `packages/db/src/dashboard/source.ts`. Every
   query (lists, totals, trends, usage, a repo, a review and its siblings) is
   scoped through the review's repo to the repos `authorize` returned, so another
   organization's row, or a private repo the viewer cannot read, is a 404.
   Every page uses it.
 
-Trends and usage are computed by the same functions in `lib/data/aggregate.ts`
+Trends and usage are computed by the same functions in `packages/db/src/dashboard/aggregate.ts`
 from the database rows. Agents the UI has no colour for (such as `general`) are left
 out of agent chips and run strips; their tokens still count toward cost.
 
 ## Cost figures
 
-`lib/data/aggregate.ts` holds a fixed per-million-token price table and derives
+`packages/db/src/dashboard/aggregate.ts` holds a fixed per-million-token price table and derives
 every dollar figure from the four token counters in `agent_runs`. The prices
 are illustrative.
 

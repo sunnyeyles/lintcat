@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pr-review": {
+      "command": "node",
+      "args": ["apps/mcp/start.mjs"]
+    }
+  }
+}

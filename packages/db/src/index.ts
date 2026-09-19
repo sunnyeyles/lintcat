@@ -1,5 +1,6 @@
 /** Postgres (Neon) access via Drizzle: the `db()` client and the table schema. */
 export { db, withWriteDatabase, type Database } from "./client";
+export { findLocalEnvFile } from "./env";
 export {
   findOrganizationByIngestToken,
   hashIngestToken,
@@ -45,4 +46,5 @@ export {
   renameOrganization,
   type OrganizationRename,
 } from "./slugs";
+export { authorize, type Authorization } from "./authorize";
 export * from "./schema";

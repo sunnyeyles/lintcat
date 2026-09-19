@@ -17,7 +17,7 @@ import { notFound } from "next/navigation";
 
 import { AgentChips, RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import type { ReviewSummary } from "@/lib/data";
+import type { ReviewSummary } from "@pr-review/db/dashboard";
 import { data } from "@/lib/data/server";
 import {
   formatDuration,

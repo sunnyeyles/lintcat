@@ -1,4 +1,5 @@
 import {
+  authorize,
   memberships,
   organizationSlugRedirects,
   organizations,
@@ -14,7 +15,6 @@ import { createTestDatabase } from "@pr-review/db/test-database";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { authorize } from "@/lib/authorize";
 import { renamedOrganizationUrl } from "@/lib/paths";
 
 let database: Database;

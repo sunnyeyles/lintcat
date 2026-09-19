@@ -1,5 +1,5 @@
 import { AgentChip } from "@/components/ui";
-import { costOf, type AgentRun } from "@/lib/data";
+import { costOf, type AgentRun } from "@pr-review/db/dashboard";
 import { formatDuration, formatTokens, formatUsd } from "@/lib/format";
 
 function tokenTotal(run: AgentRun): number {

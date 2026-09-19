@@ -7,14 +7,12 @@ import {
   gateAgentsByPaths,
   withRepositoryHints,
   type AgentDefinition,
-  type ReviewContext,
   type SynthesisHints,
 } from "@pr-review/ai";
 import type {
   ExistingReviewComment,
   GithubInstallationClient,
 } from "@pr-review/github";
-import type { RepositoryIndex } from "@pr-review/index";
 import {
   createConsoleLogger,
   errorMessage,
@@ -23,6 +21,7 @@ import {
 import type { ReviewFinding } from "@pr-review/schemas";
 
 import { buildReviewIndex } from "#src/build-index";
+import type { RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
 import { countLabel } from "#src/finding-format";
 import {
@@ -62,13 +61,7 @@ interface ReviewPullRequestDeps {
   /** The run's agent set, already narrowed by the `agents` input. */
   agents: readonly AgentDefinition[];
   /** Throws only when every agent failed; a synthesis failure is reported on the result. */
-  runReviewPipeline: (
-    client: GithubInstallationClient,
-    context: ReviewContext,
-    agents: readonly AgentDefinition[],
-    hints: SynthesisHints,
-    index: RepositoryIndex | undefined,
-  ) => Promise<ReviewPipelineResult>;
+  runReviewPipeline: RunReviewPipeline;
   /** Defaults to publishing a check run through `client`. */
   publishReview?: PublishReview | undefined;
   /** Defaults to publishing a review through `client`. */

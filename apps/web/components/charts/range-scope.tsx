@@ -4,7 +4,7 @@ import { cn, Tabs, TabsList, TabsTrigger } from "@pr-review/design";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useTransition } from "react";
 
-import type { Range } from "@/lib/data/types";
+import type { Range } from "@pr-review/db/dashboard";
 
 import { RANGE_LABEL, RANGES } from "./range";
 

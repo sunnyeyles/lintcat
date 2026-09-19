@@ -1,6 +1,6 @@
 import { Chip, ChipDot, type ChipProps, cn } from "@pr-review/design";
 
-import type { AgentName } from "@/lib/data/types";
+import type { AgentName } from "@pr-review/db/dashboard";
 
 const AGENT_TONES: Record<AgentName, ChipProps["tone"]> = {
   security: "agent-security",

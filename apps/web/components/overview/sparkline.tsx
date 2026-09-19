@@ -1,6 +1,6 @@
 import { cn } from "@pr-review/design";
 
-import type { TrendPoint } from "@/lib/data";
+import type { TrendPoint } from "@pr-review/db/dashboard";
 
 export type SparklineProps = {
   points: TrendPoint[];

@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@pr-review/design";
 
-import type { Usage } from "@/lib/data/types";
+import type { Usage } from "@pr-review/db/dashboard";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
 
 import { sumTokens } from "./series";
