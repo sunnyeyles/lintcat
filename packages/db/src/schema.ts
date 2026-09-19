@@ -1,4 +1,6 @@
 import {
+  bigint,
+  boolean,
   integer,
   pgEnum,
   pgTable,
@@ -70,8 +72,11 @@ export const repos = pgTable(
     organizationId: integer("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    // Null for a repo only ingest has seen; the installation webhook fills it in.
+    githubRepoId: bigint("github_repo_id", { mode: "number" }).unique(),
     owner: text("owner").notNull(),
     name: text("name").notNull(),
+    private: boolean("private").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [

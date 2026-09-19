@@ -75,6 +75,18 @@ describe("migrations applied in order to an empty database", () => {
     expect(await columns("repos")).not.toContain("team_id");
   });
 
+  it("give repos their GitHub id and visibility", async () => {
+    expect(await columns("repos")).toEqual([
+      "created_at",
+      "github_repo_id",
+      "id",
+      "name",
+      "organization_id",
+      "owner",
+      "private",
+    ]);
+  });
+
   it("allow one membership per user and organization", async () => {
     const [user] = await database
       .insert(users)
