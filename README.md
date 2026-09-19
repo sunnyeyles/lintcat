@@ -506,13 +506,23 @@ beyond `contents: read` is needed.
 What it holds is each file's role — source, test, config, migration, generated,
 docs, vendored, asset — which test covers which source file by naming
 convention, and an **import graph** of every TypeScript and JavaScript
-`import`, `export … from`, dynamic `import()` and `require()`. Relative
-specifiers resolve the way the language's own tooling resolves them:
-extensionless, through `index` files, and a written `.js` to the `.ts` or
-`.tsx` behind it. An alias (`#src/`, `@/`, a workspace package name) and a
-third-party package stay **unresolved** — counted, never guessed at. Only
-TypeScript and JavaScript report as indexed; every other language is seen for
-its role and its tests and says so.
+`import`, `export … from`, dynamic `import()` and `require()`. Specifiers
+resolve the way the repository's own tooling resolves them, in one order:
+a relative path (extensionless, through `index` files, and a written `.js` to
+the `.ts` or `.tsx` behind it), then a `#` import map from the nearest
+`package.json`, then `tsconfig.json` `paths` with its `extends` chain followed,
+then a workspace package name through that package's `exports` map — and then
+nothing. A third-party package is never guessed at. Workspace packages
+themselves come from `pnpm-workspace.yaml` or `package.json` `workspaces`, and
+a manifest too malformed to read costs that one file's contribution, not the
+build. Only TypeScript and JavaScript report as indexed; every other language
+is seen for its role and its tests and says so.
+
+Each indexed language carries a **resolution rate**: how many of the imports
+that are not third-party the index could actually place. A repository whose
+alias scheme this resolver does not understand shows it there rather than
+silently answering `find_references` with too few files. On this repository the
+TypeScript rate is 1.0.
 
 The agents read the graph through `find_references(path, name?)`: without a
 name, every file importing `path` with the line each import sits on; with one,
@@ -524,8 +534,11 @@ an unindexed one. A path this pull request added, or one the index does not
 hold, comes back as `known: false` with the reason rather than as a file that
 does not exist.
 
-The opening message carries a `<repository_index>` block: one line per changed
-file, with its role, its covering test and its importer count.
+The opening message carries two blocks. `<repository>` gives bearings in a
+monorepo: every workspace package with its root, the indexed commit, and what
+each language contributed, resolution rate included. `<repository_index>` is
+one line per changed file — its package, its role, its covering test and its
+importer count.
 
 Reading the archive is capped at 50 MB, 20 000 files and 512 KB per file, and
 `node_modules`, `vendor`, `dist`, `.git` and similar are dropped as it reads.

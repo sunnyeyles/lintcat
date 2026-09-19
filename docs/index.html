@@ -804,8 +804,9 @@ html { scroll-behavior: smooth; }
           and namespace (<code>*</code>) imports marked. At most 50 files come
           back, alongside the true <code>total</code>. Every result carries an
           <code>index</code> header naming the commit, whether the index is
-          truncated, and which languages were parsed, so an agent can tell an
-          empty answer from an unindexed one; a path the pull request added, or
+          truncated, which languages were parsed and how much of each one's
+          internal imports were placed, so an agent can tell an empty answer
+          from an unindexed one; a path the pull request added, or
           one the index does not hold, comes back as
           <code>known: false</code> with the reason rather than as a file that
           does not exist. With no index for the review it returns one line
@@ -814,12 +815,32 @@ html { scroll-behavior: smooth; }
         <p>
           The index itself is built once, in memory, from one archive request at
           the base SHA, and thrown away when the review ends — nothing is
-          stored. It parses TypeScript and JavaScript only: relative specifiers
-          resolve extensionless, through <code>index</code> files, and from a
-          written <code>.js</code> to the <code>.ts</code> or <code>.tsx</code>
-          behind it, while an alias or a third-party package is kept unresolved
-          rather than guessed at. Every other language is seen for its role and
-          its tests, and reported as not indexed.
+          stored. It parses TypeScript and JavaScript only, and resolves the way
+          the repository's own tooling does, in one order: a relative path
+          (extensionless, through <code>index</code> files, a written
+          <code>.js</code> to the <code>.ts</code> or <code>.tsx</code> behind
+          it), a <code>#</code> import map from the nearest
+          <code>package.json</code>, a <code>tsconfig.json</code>
+          <code>paths</code> alias with its <code>extends</code> chain followed,
+          then a workspace package name through that package's
+          <code>exports</code> map. Workspace packages come from
+          <code>pnpm-workspace.yaml</code> or <code>package.json</code>
+          <code>workspaces</code>; a third-party package is kept unresolved
+          rather than guessed at, and a malformed manifest costs that one file's
+          contribution rather than the build. Every other language is seen for
+          its role and its tests, and reported as not indexed.
+        </p>
+        <p>
+          What the resolver could not place is not hidden. Each indexed language
+          carries a <strong>resolution rate</strong> — the share of the imports
+          that are not third-party which landed on a real file — and that rate
+          travels in every <code>find_references</code> header. A repository
+          whose alias scheme this resolver does not understand reads as a low
+          rate rather than as a suspiciously short list of importers. The
+          opening message also gains a <code>&lt;repository&gt;</code> block:
+          every workspace package with its root, the indexed commit, and the
+          same per-language summary, so an agent has bearings in a monorepo it
+          has never seen.
         </p>
         <p>
           Every input is Zod-validated by the tool's own

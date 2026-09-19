@@ -166,17 +166,25 @@ service runs, and `contents: read` is the only permission it needs.
 
 The index holds each file's role, which test covers which source file by naming
 convention, and an import graph of every TypeScript and JavaScript `import`,
-`export … from`, dynamic `import()` and `require()`. Relative specifiers
-resolve extensionless, through `index` files, and from a written `.js` to the
-`.ts` or `.tsx` behind it; an alias or a third-party package is left unresolved
-rather than guessed. Only TypeScript and JavaScript are parsed — every other
-language is seen for its role and reported as not indexed.
+`export … from`, dynamic `import()` and `require()`. Specifiers resolve the way
+your own tooling resolves them, in order: a relative path (extensionless,
+through `index` files, `.js` to the `.ts` behind it), a `#` import map, a
+`tsconfig.json` `paths` alias with `extends` followed, then a workspace package
+name through its `exports` map. Workspace packages come from
+`pnpm-workspace.yaml` or `package.json` `workspaces`. A third-party package is
+left unresolved rather than guessed, and a manifest too malformed to read costs
+that file's contribution, not the build. Only TypeScript and JavaScript are
+parsed — every other language is seen for its role and reported as not indexed.
 
 Agents read it through `find_references(path, name?)`: the files importing a
 path, with lines, and optionally only those importing one exported name. Every
-result names the commit it covers and whether the index is truncated, so an
-empty answer is never mistaken for "nothing depends on this". Each changed file
-in the opening message gets its role, its covering test and its importer count.
+result names the commit it covers, whether the index is truncated, and each
+indexed language's **resolution rate** — the share of your repository's own
+imports the index could place — so an empty answer is never mistaken for
+"nothing depends on this", and an alias scheme this resolver does not
+understand is visible rather than silent. The opening message gets a
+`<repository>` block listing your workspace packages with their roots, and one
+line per changed file with its package, role, covering test and importer count.
 
 Reading the archive is capped, and hitting a cap marks the index truncated
 rather than failing. Any failure at all is logged and the review runs without
