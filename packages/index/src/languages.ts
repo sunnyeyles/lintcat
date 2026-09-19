@@ -45,16 +45,22 @@ export function languageOf(path: string): string {
   return LANGUAGE_BY_EXTENSION.get(base.slice(dot + 1).toLowerCase()) ?? "other";
 }
 
+/** The languages whose imports the builder parses. Everything else is seen only. */
+export const INDEXED_LANGUAGES: ReadonlySet<string> = new Set([
+  "typescript",
+  "javascript",
+]);
+
 /** What the index saw of one language, and whether it parsed any of it. */
 export interface LanguageCoverage {
   language: string;
   /** Files of this language the index read. */
   files: number;
-  /** False everywhere until a language's imports are actually parsed. */
+  /** True only where imports were parsed; elsewhere the file was merely seen. */
   indexed: boolean;
 }
 
-/** Counts files per language, commonest first. Nothing is indexed yet. */
+/** Counts files per language, commonest first. */
 export function summariseLanguages(
   languages: Iterable<string>,
 ): LanguageCoverage[] {
@@ -63,6 +69,10 @@ export function summariseLanguages(
     counts.set(language, (counts.get(language) ?? 0) + 1);
   }
   return [...counts]
-    .map(([language, files]) => ({ language, files, indexed: false }))
+    .map(([language, files]) => ({
+      language,
+      files,
+      indexed: INDEXED_LANGUAGES.has(language),
+    }))
     .sort((a, b) => b.files - a.files || a.language.localeCompare(b.language));
 }

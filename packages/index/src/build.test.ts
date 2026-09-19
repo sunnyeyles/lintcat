@@ -151,7 +151,7 @@ describe("buildRepositoryIndex", () => {
     expect(index(["src/a.ts"]).sha).toBe(sha);
   });
 
-  it("reports every language it saw, commonest first, none indexed", () => {
+  it("reports every language it saw, commonest first", () => {
     const built = index([
       "src/a.ts",
       "src/b.ts",
@@ -161,7 +161,7 @@ describe("buildRepositoryIndex", () => {
     ]);
 
     expect(built.coverage).toEqual([
-      { language: "typescript", files: 2, indexed: false },
+      { language: "typescript", files: 2, indexed: true },
       { language: "markdown", files: 1, indexed: false },
       { language: "other", files: 1, indexed: false },
       { language: "python", files: 1, indexed: false },
