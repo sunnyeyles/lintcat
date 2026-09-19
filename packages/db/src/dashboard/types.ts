@@ -1,4 +1,4 @@
-import type { Finding, Organization, Repo, Review } from "@pr-review/db";
+import type { Finding, Organization, Repo, Review } from "../schema";
 
 export type Severity = "low" | "medium" | "high";
 

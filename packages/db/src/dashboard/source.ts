@@ -1,16 +1,4 @@
 import {
-  agentRuns,
-  findings,
-  repos,
-  reviews,
-  type AgentRun as AgentRunRow,
-  type Database,
-  type Finding,
-  type Repo,
-  type Organization,
-  type Review,
-} from "@pr-review/db";
-import {
   and,
   asc,
   count,
@@ -23,6 +11,19 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
+
+import type { Database } from "../client";
+import {
+  agentRuns,
+  findings,
+  repos,
+  reviews,
+  type AgentRun as AgentRunRow,
+  type Finding,
+  type Repo,
+  type Organization,
+  type Review,
+} from "../schema";
 
 
 import {

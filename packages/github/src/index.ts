@@ -1,7 +1,9 @@
 export {
   ArchiveTooLargeError,
   DEFAULT_ARCHIVE_LIMITS,
+  collectRepositoryFiles,
   readRepositoryTarball,
+  type RepositoryFileEntry,
   type TarballContents,
 } from "#src/archive";
 export {

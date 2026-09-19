@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@pr-review/design";
 
-import type { RepoSummary } from "@/lib/data";
+import type { RepoSummary } from "@pr-review/db/dashboard";
 import { formatNumber, formatRelative, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 

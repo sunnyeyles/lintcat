@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@pr-review/design";
 
 import { SeverityBadge } from "@/components/ui";
-import type { Severity } from "@/lib/data";
+import type { Severity } from "@pr-review/db/dashboard";
 
 import { SEVERITIES } from "./sort";
 

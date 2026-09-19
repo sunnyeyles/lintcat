@@ -1,4 +1,4 @@
-import type { AgentName, Severity, TokenCounts } from "@/lib/data/types";
+import type { AgentName, Severity, TokenCounts } from "@pr-review/db/dashboard";
 
 import type { ChartColorKey } from "./use-chart-colors";
 

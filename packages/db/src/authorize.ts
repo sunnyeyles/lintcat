@@ -1,17 +1,17 @@
+import { and, eq, isNull } from "drizzle-orm";
+
+import type { Database } from "./client";
+import { readableRepos, type ReadableRepo } from "./repo-access";
 import {
-  findSlugRedirect,
   memberships,
   organizations,
-  readableRepos,
   repos,
   users,
-  type Database,
   type MembershipRole,
   type Organization,
-  type ReadableRepo,
   type Repo,
-} from "@pr-review/db";
-import { and, eq, isNull } from "drizzle-orm";
+} from "./schema";
+import { findSlugRedirect } from "./slugs";
 
 export type Authorization =
   | {

@@ -2,7 +2,7 @@ import { cn } from "@pr-review/design";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-import type { ReviewSummary } from "@/lib/data";
+import type { ReviewSummary } from "@pr-review/db/dashboard";
 import { organizationPath } from "@/lib/paths";
 
 export type ReviewPagerProps = {

@@ -217,37 +217,60 @@ export function readRepositoryTarball(
   tarball: Uint8Array,
   limits: RepositoryArchiveLimits = {},
 ): TarballContents {
-  const maxTotalBytes = limits.maxTotalBytes ?? DEFAULT_ARCHIVE_LIMITS.maxTotalBytes;
-  const maxFiles = limits.maxFiles ?? DEFAULT_ARCHIVE_LIMITS.maxFiles;
-  const maxFileBytes = limits.maxFileBytes ?? DEFAULT_ARCHIVE_LIMITS.maxFileBytes;
   const maxInflatedBytes =
     limits.maxInflatedBytes ?? DEFAULT_ARCHIVE_LIMITS.maxInflatedBytes;
 
   const bytes = inflate(tarball, maxInflatedBytes);
+  return collectRepositoryFiles(tarballFiles(bytes), limits);
+}
+
+function* tarballFiles(bytes: Uint8Array): Generator<RepositoryFileEntry> {
+  for (const entry of tarEntries(bytes)) {
+    const path = stripRootDirectory(entry.name);
+    if (path !== undefined) {
+      yield { path, size: entry.body.length, read: () => entry.body };
+    }
+  }
+}
+
+/** One file offered to collectRepositoryFiles; `read` runs only for a file that is kept. */
+export interface RepositoryFileEntry {
+  path: string;
+  size: number;
+  read: () => Uint8Array;
+}
+
+/** Applies the archive's caps and skip rules to files from any source. */
+export function collectRepositoryFiles(
+  entries: Iterable<RepositoryFileEntry>,
+  limits: RepositoryArchiveLimits = {},
+): TarballContents {
+  const maxTotalBytes = limits.maxTotalBytes ?? DEFAULT_ARCHIVE_LIMITS.maxTotalBytes;
+  const maxFiles = limits.maxFiles ?? DEFAULT_ARCHIVE_LIMITS.maxFiles;
+  const maxFileBytes = limits.maxFileBytes ?? DEFAULT_ARCHIVE_LIMITS.maxFileBytes;
   const files = new Map<string, string>();
   const oversized: string[] = [];
   let truncated = false;
   let totalBytes = 0;
 
-  for (const entry of tarEntries(bytes)) {
-    const path = stripRootDirectory(entry.name);
-    if (path === undefined || isSkipped(path)) {
+  for (const entry of entries) {
+    if (isSkipped(entry.path)) {
       continue;
     }
-    if (entry.body.length > maxFileBytes) {
-      oversized.push(path);
+    if (entry.size > maxFileBytes) {
+      oversized.push(entry.path);
       continue;
     }
-    if (files.size >= maxFiles || totalBytes + entry.body.length > maxTotalBytes) {
+    if (files.size >= maxFiles || totalBytes + entry.size > maxTotalBytes) {
       truncated = true;
       break;
     }
-    const text = decodeText(entry.body);
+    const text = decodeText(entry.read());
     if (text === undefined) {
       continue;
     }
-    totalBytes += entry.body.length;
-    files.set(path, text);
+    totalBytes += entry.size;
+    files.set(entry.path, text);
   }
 
   return { files, truncated, oversized };

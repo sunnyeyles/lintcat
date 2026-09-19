@@ -1,3 +1,4 @@
+import { costOf, type TokenCounts } from "@pr-review/db/dashboard";
 import { EmptyState, Stat, StatGrid } from "@pr-review/design";
 import type { Metadata } from "next";
 
@@ -13,9 +14,7 @@ import {
   TokenCompositionChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
-import { costOf } from "@/lib/data";
 import { data } from "@/lib/data/server";
-import type { TokenCounts } from "@/lib/data/types";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Tokens & cost" };
@@ -69,7 +68,7 @@ export default async function UsagePage({
       <PageHeader
         eyebrow="Usage"
         title="Tokens & cost"
-        description={`What the agents spent in ${phrase}. Cost uses the fixed price table in lib/data/aggregate.ts, so the figures are illustrative rather than billed.`}
+        description={`What the agents spent in ${phrase}. Cost uses the fixed price table in packages/db/src/dashboard/aggregate.ts, so the figures are illustrative rather than billed.`}
       />
 
       <div className="mt-8">

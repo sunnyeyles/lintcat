@@ -1,21 +1,21 @@
+import type { ReviewRecord, ReviewRecordAgentRun } from "@pr-review/schemas";
+import { eq, inArray } from "drizzle-orm";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { authorize } from "../authorize";
+import type { Database } from "../client";
+import { ingestReviewRecord } from "../ingest";
 import {
-  ingestReviewRecord,
   memberships,
   organizations,
   repoAccess,
   repos,
   users,
-  type Database,
   type Organization,
-} from "@pr-review/db";
-import { createTestDatabase } from "@pr-review/db/test-database";
-import type { ReviewRecord, ReviewRecordAgentRun } from "@pr-review/schemas";
-import { eq, inArray } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
-
-import { authorize } from "@/lib/authorize";
-import { costOf } from "@/lib/data";
-import { createDbSource } from "@/lib/data/db";
+} from "../schema";
+import { createTestDatabase } from "../test-database";
+import { costOf } from "./aggregate";
+import { createDbSource } from "./source";
 
 function run(agent: string, findingCount: number): ReviewRecordAgentRun {
   return {

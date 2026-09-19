@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@pr-review/design";
 
-import type { ReviewSummary } from "@/lib/data";
+import type { ReviewSummary } from "@pr-review/db/dashboard";
 import { formatDuration, formatRelative } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 

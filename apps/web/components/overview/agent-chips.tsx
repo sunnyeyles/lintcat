@@ -1,7 +1,7 @@
 import { Chip, cn } from "@pr-review/design";
 
 import { AgentChip } from "@/components/ui";
-import { AGENTS, type AgentName } from "@/lib/data";
+import { AGENTS, type AgentName } from "@pr-review/db/dashboard";
 
 const KNOWN = new Set<string>(AGENTS);
 

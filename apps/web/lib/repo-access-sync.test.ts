@@ -1,4 +1,5 @@
 import {
+  authorize,
   memberships,
   organizations,
   repoAccess,
@@ -15,7 +16,6 @@ import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging
 import { asc, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { authorize } from "@/lib/authorize";
 import { syncSignInRepoAccess } from "@/lib/repo-access-sync";
 
 const mona: GithubAccount = { githubId: 3_000_000_001, login: "mona", avatarUrl: null };

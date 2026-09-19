@@ -3,7 +3,7 @@
 import { Bar, BarChart, Cell, LabelList, Tooltip, XAxis, YAxis } from "recharts";
 
 import { formatDuration, formatNumber } from "@/lib/format";
-import type { AgentBreakdown } from "@/lib/data/types";
+import type { AgentBreakdown } from "@pr-review/db/dashboard";
 
 import { axisLineProps, barCursorProps, TICK_FONT_SIZE, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";

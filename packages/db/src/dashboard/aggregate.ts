@@ -1,4 +1,4 @@
-import type { Repo } from "@pr-review/db";
+import type { Repo } from "../schema";
 
 import {
   AGENTS,

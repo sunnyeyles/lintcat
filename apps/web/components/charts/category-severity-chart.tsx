@@ -3,7 +3,7 @@
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 
 import { formatNumber } from "@/lib/format";
-import type { CategoryCount, Severity } from "@/lib/data/types";
+import type { CategoryCount, Severity } from "@pr-review/db/dashboard";
 
 import { axisLineProps, barCursorProps, gridProps, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";

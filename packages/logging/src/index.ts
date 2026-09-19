@@ -30,6 +30,18 @@ export function createConsoleLogger(): StructuredLogger {
   };
 }
 
+/** Every level to stderr, for a process whose stdout carries a protocol. */
+export function createStderrLogger(): StructuredLogger {
+  return {
+    info(event, fields = {}) {
+      console.error(logLine("info", event, fields));
+    },
+    error(event, fields = {}) {
+      console.error(logLine("error", event, fields));
+    },
+  };
+}
+
 /** One event recorded by the capturing logger: level + event + fields, flattened. */
 export interface CapturedLogEvent extends LogFields {
   level: LogLevel;

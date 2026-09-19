@@ -10,7 +10,6 @@ import {
   DEFAULT_AGENT_CONFIG_PATH,
   DEFAULT_PROMPT_LABEL,
   createLangfusePromptClient,
-  createReviewAgents,
   apiKeyEnvFor,
   createLanguageModel,
   createSynthesiser,
@@ -25,13 +24,11 @@ import {
   type ManagedPrompts,
   type LanguageModelConfig,
   type ReviewModel,
-  type ReadOptionalFile,
   type AgentDefinition,
   type AgentUsageReport,
 } from "@pr-review/ai";
 import {
   createTokenClient,
-  httpStatus,
   type GithubInstallationClient,
   type GithubTokenConfig,
 } from "@pr-review/github";
@@ -45,11 +42,12 @@ import {
   createBranchMemoryStore,
   createCheckRunPublisher,
   createDashboardPublisher,
+  createPipelineRunner,
   isFixCommit,
   learnFromMergedPullRequest,
+  readAtCommit,
   reviewCorrelation,
   reviewPullRequest,
-  runReviewPipeline,
   type DashboardPublisherConfig,
   type DashboardReview,
   type PublishToDashboard,
@@ -291,29 +289,6 @@ function resolveModelInputs(
 }
 
 /**
- * Reads repository files at one commit. The agent configuration is read at the
- * base commit, so the branch under review cannot choose its own reviewers.
- */
-export function readAtCommit(
-  client: GithubInstallationClient,
-  repository: { owner: string; repo: string },
-  ref: string,
-): ReadOptionalFile {
-  return async (filePath) => {
-    try {
-      return await client.getFileContents({ ...repository, path: filePath, ref });
-    } catch (error: unknown) {
-      // 404 is "not configured"; anything else, a missing contents:read
-      // scope included, must not read as an absent file.
-      if (httpStatus(error) === 404) {
-        return undefined;
-      }
-      throw error;
-    }
-  };
-}
-
-/**
  * Whether this run may commit fixes. Fixing our own fix commit would loop, so
  * an unreadable head commit disables the step rather than risking one.
  */
@@ -466,25 +441,13 @@ export async function runAction(
       incremental: getInput(env, "incremental") === "true",
       // On unless it is switched off, which is the opposite of the others.
       index: getInput(env, "index") !== "false",
-      // `activeAgents` is the subset the path gate woke, decided once the
-      // changed files are known.
-      runReviewPipeline: (reviewClient, context, activeAgents, hints, index) =>
-        runReviewPipeline(
-          createReviewAgents(
-            {
-              model,
-              createModel,
-              github: reviewClient,
-              onUsage: (report) => usageReports.push(report),
-              ...(prompts === undefined ? {} : { systemPrompts: prompts }),
-              ...(index === undefined ? {} : { index }),
-            },
-            activeAgents,
-          ),
-          synthesiser,
-          context,
-          hints,
-        ),
+      runReviewPipeline: createPipelineRunner({
+        model,
+        createModel,
+        synthesiser,
+        onUsage: (report) => usageReports.push(report),
+        ...(prompts === undefined ? {} : { systemPrompts: prompts }),
+      }),
       // Check run first; job summary when the token cannot create one (forks).
       publishReview: createFallbackPublisher({
         publishCheckRun: createCheckRunPublisher(client),

@@ -1,10 +1,15 @@
-import { db, type MembershipRole, type Organization, type ReadableRepo } from "@pr-review/db";
+import {
+  authorize,
+  db,
+  type MembershipRole,
+  type Organization,
+  type ReadableRepo,
+} from "@pr-review/db";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import { auth } from "@/auth";
-import { authorize } from "@/lib/authorize";
 import { appDomain } from "@/lib/host";
 import {
   organizationPath,

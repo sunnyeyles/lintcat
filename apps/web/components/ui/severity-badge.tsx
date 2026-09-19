@@ -1,6 +1,6 @@
 import { Chip, type ChipProps, cn } from "@pr-review/design";
 
-import type { Severity } from "@/lib/data/types";
+import type { Severity } from "@pr-review/db/dashboard";
 
 type SeverityStyle = { variant: ChipProps["variant"]; shape?: ChipProps["shape"]; marker: string };
 

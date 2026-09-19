@@ -6,6 +6,12 @@ export {
   runReviewPipeline,
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
+export {
+  createPipelineRunner,
+  type PipelineRunnerDeps,
+  type RunReviewPipeline,
+} from "#src/pipeline-runner";
+export { readAtCommit } from "#src/read-at-commit";
 export { validateFindings } from "#src/validate-findings";
 export type { RenderedCheckRun } from "#src/render-check-run";
 export {
