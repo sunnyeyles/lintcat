@@ -156,6 +156,32 @@ of this action's repository — copy it and edit.
 | `langfuse-base-url` | no | `https://cloud.langfuse.com` | Langfuse host, for self-hosted instances. |
 | `langfuse-prompt-label` | no | `production` | Which labelled version of each prompt to fetch. |
 
+## Repository index
+
+With `index` on, the review fetches your repository's files at the pull
+request's **base** commit in one archive request and builds an index of them in
+memory before any agent starts. Never the head commit: a pull request must not
+shape what the reviewer believes about the repository. Nothing is stored, no
+service runs, and `contents: read` is the only permission it needs.
+
+The index holds each file's role, which test covers which source file by naming
+convention, and an import graph of every TypeScript and JavaScript `import`,
+`export … from`, dynamic `import()` and `require()`. Relative specifiers
+resolve extensionless, through `index` files, and from a written `.js` to the
+`.ts` or `.tsx` behind it; an alias or a third-party package is left unresolved
+rather than guessed. Only TypeScript and JavaScript are parsed — every other
+language is seen for its role and reported as not indexed.
+
+Agents read it through `find_references(path, name?)`: the files importing a
+path, with lines, and optionally only those importing one exported name. Every
+result names the commit it covers and whether the index is truncated, so an
+empty answer is never mistaken for "nothing depends on this". Each changed file
+in the opening message gets its role, its covering test and its importer count.
+
+Reading the archive is capped, and hitting a cap marks the index truncated
+rather than failing. Any failure at all is logged and the review runs without
+the index.
+
 ## Model providers
 
 The action is provider-agnostic: `model-provider` picks the adapter, `api-key`

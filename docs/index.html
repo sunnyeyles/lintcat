@@ -779,7 +779,7 @@ html { scroll-behavior: smooth; }
             <tr><td><code>get_file</code></td><td>One file at the <strong>head</strong> SHA — the proposed state</td></tr>
             <tr><td><code>get_base_file</code></td><td>One file at the <strong>base</strong> SHA — before this PR</td></tr>
             <tr><td><code>search_repository</code></td><td>Code search with matching snippets and the repository-wide total, always scoped to this repository</td></tr>
-            <tr><td><code>find_importers</code></td><td>Files mentioning one file's name — a text-search proxy for its importers</td></tr>
+            <tr><td><code>find_references</code></td><td>Files importing one file, or one of its exported names, resolved from the repository index at the <strong>base</strong> SHA</td></tr>
             <tr><td><code>find_co_changed_files</code></td><td>Files edited in the same recent commits as one file — correlation, not dependency</td></tr>
           </tbody>
         </table>
@@ -787,11 +787,39 @@ html { scroll-behavior: smooth; }
       <div class="prose">
         <p>
           The first three answer from what the run already loaded, so they cost
-          no GitHub call. The last three read the <strong>default branch</strong>:
-          the search pair through GitHub's code search index, the third through
-          commit history. Their results do not reflect this pull request and
-          their snippets carry no line numbers, so a claim about a changed file
-          still needs <code>get_file</code>.
+          no GitHub call. <code>search_repository</code> and
+          <code>find_co_changed_files</code> read the <strong>default
+          branch</strong> — one through GitHub's code search index, the other
+          through commit history. Their results do not reflect this pull request
+          and their snippets carry no line numbers, so a claim about a changed
+          file still needs <code>get_file</code>.
+        </p>
+        <p>
+          <code>find_references</code> is different: it answers from the
+          repository index this review built at the pull request's
+          <strong>base</strong> commit, so what it returns is the import
+          statements themselves rather than a text search. It gives every file
+          importing a path with the line each import sits on, or — given a
+          <code>name</code> — only the files importing that export, with default
+          and namespace (<code>*</code>) imports marked. At most 50 files come
+          back, alongside the true <code>total</code>. Every result carries an
+          <code>index</code> header naming the commit, whether the index is
+          truncated, and which languages were parsed, so an agent can tell an
+          empty answer from an unindexed one; a path the pull request added, or
+          one the index does not hold, comes back as
+          <code>known: false</code> with the reason rather than as a file that
+          does not exist. With no index for the review it returns one line
+          saying so, and the agents fall back to the other tools.
+        </p>
+        <p>
+          The index itself is built once, in memory, from one archive request at
+          the base SHA, and thrown away when the review ends — nothing is
+          stored. It parses TypeScript and JavaScript only: relative specifiers
+          resolve extensionless, through <code>index</code> files, and from a
+          written <code>.js</code> to the <code>.ts</code> or <code>.tsx</code>
+          behind it, while an alias or a third-party package is kept unresolved
+          rather than guessed at. Every other language is seen for its role and
+          its tests, and reported as not indexed.
         </p>
         <p>
           Every input is Zod-validated by the tool's own
