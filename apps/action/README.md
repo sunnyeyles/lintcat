@@ -154,6 +154,8 @@ of this action's repository — copy it and edit.
 | `langfuse-secret-key` | no | — | Langfuse secret key. Store it as a secret. |
 | `langfuse-base-url` | no | `https://cloud.langfuse.com` | Langfuse host, for self-hosted instances. |
 | `langfuse-prompt-label` | no | `production` | Which labelled version of each prompt to fetch. |
+| `dashboard-token` | no | — | Ingest secret for the review dashboard. Set this and `dashboard-url` to record each review there. Store it as a secret. |
+| `dashboard-url` | no | — | Dashboard base URL, e.g. `https://example.vercel.app`; the action appends `/api/ingest`. |
 
 ## Model providers
 
@@ -195,6 +197,29 @@ returns text that has lost its output contract, that prompt falls back to the
 built-in one and the review proceeds — per prompt, so one bad entry costs one
 prompt rather than the run. Setting only one of the two keys disables both
 features and logs `langfuse.disabled_incomplete_credentials`.
+
+## Review dashboard (optional)
+
+Leave both dashboard inputs unset and the review is published to GitHub only.
+That is the default and needs nothing hosted.
+
+Supply **both** and each finished review is also POSTed to
+`<dashboard-url>/api/ingest`, authenticated with `dashboard-token` as a bearer
+token: the agents that ran, a one-line summary, the run's duration, one entry
+per agent with its duration, finding count and four token counters, and every
+published finding stamped with the agent that found it.
+
+```yaml
+        with:
+          api-key: ${{ secrets.OPENAI_API_KEY }}
+          dashboard-url: https://example.vercel.app
+          dashboard-token: ${{ secrets.PR_REVIEW_DASHBOARD_TOKEN }}
+```
+
+The report is not load-bearing. A dashboard that is unreachable, slow, or
+rejects the record logs `dashboard.publish_failed` and the review still passes
+— the step's exit code never depends on it. Setting only one of the two inputs
+records nothing and logs `dashboard.disabled_incomplete_config`.
 
 ## Permissions
 

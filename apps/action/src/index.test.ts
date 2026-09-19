@@ -20,7 +20,12 @@ import type {
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
-import { FIX_COMMIT_MARKER, MEMORY_FILE_PATH } from "@pr-review/reviewer";
+import {
+  FIX_COMMIT_MARKER,
+  MEMORY_FILE_PATH,
+  createDashboardPublisher,
+} from "@pr-review/reviewer";
+import { reviewRecordSchema } from "@pr-review/schemas";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 const originalGithubActions = vi.hoisted(() => {
@@ -89,6 +94,11 @@ interface Harness {
   /** Prompt names fetched, in order, across every client built. */
   promptFetches: { name: string; label: string | undefined }[];
   tracingConfigs: { baseUrl: string; release?: string | undefined }[];
+  dashboardPosts: {
+    url: string;
+    headers: Record<string, string>;
+    body: unknown;
+  }[];
   /** How many times spans were flushed across the run. */
   flushCount: () => number;
   readPaths: string[];
@@ -114,6 +124,8 @@ interface HarnessOptions {
   modelError?: Error | undefined;
   /** The review threads a merged pull request carries. */
   reviewThreads?: readonly ReviewThread[] | undefined;
+  /** What the dashboard answers; a 200 carrying a review id by default. */
+  dashboardResponse?: (() => Promise<Response>) | undefined;
 }
 
 function harness(
@@ -127,6 +139,7 @@ function harness(
   const promptClientConfigs: Harness["promptClientConfigs"] = [];
   const promptFetches: Harness["promptFetches"] = [];
   const tracingConfigs: Harness["tracingConfigs"] = [];
+  const dashboardPosts: Harness["dashboardPosts"] = [];
   let flushCount = 0;
   let modelCalls = 0;
   const readPaths: string[] = [];
@@ -172,6 +185,7 @@ function harness(
     promptClientConfigs,
     promptFetches,
     tracingConfigs,
+    dashboardPosts,
     flushCount: () => flushCount,
     readPaths,
     fileReads,
@@ -242,6 +256,21 @@ function harness(
           },
         };
       },
+      // The real publisher over a fake fetch: the request itself is the contract.
+      createDashboardPublisher: (config) =>
+        createDashboardPublisher({
+          ...config,
+          fetch: async (url, init) => {
+            dashboardPosts.push({
+              url: String(url),
+              headers: (init?.headers ?? {}) as Record<string, string>,
+              body: JSON.parse(String(init?.body)) as unknown,
+            });
+            return options.dashboardResponse === undefined
+              ? Response.json({ reviewId: 1 })
+              : await options.dashboardResponse();
+          },
+        }),
       logger,
       setExitCode: (code) => exitCodes.push(code),
     },
@@ -1050,6 +1079,137 @@ describe("Langfuse wiring", () => {
     await expect(runAction(environment)).rejects.toThrow();
 
     expect(flushCount()).toBe(1);
+  });
+});
+
+const dashboardInputs = {
+  "INPUT_DASHBOARD-URL": "https://dash.example.app",
+  "INPUT_DASHBOARD-TOKEN": "ingest-secret",
+};
+
+describe("review dashboard wiring", () => {
+  it("posts nothing when neither input is set", async () => {
+    const { environment, dashboardPosts, entries } = harness(reviewEnv);
+
+    await runAction(environment);
+
+    expect(dashboardPosts).toEqual([]);
+    expect(
+      events(entries).filter(
+        (event) => typeof event === "string" && event.startsWith("dashboard."),
+      ),
+    ).toEqual([]);
+  });
+
+  it("posts the record once, to the ingest endpoint, as the bearer token", async () => {
+    const { environment, dashboardPosts, entries } = harness({
+      ...reviewEnv,
+      ...dashboardInputs,
+    });
+
+    await runAction(environment);
+
+    expect(dashboardPosts).toHaveLength(1);
+    expect(dashboardPosts[0]?.url).toBe("https://dash.example.app/api/ingest");
+    expect(dashboardPosts[0]?.headers).toMatchObject({
+      authorization: "Bearer ingest-secret",
+      "content-type": "application/json",
+    });
+    expect(entries).toContainEqual(
+      expect.objectContaining({ event: "dashboard.published", reviewId: 1 }),
+    );
+  });
+
+  it("sends a body the ingest schema accepts, with one run per agent", async () => {
+    const { environment, dashboardPosts } = harness({
+      ...reviewEnv,
+      ...dashboardInputs,
+    });
+
+    await runAction(environment);
+
+    const parsed = reviewRecordSchema.safeParse(dashboardPosts[0]?.body);
+    expect(parsed.error?.issues).toBeUndefined();
+    const agents = parsed.data?.agents ?? [];
+    expect(agents.length).toBeGreaterThan(0);
+    expect(parsed.data).toMatchObject({
+      owner: "octo-org",
+      repo: "example-service",
+      prNumber: 42,
+      headSha,
+      summary: `0 findings from ${agents.join(", ")}`,
+      findings: [],
+    });
+    expect(parsed.data?.agentRuns.map((run) => run.agent)).toEqual(agents);
+    for (const run of parsed.data?.agentRuns ?? []) {
+      expect(run).toMatchObject({ findingCount: 0 });
+      expect(run.inputTokens + run.outputTokens).toBeGreaterThan(0);
+    }
+  });
+
+  it.each([
+    ["INPUT_DASHBOARD-TOKEN", "dashboard-token"],
+    ["INPUT_DASHBOARD-URL", "dashboard-url"],
+  ])(
+    "records nothing and logs incomplete config when %s is missing",
+    async (variable, missingInput) => {
+      const env: Record<string, string | undefined> = {
+        ...reviewEnv,
+        ...dashboardInputs,
+      };
+      delete env[variable];
+      const { environment, dashboardPosts, entries } = harness(env);
+
+      await expect(runAction(environment)).resolves.toBeUndefined();
+
+      expect(dashboardPosts).toEqual([]);
+      expect(entries).toContainEqual({
+        level: "error",
+        event: "dashboard.disabled_incomplete_config",
+        missingInput,
+      });
+    },
+  );
+
+  it("never logs the ingest token", async () => {
+    const { environment, entries } = harness({ ...reviewEnv, ...dashboardInputs });
+
+    await runAction(environment);
+
+    expect(JSON.stringify(entries)).not.toContain("ingest-secret");
+  });
+
+  it("fails neither the review nor the step when the post is rejected", async () => {
+    const { environment, entries, exitCodes } = harness(
+      { ...reviewEnv, ...dashboardInputs, GITHUB_ACTIONS: "true" },
+      pullRequestEvent(),
+      { dashboardResponse: () => Promise.resolve(new Response("nope", { status: 500 })) },
+    );
+
+    runEntrypoint(environment);
+    await flush();
+
+    expect(exitCodes).toEqual([]);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        event: "dashboard.publish_failed",
+        status: 500,
+        error: "nope",
+      }),
+    );
+    expect(events(entries)).toContain("review.published");
+  });
+
+  it("posts nothing for an event nobody reviews", async () => {
+    const { environment, dashboardPosts } = harness({
+      ...reviewEnv,
+      ...dashboardInputs,
+      GITHUB_EVENT_NAME: "push",
+    });
+
+    await runAction(environment);
+
+    expect(dashboardPosts).toEqual([]);
   });
 });
 
