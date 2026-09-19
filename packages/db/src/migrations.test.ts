@@ -2,7 +2,14 @@ import { sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import type { Database } from "./client";
-import { memberships, organizations, repoAccess, repos, users } from "./schema";
+import {
+  memberships,
+  organizationSlugRedirects,
+  organizations,
+  repoAccess,
+  repos,
+  users,
+} from "./schema";
 import { createTestDatabase } from "./test-database";
 
 let database: Database;
@@ -160,5 +167,20 @@ describe("migrations applied in order to an empty database", () => {
     await expect(
       database.insert(repoAccess).values({ ...access, permission: "admin" }),
     ).rejects.toThrow();
+  });
+
+  it("add organization_slug_redirects, one row per retired slug", async () => {
+    expect(await columns("organization_slug_redirects")).toEqual([
+      "created_at",
+      "organization_id",
+      "slug",
+    ]);
+    const [organization] = await database
+      .insert(organizations)
+      .values({ githubAccountId: 30, accountType: "user", slug: "mona-lisa", name: "Mona-Lisa" })
+      .returning();
+    const redirect = { slug: "mona", organizationId: organization!.id };
+    await database.insert(organizationSlugRedirects).values(redirect);
+    await expect(database.insert(organizationSlugRedirects).values(redirect)).rejects.toThrow();
   });
 });

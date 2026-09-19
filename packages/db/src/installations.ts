@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "./client";
 import { organizations, repos, type Organization, type Repo } from "./schema";
+import { claimSlug, renameOrganization } from "./slugs";
 
 /** One GitHub App installation as its webhook payloads describe it. */
 export interface InstallationInput {
@@ -24,6 +25,9 @@ export async function upsertInstallation(
   installation: InstallationInput,
   { reinstall = false }: { reinstall?: boolean } = {},
 ): Promise<Organization> {
+  if (!(await renameOrganization(database, installation.accountId, installation.login))) {
+    await claimSlug(database, installation.login.toLowerCase(), installation.accountId);
+  }
   const values = {
     githubAccountId: installation.accountId,
     accountType: installation.accountType,

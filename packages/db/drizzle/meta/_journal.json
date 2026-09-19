@@ -57,6 +57,13 @@
       "when": 1789784386994,
       "tag": "0007_repo_access",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789786038441,
+      "tag": "0008_organization_slug_redirects",
+      "breakpoints": true
     }
   ]
 }

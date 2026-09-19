@@ -39,4 +39,10 @@ export {
   setRepoAccess,
   type ReadableRepo,
 } from "./repo-access";
+export {
+  claimSlug,
+  findSlugRedirect,
+  renameOrganization,
+  type OrganizationRename,
+} from "./slugs";
 export * from "./schema";

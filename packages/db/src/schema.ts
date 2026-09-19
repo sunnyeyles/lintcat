@@ -41,6 +41,15 @@ export const organizations = pgTable("organizations", {
   createdAt: createdAt(),
 });
 
+// A slug the organization used before a GitHub rename; never also a live slug.
+export const organizationSlugRedirects = pgTable("organization_slug_redirects", {
+  slug: text("slug").primaryKey(),
+  organizationId: integer("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  createdAt: createdAt(),
+});
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   githubId: bigint("github_id", { mode: "number" }).notNull().unique(),
@@ -180,6 +189,7 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
+export type OrganizationSlugRedirect = typeof organizationSlugRedirects.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type NewMembership = typeof memberships.$inferInsert;
 export type MembershipRole = Membership["role"];
