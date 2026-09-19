@@ -1,5 +1,6 @@
 import {
   memberships,
+  organizationSlugRedirects,
   organizations,
   repoAccess,
   repos,
@@ -14,6 +15,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { authorize } from "@/lib/authorize";
+import { renamedOrganizationUrl } from "@/lib/paths";
 
 let database: Database;
 
@@ -216,6 +218,41 @@ describe("authorize", () => {
         status: "allowed",
         readableRepos: [],
       });
+    });
+  });
+
+  describe("a retired slug", () => {
+    async function renamedAcme(): Promise<Organization> {
+      const acme = await insertOrganization(10, "acme-corp");
+      await database.insert(organizationSlugRedirects).values({ slug: "acme", organizationId: acme.id });
+      await join(await insertUser(1, "mona"), acme, "member");
+      await insertUser(2, "outsider");
+      return acme;
+    }
+
+    it("redirects to the current slug, keeping the rest of the path", async () => {
+      await renamedAcme();
+      const access = await authorize(database, mona, "Acme", { owner: "acme", name: "api" });
+
+      expect(access).toEqual({ status: "redirect", slug: "acme-corp" });
+      if (access.status !== "redirect") return;
+      expect(renamedOrganizationUrl("/o/acme/repos/acme/api?range=7d", access.slug, "prreview.dev")).toBe(
+        "/o/acme-corp/repos/acme/api?range=7d",
+      );
+      expect(renamedOrganizationUrl("https://acme.prreview.dev/usage", access.slug, "prreview.dev")).toBe(
+        "https://acme-corp.prreview.dev/usage",
+      );
+      expect(await authorize(database, mona, "acme-corp")).toMatchObject({ status: "allowed" });
+    });
+
+    it("redirects a non-member too, whose target is still not-found", async () => {
+      await renamedAcme();
+
+      expect(await authorize(database, outsider, "acme")).toEqual({
+        status: "redirect",
+        slug: "acme-corp",
+      });
+      expect(await authorize(database, outsider, "acme-corp")).toEqual({ status: "not-found" });
     });
   });
 

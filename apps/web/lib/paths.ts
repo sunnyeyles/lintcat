@@ -67,3 +67,26 @@ export function returnUrl(callbackUrl: string, domain: string): string {
   if (slug === undefined) return callbackUrl;
   return subdomainRewritePath(slug, url.pathname) + url.search + url.hash;
 }
+
+/** The requested page under the organization's current slug, on its subdomain if asked for on one. */
+export function renamedOrganizationUrl(
+  requested: string | null,
+  slug: string,
+  domain: string,
+): string {
+  if (!requested) return organizationPath(slug);
+  if (requested.startsWith("/")) {
+    return organizationPath(slug, requested.replace(/^\/o\/[^/?#]+/, ""));
+  }
+  const url = new URL(requested);
+  const pathname = url.pathname.replace(/^\/o\/[^/]+/, "");
+  const rest = url.search + url.hash;
+  const port = url.port ? `:${url.port}` : "";
+  const host = `${slug}.${hostname(domain)}`;
+  // A reserved slug has no subdomain, so it is served at its /o/ path on the apex.
+  if (organizationSlugFromHost(host, domain) !== slug) {
+    const path = organizationPath(slug, pathname === "/" ? "" : pathname);
+    return `${url.protocol}//${hostname(domain)}${port}${path}${rest}`;
+  }
+  return `${url.protocol}//${host}${port}${pathname || "/"}${rest}`;
+}

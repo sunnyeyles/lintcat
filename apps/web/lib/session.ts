@@ -6,7 +6,12 @@ import { cache } from "react";
 import { auth } from "@/auth";
 import { authorize } from "@/lib/authorize";
 import { appDomain } from "@/lib/host";
-import { organizationPath, REQUEST_PATH_HEADER, signInUrl } from "@/lib/paths";
+import {
+  organizationPath,
+  renamedOrganizationUrl,
+  REQUEST_PATH_HEADER,
+  signInUrl,
+} from "@/lib/paths";
 
 /** What a page needs about the signed-in user; `githubId` keys the `users` row. */
 export type AppSession = {
@@ -36,7 +41,7 @@ export type OrganizationAccess = {
   readableRepos: ReadableRepo[];
 };
 
-/** Every organization page's guard: signed out goes to sign-in, anyone not allowed gets a 404. */
+/** Every organization page's guard: signed out goes to sign-in, a retired slug to the current one, else 404. */
 export const requireOrganization = cache(
   async (slug: string): Promise<OrganizationAccess> => {
     const session = await currentSession();
@@ -45,6 +50,10 @@ export const requireOrganization = cache(
       redirect(signInUrl(requested ?? organizationPath(slug), appDomain()));
     }
     const access = await authorize(db(), session, slug);
+    if (access.status === "redirect") {
+      const requested = (await headers()).get(REQUEST_PATH_HEADER);
+      redirect(renamedOrganizationUrl(requested, access.slug, appDomain()));
+    }
     if (access.status !== "allowed") notFound();
     const { organization, role, readableRepos } = access;
     return { session, organization, role, readableRepos };

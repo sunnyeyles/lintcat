@@ -7,6 +7,7 @@ import {
   markUninstalled,
   removeRepositories,
   removeRepository,
+  renameOrganization,
   replaceRepoAccess,
   replaceRepositories,
   setInstallationSuspended,
@@ -152,12 +153,14 @@ function dispatch(
     case "installation_repositories":
       return (payload) =>
         withPayload(installationRepositoriesEventSchema, payload, (data) =>
-          onInstallationRepositories(deps.database, data),
+          onInstallationRepositories(deps, data),
         );
     case "organization":
       return (payload) =>
         withPayload(organizationEventSchema, payload, (data) =>
-          onMemberChanged(deps, event, data.action, data.organization, data.membership?.user),
+          data.action === "renamed"
+            ? onOrganizationRenamed(deps, data.organization)
+            : onMemberChanged(deps, event, data.action, data.organization, data.membership?.user),
         );
     case "member":
     case "membership":
@@ -219,6 +222,7 @@ async function onInstallation(
         }),
       );
       await database.transaction(async (tx) => {
+        await followRename(deps, tx, installation, source);
         const organization = await upsertInstallation(tx, installation, {
           reinstall: true,
         });
@@ -228,19 +232,28 @@ async function onInstallation(
       return true;
     }
     case "deleted":
-      await markUninstalled(database, installation.accountId);
+      await database.transaction(async (tx) => {
+        await followRename(deps, tx, installation, source);
+        await markUninstalled(tx, installation.accountId);
+      });
       return true;
     case "suspend":
-      await setInstallationSuspended(
-        database,
-        installation.accountId,
-        installation.suspendedAt ?? new Date(),
-      );
+      await database.transaction(async (tx) => {
+        await followRename(deps, tx, installation, source);
+        await setInstallationSuspended(
+          tx,
+          installation.accountId,
+          installation.suspendedAt ?? new Date(),
+        );
+      });
       return true;
+    case "new_permissions_accepted":
+      return database.transaction((tx) => followRename(deps, tx, installation, source));
     case "unsuspend": {
       // No deliveries arrive while suspended, so members may have drifted.
       const members = await lookupMembers(github, installation);
       await database.transaction(async (tx) => {
+        await followRename(deps, tx, installation, source);
         await setInstallationSuspended(tx, installation.accountId, null);
         const organization = await findOrganizationByAccountId(tx, installation.accountId);
         if (organization && !organization.uninstalledAt) {
@@ -255,9 +268,10 @@ async function onInstallation(
 }
 
 async function onInstallationRepositories(
-  database: Database,
+  deps: GithubWebhookDeps,
   payload: z.infer<typeof installationRepositoriesEventSchema>,
 ): Promise<boolean> {
+  const { database } = deps;
   const installation = toInstallation(payload.installation);
   if (!installation) return false;
   if (payload.action !== "added" && payload.action !== "removed") return false;
@@ -265,6 +279,7 @@ async function onInstallationRepositories(
   const existing = await findOrganizationByAccountId(database, installation.accountId);
   if (existing?.uninstalledAt) return false;
   await database.transaction(async (tx) => {
+    await followRename(deps, tx, installation, `installation_repositories.${payload.action}`);
     const organization = await upsertInstallation(tx, installation);
     await upsertRepositories(
       tx,
@@ -283,6 +298,44 @@ async function onInstallationRepositories(
     );
   });
   return true;
+}
+
+async function onOrganizationRenamed(
+  deps: GithubWebhookDeps,
+  organization: z.infer<typeof payloadOrganizationSchema>,
+): Promise<boolean> {
+  const source = "organization.renamed";
+  const renamed = await deps.database.transaction((tx) =>
+    followRename(deps, tx, { accountId: organization.id, login: organization.login }, source),
+  );
+  if (!renamed) {
+    deps.logger.info("organization.rename_skipped", {
+      source,
+      githubAccountId: organization.id,
+      login: organization.login,
+      reason: "unchanged_or_not_installed",
+    });
+  }
+  return renamed;
+}
+
+// The payload's login is taken as current, so a stale redelivery can move the slug back.
+async function followRename(
+  deps: GithubWebhookDeps,
+  database: Database,
+  account: Pick<InstallationInput, "accountId" | "login">,
+  source: string,
+): Promise<boolean> {
+  const renamed = await renameOrganization(database, account.accountId, account.login);
+  if (renamed && renamed.from !== renamed.to) {
+    deps.logger.info("organization.renamed", {
+      source,
+      githubAccountId: account.accountId,
+      from: renamed.from,
+      to: renamed.to,
+    });
+  }
+  return renamed !== undefined;
 }
 
 // The payload's role is not trusted: GitHub is asked for the current one, so reordered deliveries converge.

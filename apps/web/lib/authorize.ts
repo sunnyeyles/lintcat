@@ -1,4 +1,5 @@
 import {
+  findSlugRedirect,
   memberships,
   organizations,
   readableRepos,
@@ -22,11 +23,13 @@ export type Authorization =
       /** Set when a repo was asked for. */
       repo?: Repo & { isOwner: boolean };
     }
+  | { status: "redirect"; slug: string }
   | { status: "not-found" };
 
 const NOT_FOUND: Authorization = { status: "not-found" };
 
-/** Unknown slug, suspended or uninstalled organization, non-member and unreadable repo all give the same not-found. */
+// Unknown slug, suspended or uninstalled organization, non-member and unreadable repo all give the same not-found.
+// A retired slug redirects anyone: that reveals only the rename, and the target still 404s for non-members.
 export async function authorize(
   database: Database,
   session: { githubId: number },
@@ -47,7 +50,10 @@ export async function authorize(
       ),
     )
     .limit(1);
-  if (!row) return NOT_FOUND;
+  if (!row) {
+    const current = await findSlugRedirect(database, slug);
+    return current ? { status: "redirect", slug: current } : NOT_FOUND;
+  }
   const { organization, role, userId } = row;
   const readable = await readableRepos(database, {
     organizationId: organization.id,

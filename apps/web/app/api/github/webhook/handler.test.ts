@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 
 import {
   memberships,
+  organizationSlugRedirects,
   organizations,
   repos,
   reviews,
@@ -710,7 +711,7 @@ describe("handleGithubWebhook organization members", () => {
 
   it("204s organization actions it does not act on", async () => {
     const response = await deliver(
-      delivery("organization", { action: "renamed", organization: acme }),
+      delivery("organization", { action: "member_invited", organization: acme }),
     );
     expect(response.status).toBe(204);
   });
@@ -735,7 +736,7 @@ function repositoryEvent(
   });
 }
 
-async function readableBy(member: OrganizationMember): Promise<string[] | "not-found"> {
+async function readableBy(member: OrganizationMember): Promise<string[] | "not-found" | "redirect"> {
   const result = await authorize(database, { githubId: member.id }, "acme");
   if (result.status !== "allowed") return result.status;
   const rows = await database.select({ id: repos.id, name: repos.name }).from(repos);
@@ -880,6 +881,165 @@ describe("handleGithubWebhook repository collaborators", () => {
     collaborators = { "acme/secrets": [readAs(hubot, "read")] };
     await deliver(collaboratorEvent("removed", hubot, secrets));
     expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
+  });
+});
+
+const renamed = (login: string) =>
+  delivery("organization", {
+    action: "renamed",
+    changes: { login: { from: "Acme" } },
+    organization: { id: ACCOUNT_ID, login },
+    installation: { id: INSTALLATION_ID },
+  });
+
+function repositoriesAddedAs(account: { id: number; login: string; type: string }, installationId = INSTALLATION_ID) {
+  return delivery("installation_repositories", {
+    action: "added",
+    installation: { id: installationId, account, suspended_at: null },
+    repositories_added: [],
+    repositories_removed: [],
+  });
+}
+
+async function slugs() {
+  const orgs = await database
+    .select({ githubAccountId: organizations.githubAccountId, slug: organizations.slug, name: organizations.name })
+    .from(organizations)
+    .orderBy(asc(organizations.id));
+  const redirects = await database
+    .select({ slug: organizationSlugRedirects.slug, githubAccountId: organizations.githubAccountId })
+    .from(organizationSlugRedirects)
+    .innerJoin(organizations, eq(organizations.id, organizationSlugRedirects.organizationId))
+    .orderBy(asc(organizationSlugRedirects.slug));
+  return { organizations: orgs, redirects };
+}
+
+describe("handleGithubWebhook account rename", () => {
+  beforeEach(async () => {
+    await deliver(created());
+  });
+
+  it("moves the slug and name and records the old slug as a redirect", async () => {
+    const response = await deliver(renamed("Acme-Corp"));
+    expect(response.status).toBe(200);
+    expect(await slugs()).toEqual({
+      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" }],
+      redirects: [{ slug: "acme", githubAccountId: ACCOUNT_ID }],
+    });
+    expect(log).toContainEqual(
+      expect.objectContaining({
+        event: "organization.renamed",
+        source: "organization.renamed",
+        from: "acme",
+        to: "acme-corp",
+      }),
+    );
+    expect(await authorize(database, { githubId: octocat.id }, "acme")).toEqual({
+      status: "redirect",
+      slug: "acme-corp",
+    });
+    expect(await authorize(database, { githubId: octocat.id }, "acme-corp")).toMatchObject({
+      status: "allowed",
+      role: "owner",
+    });
+    expect((await state()).repos).toEqual([repoRow(widgets), repoRow(secrets)]);
+  });
+
+  it("converges on redelivery", async () => {
+    await deliver(renamed("Acme-Corp"));
+    const once = await slugs();
+    const response = await deliver(renamed("Acme-Corp"));
+    expect(response.status).toBe(204);
+    expect(await slugs()).toEqual(once);
+  });
+
+  it("keeps every earlier slug redirecting to the current one", async () => {
+    await deliver(renamed("Acme-Corp"));
+    await deliver(renamed("Acme-Global"));
+    expect(await slugs()).toEqual({
+      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme-global", name: "Acme-Global" }],
+      redirects: [
+        { slug: "acme", githubAccountId: ACCOUNT_ID },
+        { slug: "acme-corp", githubAccountId: ACCOUNT_ID },
+      ],
+    });
+    expect(await authorize(database, { githubId: hubot.id }, "acme")).toEqual({
+      status: "redirect",
+      slug: "acme-global",
+    });
+  });
+
+  it("renaming back to an earlier slug drops that redirect", async () => {
+    await deliver(renamed("Acme-Corp"));
+    await deliver(renamed("Acme"));
+    expect(await slugs()).toEqual({
+      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme", name: "Acme" }],
+      redirects: [{ slug: "acme-corp", githubAccountId: ACCOUNT_ID }],
+    });
+    expect(await readableBy(hubot)).toEqual(["widgets"]);
+  });
+
+  it("follows a login change seen on an installation delivery", async () => {
+    const response = await deliver(
+      repositoriesAddedAs({ id: ACCOUNT_ID, login: "Acme-Corp", type: "Organization" }),
+    );
+    expect(response.status).toBe(200);
+    expect(await slugs()).toEqual({
+      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" }],
+      redirects: [{ slug: "acme", githubAccountId: ACCOUNT_ID }],
+    });
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "organization.renamed", source: "installation_repositories.added" }),
+    );
+  });
+
+  it("follows a login change on new_permissions_accepted", async () => {
+    const response = await deliver(
+      delivery("installation", {
+        action: "new_permissions_accepted",
+        installation: installation("Organization", "Acme-Corp"),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect((await slugs()).organizations).toEqual([
+      { githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" },
+    ]);
+  });
+
+  it("gives a retired slug to a new account that claims it, dropping the redirect", async () => {
+    await deliver(renamed("Acme-Corp"));
+    await deliver(repositoriesAddedAs({ id: 2_000, login: "Acme", type: "User" }, 556));
+    expect(await slugs()).toEqual({
+      organizations: [
+        { githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" },
+        { githubAccountId: 2_000, slug: "acme", name: "Acme" },
+      ],
+      redirects: [],
+    });
+    expect(await authorize(database, { githubId: octocat.id }, "acme")).toEqual({ status: "not-found" });
+  });
+
+  it("moves a stale holder of the slug aside for the account that now has the login", async () => {
+    await deliver(repositoriesAddedAs({ id: 2_000, login: "Acme", type: "User" }, 556));
+    expect((await slugs()).organizations).toEqual([
+      { githubAccountId: ACCOUNT_ID, slug: "acme_1000", name: "Acme" },
+      { githubAccountId: 2_000, slug: "acme", name: "Acme" },
+    ]);
+  });
+
+  it("204s a rename of an account it does not know and writes nothing", async () => {
+    const before = await slugs();
+    const response = await deliver(
+      delivery("organization", {
+        action: "renamed",
+        organization: { id: 9_999, login: "Elsewhere" },
+      }),
+    );
+    expect(response.status).toBe(204);
+    expect(await slugs()).toEqual(before);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "organization.rename_skipped", githubAccountId: 9_999 }),
+    );
   });
 });
 

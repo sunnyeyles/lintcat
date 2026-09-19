@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   authRedirect,
   organizationPath,
+  renamedOrganizationUrl,
   returnUrl,
   safeCallbackUrl,
   signInUrl,
@@ -116,5 +117,33 @@ describe("signInUrl", () => {
     expect(signInUrl("http://acme.localhost:3000/", "localhost")).toBe(
       "http://localhost:3000/sign-in?callbackUrl=http%3A%2F%2Facme.localhost%3A3000%2F",
     );
+  });
+});
+
+describe("renamedOrganizationUrl", () => {
+  it("swaps the slug in an /o/ path and keeps the rest", () => {
+    expect(renamedOrganizationUrl("/o/acme/usage?range=7d#top", "acme-corp", DOMAIN)).toBe(
+      "/o/acme-corp/usage?range=7d#top",
+    );
+    expect(renamedOrganizationUrl("/o/acme", "acme-corp", DOMAIN)).toBe("/o/acme-corp");
+  });
+
+  it("moves a subdomain request to the new subdomain", () => {
+    expect(renamedOrganizationUrl("https://acme.prreview.dev/repos/acme/api?x=1", "acme-corp", DOMAIN)).toBe(
+      "https://acme-corp.prreview.dev/repos/acme/api?x=1",
+    );
+    expect(renamedOrganizationUrl("http://acme.localhost:3000/", "acme-corp", "localhost")).toBe(
+      "http://acme-corp.localhost:3000/",
+    );
+  });
+
+  it("sends a slug with no subdomain of its own to its /o/ path on the apex", () => {
+    expect(renamedOrganizationUrl("https://acme.prreview.dev/usage?x=1", "admin", DOMAIN)).toBe(
+      "https://prreview.dev/o/admin/usage?x=1",
+    );
+  });
+
+  it("falls back to the organization's root without a recorded request", () => {
+    expect(renamedOrganizationUrl(null, "acme-corp", DOMAIN)).toBe("/o/acme-corp");
   });
 });
