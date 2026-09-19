@@ -56,7 +56,7 @@ export function repositoryAgent(category: string): AgentDefinition {
 /** Every tool createReviewTools exposes, sorted. */
 export const REVIEW_TOOL_NAMES = [
   "find_co_changed_files",
-  "find_importers",
+  "find_references",
   "get_base_file",
   "get_diff",
   "get_file",
@@ -199,8 +199,14 @@ export function makeModel(
 
 /** The base commit's tree the fake archive serves. */
 export const archiveFiles = new Map<string, string>([
-  ["src/sessions.ts", "export const sessions = [];\n"],
+  [
+    "src/sessions.ts",
+    "export const sessions = [];\nexport function createSession() {}\n",
+  ],
   ["src/sessions.test.ts", "import { sessions } from './sessions';\n"],
+  ["src/api.ts", 'import { createSession } from "./sessions";\n'],
+  ["src/admin.ts", 'import * as all from "./sessions";\nimport "./untested";\n'],
+  ["src/boot.ts", 'import "./sessions";\n'],
   ["src/untested.ts", "export const untested = true;\n"],
   ["README.md", "# Example service\n"],
 ]);

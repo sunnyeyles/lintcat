@@ -12,14 +12,18 @@ export const INDEX_ABSENT_LINE =
 /** Said for a path the index has no entry for, an addition included. */
 const UNKNOWN_LINE = "not in the index at this commit";
 
+function importers(file: IndexedFile): string {
+  return `${file.importerCount} importer${file.importerCount === 1 ? "" : "s"}`;
+}
+
 function describe(file: IndexedFile): string {
   if (file.role === "test" && file.covers !== undefined) {
-    return `test, covers ${file.covers}`;
+    return `test, covers ${file.covers}, ${importers(file)}`;
   }
   if (file.coveredBy !== undefined) {
-    return `${file.role}, covered by ${file.coveredBy}`;
+    return `${file.role}, covered by ${file.coveredBy}, ${importers(file)}`;
   }
-  return `${file.role}, no test`;
+  return `${file.role}, no test, ${importers(file)}`;
 }
 
 /**

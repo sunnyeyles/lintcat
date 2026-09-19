@@ -737,11 +737,11 @@ describe("the repository index block", () => {
     );
   });
 
-  it("gives each changed file its role and covering test", async () => {
+  it("gives each changed file its role, covering test and importer count", async () => {
     const opening = await openingWith(fakeIndex());
 
     expect(opening).toContain(
-      "- src/sessions.ts — source, covered by src/sessions.test.ts",
+      "- src/sessions.ts — source, covered by src/sessions.test.ts, 4 importers",
     );
   });
 
@@ -755,7 +755,9 @@ describe("the repository index block", () => {
       ],
     });
 
-    expect(openingOf(calls[0])).toContain("- src/untested.ts — source, no test");
+    expect(openingOf(calls[0])).toContain(
+      "- src/untested.ts — source, no test, 1 importer",
+    );
   });
 
   it("says a file the base commit did not have is not in the index", async () => {
@@ -804,5 +806,61 @@ describe("the repository index block", () => {
     await agent.run({ ...context, changedFiles });
 
     expect(openingOf(calls[0])).toContain("- [... 2 more files]");
+  });
+});
+
+describe("find_references through the agent runtime", () => {
+  const callReferences = (input: unknown): ScriptedResponse[] => [
+    message([toolUseBlock("toolu_1", "find_references", input)], "tool_use"),
+    message([textBlock(finalJson)], "end_turn"),
+  ];
+
+  async function referencesResult(
+    input: unknown,
+    index?: ReturnType<typeof fakeIndex>,
+  ): Promise<string> {
+    const { agent, calls } = makeAgent(
+      callReferences(input),
+      index === undefined ? {} : { index },
+    );
+    await agent.run(context);
+    return String(toolResultsOf(calls[1])[0]?.output.value ?? "");
+  }
+
+  it("answers from the index the reviewer built, with no GitHub call", async () => {
+    const { agent, calls, github } = makeAgent(
+      callReferences({ path: "src/sessions.ts" }),
+      { index: fakeIndex() },
+    );
+
+    await agent.run(context);
+
+    expect(github.searchCode).not.toHaveBeenCalled();
+    const payload = JSON.parse(
+      String(toolResultsOf(calls[1])[0]?.output.value ?? ""),
+    );
+    expect(payload.known).toBe(true);
+    expect(payload.total).toBe(4);
+    expect(payload.index).toMatchObject({ sha: baseSha, truncated: false });
+  });
+
+  it("narrows to one exported name", async () => {
+    const payload = JSON.parse(
+      await referencesResult(
+        { path: "src/sessions.ts", name: "createSession" },
+        fakeIndex(),
+      ),
+    );
+
+    expect(payload.references.map((entry: { path: string }) => entry.path)).toEqual([
+      "src/admin.ts",
+      "src/api.ts",
+    ]);
+  });
+
+  it("returns the absent one-liner when the reviewer built no index", async () => {
+    expect(await referencesResult({ path: "src/sessions.ts" })).toBe(
+      INDEX_ABSENT_LINE,
+    );
   });
 });

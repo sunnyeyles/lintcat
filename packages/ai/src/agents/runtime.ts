@@ -212,7 +212,7 @@ export function createReviewAgent(
                   content: buildOpeningMessage(context, deps.index),
                 },
               ],
-              tools: createReviewTools(deps.github, context),
+              tools: createReviewTools(deps.github, context, deps.index),
               stopWhen: isStepCount(maxTurns),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
               providerOptions: CACHE_BREAKPOINT,
