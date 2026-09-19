@@ -6,12 +6,24 @@ import { gunzipSync } from "node:zlib";
 
 import type { RepositoryArchiveLimits } from "#src/client";
 
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+
 /** Sized so a large monorepo fits; hitting one truncates, never fails. */
 export const DEFAULT_ARCHIVE_LIMITS = {
-  maxTotalBytes: 50 * 1024 * 1024,
+  maxTotalBytes: MAX_TOTAL_BYTES,
   maxFiles: 20_000,
   maxFileBytes: 512 * 1024,
+  /** The one cap that fails rather than truncates: past it nothing fits in memory. */
+  maxInflatedBytes: 8 * MAX_TOTAL_BYTES,
 } as const;
+
+/** Thrown before an archive is read, so the review falls back to no index. */
+export class ArchiveTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArchiveTooLargeError";
+  }
+}
 
 /** Path segments dropped while reading: never this repository's own code. */
 const SKIPPED_DIRECTORIES = new Set([
@@ -171,6 +183,34 @@ function isGzip(bytes: Uint8Array): boolean {
   return bytes[0] === 0x1f && bytes[1] === 0x8b;
 }
 
+/** Gunzips under a hard output cap; a compressed buffer already past it cannot fit. */
+function inflate(tarball: Uint8Array, maxInflatedBytes: number): Uint8Array {
+  if (!isGzip(tarball)) {
+    return tarball;
+  }
+  if (tarball.length > maxInflatedBytes) {
+    throw new ArchiveTooLargeError(
+      `the compressed repository archive is ${tarball.length} bytes,` +
+        ` over the ${maxInflatedBytes}-byte inflation cap`,
+    );
+  }
+  try {
+    return new Uint8Array(
+      gunzipSync(tarball, { maxOutputLength: maxInflatedBytes }),
+    );
+  } catch (error) {
+    if (
+      error instanceof RangeError ||
+      (error as { code?: string }).code === "ERR_BUFFER_TOO_LARGE"
+    ) {
+      throw new ArchiveTooLargeError(
+        `the repository archive inflates past the ${maxInflatedBytes}-byte cap`,
+      );
+    }
+    throw error;
+  }
+}
+
 /** Decodes a repository tarball under the given caps. Only a cap that stops
  * the read sets `truncated`; a file over the per-file cap is listed instead. */
 export function readRepositoryTarball(
@@ -180,8 +220,10 @@ export function readRepositoryTarball(
   const maxTotalBytes = limits.maxTotalBytes ?? DEFAULT_ARCHIVE_LIMITS.maxTotalBytes;
   const maxFiles = limits.maxFiles ?? DEFAULT_ARCHIVE_LIMITS.maxFiles;
   const maxFileBytes = limits.maxFileBytes ?? DEFAULT_ARCHIVE_LIMITS.maxFileBytes;
+  const maxInflatedBytes =
+    limits.maxInflatedBytes ?? DEFAULT_ARCHIVE_LIMITS.maxInflatedBytes;
 
-  const bytes = isGzip(tarball) ? new Uint8Array(gunzipSync(tarball)) : tarball;
+  const bytes = inflate(tarball, maxInflatedBytes);
   const files = new Map<string, string>();
   const oversized: string[] = [];
   let truncated = false;

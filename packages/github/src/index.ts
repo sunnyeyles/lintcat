@@ -1,4 +1,5 @@
 export {
+  ArchiveTooLargeError,
   DEFAULT_ARCHIVE_LIMITS,
   readRepositoryTarball,
   type TarballContents,

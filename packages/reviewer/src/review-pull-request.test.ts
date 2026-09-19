@@ -4,6 +4,7 @@ import {
   type ReviewContext,
   type SynthesisHints,
 } from "@pr-review/ai";
+import { ArchiveTooLargeError } from "@pr-review/github";
 import type {
   ChangedFile,
   CreateCheckRunInput,
@@ -1071,6 +1072,21 @@ describe("the repository index", () => {
     expect(entry(entries, "index.failed")).toMatchObject({
       reason: "archive too large",
       level: "error",
+    });
+  });
+
+  it("reviews without an index when the archive is too large to inflate", async () => {
+    const { deps, client, runReviewPipeline, entries } = makeDeps();
+    client.getRepositoryArchive.mockRejectedValue(
+      new ArchiveTooLargeError("the repository archive inflates past the cap"),
+    );
+
+    await expect(reviewPullRequest(target, deps)).resolves.toBeDefined();
+
+    expect(indexPassedTo(runReviewPipeline)).toBeUndefined();
+    expect(entry(entries, "index.failed")).toMatchObject({
+      reason: "the repository archive inflates past the cap",
+      fallback: "reviewing without the repository index",
     });
   });
 

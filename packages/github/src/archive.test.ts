@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { readRepositoryTarball } from "#src/archive";
+import { ArchiveTooLargeError, readRepositoryTarball } from "#src/archive";
 
 const ROOT = "octo-org-example-service-0000000";
 
@@ -188,6 +188,28 @@ describe("readRepositoryTarball", () => {
     );
 
     expect(archive.files.get(long)).toBe("deep\n");
+  });
+
+  it("refuses an archive that inflates past the cap", () => {
+    const gzipped = gzipSync(
+      repositoryTarball({ "big.ts": "x".repeat(100_000) }),
+    );
+
+    expect(() =>
+      readRepositoryTarball(new Uint8Array(gzipped), {
+        maxInflatedBytes: 4096,
+      }),
+    ).toThrow(ArchiveTooLargeError);
+  });
+
+  it("refuses a compressed archive already over the cap, without inflating", () => {
+    const gzipped = gzipSync(
+      repositoryTarball({ "big.ts": "x".repeat(100_000) }),
+    );
+
+    expect(() =>
+      readRepositoryTarball(new Uint8Array(gzipped), { maxInflatedBytes: 4 }),
+    ).toThrow(/compressed repository archive/);
   });
 
   it("reads an empty archive as no files", () => {

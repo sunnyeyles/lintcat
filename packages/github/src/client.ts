@@ -50,6 +50,8 @@ export interface RepositoryArchiveLimits {
   maxFiles?: number | undefined;
   /** A file above this is skipped entirely, not read in part. */
   maxFileBytes?: number | undefined;
+  /** The only cap that fails the read: an archive inflating past it cannot be held. */
+  maxInflatedBytes?: number | undefined;
 }
 
 /** The repository's text files at one commit. */
