@@ -60,6 +60,8 @@ export interface RepositoryArchive {
   files: Map<string, string>;
   /** True when a cap stopped the read, so files are missing. */
   truncated: boolean;
+  /** Paths skipped for exceeding the per-file cap; the read carried on. */
+  oversized?: readonly string[];
 }
 
 /** A code search request; always scoped to the single named repository. */

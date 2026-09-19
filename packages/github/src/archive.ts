@@ -159,20 +159,20 @@ function decodeText(body: Uint8Array): string | undefined {
   }
 }
 
-/** The tarball's files, with `truncated` set when any cap was reached. */
+/** The tarball's files, with `truncated` set when the read stopped early. */
 export interface TarballContents {
   files: Map<string, string>;
   truncated: boolean;
+  /** Paths skipped for exceeding the per-file cap; the read carried on. */
+  oversized?: readonly string[];
 }
 
 function isGzip(bytes: Uint8Array): boolean {
   return bytes[0] === 0x1f && bytes[1] === 0x8b;
 }
 
-/**
- * Decodes a repository tarball under the given caps. Binary files and the
- * skipped directories are dropped silently; a cap sets `truncated`.
- */
+/** Decodes a repository tarball under the given caps. Only a cap that stops
+ * the read sets `truncated`; a file over the per-file cap is listed instead. */
 export function readRepositoryTarball(
   tarball: Uint8Array,
   limits: RepositoryArchiveLimits = {},
@@ -183,6 +183,7 @@ export function readRepositoryTarball(
 
   const bytes = isGzip(tarball) ? new Uint8Array(gunzipSync(tarball)) : tarball;
   const files = new Map<string, string>();
+  const oversized: string[] = [];
   let truncated = false;
   let totalBytes = 0;
 
@@ -192,7 +193,7 @@ export function readRepositoryTarball(
       continue;
     }
     if (entry.body.length > maxFileBytes) {
-      truncated = true;
+      oversized.push(path);
       continue;
     }
     if (files.size >= maxFiles || totalBytes + entry.body.length > maxTotalBytes) {
@@ -207,7 +208,7 @@ export function readRepositoryTarball(
     files.set(path, text);
   }
 
-  return { files, truncated };
+  return { files, truncated, oversized };
 }
 
 /** Normalises what Octokit hands back for a binary response body. */

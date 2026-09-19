@@ -142,7 +142,7 @@ describe("readRepositoryTarball", () => {
     expect(archive.truncated).toBe(false);
   });
 
-  it("skips a file over the per-file cap and reports truncation", () => {
+  it("lists a file over the per-file cap without truncating", () => {
     const archive = readRepositoryTarball(
       repositoryTarball({
         "big.ts": "x".repeat(100),
@@ -152,7 +152,8 @@ describe("readRepositoryTarball", () => {
     );
 
     expect([...archive.files.keys()]).toEqual(["small.ts"]);
-    expect(archive.truncated).toBe(true);
+    expect(archive.oversized).toEqual(["big.ts"]);
+    expect(archive.truncated).toBe(false);
   });
 
   it("stops at the file-count cap and reports truncation", () => {

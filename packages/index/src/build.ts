@@ -67,6 +67,14 @@ export interface RepositoryIndexInput {
   /** Repository-relative path to contents, as the archive read them. */
   files: ReadonlyMap<string, string>;
   truncated?: boolean | undefined;
+  /** Paths the archive skipped for size; only an indexed one hides a graph edge. */
+  oversized?: readonly string[] | undefined;
+}
+
+function hidesIndexedSource(paths: readonly string[] | undefined): boolean {
+  return (paths ?? []).some((path) =>
+    INDEXED_LANGUAGES.has(languageOf(path)),
+  );
 }
 
 type MutableIndexedFile = {
@@ -168,7 +176,7 @@ export function buildRepositoryIndex(
 
   return {
     sha: input.sha,
-    truncated: input.truncated ?? false,
+    truncated: (input.truncated ?? false) || hidesIndexedSource(input.oversized),
     files,
     packages: workspace.packages,
     coverage: summariseLanguages(

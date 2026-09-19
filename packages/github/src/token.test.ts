@@ -1279,7 +1279,12 @@ describe("getRepositoryArchive", () => {
       repo: "example-service",
       ref: headSha,
     });
-    expect(archive).toEqual({ sha: headSha, files: new Map(), truncated: false });
+    expect(archive).toEqual({
+      sha: headSha,
+      files: new Map(),
+      truncated: false,
+      oversized: [],
+    });
   });
 
   it("rejects when the response body is not binary", async () => {

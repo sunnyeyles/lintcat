@@ -16,6 +16,14 @@ function index(paths: readonly string[], truncated = false) {
   });
 }
 
+function oversizedIndex(oversized: readonly string[]) {
+  return buildRepositoryIndex({
+    sha,
+    oversized,
+    files: new Map([["src/a.ts", "// contents\n"]]),
+  });
+}
+
 function roleOf(paths: readonly string[], path: string): string | undefined {
   return index(paths).files.get(path)?.role;
 }
@@ -184,6 +192,15 @@ describe("buildRepositoryIndex", () => {
   it("propagates truncation from the archive", () => {
     expect(index(["src/a.ts"], true).truncated).toBe(true);
     expect(index(["src/a.ts"]).truncated).toBe(false);
+  });
+
+  it("truncates when an oversized file was one the index would have parsed", () => {
+    expect(oversizedIndex(["packages/a/src/huge.ts"]).truncated).toBe(true);
+  });
+
+  it("does not truncate when only an unindexed file was oversized", () => {
+    expect(oversizedIndex(["pnpm-lock.yaml"]).truncated).toBe(false);
+    expect(oversizedIndex(["fixtures/big.json"]).truncated).toBe(false);
   });
 
   it("indexes an empty repository without failing", () => {

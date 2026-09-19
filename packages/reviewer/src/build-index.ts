@@ -43,6 +43,7 @@ export async function buildReviewIndex({
       sha: archive.sha,
       files: archive.files,
       truncated: archive.truncated,
+      oversized: archive.oversized,
     });
     logger.info("index.built", {
       ...fields,
