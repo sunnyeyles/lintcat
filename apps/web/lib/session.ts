@@ -1,11 +1,11 @@
-import { db } from "@pr-review/db";
-import { redirect } from "next/navigation";
+import { db, type MembershipRole, type Organization } from "@pr-review/db";
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
 import { auth } from "@/auth";
-import {
-  currentMembershipForUser,
-  type OrganizationMembership,
-} from "@/lib/organization";
+import { authorize } from "@/lib/authorize";
+import { organizationPath, REQUEST_PATH_HEADER, signInPath } from "@/lib/paths";
 
 /** What a page needs about the signed-in user; `githubId` keys the `users` row. */
 export type AppSession = {
@@ -28,19 +28,22 @@ export async function currentSession(): Promise<AppSession | undefined> {
   };
 }
 
-export async function currentMembership(
-  session: AppSession,
-): Promise<OrganizationMembership | undefined> {
-  return currentMembershipForUser(db(), session.githubId);
-}
+export type OrganizationAccess = {
+  session: AppSession;
+  organization: Organization;
+  role: MembershipRole;
+};
 
-/** `/sign-in` explains both the signed-out and the no-organization state. */
-export async function requireMembership(): Promise<
-  OrganizationMembership & { session: AppSession }
-> {
-  const session = await currentSession();
-  if (!session) redirect("/sign-in");
-  const membership = await currentMembership(session);
-  if (!membership) redirect("/sign-in");
-  return { session, ...membership };
-}
+/** Every organization page's guard: signed out goes to sign-in, anyone not allowed gets a 404. */
+export const requireOrganization = cache(
+  async (slug: string): Promise<OrganizationAccess> => {
+    const session = await currentSession();
+    if (!session) {
+      const requested = (await headers()).get(REQUEST_PATH_HEADER);
+      redirect(signInPath(requested ?? organizationPath(slug)));
+    }
+    const access = await authorize(db(), session, slug);
+    if (access.status !== "allowed") notFound();
+    return { session, organization: access.organization, role: access.role };
+  },
+);

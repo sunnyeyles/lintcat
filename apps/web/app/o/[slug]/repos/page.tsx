@@ -5,8 +5,13 @@ import { PageHeader } from "@/components/shell";
 import { data } from "@/lib/data/server";
 import { formatNumber } from "@/lib/format";
 
-export default async function ReposPage() {
-  const repos = await (await data()).listRepos();
+export default async function ReposPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const repos = await (await data(slug)).listRepos();
   const reviewCount = repos.reduce((n, repo) => n + repo.reviewCount, 0);
 
   return (
@@ -25,6 +30,7 @@ export default async function ReposPage() {
         {repos.length > 0 ? (
           <Card padding="table">
             <RepoTable
+              slug={slug}
               repos={repos}
               caption="All connected repositories, most recently reviewed first."
             />

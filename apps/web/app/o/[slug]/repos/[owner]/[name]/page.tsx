@@ -26,6 +26,7 @@ import {
   formatUsd,
   shortSha,
 } from "@/lib/format";
+import { organizationPath } from "@/lib/paths";
 
 type PrGroup = { prNumber: number; reviews: ReviewSummary[] };
 
@@ -43,10 +44,10 @@ function groupByPr(reviews: ReviewSummary[]): PrGroup[] {
 export default async function RepoDetailPage({
   params,
 }: {
-  params: Promise<{ owner: string; name: string }>;
+  params: Promise<{ slug: string; owner: string; name: string }>;
 }) {
-  const { owner, name } = await params;
-  const source = await data();
+  const { slug, owner, name } = await params;
+  const source = await data(slug);
   const repo = await source.getRepo(owner, name);
   if (!repo) notFound();
 
@@ -171,7 +172,7 @@ export default async function RepoDetailPage({
                             )}
                           >
                             <RowLink
-                              href={`/reviews/${review.id}`}
+                              href={organizationPath(slug, `/reviews/${review.id}`)}
                               aria-label={
                                 grouped
                                   ? `Review ${revision} of ${total} for pull request ${group.prNumber}`

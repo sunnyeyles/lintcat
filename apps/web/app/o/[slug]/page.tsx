@@ -10,9 +10,15 @@ import {
 import { PageHeader } from "@/components/shell";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
+import { organizationPath } from "@/lib/paths";
 
-export default async function OverviewPage() {
-  const source = await data();
+export default async function OverviewPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const source = await data((await params).slug);
+  const { slug } = source.organization;
   const [trends, usage, reviews, repos] = await Promise.all([
     source.getTrends("30d"),
     source.getUsage("30d"),
@@ -32,7 +38,7 @@ export default async function OverviewPage() {
         description={`${source.organization.name} — every review the agents published in the last 30 days, newest first.`}
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/repos">All repositories</Link>
+            <Link href={organizationPath(slug, "/repos")}>All repositories</Link>
           </Button>
         }
       />
@@ -70,6 +76,7 @@ export default async function OverviewPage() {
         <Card padding="table">
           {reviews.length > 0 ? (
             <ReviewsTable
+              slug={slug}
               reviews={reviews}
               caption="The eight most recent reviews, newest first."
             />
@@ -86,7 +93,7 @@ export default async function OverviewPage() {
         title="Repositories at a glance"
         action={
           <Link
-            href="/repos"
+            href={organizationPath(slug, "/repos")}
             className="font-mono text-caption text-accent no-underline hover:underline"
           >
             View all →
@@ -96,6 +103,7 @@ export default async function OverviewPage() {
         <Card padding="table">
           {repos.length > 0 ? (
             <RepoTable
+              slug={slug}
               repos={repos}
               limit={6}
               caption="Repositories connected to this organization, most recently reviewed first."

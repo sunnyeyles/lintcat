@@ -1,12 +1,12 @@
 import { db } from "@pr-review/db";
 
-import { requireMembership } from "@/lib/session";
+import { requireOrganization } from "@/lib/session";
 
 import { createDbSource } from "./db";
 import type { DataSource } from "./types";
 
-/** The signed-in user's organization's data; redirects to /sign-in without one. */
-export async function data(): Promise<DataSource> {
-  const { organization } = await requireMembership();
+/** The organization's data, only once `requireOrganization` has let the user in. */
+export async function data(slug: string): Promise<DataSource> {
+  const { organization } = await requireOrganization(slug);
   return createDbSource(db(), organization);
 }

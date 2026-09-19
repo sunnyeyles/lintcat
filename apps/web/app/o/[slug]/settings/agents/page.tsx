@@ -4,6 +4,7 @@ import { AgentConfigEditor, RepoPicker } from "@/components/config";
 import { PageHeader } from "@/components/shell";
 import { AGENT_CONFIG_PATH } from "@/lib/agent-config";
 import { demoData } from "@/lib/data";
+import { requireOrganization } from "@/lib/session";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -12,11 +13,14 @@ function firstValue(value: string | string[] | undefined): string | undefined {
 }
 
 export default async function AgentSettingsPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<SearchParams>;
 }) {
-  const [params, repos] = await Promise.all([searchParams, demoData().listRepos()]);
+  await requireOrganization((await params).slug);
+  const [query, repos] = await Promise.all([searchParams, demoData().listRepos()]);
 
   if (repos.length === 0) {
     return (
@@ -32,7 +36,7 @@ export default async function AgentSettingsPage({
     );
   }
 
-  const requested = Number(firstValue(params["repo"]));
+  const requested = Number(firstValue(query["repo"]));
   const selected = repos.find((repo) => repo.id === requested) ?? repos[0];
   if (selected === undefined) return null;
 
