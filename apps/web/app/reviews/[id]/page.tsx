@@ -11,20 +11,20 @@ import {
   ReviewSummaryPanel,
 } from "@/components/review";
 import { PageHeader } from "@/components/shell";
-import { data } from "@/lib/data";
+import { data } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 
 type PageProps = { params: Promise<{ id: string }> };
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  return Number.isInteger(id) && id > 0 && id <= 2 ** 31 - 1 ? id : null;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   const parsed = parseId(id);
-  const review = parsed === null ? null : await data().getReview(parsed);
+  const review = parsed === null ? null : await (await data()).getReview(parsed);
   if (!review) return { title: "Review not found" };
   return { title: `${review.repo.owner}/${review.repo.name} #${review.prNumber}` };
 }
@@ -34,10 +34,11 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   const parsed = parseId(id);
   if (parsed === null) notFound();
 
-  const review = await data().getReview(parsed);
+  const source = await data();
+  const review = await source.getReview(parsed);
   if (!review) notFound();
 
-  const siblings = await data().listReviews({ repoId: review.repoId });
+  const siblings = await source.listReviews({ repoId: review.repoId });
   const at = siblings.findIndex((r) => r.id === review.id);
   const newer = at > 0 ? (siblings[at - 1] ?? null) : null;
   const older = at >= 0 ? (siblings[at + 1] ?? null) : null;

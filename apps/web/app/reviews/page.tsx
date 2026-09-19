@@ -15,13 +15,13 @@ import Link from "next/link";
 import { SEVERITIES } from "@/components/review";
 import { PageHeader } from "@/components/shell";
 import { AgentChip, SeverityBadge } from "@/components/ui";
-import { data } from "@/lib/data";
+import { data } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Reviews" };
 
 export default async function ReviewsIndexPage() {
-  const reviews = await data().listReviews({ limit: 50 });
+  const reviews = await (await data()).listReviews({ limit: 50 });
 
   return (
     <div className="flex flex-col gap-8">

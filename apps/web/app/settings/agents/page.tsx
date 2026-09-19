@@ -3,7 +3,7 @@ import { EmptyState } from "@pr-review/design";
 import { AgentConfigEditor, RepoPicker } from "@/components/config";
 import { PageHeader } from "@/components/shell";
 import { AGENT_CONFIG_PATH } from "@/lib/agent-config";
-import { data } from "@/lib/data";
+import { demoData } from "@/lib/data";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -16,7 +16,7 @@ export default async function AgentSettingsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const [params, repos] = await Promise.all([searchParams, data().listRepos()]);
+  const [params, repos] = await Promise.all([searchParams, demoData().listRepos()]);
 
   if (repos.length === 0) {
     return (
@@ -36,7 +36,7 @@ export default async function AgentSettingsPage({
   const selected = repos.find((repo) => repo.id === requested) ?? repos[0];
   if (selected === undefined) return null;
 
-  const config = await data().getAgentConfig(selected.id);
+  const config = await demoData().getAgentConfig(selected.id);
   const repoLabel = `${selected.owner}/${selected.name}`;
 
   return (

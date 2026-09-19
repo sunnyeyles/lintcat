@@ -2,11 +2,11 @@ import { Card, EmptyState } from "@pr-review/design";
 
 import { RepoTable } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { data } from "@/lib/data";
+import { data } from "@/lib/data/server";
 import { formatNumber } from "@/lib/format";
 
 export default async function ReposPage() {
-  const repos = await data().listRepos();
+  const repos = await (await data()).listRepos();
   const reviewCount = repos.reduce((n, repo) => n + repo.reviewCount, 0);
 
   return (

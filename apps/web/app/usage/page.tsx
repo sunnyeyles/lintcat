@@ -13,7 +13,7 @@ import {
   TokenCompositionChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
-import { costOf, data } from "@/lib/data";
+import { costOf, demoData } from "@/lib/data";
 import type { TokenCounts } from "@/lib/data/types";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
 
@@ -49,7 +49,7 @@ export default async function UsagePage({
   searchParams: SearchParams;
 }) {
   const range = parseRange((await searchParams).range);
-  const usage = await data().getUsage(range);
+  const usage = await demoData().getUsage(range);
   const phrase = RANGE_PHRASE[range];
   const { totals } = usage;
 

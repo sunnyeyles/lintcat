@@ -8,11 +8,11 @@ import {
   Sparkline,
 } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { data } from "@/lib/data";
+import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
 
 export default async function OverviewPage() {
-  const source = data();
+  const source = await data();
   const [trends, usage, reviews, repos] = await Promise.all([
     source.getTrends("30d"),
     source.getUsage("30d"),

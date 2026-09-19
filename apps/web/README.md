@@ -1,44 +1,70 @@
 # @pr-review/web
 
 The dashboard: review history, trends, token spend, and an editor for
-`.github/pr-review-agents.yml`.
+`.github/pr-review-agents.yml`. Also `POST /api/ingest`, where the action
+records each review.
 
 ```bash
 pnpm --filter @pr-review/web dev     # http://localhost:3000
 ```
 
-## It runs on demo data
+## Environment
 
-Nothing writes to Postgres yet. The Action publishes its review to GitHub and
-keeps no state, so every figure here comes from a seeded generator in
-`lib/data/mock.ts` — same seed, same numbers, every run. A **DEMO DATA** chip
-sits in the top bar on every page so this is never mistaken for production.
+| Variable             | Used for                                               |
+| -------------------- | ------------------------------------------------------ |
+| `DATABASE_URL`       | Postgres, see [`packages/db`](../../packages/db)       |
+| `AUTH_SECRET`        | Signs the session cookie; `pnpm dlx auth secret`       |
+| `AUTH_GITHUB_ID`     | GitHub OAuth app client id                             |
+| `AUTH_GITHUB_SECRET` | GitHub OAuth app client secret                         |
+| `AUTH_TRUST_HOST`    | `true` for `next start` outside Vercel                 |
+
+Locally they go in the repo root `.env.local` (gitignored); `.env.example`
+lists them. Register the OAuth app with the callback URL
+`http://localhost:3000/api/auth/callback/github`, one more per deployed origin.
+`next build` needs none of them: every page reads the session, so nothing is
+prerendered.
+
+## Ingest
+
+`POST /api/ingest` takes a `reviewRecordSchema` body (`@pr-review/schemas`)
+with `Authorization: Bearer <team ingest secret>`. The team's row stores only
+the secret's SHA-256 (`hashIngestToken`). A missing or unknown token is a 401
+and writes nothing; a rerun of the same commit replaces that review's agent
+runs and findings.
+
+## Sign-in
+
+GitHub OAuth through Auth.js v5 (`auth.ts`), with JWT sessions and no auth
+tables. The sign-in pass upserts the `users` row by GitHub id. A user sees one
+team, from `users.team_id`; `requireTeam()` in `lib/session.ts` sends anyone
+signed out or teamless to `/sign-in`.
 
 ## The seam
 
-Pages never touch Drizzle. They call `data()`, which returns a `DataSource`:
+Pages never touch Drizzle. They ask for a `DataSource` (`lib/data/types.ts`):
 
 ```ts
-import { data } from "@/lib/data";
+import { data } from "@/lib/data/server";
 
-const reviews = await data().listReviews({ repoId, limit: 20 });
+const reviews = await (await data()).listReviews({ repoId, limit: 20 });
 ```
 
-`DataSource` (in `lib/data/types.ts`) is the whole contract, and its methods
-return Drizzle's own row types from `@pr-review/db`. Pointing the dashboard at
-real data means writing one more implementation of that interface and choosing
-it in `lib/data/index.ts`; no page changes.
+- `data()` (`lib/data/server.ts`) is the signed-in user's team, read from
+  Postgres by `createDbSource` in `lib/data/db.ts`. Every query is scoped by the
+  team through the review's repo, so another team's row is a 404, not a leak.
+  Overview, Repositories, a repository, and the review pages use it.
+- `demoData()` (`lib/data/index.ts`) is the seeded fixture in `lib/data/mock.ts`.
+  Analytics, Usage and Agents still use it, and show a **DEMO DATA** chip.
 
-What's missing is upstream of here: something has to populate `reviews`,
-`findings` and `agent_runs` in the first place. The likely path is the Action
-POSTing its result to a route in this app after it publishes — which keeps
-database credentials out of every customer's CI.
+Trends and usage are computed by the same functions in `lib/data/aggregate.ts`
+for both sources. Agents the UI has no colour for (such as `general`) are left
+out of agent chips and run strips; their tokens still count toward cost.
 
 ## Cost figures
 
-`lib/data/mock.ts` holds a fixed per-million-token price table and derives
-every dollar figure from the four token counters. The counters are the shape
-the logging events already emit; the prices are illustrative.
+`lib/data/aggregate.ts` holds a fixed per-million-token price table and derives
+every dollar figure from the four token counters in `agent_runs`. The prices
+are illustrative.
 
 ## Layout
 
@@ -46,20 +72,17 @@ the logging events already emit; the prices are illustrative.
 app/
   page.tsx              overview
   repos/                repo list, and per-repo review history
-  reviews/[id]/         one review: summary, agent legs, findings
-  analytics/            trends over time
-  usage/                tokens and spend
-  settings/agents/      agent config editor (emits YAML to copy)
+  reviews/              recent reviews; [id]/ one review
+  analytics/            trends over time (fixture)
+  usage/                tokens and spend (fixture)
+  settings/agents/      agent config editor (fixture)
+  sign-in/              sign-in and no-team state
+  api/ingest/           the action's endpoint
 components/
-  ui/                   primitives, styled to the docs/index.html palette
-  shell/                sidebar, top bar, theme, page header
-  charts/               recharts wrappers that follow the theme
+  ui/ shell/ charts/ overview/ review/ config/
 lib/
   data/                 the seam above
+  session.ts            session and team helpers
   format.ts             number, duration and date formatting
   agent-config.ts       pr-review-agents.yml serialisation
 ```
-
-Theming is a `data-theme` attribute on `<html>` driven by `next-themes`;
-colours come from the custom properties in `app/globals.css`, which are lifted
-from `docs/index.html` so the dashboard and the project site match.

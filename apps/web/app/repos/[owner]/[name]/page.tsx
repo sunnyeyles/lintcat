@@ -17,7 +17,8 @@ import { notFound } from "next/navigation";
 
 import { AgentChips, RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { data, type ReviewSummary } from "@/lib/data";
+import type { ReviewSummary } from "@/lib/data";
+import { data } from "@/lib/data/server";
 import {
   formatDuration,
   formatNumber,
@@ -45,7 +46,7 @@ export default async function RepoDetailPage({
   params: Promise<{ owner: string; name: string }>;
 }) {
   const { owner, name } = await params;
-  const source = data();
+  const source = await data();
   const repo = await source.getRepo(owner, name);
   if (!repo) notFound();
 
