@@ -3,7 +3,7 @@
 The dashboard: review history, trends, token spend, and an editor for
 `.github/pr-review-agents.yml`. Also `POST /api/ingest`, where the action
 records each review, and `POST /api/github/webhook`, where the GitHub App
-reports installations.
+reports installations and organization members.
 
 ```bash
 pnpm --filter @pr-review/web dev     # http://localhost:3000
@@ -15,15 +15,15 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | --------------------------- | ------------------------------------------------------ |
 | `DATABASE_URL`              | Postgres, see [`packages/db`](../../packages/db)       |
 | `AUTH_SECRET`               | Signs the session cookie; `pnpm dlx auth secret`       |
-| `AUTH_GITHUB_ID`            | GitHub OAuth app client id                             |
-| `AUTH_GITHUB_SECRET`        | GitHub OAuth app client secret                         |
+| `AUTH_GITHUB_ID`            | The GitHub App's client id (user sign-in)              |
+| `AUTH_GITHUB_SECRET`        | The GitHub App's client secret                         |
 | `AUTH_TRUST_HOST`           | `true` for `next start` outside Vercel                 |
 | `GITHUB_APP_ID`             | The GitHub App's id                                    |
 | `GITHUB_APP_PRIVATE_KEY`    | The App's PEM key; newlines may be written as `\n`     |
 | `GITHUB_APP_WEBHOOK_SECRET` | Verifies `X-Hub-Signature-256` on each delivery        |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
-lists them. Register the OAuth app with the callback URL
+lists them. Give the GitHub App the callback URL
 `http://localhost:3000/api/auth/callback/github`, one more per deployed origin.
 `next build` needs none of them: every page reads the session, so nothing is
 prerendered.
@@ -50,6 +50,9 @@ a 401 and writes nothing.
 | `installation`              | `suspend`, `unsuspend` | Set or clear `organizations.suspended_at`                 |
 | `installation`              | `deleted`              | Delete the organization; memberships, repos and reviews cascade |
 | `installation_repositories` | `added`, `removed`     | Upsert or delete those repos (their reviews go with them) |
+| `organization`              | `member_added`, `member_removed` | Re-check that user's membership with GitHub     |
+| `member`                    | `added`, `edited`, `removed`     | Same, when the repository belongs to an organization |
+| `membership`                | `added`, `removed`     | Same                                                      |
 
 Anything else gets a 204. The slug is the account's lowercased login; a
 personal account becomes an organization of type `user`. Uninstalling is a hard
@@ -58,9 +61,29 @@ keyed on GitHub ids, so a redelivery converges, and each delivery's writes run
 in one transaction over Neon's WebSocket pool (`withWriteDatabase`), since the
 HTTP driver behind `db()` cannot run one. Pages keep reading over HTTP.
 
-`created` lists the installation's repositories through `GithubAppClient`
-(`@pr-review/github`), authenticated as the App with an installation token.
-Tests pass a fake.
+`created` lists the installation's repositories and members through
+`GithubAppClient` (`@pr-review/github`), authenticated as the App with an
+installation token; `unsuspend` re-lists the members. Tests pass a fake.
+
+### Memberships
+
+Roles come from GitHub and are never edited here: an organization admin is an
+**owner**, any other member a **member**, and a personal account's own user its
+owner. `lib/membership-sync.ts` holds the one set of sync functions the webhook
+and sign-in share.
+
+- Member events do not trust the payload's role. They ask GitHub for the user's
+  current membership (`GET /orgs/{org}/memberships/{username}`) and store that,
+  so reordered or redelivered events converge. GitHub has no webhook for a role
+  change, so a promotion or demotion lands with that user's next member event or
+  sign-in.
+- An installation for an organization lists its members: two paginated calls,
+  `role=admin` then `role=all`. Anyone stored who is no longer listed loses
+  their membership.
+- Events for an organization that is suspended or has not installed the App
+  change nothing and get a 204.
+- Every decision is logged: `membership.granted`, `membership.revoked` (with
+  `removed`) or `membership.skipped`, each with a `reason` and `source`.
 
 ### Registering the App
 
@@ -69,15 +92,27 @@ Tests pass a fake.
 - Webhook URL `https://<app-domain>/api/github/webhook`, secret in
   `GITHUB_APP_WEBHOOK_SECRET`. Subscribe to `installation`,
   `installation_repositories`, `organization`, `member`, `membership` and
-  `repository`. Only the first two are acted on so far; the rest get a 204.
+  `repository`. `repository` is not acted on yet and gets a 204.
+- User authorization: callback URL as under Environment; its client id and
+  secret are `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`. There is no separate
+  OAuth app.
 - Locally, forward deliveries to the dev server with a service such as smee.io.
 
 ## Sign-in
 
-GitHub OAuth through Auth.js v5 (`auth.ts`), with JWT sessions and no auth
-tables. The sign-in pass upserts the `users` row by GitHub id. A user can have
-memberships in several organizations, each with its own role; `/` lists them
-(`lib/organization.ts`).
+The GitHub App's user authorization through Auth.js v5 (`auth.ts`), with JWT
+sessions and no auth tables; the GitHub provider works unchanged with an App's
+client id and secret. The sign-in pass (`lib/sign-in.ts`) upserts the `users`
+row by GitHub id, then refreshes the user's membership in every installed
+organization. A user can have memberships in several organizations, each with
+its own role; `/` lists them (`lib/organization.ts`).
+
+The refresh costs one `GET /orgs/{org}/memberships/{username}` per installed
+organization, up to eight at a time, before one transaction writes the results.
+Personal accounts need no call. Installation tokens are cached per process, so
+a warm instance mints each one about once an hour. A failed lookup or a
+suspended installation keeps what was stored, and a failed refresh never blocks
+sign-in. The user's OAuth token is not kept.
 
 ## Organizations and access
 
@@ -138,6 +173,8 @@ lib/
   data/                 the seam above
   authorize.ts          slug + session -> organization and role, or not-found
   session.ts            session and the requireOrganization guard
+  sign-in.ts            the sign-in pass: user row, then membership refresh
+  membership-sync.ts    GitHub role -> membership, shared by webhook and sign-in
   organization.ts       a user's memberships
   github-app.ts         the GitHub App's env and client
   paths.ts              /o/<slug> paths and callbackUrl checks

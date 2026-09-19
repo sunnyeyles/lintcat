@@ -3,6 +3,8 @@ export {
   type GithubAppClient,
   type GithubAppConfig,
   type InstallationRepository,
+  type OrganizationMember,
+  type OrganizationRole,
 } from "#src/app-client";
 export { httpStatus, isPermissionError } from "#src/errors";
 export { createTokenClient, type GithubTokenConfig } from "#src/token";

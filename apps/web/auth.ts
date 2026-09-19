@@ -1,8 +1,7 @@
-import { db } from "@pr-review/db";
 import NextAuth from "next-auth";
 import GitHub, { type GitHubProfile } from "next-auth/providers/github";
 
-import { upsertGithubUser } from "@/lib/users";
+import { signInUser } from "@/lib/sign-in";
 
 declare module "next-auth" {
   interface Session {
@@ -19,10 +18,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     // `profile` is set only on the sign-in pass; that is when the row is mirrored.
     async jwt({ token, profile }) {
       if (!profile) return token;
-      const user = await upsertGithubUser(
-        db(),
-        profile as unknown as GitHubProfile,
-      );
+      const user = await signInUser(profile as unknown as GitHubProfile);
       return { ...token, githubId: user.githubId, login: user.login };
     },
     session({ session, token }) {

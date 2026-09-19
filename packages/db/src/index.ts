@@ -17,4 +17,13 @@ export {
   type InstallationInput,
   type RepositoryInput,
 } from "./installations";
+export {
+  deleteMembership,
+  findOrganizationByAccountId,
+  listInstalledOrganizations,
+  listOrganizationMembers,
+  upsertAccountUser,
+  upsertMembership,
+  type GithubAccount,
+} from "./memberships";
 export * from "./schema";

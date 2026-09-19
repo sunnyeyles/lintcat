@@ -10,10 +10,14 @@ export function githubWebhookSecret(): string {
   return required("GITHUB_APP_WEBHOOK_SECRET");
 }
 
+let cached: GithubAppClient | undefined;
+
+// Kept per process so installation tokens are reused while they last.
 // Single-line env values carry the PEM's newlines as literal `\n`.
 export function githubApp(): GithubAppClient {
-  return createGithubAppClient({
+  cached ??= createGithubAppClient({
     appId: required("GITHUB_APP_ID"),
     privateKey: required("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n"),
   });
+  return cached;
 }

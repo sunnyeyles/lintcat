@@ -68,6 +68,9 @@ importers:
       '@pr-review/github':
         specifier: workspace:*
         version: link:../../packages/github
+      '@pr-review/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
       '@pr-review/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas

@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
   deleteInstallation,
+  findOrganizationByAccountId,
   removeRepositories,
   replaceRepositories,
   setInstallationSuspended,
@@ -12,12 +13,22 @@ import {
   type RepositoryInput,
 } from "@pr-review/db";
 import type { GithubAppClient } from "@pr-review/github";
+import type { StructuredLogger } from "@pr-review/logging";
 import { z } from "zod";
+
+import {
+  applyMembership,
+  installedAccount,
+  lookupMembers,
+  lookupMembership,
+  replaceMembers,
+} from "@/lib/membership-sync";
 
 export interface GithubWebhookDeps {
   /** Must support `.transaction()`: the WebSocket pool in production, PGlite in tests. */
   database: Database;
   github: GithubAppClient;
+  logger: StructuredLogger;
   webhookSecret: string;
 }
 
@@ -48,6 +59,33 @@ const installationRepositoriesEventSchema = installationEventSchema.extend({
   repositories_removed: z.array(payloadRepositorySchema.pick({ id: true })),
 });
 
+const payloadUserSchema = z.object({
+  id: z.number(),
+  login: z.string(),
+  avatar_url: z.string().nullish(),
+});
+
+const payloadOrganizationSchema = z.object({ id: z.number(), login: z.string() });
+
+const organizationEventSchema = z.object({
+  action: z.string(),
+  organization: payloadOrganizationSchema,
+  membership: z.object({ user: payloadUserSchema.nullable() }).optional(),
+});
+
+// `member` (repository collaborator) and `membership` (team) both name the user `member`.
+const memberEventSchema = z.object({
+  action: z.string(),
+  organization: payloadOrganizationSchema.optional(),
+  member: payloadUserSchema.nullable(),
+});
+
+const MEMBER_ACTIONS: Record<string, readonly string[]> = {
+  organization: ["member_added", "member_removed"],
+  member: ["added", "edited", "removed"],
+  membership: ["added", "removed"],
+};
+
 /** The route body, with its collaborators passed in so tests need no Neon or GitHub. */
 export async function handleGithubWebhook(
   request: Request,
@@ -64,10 +102,9 @@ export async function handleGithubWebhook(
     return Response.json({ error: "bad signature" }, { status: 401 });
   }
 
-  const event = request.headers.get("x-github-event");
-  if (event !== "installation" && event !== "installation_repositories") {
-    return ignored();
-  }
+  const event = request.headers.get("x-github-event") ?? "";
+  const run = dispatch(event, deps);
+  if (!run) return ignored();
 
   let payload: unknown;
   try {
@@ -76,17 +113,41 @@ export async function handleGithubWebhook(
     return Response.json({ error: "body is not valid JSON" }, { status: 400 });
   }
 
-  const handled =
-    event === "installation"
-      ? await withPayload(installationEventSchema, payload, (data) =>
-          onInstallation(deps, data),
-        )
-      : await withPayload(installationRepositoriesEventSchema, payload, (data) =>
-          onInstallationRepositories(deps.database, data),
-        );
+  const handled = await run(payload);
   if (handled instanceof Response) return handled;
   if (!handled) return ignored();
   return Response.json({ event }, { status: 200 });
+}
+
+function dispatch(
+  event: string,
+  deps: GithubWebhookDeps,
+): ((payload: unknown) => Promise<boolean | Response>) | undefined {
+  switch (event) {
+    case "installation":
+      return (payload) =>
+        withPayload(installationEventSchema, payload, (data) =>
+          onInstallation(deps, data),
+        );
+    case "installation_repositories":
+      return (payload) =>
+        withPayload(installationRepositoriesEventSchema, payload, (data) =>
+          onInstallationRepositories(deps.database, data),
+        );
+    case "organization":
+      return (payload) =>
+        withPayload(organizationEventSchema, payload, (data) =>
+          onMemberChanged(deps, event, data.action, data.organization, data.membership?.user),
+        );
+    case "member":
+    case "membership":
+      return (payload) =>
+        withPayload(memberEventSchema, payload, (data) =>
+          onMemberChanged(deps, event, data.action, data.organization, data.member),
+        );
+    default:
+      return undefined;
+  }
 }
 
 async function withPayload<T>(
@@ -105,17 +166,20 @@ async function withPayload<T>(
 }
 
 async function onInstallation(
-  { database, github }: GithubWebhookDeps,
+  deps: GithubWebhookDeps,
   payload: z.infer<typeof installationEventSchema>,
 ): Promise<boolean> {
+  const { database, github } = deps;
   const installation = toInstallation(payload.installation);
   if (!installation) return false;
+  const source = `installation.${payload.action}`;
   switch (payload.action) {
     case "created": {
       // Fetched before the transaction opens, so no connection idles on GitHub.
       const listed = await github.listInstallationRepositories(
         installation.installationId,
       );
+      const members = await lookupMembers(github, installation);
       const repositories = listed.map(
         (repo): RepositoryInput => ({
           githubRepoId: repo.id,
@@ -127,6 +191,7 @@ async function onInstallation(
       await database.transaction(async (tx) => {
         const organization = await upsertInstallation(tx, installation);
         await replaceRepositories(tx, organization.id, repositories);
+        await replaceMembers({ ...deps, database: tx }, organization, members, source);
       });
       return true;
     }
@@ -140,9 +205,18 @@ async function onInstallation(
         installation.suspendedAt ?? new Date(),
       );
       return true;
-    case "unsuspend":
-      await setInstallationSuspended(database, installation.accountId, null);
+    case "unsuspend": {
+      // No deliveries arrive while suspended, so members may have drifted.
+      const members = await lookupMembers(github, installation);
+      await database.transaction(async (tx) => {
+        await setInstallationSuspended(tx, installation.accountId, null);
+        const organization = await findOrganizationByAccountId(tx, installation.accountId);
+        if (organization) {
+          await replaceMembers({ ...deps, database: tx }, organization, members, source);
+        }
+      });
       return true;
+    }
     default:
       return false;
   }
@@ -173,6 +247,48 @@ async function onInstallationRepositories(
       payload.repositories_removed.map((repo) => repo.id),
     );
   });
+  return true;
+}
+
+// The payload's role is not trusted: GitHub is asked for the current one, so reordered deliveries converge.
+async function onMemberChanged(
+  deps: GithubWebhookDeps,
+  event: string,
+  action: string,
+  payloadOrganization: z.infer<typeof payloadOrganizationSchema> | undefined,
+  user: z.infer<typeof payloadUserSchema> | null | undefined,
+): Promise<boolean> {
+  if (!MEMBER_ACTIONS[event]?.includes(action) || !payloadOrganization || !user) {
+    return false;
+  }
+  const source = `${event}.${action}`;
+  const account = {
+    githubId: user.id,
+    login: user.login,
+    avatarUrl: user.avatar_url ?? null,
+  };
+  const organization = await findOrganizationByAccountId(
+    deps.database,
+    payloadOrganization.id,
+  );
+  const installed = organization && installedAccount(organization);
+  const skip = (reason: string) => {
+    deps.logger.info("membership.skipped", {
+      source,
+      organization: payloadOrganization.login.toLowerCase(),
+      githubUserId: account.githubId,
+      login: account.login,
+      reason,
+    });
+    return false;
+  };
+  if (!organization || !installed) return skip("organization_not_installed");
+  if (organization.suspendedAt) return skip("installation_suspended");
+
+  const decision = await lookupMembership(deps.github, installed, account);
+  await deps.database.transaction((tx) =>
+    applyMembership({ ...deps, database: tx }, organization, { account, decision }, source),
+  );
   return true;
 }
 

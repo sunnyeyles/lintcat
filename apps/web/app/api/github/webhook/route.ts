@@ -1,4 +1,5 @@
 import { withWriteDatabase } from "@pr-review/db";
+import { createConsoleLogger } from "@pr-review/logging";
 
 import { githubApp, githubWebhookSecret } from "@/lib/github-app";
 
@@ -12,6 +13,7 @@ export function POST(request: Request): Promise<Response> {
     handleGithubWebhook(request, {
       database,
       github: githubApp(),
+      logger: createConsoleLogger(),
       webhookSecret,
     }),
   );
