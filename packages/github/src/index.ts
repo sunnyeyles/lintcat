@@ -1,3 +1,9 @@
+export {
+  createGithubAppClient,
+  type GithubAppClient,
+  type GithubAppConfig,
+  type InstallationRepository,
+} from "#src/app-client";
 export { httpStatus, isPermissionError } from "#src/errors";
 export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
