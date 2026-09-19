@@ -24,7 +24,6 @@ import {
   type SQL,
 } from "drizzle-orm";
 
-import { DEFAULT_CONFIG } from "@/lib/agent-config";
 
 import {
   addTokens,
@@ -215,7 +214,7 @@ export function createDbSource(
         ...repo,
         reviewCount: reviewStat?.reviewCount ?? 0,
         findingCount: findingStat?.findingCount ?? 0,
-        openHighSeverity: findingStat?.high ?? 0,
+        highSeverity: findingStat?.high ?? 0,
         lastReviewedAt: reviewStat?.lastReviewedAt ?? null,
         costUsd: tokens ? costOf(tokens) : 0,
       };
@@ -223,7 +222,6 @@ export function createDbSource(
   }
 
   return {
-    isDemo: false,
     organization,
 
     listRepos() {
@@ -271,9 +269,5 @@ export function createDbSource(
       return computeUsage(scoped, repoRows, range);
     },
 
-    // No agent configuration is stored yet; the settings page stays on the fixture.
-    async getAgentConfig() {
-      return DEFAULT_CONFIG;
-    },
   };
 }

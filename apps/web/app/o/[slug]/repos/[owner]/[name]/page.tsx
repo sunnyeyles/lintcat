@@ -88,14 +88,7 @@ export default async function RepoDetailPage({
           hint={revisited > 0 ? `${formatNumber(revisited)} PRs reviewed more than once` : undefined}
         />
         <Stat label="Findings all time" value={formatNumber(repo.findingCount)} />
-        <Stat
-          label="High severity"
-          value={formatNumber(repo.openHighSeverity)}
-          delta={{
-            value: repo.openHighSeverity > 0 ? "needs attention" : "clear",
-            tone: repo.openHighSeverity > 0 ? "stop" : "ok",
-          }}
-        />
+        <Stat label="High severity" value={formatNumber(repo.highSeverity)} />
         <Stat
           label="Median duration"
           value={formatDuration(trends.totals.medianDurationMs)}

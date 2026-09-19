@@ -68,10 +68,10 @@ export function RepoTable({ slug, repos, caption, limit }: RepoTableProps) {
             <TableCell
               className={cn(
                 "text-right font-semibold tabular-nums",
-                repo.openHighSeverity > 0 ? "text-sev-high" : "text-slate",
+                repo.highSeverity > 0 ? "text-sev-high" : "text-slate",
               )}
             >
-              {formatNumber(repo.openHighSeverity)}
+              {formatNumber(repo.highSeverity)}
             </TableCell>
             <TableCell className="whitespace-nowrap">
               {repo.lastReviewedAt ? (

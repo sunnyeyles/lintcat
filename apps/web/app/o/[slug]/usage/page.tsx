@@ -13,10 +13,10 @@ import {
   TokenCompositionChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
-import { costOf, demoData } from "@/lib/data";
+import { costOf } from "@/lib/data";
+import { data } from "@/lib/data/server";
 import type { TokenCounts } from "@/lib/data/types";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
-import { requireOrganization } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Tokens & cost" };
 
@@ -51,9 +51,9 @@ export default async function UsagePage({
   params: Promise<{ slug: string }>;
   searchParams: SearchParams;
 }) {
-  await requireOrganization((await params).slug);
+  const source = await data((await params).slug);
   const range = parseRange((await searchParams).range);
-  const usage = await demoData().getUsage(range);
+  const usage = await source.getUsage(range);
   const phrase = RANGE_PHRASE[range];
   const { totals } = usage;
 
@@ -69,7 +69,7 @@ export default async function UsagePage({
       <PageHeader
         eyebrow="Usage"
         title="Tokens & cost"
-        description={`What the agents spent in ${phrase}. Cost uses the fixed price table in lib/data/mock.ts, so the figures are illustrative rather than billed.`}
+        description={`What the agents spent in ${phrase}. Cost uses the fixed price table in lib/data/aggregate.ts, so the figures are illustrative rather than billed.`}
       />
 
       <div className="mt-8">

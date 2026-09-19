@@ -1,7 +1,6 @@
 import { cn } from "@pr-review/design";
 import Link from "next/link";
 
-import { DemoDataBadge } from "@/components/shell/demo-data-badge";
 import { SidebarDrawer } from "@/components/shell/sidebar";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { UserMenu } from "@/components/shell/user-menu";
@@ -29,7 +28,6 @@ export function Topbar({ className }: { className?: string }) {
           </span>
         </Link>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <DemoDataBadge />
           <ThemeToggle />
           <UserMenu />
         </div>
