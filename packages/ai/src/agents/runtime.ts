@@ -22,7 +22,10 @@ import { extractAgentOutput } from "#src/agents/output";
 import type { ReviewModel } from "#src/model";
 import type { ReviewAgent, ReviewContext } from "#src/agent-contract";
 import type { ManagedPrompts } from "#src/prompts";
-import { renderRepositoryIndex } from "#src/agents/repository-index";
+import {
+  renderRepository,
+  renderRepositoryIndex,
+} from "#src/agents/repository-index";
 import { createReviewTools } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
 import { addTokenUsage, emptyTokenUsage, toTokenUsage } from "#src/usage";
@@ -106,6 +109,7 @@ function buildOpeningMessage(
     ...files,
     "</changed_files>",
     "",
+    ...renderRepository(index),
     ...renderRepositoryIndex(index, changedFiles, MAX_LISTED_FILES),
     "",
     "<diff>",

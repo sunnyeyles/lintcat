@@ -809,6 +809,100 @@ describe("the repository index block", () => {
   });
 });
 
+describe("the repository block", () => {
+  const scripted = [message([textBlock(finalJson)], "end_turn")];
+
+  /** A monorepo the archive fixture is not, so the block has packages to list. */
+  function monorepoIndex() {
+    return buildRepositoryIndex({
+      sha: baseSha,
+      files: new Map([
+        ["pnpm-workspace.yaml", "packages:\n  - packages/*\n"],
+        [
+          "packages/core/package.json",
+          JSON.stringify({ name: "@acme/core", exports: { ".": "./index.ts" } }),
+        ],
+        ["packages/core/index.ts", "export const core = 1;\n"],
+        ["packages/app/package.json", JSON.stringify({ name: "@acme/app" })],
+        ["packages/app/main.ts", 'import { core } from "@acme/core";\n'],
+        ["README.md", "# Example\n"],
+      ]),
+    });
+  }
+
+  async function openingWith(index?: ReturnType<typeof fakeIndex>) {
+    const { agent, calls } = makeAgent(
+      scripted,
+      index === undefined ? {} : { index },
+    );
+    await agent.run(context);
+    return openingOf(calls[0]);
+  }
+
+  it("lists each workspace package with its root", async () => {
+    const opening = await openingWith(monorepoIndex());
+
+    expect(opening).toContain("Packages (2):");
+    expect(opening).toContain("- @acme/app — packages/app");
+    expect(opening).toContain("- @acme/core — packages/core");
+  });
+
+  it("says so when no workspace manifest declares any package", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening).toContain("Packages: none declared by a workspace manifest.");
+  });
+
+  it("carries the commit, the truncation flag and the coverage summary", async () => {
+    const opening = await openingWith(monorepoIndex());
+
+    expect(opening).toContain(`<repository sha="${baseSha}" truncated="false">`);
+    expect(opening).toContain(
+      "typescript 2 files (indexed, 1/1 internal imports resolved, 100%)",
+    );
+    expect(opening).toContain("Languages: json 2 files (not indexed)");
+    expect(opening).toContain("markdown 1 file (not indexed)");
+  });
+
+  it("renders no block at all when the reviewer built no index", async () => {
+    const opening = await openingWith();
+
+    expect(opening).not.toContain("<repository ");
+    expect(opening).toContain(INDEX_ABSENT_LINE);
+  });
+
+  it("sits between the changed files and the per-file index", async () => {
+    const opening = await openingWith(monorepoIndex());
+
+    expect(opening.indexOf("</changed_files>")).toBeLessThan(
+      opening.indexOf("<repository "),
+    );
+    expect(opening.indexOf("</repository>")).toBeLessThan(
+      opening.indexOf("<repository_index"),
+    );
+  });
+
+  it("names the package a changed file belongs to", async () => {
+    const { agent, calls } = makeAgent(scripted, { index: monorepoIndex() });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        {
+          filename: "packages/app/main.ts",
+          status: "modified",
+          additions: 1,
+          deletions: 0,
+        },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain(
+      "- packages/app/main.ts — @acme/app, source, no test, 0 importers",
+    );
+  });
+});
+
 describe("find_references through the agent runtime", () => {
   const callReferences = (input: unknown): ScriptedResponse[] => [
     message([toolUseBlock("toolu_1", "find_references", input)], "tool_use"),

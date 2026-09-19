@@ -279,8 +279,10 @@ export function createReviewTools(
         "imports are included and marked as such, since a namespace import reaches every name. " +
         `At most ${MAX_REFERENCE_FILES} files are returned and \`total\` is the true count. ` +
         "Every result carries an `index` header: an empty list means nothing imports the path " +
-        "ONLY when that header shows the path's language indexed and truncated false. A path " +
-        "this pull request added, or one the index does not hold, comes back as known: false.",
+        "ONLY when that header shows the path's language indexed and truncated false. Each " +
+        "indexed language also carries a `resolution` rate — the share of the repository's own " +
+        "imports the index could place — so a rate below 1 means some importers are missing. A " +
+        "path this pull request added, or one the index does not hold, comes back as known: false.",
       inputSchema: z.strictObject({
         path: repositoryPathSchema,
         name: exportedNameSchema

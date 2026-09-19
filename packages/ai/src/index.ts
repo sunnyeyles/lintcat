@@ -21,6 +21,7 @@ export type {
 export { emptyTokenUsage, type TokenUsage } from "#src/usage";
 export { createReviewAgent, type ReviewAgentDeps } from "#src/agents/runtime";
 export {
+  renderRepository,
   renderRepositoryIndex,
   INDEX_ABSENT_LINE,
 } from "#src/agents/repository-index";

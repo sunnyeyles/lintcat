@@ -354,10 +354,44 @@ describe("review tool execution", () => {
       sha: baseSha,
       truncated: false,
       languages: expect.arrayContaining([
-        { language: "typescript", files: 6, indexed: true },
+        {
+          language: "typescript",
+          files: 6,
+          indexed: true,
+          resolution: { internal: 5, resolved: 5, rate: 1 },
+        },
         { language: "markdown", files: 1, indexed: false },
       ]),
     });
+  });
+
+  it("shows a rate below one when an alias points outside the tree", async () => {
+    const aliased = new Map<string, string>([
+      [
+        "tsconfig.json",
+        JSON.stringify({ compilerOptions: { paths: { "@/*": ["src/*"] } } }),
+      ],
+      ["src/sessions.ts", "export const sessions = [];\n"],
+      ["src/api.ts", 'import { sessions } from "@/sessions";\n'],
+      ["src/boot.ts", 'import { gone } from "@/gone";\n'],
+    ]);
+    const result = (await run(
+      createReviewTools(
+        makeGithub(),
+        scope,
+        buildRepositoryIndex({ sha: baseSha, files: aliased }),
+      ),
+      "find_references",
+      { path: "src/sessions.ts" },
+    )) as string;
+
+    const payload = JSON.parse(result);
+    expect(payload.index.languages[0].resolution).toEqual({
+      internal: 2,
+      resolved: 1,
+      rate: 0.5,
+    });
+    expect(payload.total).toBe(1);
   });
 
   it("reports the true total while returning at most fifty files", async () => {
