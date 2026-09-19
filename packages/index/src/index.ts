@@ -19,13 +19,31 @@ export {
   INDEXED_LANGUAGES,
   languageOf,
   summariseLanguages,
+  type ImportResolution,
   type LanguageCoverage,
 } from "#src/languages";
+export {
+  parseWorkspaceYamlPackages,
+  readPathAliases,
+  type PackageManifest,
+  type PathAlias,
+} from "#src/manifests";
 export { coveredSourcePaths } from "#src/pairing";
 export {
   referencesTo,
   type Reference,
   type ReferenceImport,
 } from "#src/references";
-export { isRelativeSpecifier, resolveRelativeImport } from "#src/resolve";
+export {
+  createImportResolver,
+  isRelativeSpecifier,
+  resolveRelativeImport,
+  type ResolvedImport,
+} from "#src/resolve";
 export { classifyFileRole, ROLE_PRECEDENCE, type FileRole } from "#src/roles";
+export {
+  packageOf,
+  readWorkspace,
+  type WorkspaceModel,
+  type WorkspacePackage,
+} from "#src/workspace";

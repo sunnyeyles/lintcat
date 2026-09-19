@@ -51,6 +51,16 @@ export const INDEXED_LANGUAGES: ReadonlySet<string> = new Set([
   "javascript",
 ]);
 
+/** How much of what a language imports from inside the repository was placed. */
+export interface ImportResolution {
+  /** Imports that are not third-party: relative, alias, or a package of this tree. */
+  internal: number;
+  /** Of those, the ones pointing at a file the index holds. */
+  resolved: number;
+  /** resolved ÷ internal, 1 when the language imports nothing internal. */
+  rate: number;
+}
+
 /** What the index saw of one language, and whether it parsed any of it. */
 export interface LanguageCoverage {
   language: string;
@@ -58,21 +68,44 @@ export interface LanguageCoverage {
   files: number;
   /** True only where imports were parsed; elsewhere the file was merely seen. */
   indexed: boolean;
+  /** Present only for an indexed language, whose imports were resolved. */
+  resolution?: ImportResolution;
+}
+
+/** Counts, per language, how many internal imports were placed in the tree. */
+export type ResolutionTally = ReadonlyMap<
+  string,
+  { internal: number; resolved: number }
+>;
+
+function resolutionOf(
+  language: string,
+  tally: ResolutionTally,
+): ImportResolution {
+  const counted = tally.get(language) ?? { internal: 0, resolved: 0 };
+  const rate =
+    counted.internal === 0 ? 1 : counted.resolved / counted.internal;
+  return { ...counted, rate: Math.round(rate * 1000) / 1000 };
 }
 
 /** Counts files per language, commonest first. */
 export function summariseLanguages(
   languages: Iterable<string>,
+  tally: ResolutionTally = new Map(),
 ): LanguageCoverage[] {
   const counts = new Map<string, number>();
   for (const language of languages) {
     counts.set(language, (counts.get(language) ?? 0) + 1);
   }
   return [...counts]
-    .map(([language, files]) => ({
-      language,
-      files,
-      indexed: INDEXED_LANGUAGES.has(language),
-    }))
+    .map(([language, files]) => {
+      const indexed = INDEXED_LANGUAGES.has(language);
+      return {
+        language,
+        files,
+        indexed,
+        ...(indexed ? { resolution: resolutionOf(language, tally) } : {}),
+      };
+    })
     .sort((a, b) => b.files - a.files || a.language.localeCompare(b.language));
 }

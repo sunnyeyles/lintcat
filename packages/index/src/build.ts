@@ -10,14 +10,22 @@ import {
   type LanguageCoverage,
 } from "#src/languages";
 import { coveredSourcePaths } from "#src/pairing";
-import { resolveRelativeImport } from "#src/resolve";
+import { createImportResolver } from "#src/resolve";
 import { classifyFileRole, type FileRole } from "#src/roles";
+import {
+  packageOf,
+  readWorkspace,
+  type WorkspaceModel,
+  type WorkspacePackage,
+} from "#src/workspace";
 
 /** One file at the indexed commit. */
 export interface IndexedFile {
   readonly path: string;
   readonly role: FileRole;
   readonly language: string;
+  /** The nearest named package.json above it, absent when there is none. */
+  readonly package?: string;
   /** Distinct files importing this one, resolved. */
   readonly importerCount: number;
   /** The test covering this source file, when one matches a convention. */
@@ -45,6 +53,8 @@ export interface RepositoryIndex {
   /** True when files are missing because the archive hit a cap. */
   readonly truncated: boolean;
   readonly files: ReadonlyMap<string, IndexedFile>;
+  /** The workspace's own packages, by root; empty outside a monorepo. */
+  readonly packages: readonly WorkspacePackage[];
   readonly coverage: readonly LanguageCoverage[];
   /** Every import parsed, unresolved ones included. */
   readonly edges: readonly ImportEdge[];
@@ -83,22 +93,38 @@ function pairTestsWithSources(files: Map<string, MutableIndexedFile>): void {
   }
 }
 
+interface ImportGraph {
+  edges: ImportEdge[];
+  importers: Map<string, ImportEdge[]>;
+  /** Internal and resolved counts per language, for the resolution rate. */
+  tally: Map<string, { internal: number; resolved: number }>;
+}
+
 /** Parses every indexed-language file and resolves what it can. */
 function readImports(
   input: RepositoryIndexInput,
   files: ReadonlyMap<string, MutableIndexedFile>,
-): { edges: ImportEdge[]; importers: Map<string, ImportEdge[]> } {
+  workspace: WorkspaceModel,
+): ImportGraph {
   const edges: ImportEdge[] = [];
   const importers = new Map<string, ImportEdge[]>();
-  const exists = (path: string): boolean => files.has(path);
+  const tally = new Map<string, { internal: number; resolved: number }>();
+  const resolve = createImportResolver(workspace, (path) => files.has(path));
 
   for (const file of files.values()) {
     const contents = input.files.get(file.path);
     if (contents === undefined || !INDEXED_LANGUAGES.has(file.language)) {
       continue;
     }
+    let counted = tally.get(file.language);
+    if (counted === undefined) {
+      counted = { internal: 0, resolved: 0 };
+      tally.set(file.language, counted);
+    }
     for (const parsed of parseImports(contents)) {
-      const to = resolveRelativeImport(file.path, parsed.specifier, exists);
+      const { path: to, internal } = resolve(file.path, parsed.specifier);
+      counted.internal += internal ? 1 : 0;
+      counted.resolved += to === undefined ? 0 : 1;
       const edge: ImportEdge = {
         from: file.path,
         specifier: parsed.specifier,
@@ -112,24 +138,27 @@ function readImports(
       }
     }
   }
-  return { edges, importers };
+  return { edges, importers, tally };
 }
 
 /** Builds the index. Paths are sorted, so the same tree always indexes alike. */
 export function buildRepositoryIndex(
   input: RepositoryIndexInput,
 ): RepositoryIndex {
+  const workspace = readWorkspace(input.files);
   const files = new Map<string, MutableIndexedFile>();
   for (const path of [...input.files.keys()].sort()) {
+    const owner = packageOf(workspace, path);
     files.set(path, {
       path,
       role: classifyFileRole(path),
       language: languageOf(path),
       importerCount: 0,
+      ...(owner === undefined ? {} : { package: owner }),
     });
   }
   pairTestsWithSources(files);
-  const { edges, importers } = readImports(input, files);
+  const { edges, importers, tally } = readImports(input, files, workspace);
   for (const [path, pointing] of importers) {
     const file = files.get(path);
     if (file !== undefined) {
@@ -141,8 +170,10 @@ export function buildRepositoryIndex(
     sha: input.sha,
     truncated: input.truncated ?? false,
     files,
+    packages: workspace.packages,
     coverage: summariseLanguages(
       [...files.values()].map((file) => file.language),
+      tally,
     ),
     edges,
     importers,

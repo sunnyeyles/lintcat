@@ -161,7 +161,12 @@ describe("buildRepositoryIndex", () => {
     ]);
 
     expect(built.coverage).toEqual([
-      { language: "typescript", files: 2, indexed: true },
+      {
+        language: "typescript",
+        files: 2,
+        indexed: true,
+        resolution: { internal: 0, resolved: 0, rate: 1 },
+      },
       { language: "markdown", files: 1, indexed: false },
       { language: "other", files: 1, indexed: false },
       { language: "python", files: 1, indexed: false },
