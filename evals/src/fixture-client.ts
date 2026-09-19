@@ -20,6 +20,8 @@ import type {
   PullRequestDetails,
   PullRequestRef,
   PullRequestReview,
+  RepositoryArchive,
+  RepositoryArchiveRequest,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -164,6 +166,24 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
         matches: matches.slice(0, MAX_SEARCH_MATCHES),
         totalCount: matches.length,
         incompleteResults: false,
+      };
+    },
+
+    async getRepositoryArchive(
+      request: RepositoryArchiveRequest,
+    ): Promise<RepositoryArchive> {
+      const { owner, repo } = fixture.context;
+      if (request.owner !== owner || request.repo !== repo) {
+        throw new FixtureNotFoundError(
+          `fixture ${fixture.name} serves ${owner}/${repo}, not ${request.owner}/${request.repo}`,
+        );
+      }
+      record("getRepositoryArchive", request.ref);
+      // The index is always built at the base commit, so that is what it serves.
+      return {
+        sha: request.ref,
+        files: new Map(fixture.baseFiles),
+        truncated: false,
       };
     },
 

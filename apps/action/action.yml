@@ -92,6 +92,19 @@ inputs:
       listed on the check run, so a narrowed review never reads as a clean one.
     required: false
     default: "false"
+  index:
+    description: >-
+      Whether the review builds a repository index before the agents start. On
+      by default; set to `false` to turn it off. The index is one archive
+      request for the repository's files at the pull request's base commit —
+      never its head, so a branch cannot shape what the reviewer believes about
+      the repository. From it the agents are told each changed file's role and
+      its covering test. It is held in memory for the review and discarded;
+      nothing is stored and no permission beyond contents: read is needed. A
+      repository too large to archive, or any failure fetching or building it,
+      is logged and the review runs exactly as it would without it.
+    required: false
+    default: "true"
   memory-branch:
     description: >-
       Branch this action stores its review memory on — one JSON file recording

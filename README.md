@@ -88,6 +88,7 @@ GitHub Action (apps/action)
    │
    ├── authenticate with the workflow token
    ├── load PR, changed files, diff
+   ├── build the repository index at the base commit
    │
    ▼
 Review pipeline
@@ -240,6 +241,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `agents` | no (default `all`) | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides any [path filters](#path-filters). |
 | `agent-config` | no (default `.github/pr-review-agents.yml`) | Path to the YAML file naming the agents. Optional — without it the general agent reviews alone; create it to opt into specialists. |
 | `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
+| `index` | no (default `true`) | Whether the review builds a [repository index](#repository-index) from the pull request's base commit before the agents start. `false` turns it off. |
 | `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
 | `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agents and cut first by the synthesiser; shapes the repository acted on are the ones the synthesiser keeps. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompts from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
@@ -491,6 +493,31 @@ given the newest commit's context is outside the diff the agents are handed.
 `get_diff` means they can still reach it; nothing makes them. That is the trade
 the input buys, which is why it ships off.
 
+### Repository index
+
+Before any agent starts, the reviewer fetches the repository's files at the
+pull request's **base** commit in one archive request and builds an in-memory
+index of them. Never the head commit: a pull request must not be able to shape
+what the reviewer believes about the repository. The index is held for the
+review and thrown away — nothing is stored, no service runs, and no permission
+beyond `contents: read` is needed.
+
+What it holds today is each file's role — source, test, config, migration,
+generated, docs, vendored, asset — which test covers which source file by
+naming convention, and how many files of each language it saw. No language's
+imports are parsed yet, so every language reports as not indexed. The agents
+see it as a `<repository_index>` block in their opening message: one line per
+changed file, with its role and its covering test.
+
+Reading the archive is capped at 50 MB, 20 000 files and 512 KB per file, and
+`node_modules`, `vendor`, `dist`, `.git` and similar are dropped as it reads.
+Hitting a cap marks the index truncated rather than failing; the block says so.
+A repository too large to archive, an unreachable endpoint, or any other
+failure is logged as `index.failed` and the review runs exactly as it would
+without the index. Set the `index` input to `false` to skip the build entirely.
+
+---
+
 ### Selecting agents
 
 Each agent is an independent tool-calling loop, so a review costs essentially
@@ -664,6 +691,7 @@ under event names, grouped by what they trace:
 | --- | --- |
 | Review | `review.skipped`, `review.started`, `review.model_selected`, `review.agents_selected`, `review.loaded`, `review.no_agents_matched`, `review.failed` |
 | Scope | `review.scope_resolved`, `review.scope_unreadable`, `review.incremental.no_changes`, `review.carried_forward.unreadable` |
+| Index | `index.built`, `index.skipped`, `index.failed` |
 | Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.skipped` |
 | Synthesis | `synthesis.started`, `synthesis.skipped`, `synthesis.completed`, `synthesis.failed` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |

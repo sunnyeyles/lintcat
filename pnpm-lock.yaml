@@ -111,6 +111,9 @@ importers:
       '@pr-review/github':
         specifier: workspace:*
         version: link:../packages/github
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../packages/index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../packages/logging
