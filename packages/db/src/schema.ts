@@ -21,6 +21,8 @@ export const teams = pgTable("teams", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   githubOrg: text("github_org"),
+  // SHA-256 hex of the team's ingest secret; the secret itself is never stored.
+  ingestToken: text("ingest_token").unique(),
   createdAt: createdAt(),
 });
 
@@ -53,18 +55,25 @@ export const repos = pgTable(
   (t) => [uniqueIndex("repos_team_owner_name_idx").on(t.teamId, t.owner, t.name)],
 );
 
-export const reviews = pgTable("reviews", {
-  id: serial("id").primaryKey(),
-  repoId: integer("repo_id")
-    .notNull()
-    .references(() => repos.id, { onDelete: "cascade" }),
-  prNumber: integer("pr_number").notNull(),
-  headSha: text("head_sha").notNull(),
-  agents: text("agents").array().notNull(),
-  summary: text("summary").notNull(),
-  durationMs: integer("duration_ms").notNull().default(0),
-  createdAt: createdAt(),
-});
+// The unique index is the ingest upsert's conflict target: one row per commit.
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: serial("id").primaryKey(),
+    repoId: integer("repo_id")
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+    prNumber: integer("pr_number").notNull(),
+    headSha: text("head_sha").notNull(),
+    agents: text("agents").array().notNull(),
+    summary: text("summary").notNull(),
+    durationMs: integer("duration_ms").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("reviews_repo_pr_head_sha_idx").on(t.repoId, t.prNumber, t.headSha),
+  ],
+);
 
 // Per-agent leg of a review: the four token counters the logging events already carry.
 export const agentRuns = pgTable(
@@ -93,6 +102,7 @@ export const findings = pgTable("findings", {
   reviewId: integer("review_id")
     .notNull()
     .references(() => reviews.id, { onDelete: "cascade" }),
+  agent: text("agent"),
   file: text("file").notNull(),
   line: integer("line"),
   category: text("category").notNull(),

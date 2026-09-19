@@ -1,9 +1,11 @@
 import { neon } from "@neondatabase/serverless";
-import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/neon-http";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { databaseUrl } from "./env";
 import * as schema from "./schema";
 
-export type Database = NeonHttpDatabase<typeof schema>;
+// Driver-agnostic so tests can pass a pglite client where production passes Neon.
+export type Database = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 let cached: Database | undefined;
 

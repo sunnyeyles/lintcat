@@ -167,6 +167,7 @@ function build(now: Date, ceiling: number): World {
     slug: "acme",
     name: "Acme Engineering",
     githubOrg: "acme",
+    ingestToken: null,
     createdAt: new Date(now.getTime() - DAYS * 864e5),
   };
 
@@ -213,6 +214,7 @@ function build(now: Date, ceiling: number): World {
           findings.push({
             id: findingId,
             reviewId,
+            agent,
             file: pick(r, PATHS),
             line: r() > 0.12 ? intBetween(r, 3, 480) : null,
             category,
