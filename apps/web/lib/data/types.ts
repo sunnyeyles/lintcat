@@ -1,4 +1,4 @@
-import type { Finding, Repo, Review, Team } from "@pr-review/db";
+import type { Finding, Organization, Repo, Review } from "@pr-review/db";
 
 export type Severity = "low" | "medium" | "high";
 
@@ -108,7 +108,7 @@ export type Range = "7d" | "30d" | "90d";
 
 export type DataSource = {
   isDemo: boolean;
-  team: Team;
+  organization: Organization;
   listRepos(): Promise<RepoSummary[]>;
   getRepo(owner: string, name: string): Promise<RepoSummary | null>;
   listReviews(opts?: { repoId?: number; limit?: number }): Promise<ReviewSummary[]>;

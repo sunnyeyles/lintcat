@@ -138,6 +138,21 @@ inputs:
       prompt change on one repository before promoting it.
     required: false
     default: production
+  dashboard-token:
+    description: >-
+      The organization's ingest secret for the review dashboard. Supply this and
+      dashboard-url to record every review there. Store it as a repository or
+      organisation secret; never inline it. Leave both unset and the review is
+      published to GitHub only, which is the default.
+    required: false
+    default: ""
+  dashboard-url:
+    description: >-
+      Base URL of the dashboard, such as https://example.vercel.app — the
+      action appends `/api/ingest`. Setting only one of the two inputs records
+      nothing and logs dashboard.disabled_incomplete_config.
+    required: false
+    default: ""
 
 runs:
   using: node24

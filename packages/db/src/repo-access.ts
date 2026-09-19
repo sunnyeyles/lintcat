@@ -1,0 +1,152 @@
+import { and, asc, eq, inArray, isNotNull, isNull, notInArray, or, sql } from "drizzle-orm";
+import type { Database } from "./client";
+import {
+  memberships,
+  repoAccess,
+  repos,
+  users,
+  type MembershipRole,
+  type Repo,
+  type RepoPermission,
+} from "./schema";
+
+export interface ReadableRepo {
+  id: number;
+  /** Organization owner, or `admin`/`maintain` on the repo. */
+  isOwner: boolean;
+}
+
+/** The live repos a member of the organization may read, by the visibility rule. */
+export async function readableRepos(
+  database: Database,
+  { organizationId, userId, role }: { organizationId: number; userId: number; role: MembershipRole },
+): Promise<ReadableRepo[]> {
+  const rows = await database
+    .select({ id: repos.id, private: repos.private, permission: repoAccess.permission })
+    .from(repos)
+    .leftJoin(
+      repoAccess,
+      and(eq(repoAccess.repoId, repos.id), eq(repoAccess.userId, userId)),
+    )
+    .where(
+      and(
+        eq(repos.organizationId, organizationId),
+        isNull(repos.removedAt),
+        role === "owner" ? undefined : or(eq(repos.private, false), isNotNull(repoAccess.id)),
+      ),
+    )
+    .orderBy(asc(repos.id));
+  return rows.map((row) => ({
+    id: row.id,
+    isOwner:
+      role === "owner" || row.permission === "admin" || row.permission === "maintain",
+  }));
+}
+
+/** Null permission deletes the row: the user has no access. */
+export async function setRepoAccess(
+  database: Database,
+  { userId, repoId, permission }: { userId: number; repoId: number; permission: RepoPermission | null },
+): Promise<void> {
+  if (permission === null) {
+    await database
+      .delete(repoAccess)
+      .where(and(eq(repoAccess.userId, userId), eq(repoAccess.repoId, repoId)));
+    return;
+  }
+  await database
+    .insert(repoAccess)
+    .values({ userId, repoId, permission })
+    .onConflictDoUpdate({
+      target: [repoAccess.userId, repoAccess.repoId],
+      set: { permission, syncedAt: sql`now()` },
+    });
+}
+
+/** Makes the repo's rows exactly `grants`, keyed by GitHub user id; users never seen are skipped. */
+export async function replaceRepoAccess(
+  database: Database,
+  repoId: number,
+  grants: readonly { githubId: number; permission: RepoPermission }[],
+): Promise<void> {
+  const known =
+    grants.length === 0
+      ? []
+      : await database
+          .select({ id: users.id, githubId: users.githubId })
+          .from(users)
+          .where(inArray(users.githubId, grants.map((grant) => grant.githubId)));
+  const byGithubId = new Map(known.map((user) => [user.githubId, user.id]));
+  const kept: number[] = [];
+  for (const grant of grants) {
+    const userId = byGithubId.get(grant.githubId);
+    if (userId === undefined) continue;
+    kept.push(userId);
+    await setRepoAccess(database, { userId, repoId, permission: grant.permission });
+  }
+  await database
+    .delete(repoAccess)
+    .where(
+      and(
+        eq(repoAccess.repoId, repoId),
+        kept.length === 0 ? undefined : notInArray(repoAccess.userId, kept),
+      ),
+    );
+}
+
+/** Drops a user's rows on every repo of the organization, as when they leave it. */
+export async function deleteOrganizationRepoAccess(
+  database: Database,
+  organizationId: number,
+  githubUserId: number,
+): Promise<void> {
+  const user = database
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.githubId, githubUserId));
+  const organizationRepos = database
+    .select({ id: repos.id })
+    .from(repos)
+    .where(eq(repos.organizationId, organizationId));
+  await database
+    .delete(repoAccess)
+    .where(
+      and(inArray(repoAccess.userId, user), inArray(repoAccess.repoId, organizationRepos)),
+    );
+}
+
+/** The live private repos GitHub knows, which are the only ones a member needs a row for. */
+export async function listPrivateRepos(
+  database: Database,
+  organizationId: number,
+): Promise<Repo[]> {
+  return database
+    .select()
+    .from(repos)
+    .where(
+      and(
+        eq(repos.organizationId, organizationId),
+        eq(repos.private, true),
+        isNull(repos.removedAt),
+        isNotNull(repos.githubRepoId),
+      ),
+    )
+    .orderBy(asc(repos.id));
+}
+
+/** The organizations the user belongs to, with their role in each. */
+export async function listUserMemberships(
+  database: Database,
+  githubUserId: number,
+): Promise<{ userId: number; organizationId: number; role: MembershipRole }[]> {
+  return database
+    .select({
+      userId: users.id,
+      organizationId: memberships.organizationId,
+      role: memberships.role,
+    })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(eq(users.githubId, githubUserId))
+    .orderBy(asc(memberships.organizationId));
+}

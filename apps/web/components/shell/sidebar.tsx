@@ -13,9 +13,12 @@ import {
 import { Bot, ChartLine, Coins, FolderGit2, LayoutDashboard, Menu } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { organizationPath, withinOrganization } from "@/lib/paths";
+
+// `href` is relative to the organization, e.g. "/repos" under `/o/<slug>`.
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -26,15 +29,18 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/settings/agents", label: "Agents", icon: Bot },
 ];
 
+// On a subdomain the browser path has no `/o/<slug>` prefix, so compare without it.
 function isActive(pathname: string, href: string): boolean {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const page = withinOrganization(pathname);
+  return href === "/" ? page === "/" : page.startsWith(href);
 }
 
 const LINK_CLASS =
   "group flex items-center gap-2.5 rounded-sm border border-transparent px-2.5 py-1.5 font-mono text-label tracking-ui transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ slug, onNavigate }: { slug: string; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const root = organizationPath(slug);
   return (
     <nav aria-label="Primary" className="flex flex-col gap-0.5">
       {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
@@ -42,7 +48,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         return (
           <Link
             key={href}
-            href={href}
+            href={href === "/" ? root : root + href}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
@@ -61,7 +67,13 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function Sidebar({ className }: { className?: string }) {
+export type SidebarProps = {
+  slug: string;
+  organizationName: string;
+  className?: string;
+};
+
+export function Sidebar({ slug, organizationName, className }: SidebarProps) {
   return (
     <aside
       className={cn(
@@ -70,9 +82,11 @@ export function Sidebar({ className }: { className?: string }) {
       )}
     >
       <div className="sticky top-14 px-3 py-5">
-        <p className="eyebrow px-2.5 pb-2.5 border-b border-rule">Sections</p>
+        <p className="eyebrow truncate px-2.5 pb-2.5 border-b border-rule">
+          {organizationName}
+        </p>
         <div className="pt-3">
-          <NavLinks />
+          <NavLinks slug={slug} />
         </div>
       </div>
     </aside>
@@ -81,6 +95,8 @@ export function Sidebar({ className }: { className?: string }) {
 
 export function SidebarDrawer({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
+  const { slug } = useParams<{ slug?: string }>();
+  if (slug === undefined) return null;
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
@@ -98,7 +114,7 @@ export function SidebarDrawer({ className }: { className?: string }) {
           <SheetDescription>pr-review-agents dashboard</SheetDescription>
         </SheetHeader>
         <div className="px-3 py-4">
-          <NavLinks onNavigate={() => setOpen(false)} />
+          <NavLinks slug={slug} onNavigate={() => setOpen(false)} />
         </div>
         <SheetClose className="sr-only">Close navigation</SheetClose>
       </SheetContent>

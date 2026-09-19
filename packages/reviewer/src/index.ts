@@ -16,6 +16,12 @@ export {
   type PublishReviewComments,
 } from "#src/publish-review";
 export {
+  createDashboardPublisher,
+  type DashboardPublisherConfig,
+  type DashboardReview,
+  type PublishToDashboard,
+} from "#src/publish-dashboard";
+export {
   FIX_COMMIT_MARKER,
   isFixCommit,
   type FixOutcome,

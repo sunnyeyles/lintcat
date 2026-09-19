@@ -1,13 +1,14 @@
 import { createMockSource } from "./mock";
 import type { DataSource } from "./types";
 
-// The only place that decides where dashboard data comes from.
-let source: DataSource | null = null;
+let demo: DataSource | null = null;
 
-export function data(): DataSource {
-  if (!source) source = createMockSource();
-  return source;
+// Analytics, Usage and Agents still read this fixture; the rest use data() in ./server.
+export function demoData(): DataSource {
+  if (!demo) demo = createMockSource();
+  return demo;
 }
 
 export * from "./types";
-export { agentForCategory, costOf } from "./mock";
+export { costOf, isAgentName } from "./aggregate";
+export { agentForCategory } from "./mock";

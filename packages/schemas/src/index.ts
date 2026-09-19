@@ -19,3 +19,11 @@ export {
   type MemoryShape,
   type ReviewMemory,
 } from "#src/review-memory";
+export {
+  reviewRecordAgentRunSchema,
+  reviewRecordFindingSchema,
+  reviewRecordSchema,
+  type ReviewRecord,
+  type ReviewRecordAgentRun,
+  type ReviewRecordFinding,
+} from "#src/review-record";

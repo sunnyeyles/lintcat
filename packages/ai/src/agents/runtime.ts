@@ -28,7 +28,19 @@ import {
 } from "#src/agents/repository-index";
 import { createReviewTools } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
-import { addTokenUsage, emptyTokenUsage, toTokenUsage } from "#src/usage";
+import {
+  addTokenUsage,
+  emptyTokenUsage,
+  toTokenUsage,
+  type TokenUsage,
+} from "#src/usage";
+
+/** One agent run's spend, reported on success and on failure alike. */
+export interface AgentUsageReport {
+  agent: string;
+  durationMs: number;
+  usage: TokenUsage;
+}
 
 /** An agent-level failure (bad final output, turn cap, ...). */
 export class AgentRunError extends Error {
@@ -130,6 +142,7 @@ export interface ReviewAgentDeps {
   logger?: StructuredLogger | undefined;
   /** Pre-resolved system prompts; missing agents fall back to the in-code prompt. */
   systemPrompts?: ManagedPrompts | undefined;
+  onUsage?: ((report: AgentUsageReport) => void) | undefined;
   /** The repository at the base commit; absent when off, failed or unbuilt. */
   index?: RepositoryIndex | undefined;
 }
@@ -245,12 +258,14 @@ export function createReviewAgent(
               (finding) => finding.category === agent.category,
             );
 
+            const durationMs = Date.now() - startedAt;
             logger.info("agent.completed", {
               ...eventFields,
-              durationMs: Date.now() - startedAt,
+              durationMs,
               ...usage,
               findingCount: findings.length,
             });
+            deps.onUsage?.({ agent: agent.category, durationMs, usage });
             agentObservation.update({
               output: { findingCount: findings.length },
               metadata: {
@@ -259,13 +274,15 @@ export function createReviewAgent(
             });
             return findings;
           } catch (error) {
+            const durationMs = Date.now() - startedAt;
             logger.error("agent.failed", {
               ...eventFields,
-              durationMs: Date.now() - startedAt,
+              durationMs,
               ...usage,
               error: errorMessage(error),
               errorName: errorName(error),
             });
+            deps.onUsage?.({ agent: agent.category, durationMs, usage });
             agentObservation.update({
               level: "ERROR",
               statusMessage: errorMessage(error),

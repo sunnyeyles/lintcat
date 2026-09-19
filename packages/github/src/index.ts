@@ -4,6 +4,16 @@ export {
   readRepositoryTarball,
   type TarballContents,
 } from "#src/archive";
+export {
+  createGithubAppClient,
+  type GithubAppClient,
+  type GithubAppConfig,
+  type InstallationRepository,
+  type OrganizationMember,
+  type OrganizationRole,
+  type RepositoryCollaborator,
+  type RepositoryPermission,
+} from "#src/app-client";
 export { httpStatus, isPermissionError } from "#src/errors";
 export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {

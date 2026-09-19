@@ -1,37 +1,10 @@
-import {
-  ChipDot,
-  chipVariants,
-  cn,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@pr-review/design";
+import { cn } from "@pr-review/design";
 import Link from "next/link";
 
+import { DemoDataBadge } from "@/components/shell/demo-data-badge";
 import { SidebarDrawer } from "@/components/shell/sidebar";
 import { ThemeToggle } from "@/components/shell/theme-toggle";
-
-function DemoDataBadge({ className }: { className?: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        type="button"
-        className={cn(
-          chipVariants({ tone: "warn", caps: true }),
-          "outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
-          className,
-        )}
-      >
-        <ChipDot />
-        Demo data
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        Every figure here is generated fixture data. No ingestion path from real
-        reviews exists yet.
-      </TooltipContent>
-    </Tooltip>
-  );
-}
+import { UserMenu } from "@/components/shell/user-menu";
 
 export function Topbar({ className }: { className?: string }) {
   return (
@@ -58,6 +31,7 @@ export function Topbar({ className }: { className?: string }) {
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <DemoDataBadge />
           <ThemeToggle />
+          <UserMenu />
         </div>
       </div>
     </header>

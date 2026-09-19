@@ -11,10 +11,12 @@ import {
 
 import type { RepoSummary } from "@/lib/data";
 import { formatNumber, formatRelative, formatUsd } from "@/lib/format";
+import { organizationPath } from "@/lib/paths";
 
 import { RowLink } from "./row-link";
 
 export type RepoTableProps = {
+  slug: string;
   repos: RepoSummary[];
   caption: string;
   limit?: number;
@@ -24,7 +26,7 @@ function byLastReviewed(a: RepoSummary, b: RepoSummary): number {
   return (b.lastReviewedAt?.getTime() ?? 0) - (a.lastReviewedAt?.getTime() ?? 0);
 }
 
-export function RepoTable({ repos, caption, limit }: RepoTableProps) {
+export function RepoTable({ slug, repos, caption, limit }: RepoTableProps) {
   const rows = [...repos].sort(byLastReviewed).slice(0, limit ?? repos.length);
 
   return (
@@ -52,7 +54,7 @@ export function RepoTable({ repos, caption, limit }: RepoTableProps) {
         {rows.map((repo) => (
           <TableRow key={repo.id} className="group relative">
             <TableCell className="whitespace-nowrap">
-              <RowLink href={`/repos/${repo.owner}/${repo.name}`}>
+              <RowLink href={organizationPath(slug, `/repos/${repo.owner}/${repo.name}`)}>
                 <span className="text-slate">{repo.owner}/</span>
                 {repo.name}
               </RowLink>

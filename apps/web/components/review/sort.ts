@@ -20,7 +20,7 @@ export function sortFindings(findings: readonly Finding[]): Finding[] {
 }
 
 export function agentKeyOf(finding: Finding): AgentFilterKey {
-  return agentForCategory(finding.category) ?? OTHER_AGENT;
+  return agentForCategory(finding.agent ?? finding.category) ?? OTHER_AGENT;
 }
 
 export function agentKeysOf(findings: readonly Finding[]): AgentFilterKey[] {

@@ -27,6 +27,7 @@ import {
   type ReviewModel,
   type ReadOptionalFile,
   type AgentDefinition,
+  type AgentUsageReport,
 } from "@pr-review/ai";
 import {
   createTokenClient,
@@ -43,11 +44,16 @@ import {
 import {
   createBranchMemoryStore,
   createCheckRunPublisher,
+  createDashboardPublisher,
   isFixCommit,
   learnFromMergedPullRequest,
   reviewCorrelation,
   reviewPullRequest,
   runReviewPipeline,
+  type DashboardPublisherConfig,
+  type DashboardReview,
+  type PublishToDashboard,
+  type ReviewOutcome,
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
@@ -71,6 +77,9 @@ export interface ActionEnvironment {
   createPromptClient: (config: LangfusePromptClientConfig) => LangfusePromptClient;
   /** Starts span export for this run and returns its flush handle. */
   createLangfuseRuntime: (config: LangfuseRuntimeConfig) => LangfuseRuntime;
+  createDashboardPublisher: (
+    config: DashboardPublisherConfig,
+  ) => PublishToDashboard;
   logger: StructuredLogger;
   /** Marks the process as failed without exiting it. */
   setExitCode: (code: number) => void;
@@ -85,6 +94,7 @@ export function actionEnvironment(): ActionEnvironment {
     createTokenClient,
     createPromptClient: createLangfusePromptClient,
     createLangfuseRuntime,
+    createDashboardPublisher,
     logger: createConsoleLogger(),
     setExitCode: (code) => {
       process.exitCode = code;
@@ -154,6 +164,66 @@ function resolveLangfuseInputs(
     // invoking the bundle directly never goes through action.yml.
     baseUrl: getInput(env, "langfuse-base-url") || DEFAULT_LANGFUSE_BASE_URL,
     promptLabel: getInput(env, "langfuse-prompt-label") || DEFAULT_PROMPT_LABEL,
+  };
+}
+
+/** Where one run's record is sent, once both inputs are known to be usable. */
+interface DashboardInputs {
+  baseUrl: string;
+  token: string;
+}
+
+/** undefined means the review is published to GitHub only. */
+function resolveDashboardInputs(
+  env: Record<string, string | undefined>,
+  logger: StructuredLogger,
+): DashboardInputs | undefined {
+  const baseUrl = getInput(env, "dashboard-url");
+  const token = getInput(env, "dashboard-token");
+
+  if (baseUrl === "" && token === "") {
+    return undefined;
+  }
+  if (baseUrl === "" || token === "") {
+    // Half-configured: the review still runs, but nothing records it. Never log the token.
+    logger.error("dashboard.disabled_incomplete_config", {
+      missingInput: baseUrl === "" ? "dashboard-url" : "dashboard-token",
+    });
+    return undefined;
+  }
+
+  return { baseUrl, token };
+}
+
+/** The dashboard's record of one run; a finding's category is the agent that found it. */
+function dashboardReview(
+  outcome: ReviewOutcome,
+  reports: readonly AgentUsageReport[],
+  agents: readonly AgentDefinition[],
+  durationMs: number,
+): DashboardReview {
+  const order = agents.map((agent) => agent.category);
+  const ran = [...reports].sort(
+    (left, right) => order.indexOf(left.agent) - order.indexOf(right.agent),
+  );
+  const names = ran.map((report) => report.agent);
+  const count = outcome.findings.length;
+  return {
+    agents: names,
+    summary: `${count === 1 ? "1 finding" : `${count} findings`} from ${names.join(", ") || "no agent"}`,
+    durationMs,
+    agentRuns: ran.map((report) => ({
+      agent: report.agent,
+      durationMs: report.durationMs,
+      findingCount: outcome.findings.filter(
+        (finding) => finding.category === report.agent,
+      ).length,
+      ...report.usage,
+    })),
+    findings: outcome.findings.map((finding) => ({
+      ...finding,
+      agent: finding.category,
+    })),
   };
 }
 
@@ -356,6 +426,7 @@ export async function runAction(
   });
 
   const langfuse = resolveLangfuseInputs(env, logger);
+  const dashboard = resolveDashboardInputs(env, logger);
   // Tracing starts before the prompt fetch so the fetch's spans are captured.
   const tracing =
     langfuse === undefined
@@ -386,7 +457,9 @@ export async function runAction(
       applyFixes,
     });
 
-    await reviewPullRequest(target, {
+    const usageReports: AgentUsageReport[] = [];
+    const startedAt = Date.now();
+    const outcome = await reviewPullRequest(target, {
       applyFixes,
       client,
       agents,
@@ -402,6 +475,7 @@ export async function runAction(
               model,
               createModel,
               github: reviewClient,
+              onUsage: (report) => usageReports.push(report),
               ...(prompts === undefined ? {} : { systemPrompts: prompts }),
               ...(index === undefined ? {} : { index }),
             },
@@ -423,6 +497,13 @@ export async function runAction(
           ? undefined
           : createBranchMemoryStore(client, target, memoryBranch),
     });
+
+    if (dashboard !== undefined) {
+      await environment.createDashboardPublisher({ ...dashboard, logger })(
+        target,
+        dashboardReview(outcome, usageReports, agents, Date.now() - startedAt),
+      );
+    }
   } finally {
     // A flush failure never fails a review that already ran.
     if (tracing !== undefined) {

@@ -1,12 +1,20 @@
-import type { Finding, Repo, Team } from "@pr-review/db";
+import type { Finding, Organization, Repo } from "@pr-review/db";
 
 import {
+  addTokens,
+  computeTrends,
+  computeUsage,
+  costOf,
+  emptySeverity,
+  isAgentName,
+  windowStart,
+  zeroTokens,
+} from "./aggregate";
+import {
   AGENTS,
-  type AgentBreakdown,
   type AgentConfig,
   type AgentName,
   type AgentRun,
-  type CategoryCount,
   type DataSource,
   type Range,
   type RepoSummary,
@@ -16,14 +24,10 @@ import {
   type TokenCounts,
   type Trends,
   type Usage,
-  type UsagePoint,
 } from "./types";
 
 const SEED = 0x5eed_1234;
 const DAYS = 90;
-
-// USD per million tokens; cache reads bill at a tenth of input.
-const PRICE = { input: 3, cacheWrite: 3.75, cacheRead: 0.3, output: 15 };
 
 function rng(seed: number) {
   let a = seed >>> 0;
@@ -107,9 +111,9 @@ const AGENT_OF_CATEGORY = new Map<string, AgentName>(
   AGENTS.flatMap((a) => CATEGORIES[a].map((c) => [c, a] as const)),
 );
 
-// Findings carry a category, not an agent; this is how the UI gets back to one.
+// Recorded findings use the agent's name as their category; the fixture uses finer ones.
 export function agentForCategory(category: string): AgentName | null {
-  return AGENT_OF_CATEGORY.get(category) ?? null;
+  return AGENT_OF_CATEGORY.get(category) ?? (isAgentName(category) ? category : null);
 }
 
 function severityFor(r: () => number, agent: AgentName): Severity {
@@ -120,61 +124,35 @@ function severityFor(r: () => number, agent: AgentName): Severity {
   return roll < 0.08 ? "high" : roll < 0.45 ? "medium" : "low";
 }
 
-function emptySeverity(): Record<Severity, number> {
-  return { low: 0, medium: 0, high: 0 };
-}
-
-function zeroTokens(): TokenCounts {
-  return {
-    inputTokens: 0,
-    cacheCreationInputTokens: 0,
-    cacheReadInputTokens: 0,
-    outputTokens: 0,
-  };
-}
-
-function addTokens(into: TokenCounts, from: TokenCounts) {
-  into.inputTokens += from.inputTokens;
-  into.cacheCreationInputTokens += from.cacheCreationInputTokens;
-  into.cacheReadInputTokens += from.cacheReadInputTokens;
-  into.outputTokens += from.outputTokens;
-}
-
-export function costOf(t: TokenCounts): number {
-  return (
-    (t.inputTokens * PRICE.input +
-      t.cacheCreationInputTokens * PRICE.cacheWrite +
-      t.cacheReadInputTokens * PRICE.cacheRead +
-      t.outputTokens * PRICE.output) /
-    1_000_000
-  );
-}
-
-function dayKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
 type World = {
-  team: Team;
+  organization: Organization;
   repos: Repo[];
   reviews: ReviewDetail[];
 };
 
 function build(now: Date, ceiling: number): World {
   const r = rng(SEED);
-  const team: Team = {
+  const organization: Organization = {
     id: 1,
+    githubAccountId: 1,
+    accountType: "organization",
     slug: "acme",
     name: "Acme Engineering",
-    githubOrg: "acme",
+    installationId: null,
+    suspendedAt: null,
+    uninstalledAt: null,
+    ingestToken: null,
     createdAt: new Date(now.getTime() - DAYS * 864e5),
   };
 
   const repos: Repo[] = REPOS.map(([owner, name], i) => ({
     id: i + 1,
-    teamId: team.id,
+    organizationId: organization.id,
+    githubRepoId: null,
     owner,
     name,
+    private: false,
+    removedAt: null,
     createdAt: new Date(now.getTime() - (DAYS - i) * 864e5),
   }));
 
@@ -213,6 +191,7 @@ function build(now: Date, ceiling: number): World {
           findings.push({
             id: findingId,
             reviewId,
+            agent,
             file: pick(r, PATHS),
             line: r() > 0.12 ? intBetween(r, 3, 480) : null,
             category,
@@ -265,7 +244,7 @@ function build(now: Date, ceiling: number): World {
   }
 
   reviews.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  return { team, repos, reviews };
+  return { organization, repos, reviews };
 }
 
 let cached: World | null = null;
@@ -281,17 +260,6 @@ function world(): World {
   return cached;
 }
 
-function rangeDays(range: Range): number {
-  return range === "7d" ? 7 : range === "30d" ? 30 : 90;
-}
-
-// Buckets and the range filter must share one boundary or totals drift from the chart.
-function windowStart(range: Range): number {
-  const midnight = new Date();
-  midnight.setUTCHours(0, 0, 0, 0);
-  return midnight.getTime() - (rangeDays(range) - 1) * 864e5;
-}
-
 function withinRange(reviews: ReviewDetail[], range: Range, repoId?: number) {
   const cutoff = windowStart(range);
   return reviews.filter(
@@ -299,51 +267,17 @@ function withinRange(reviews: ReviewDetail[], range: Range, repoId?: number) {
   );
 }
 
-function median(xs: number[]): number {
-  if (xs.length === 0) return 0;
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 === 0 ? Math.round((s[mid - 1]! + s[mid]!) / 2) : s[mid]!;
-}
-
 function strip(review: ReviewDetail): ReviewSummary {
   const { findings: _f, runs: _r, ...rest } = review;
   return rest;
 }
 
-function agentBreakdown(reviews: ReviewDetail[]): AgentBreakdown[] {
-  return AGENTS.map((agent) => {
-    const runs = reviews.flatMap((v) => v.runs.filter((run) => run.agent === agent));
-    const tokens = zeroTokens();
-    let findingCount = 0;
-    for (const run of runs) {
-      addTokens(tokens, run);
-      findingCount += run.findingCount;
-    }
-    return {
-      agent,
-      findingCount,
-      reviewCount: runs.length,
-      medianDurationMs: median(runs.map((run) => run.durationMs)),
-      costUsd: costOf(tokens),
-      ...tokens,
-    };
-  }).filter((a) => a.reviewCount > 0);
-}
-
-function dayBuckets(range: Range): string[] {
-  const start = windowStart(range);
-  return Array.from({ length: rangeDays(range) }, (_, i) =>
-    dayKey(new Date(start + i * 864e5)),
-  );
-}
-
 export function createMockSource(): DataSource {
-  const { team, repos, reviews } = world();
+  const { organization, repos, reviews } = world();
 
   return {
     isDemo: true,
-    team,
+    organization,
 
     async listRepos(): Promise<RepoSummary[]> {
       return repos.map((repo) => {
@@ -378,85 +312,11 @@ export function createMockSource(): DataSource {
     },
 
     async getTrends(range, repoId): Promise<Trends> {
-      const scoped = withinRange(reviews, range, repoId);
-      const byDay = new Map(
-        dayBuckets(range).map((date) => [
-          date,
-          { date, reviews: 0, low: 0, medium: 0, high: 0 },
-        ]),
-      );
-      for (const v of scoped) {
-        const bucket = byDay.get(dayKey(v.createdAt));
-        if (!bucket) continue;
-        bucket.reviews += 1;
-        bucket.low += v.bySeverity.low;
-        bucket.medium += v.bySeverity.medium;
-        bucket.high += v.bySeverity.high;
-      }
-
-      const categories = new Map<string, CategoryCount>();
-      const bySeverity = emptySeverity();
-      let findings = 0;
-      for (const v of scoped) {
-        for (const f of v.findings) {
-          findings += 1;
-          bySeverity[f.severity as Severity] += 1;
-          const entry = categories.get(f.category) ?? {
-            category: f.category,
-            count: 0,
-            bySeverity: emptySeverity(),
-          };
-          entry.count += 1;
-          entry.bySeverity[f.severity as Severity] += 1;
-          categories.set(f.category, entry);
-        }
-      }
-
-      return {
-        points: [...byDay.values()],
-        byAgent: agentBreakdown(scoped),
-        byCategory: [...categories.values()].sort((a, b) => b.count - a.count),
-        totals: {
-          reviews: scoped.length,
-          findings,
-          bySeverity,
-          medianDurationMs: median(scoped.map((v) => v.durationMs)),
-        },
-      };
+      return computeTrends(withinRange(reviews, range, repoId), range);
     },
 
     async getUsage(range, repoId): Promise<Usage> {
-      const scoped = withinRange(reviews, range, repoId);
-      const byDay = new Map<string, UsagePoint>(
-        dayBuckets(range).map((date) => [
-          date,
-          { date, costUsd: 0, ...zeroTokens() },
-        ]),
-      );
-      const totals = zeroTokens();
-      for (const v of scoped) {
-        addTokens(totals, v);
-        const bucket = byDay.get(dayKey(v.createdAt));
-        if (!bucket) continue;
-        addTokens(bucket, v);
-        bucket.costUsd += v.costUsd;
-      }
-
-      const perRepo = repos
-        .map((repo) => {
-          const mine = scoped.filter((v) => v.repoId === repo.id);
-          const tokens = zeroTokens();
-          for (const v of mine) addTokens(tokens, v);
-          return { repo, reviewCount: mine.length, costUsd: costOf(tokens), ...tokens };
-        })
-        .sort((a, b) => b.costUsd - a.costUsd);
-
-      return {
-        points: [...byDay.values()],
-        byAgent: agentBreakdown(scoped),
-        byRepo: perRepo,
-        totals: { ...totals, costUsd: costOf(totals), reviewCount: scoped.length },
-      };
+      return computeUsage(withinRange(reviews, range, repoId), repos, range);
     },
 
     async getAgentConfig(repoId) {
