@@ -12,10 +12,13 @@
   "dependencies": {
     "@pr-review/db": "workspace:*",
     "@pr-review/design": "workspace:*",
+    "@pr-review/schemas": "workspace:*",
     "@radix-ui/react-dropdown-menu": "^2.1.24",
     "@tailwindcss/postcss": "^4.3.3",
+    "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.46.0",
     "next": "^15.5.4",
+    "next-auth": "5.0.0-beta.32",
     "next-themes": "^0.4.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

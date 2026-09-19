@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./test-database": "./src/test-database.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -15,9 +16,11 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@pr-review/schemas": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "drizzle-kit": "^0.31.10"
   }
 }
