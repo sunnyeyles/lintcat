@@ -40,8 +40,10 @@ erDiagram
   repos {
     serial id PK
     int organization_id FK
+    bigint github_repo_id UK "null until the App reports it"
     text owner
     text name
+    boolean private
   }
   reviews {
     serial id PK
@@ -92,6 +94,9 @@ erDiagram
   stays the finding's own classification.
 - `memberships` is unique on `(user_id, organization_id)`: one role per user
   per organization, and a user may belong to any number of organizations.
+- `repos.github_repo_id` is the key the installation webhook upserts on
+  (`src/installations.ts`); a repo ingest recorded first is claimed by owner
+  and name, so its reviews stay.
 - Deleting an organization cascades to its memberships, repos, reviews and
   findings; its users stay.
 
@@ -122,5 +127,7 @@ An in-memory Postgres (PGlite) with `drizzle/` applied, so tests need no
 `DATABASE_URL`. `Database` is driver-agnostic, so anything typed against it
 takes the test client as readily as the Neon one.
 
-`ingestReviewRecord` runs its writes one by one: the Neon HTTP driver has no
-interactive transactions.
+`ingestReviewRecord` runs its writes one by one: the Neon HTTP driver behind
+`db()` has no interactive transactions. Writes that must be atomic go through
+`withWriteDatabase(run)`, a Neon WebSocket pool opened for `run` and closed
+after; `.transaction()` works there and on the test database.

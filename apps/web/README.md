@@ -2,7 +2,8 @@
 
 The dashboard: review history, trends, token spend, and an editor for
 `.github/pr-review-agents.yml`. Also `POST /api/ingest`, where the action
-records each review.
+records each review, and `POST /api/github/webhook`, where the GitHub App
+reports installations.
 
 ```bash
 pnpm --filter @pr-review/web dev     # http://localhost:3000
@@ -10,13 +11,16 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 
 ## Environment
 
-| Variable             | Used for                                               |
-| -------------------- | ------------------------------------------------------ |
-| `DATABASE_URL`       | Postgres, see [`packages/db`](../../packages/db)       |
-| `AUTH_SECRET`        | Signs the session cookie; `pnpm dlx auth secret`       |
-| `AUTH_GITHUB_ID`     | GitHub OAuth app client id                             |
-| `AUTH_GITHUB_SECRET` | GitHub OAuth app client secret                         |
-| `AUTH_TRUST_HOST`    | `true` for `next start` outside Vercel                 |
+| Variable                    | Used for                                               |
+| --------------------------- | ------------------------------------------------------ |
+| `DATABASE_URL`              | Postgres, see [`packages/db`](../../packages/db)       |
+| `AUTH_SECRET`               | Signs the session cookie; `pnpm dlx auth secret`       |
+| `AUTH_GITHUB_ID`            | GitHub OAuth app client id                             |
+| `AUTH_GITHUB_SECRET`        | GitHub OAuth app client secret                         |
+| `AUTH_TRUST_HOST`           | `true` for `next start` outside Vercel                 |
+| `GITHUB_APP_ID`             | The GitHub App's id                                    |
+| `GITHUB_APP_PRIVATE_KEY`    | The App's PEM key; newlines may be written as `\n`     |
+| `GITHUB_APP_WEBHOOK_SECRET` | Verifies `X-Hub-Signature-256` on each delivery        |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
 lists them. Register the OAuth app with the callback URL
@@ -32,6 +36,41 @@ row stores only the secret's SHA-256 (`hashIngestToken`). The record's owner
 must be the organization's login, or it is a 404. A missing or unknown token is a 401
 and writes nothing; a rerun of the same commit replaces that review's agent
 runs and findings.
+
+## GitHub App webhook
+
+`POST /api/github/webhook` turns GitHub App installations into organizations.
+Each delivery's `X-Hub-Signature-256` is checked against
+`GITHUB_APP_WEBHOOK_SECRET` before the body is parsed; a missing or wrong one is
+a 401 and writes nothing.
+
+| Event                       | Action                 | Effect                                                    |
+| --------------------------- | ---------------------- | --------------------------------------------------------- |
+| `installation`              | `created`              | Upsert the organization; its repos become exactly what GitHub lists |
+| `installation`              | `suspend`, `unsuspend` | Set or clear `organizations.suspended_at`                 |
+| `installation`              | `deleted`              | Delete the organization; memberships, repos and reviews cascade |
+| `installation_repositories` | `added`, `removed`     | Upsert or delete those repos (their reviews go with them) |
+
+Anything else gets a 204. The slug is the account's lowercased login; a
+personal account becomes an organization of type `user`. Uninstalling is a hard
+delete, not a soft one: reinstalling starts the organization afresh. Writes are
+keyed on GitHub ids, so a redelivery converges, and each delivery's writes run
+in one transaction over Neon's WebSocket pool (`withWriteDatabase`), since the
+HTTP driver behind `db()` cannot run one. Pages keep reading over HTTP.
+
+`created` lists the installation's repositories through `GithubAppClient`
+(`@pr-review/github`), authenticated as the App with an installation token.
+Tests pass a fake.
+
+### Registering the App
+
+- Permissions, all read-only: repository **Metadata**, organization
+  **Members**, account **Email addresses**.
+- Webhook URL `https://<app-domain>/api/github/webhook`, secret in
+  `GITHUB_APP_WEBHOOK_SECRET`. Subscribe to `installation`,
+  `installation_repositories`, `organization`, `member`, `membership` and
+  `repository`. Only the first two are acted on so far; the rest get a 204.
+- Locally, forward deliveries to the dev server with a service such as smee.io.
 
 ## Sign-in
 
@@ -81,12 +120,14 @@ app/
   settings/agents/      agent config editor (fixture)
   sign-in/              sign-in and no-organization state
   api/ingest/           the action's endpoint
+  api/github/webhook/   the GitHub App's webhook
 components/
   ui/ shell/ charts/ overview/ review/ config/
 lib/
   data/                 the seam above
   session.ts            session and membership helpers
   organization.ts       a user's memberships
+  github-app.ts         the GitHub App's env and client
   format.ts             number, duration and date formatting
   agent-config.ts       pr-review-agents.yml serialisation
 ```
