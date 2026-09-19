@@ -101,6 +101,22 @@ describe("tsconfig paths", () => {
     expect(targetOf(files, "apps/web/app/page.tsx")).toBe("shared/log.ts");
   });
 
+  it("follows an extends naming the root package by name", () => {
+    const files = {
+      "package.json": JSON.stringify({ name: "my-repo" }),
+      "tsconfig.base.json": JSON.stringify({
+        compilerOptions: { baseUrl: ".", paths: { "~/*": ["shared/*"] } },
+      }),
+      "apps/web/tsconfig.json": JSON.stringify({
+        extends: "my-repo/tsconfig.base.json",
+      }),
+      "apps/web/app/page.tsx": 'import { log } from "~/log";\n',
+      "shared/log.ts": "export const log = 1;\n",
+    };
+
+    expect(targetOf(files, "apps/web/app/page.tsx")).toBe("shared/log.ts");
+  });
+
   it("rebases targets onto baseUrl when the config sets one", () => {
     const files = {
       "apps/web/tsconfig.json": JSON.stringify({

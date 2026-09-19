@@ -292,11 +292,11 @@ function extendsTarget(
   // A bare `extends` names a package; only a workspace one is in the archive.
   for (const [name, root] of packageRoots) {
     if (target === name) {
-      return `${root}/tsconfig.json`;
+      return joinPath(root, "tsconfig.json");
     }
     if (target.startsWith(`${name}/`)) {
       const rest = target.slice(name.length + 1);
-      return `${root}/${rest.endsWith(".json") ? rest : `${rest}.json`}`;
+      return joinPath(root, rest.endsWith(".json") ? rest : `${rest}.json`);
     }
   }
   return undefined;
