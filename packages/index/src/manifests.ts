@@ -214,10 +214,12 @@ function matchSubpathKey(
   let best: { value: unknown; capture: string; head: number } | undefined;
   for (const [key, value] of Object.entries(map)) {
     const star = key.indexOf("*");
+    if (star < 0) {
+      continue;
+    }
     const head = key.slice(0, star);
     const tail = key.slice(star + 1);
     if (
-      star < 0 ||
       !subject.startsWith(head) ||
       !subject.endsWith(tail) ||
       subject.length < head.length + tail.length
