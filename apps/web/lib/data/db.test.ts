@@ -1,15 +1,19 @@
 import {
   ingestReviewRecord,
+  memberships,
   organizations,
+  repoAccess,
   repos,
+  users,
   type Database,
   type Organization,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import type { ReviewRecord, ReviewRecordAgentRun } from "@pr-review/schemas";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { authorize } from "@/lib/authorize";
 import { costOf } from "@/lib/data";
 import { createDbSource } from "@/lib/data/db";
 
@@ -84,6 +88,19 @@ async function ingest(
   return result.reviewId;
 }
 
+// Every repo of the organization readable, as for an organization owner.
+async function sourceFor(organization: Organization) {
+  const rows = await database
+    .select({ id: repos.id })
+    .from(repos)
+    .where(eq(repos.organizationId, organization.id));
+  return createDbSource(
+    database,
+    organization,
+    rows.map((row) => row.id),
+  );
+}
+
 beforeEach(async () => {
   database = await createTestDatabase();
   acme = await insertOrganization(10, "acme");
@@ -96,7 +113,7 @@ describe("createDbSource", () => {
     await ingest(acme, record({ headSha: "b".repeat(40), findings: [], agentRuns: [run("security", 0)] }));
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
 
-    const repos = await createDbSource(database, acme).listRepos();
+    const repos = await (await sourceFor(acme)).listRepos();
 
     expect(repos).toHaveLength(1);
     const perRun = costOf(run("security", 0));
@@ -114,8 +131,8 @@ describe("createDbSource", () => {
   it("finds a repo by owner and name only within the organization", async () => {
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
 
-    expect(await createDbSource(database, acme).getRepo("globex", "secret")).toBeNull();
-    expect(await createDbSource(database, globex).getRepo("globex", "secret")).toMatchObject({
+    expect(await (await sourceFor(acme)).getRepo("globex", "secret")).toBeNull();
+    expect(await (await sourceFor(globex)).getRepo("globex", "secret")).toMatchObject({
       reviewCount: 1,
     });
   });
@@ -125,7 +142,7 @@ describe("createDbSource", () => {
     await ingest(acme, record({ headSha: "b".repeat(40), prNumber: 8, findings: [] }));
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
 
-    const reviews = await createDbSource(database, acme).listReviews();
+    const reviews = await (await sourceFor(acme)).listReviews();
 
     expect(reviews.map((review) => review.prNumber)).toEqual([8, 7]);
     const [, first] = reviews;
@@ -139,13 +156,13 @@ describe("createDbSource", () => {
       repo: { owner: "acme", name: "widgets" },
     });
     expect(first!.costUsd).toBeCloseTo(costOf(run("x", 0)) * 2, 10);
-    expect(await createDbSource(database, acme).listReviews({ limit: 1 })).toHaveLength(1);
+    expect(await (await sourceFor(acme)).listReviews({ limit: 1 })).toHaveLength(1);
   });
 
   it("returns a review with its findings and runs, and not another organization's", async () => {
     const mine = await ingest(acme, record());
     const theirs = await ingest(globex, record({ owner: "globex", repo: "secret" }));
-    const source = createDbSource(database, acme);
+    const source = await sourceFor(acme);
 
     const review = await source.getReview(mine);
     expect(review?.findings.map((f) => f.severity)).toEqual(["high", "low"]);
@@ -160,7 +177,7 @@ describe("createDbSource", () => {
       record({ agents: ["general"], agentRuns: [run("general", 0)], findings: [] }),
     );
 
-    const review = await createDbSource(database, acme).getReview(id);
+    const review = await (await sourceFor(acme)).getReview(id);
 
     expect(review?.agents).toEqual([]);
     expect(review?.runs).toEqual([]);
@@ -170,7 +187,7 @@ describe("createDbSource", () => {
   it("aggregates trends and usage over the organization's recent reviews", async () => {
     await ingest(acme, record());
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
-    const source = createDbSource(database, acme);
+    const source = await sourceFor(acme);
 
     const trends = await source.getTrends("30d");
     expect(trends.totals).toMatchObject({
@@ -196,7 +213,7 @@ describe("createDbSource", () => {
       .update(repos)
       .set({ removedAt: new Date() })
       .where(eq(repos.name, "gadgets"));
-    const source = createDbSource(database, acme);
+    const source = await sourceFor(acme);
 
     expect((await source.listRepos()).map((repo) => repo.name)).toEqual(["widgets"]);
     expect(await source.getRepo("acme", "gadgets")).toBeNull();
@@ -211,9 +228,99 @@ describe("createDbSource", () => {
   });
 
   it("is empty for an organization with nothing recorded", async () => {
-    const source = createDbSource(database, acme);
+    const source = await sourceFor(acme);
     expect(await source.listRepos()).toEqual([]);
     expect(await source.listReviews()).toEqual([]);
     expect((await source.getTrends("7d")).totals.reviews).toBe(0);
+  });
+});
+
+describe("createDbSource for the repos authorize lets a viewer read", () => {
+  const mona = { githubId: 1 };
+  const octo = { githubId: 2 };
+  let hidden: number;
+
+  async function viewerSource(session: { githubId: number }) {
+    const access = await authorize(database, session, "acme");
+    if (access.status !== "allowed") throw new Error("not allowed");
+    return createDbSource(
+      database,
+      access.organization,
+      access.readableRepos.map((repo) => repo.id),
+    );
+  }
+
+  beforeEach(async () => {
+    await ingest(acme, record());
+    hidden = await ingest(acme, record({ repo: "vault", prNumber: 9 }));
+    await ingest(acme, record({ repo: "ledger", prNumber: 10 }));
+    await database
+      .update(repos)
+      .set({ private: true })
+      .where(inArray(repos.name, ["vault", "ledger"]));
+    const [ledger] = await database.select().from(repos).where(eq(repos.name, "ledger"));
+    const [monaRow, octoRow] = await database
+      .insert(users)
+      .values([
+        { githubId: mona.githubId, login: "mona" },
+        { githubId: octo.githubId, login: "octo" },
+      ])
+      .returning();
+    await database.insert(memberships).values([
+      { userId: monaRow!.id, organizationId: acme.id, role: "member" },
+      { userId: octoRow!.id, organizationId: acme.id, role: "owner" },
+    ]);
+    await database
+      .insert(repoAccess)
+      .values({ userId: monaRow!.id, repoId: ledger!.id, permission: "read" });
+  });
+
+  it("leaves an unreadable private repo out of a member's lists, totals, trends and usage", async () => {
+    const source = await viewerSource(mona);
+
+    expect((await source.listRepos()).map((repo) => repo.name).sort()).toEqual([
+      "ledger",
+      "widgets",
+    ]);
+    expect((await source.listReviews()).map((review) => review.repo.name).sort()).toEqual([
+      "ledger",
+      "widgets",
+    ]);
+    expect((await source.getTrends("30d")).totals.reviews).toBe(2);
+    const usage = await source.getUsage("30d");
+    expect(usage.totals.reviewCount).toBe(2);
+    expect(usage.byRepo.map((row) => row.repo.name).sort()).toEqual(["ledger", "widgets"]);
+  });
+
+  it("answers an unreadable repo and its review exactly as unknown ones", async () => {
+    const source = await viewerSource(mona);
+    const [vault] = await database.select().from(repos).where(eq(repos.name, "vault"));
+
+    expect(await source.getRepo("acme", "vault")).toStrictEqual(
+      await source.getRepo("acme", "no-such-repo"),
+    );
+    expect(await source.getReview(hidden)).toStrictEqual(await source.getReview(999_999));
+    expect(await source.listReviews({ repoId: vault!.id })).toEqual([]);
+    expect((await source.getTrends("30d", vault!.id)).totals.reviews).toBe(0);
+  });
+
+  it("shows an organization owner every repo", async () => {
+    const source = await viewerSource(octo);
+
+    expect((await source.listRepos()).map((repo) => repo.name).sort()).toEqual([
+      "ledger",
+      "vault",
+      "widgets",
+    ]);
+    expect(await source.getReview(hidden)).not.toBeNull();
+    expect((await source.getTrends("30d")).totals.reviews).toBe(3);
+  });
+
+  it("shows nothing when nothing is readable", async () => {
+    const source = createDbSource(database, acme, []);
+
+    expect(await source.listRepos()).toEqual([]);
+    expect(await source.listReviews()).toEqual([]);
+    expect((await source.getUsage("30d")).totals.reviewCount).toBe(0);
   });
 });

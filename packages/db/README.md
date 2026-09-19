@@ -8,6 +8,8 @@ erDiagram
   organizations ||--o{ memberships : "has"
   users ||--o{ memberships : "holds"
   organizations ||--o{ repos : "owns"
+  users ||--o{ repo_access : "holds"
+  repos ||--o{ repo_access : "grants"
   repos ||--o{ reviews : "collects"
   reviews ||--o{ findings : "holds"
   reviews ||--o{ agent_runs : "times"
@@ -46,6 +48,13 @@ erDiagram
     text name
     boolean private
     timestamptz removed_at
+  }
+  repo_access {
+    serial id PK
+    int user_id FK
+    int repo_id FK
+    repo_permission permission "admin maintain write triage read"
+    timestamptz synced_at
   }
   reviews {
     serial id PK
@@ -96,6 +105,10 @@ erDiagram
   stays the finding's own classification.
 - `memberships` is unique on `(user_id, organization_id)`: one role per user
   per organization, and a user may belong to any number of organizations.
+- `repo_access` is a user's GitHub permission on one repo, unique on
+  `(user_id, repo_id)`. A member reads a public repo without a row and a
+  private one only with a row; organization owners read every repo
+  (`src/repo-access.ts`).
 - `repos.github_repo_id` is the key the installation webhook upserts on
   (`src/installations.ts`); a repo ingest recorded first is claimed by owner
   and name, so its reviews stay.

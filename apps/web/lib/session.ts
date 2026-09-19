@@ -1,4 +1,4 @@
-import { db, type MembershipRole, type Organization } from "@pr-review/db";
+import { db, type MembershipRole, type Organization, type ReadableRepo } from "@pr-review/db";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
@@ -33,6 +33,7 @@ export type OrganizationAccess = {
   session: AppSession;
   organization: Organization;
   role: MembershipRole;
+  readableRepos: ReadableRepo[];
 };
 
 /** Every organization page's guard: signed out goes to sign-in, anyone not allowed gets a 404. */
@@ -45,6 +46,7 @@ export const requireOrganization = cache(
     }
     const access = await authorize(db(), session, slug);
     if (access.status !== "allowed") notFound();
-    return { session, organization: access.organization, role: access.role };
+    const { organization, role, readableRepos } = access;
+    return { session, organization, role, readableRepos };
   },
 );

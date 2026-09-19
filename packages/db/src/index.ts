@@ -8,8 +8,11 @@ export {
   type IngestResult,
 } from "./ingest";
 export {
+  findRepoByGithubId,
   markUninstalled,
   removeRepositories,
+  removeRepository,
+  updateRepository,
   replaceRepositories,
   setInstallationSuspended,
   upsertInstallation,
@@ -26,4 +29,13 @@ export {
   upsertMembership,
   type GithubAccount,
 } from "./memberships";
+export {
+  deleteOrganizationRepoAccess,
+  listPrivateRepos,
+  listUserMemberships,
+  readableRepos,
+  replaceRepoAccess,
+  setRepoAccess,
+  type ReadableRepo,
+} from "./repo-access";
 export * from "./schema";

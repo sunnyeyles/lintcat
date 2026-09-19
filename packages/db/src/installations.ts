@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "./client";
-import { organizations, repos, type Organization } from "./schema";
+import { organizations, repos, type Organization, type Repo } from "./schema";
 
 /** One GitHub App installation as its webhook payloads describe it. */
 export interface InstallationInput {
@@ -124,6 +124,36 @@ async function markRemoved(database: Database, where: SQL | undefined): Promise<
     .update(repos)
     .set({ removedAt: sql`now()` })
     .where(and(where, isNull(repos.removedAt)));
+}
+
+export async function findRepoByGithubId(
+  database: Database,
+  githubRepoId: number,
+): Promise<Repo | undefined> {
+  const [row] = await database
+    .select()
+    .from(repos)
+    .where(eq(repos.githubRepoId, githubRepoId))
+    .limit(1);
+  return row;
+}
+
+/** Follows a rename or visibility change of a repo the installation already reported. */
+export async function updateRepository(
+  database: Database,
+  repository: RepositoryInput,
+): Promise<void> {
+  await database
+    .update(repos)
+    .set({ owner: repository.owner, name: repository.name, private: repository.private })
+    .where(eq(repos.githubRepoId, repository.githubRepoId));
+}
+
+export async function removeRepository(
+  database: Database,
+  githubRepoId: number,
+): Promise<void> {
+  await markRemoved(database, eq(repos.githubRepoId, githubRepoId));
 }
 
 /** Makes the organization's live repos exactly `repositories`, marking any others removed. */

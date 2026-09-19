@@ -92,13 +92,18 @@ function strip(review: ReviewDetail): ReviewSummary {
   return rest;
 }
 
-/** Every read is scoped to the organization through the review's repo. */
+/** Every read is scoped through the review's repo to the repos `authorize` let the viewer read. */
 export function createDbSource(
   database: Database,
   organization: Organization,
+  readableRepoIds: readonly number[],
 ): DataSource {
   // A removed repo and its reviews stay stored but are never shown.
-  const liveRepos = and(eq(repos.organizationId, organization.id), isNull(repos.removedAt))!;
+  const liveRepos = and(
+    eq(repos.organizationId, organization.id),
+    isNull(repos.removedAt),
+    inArray(repos.id, [...readableRepoIds]),
+  )!;
 
   async function organizationRepos(): Promise<Repo[]> {
     return database

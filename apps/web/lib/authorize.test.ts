@@ -1,12 +1,16 @@
 import {
   memberships,
   organizations,
+  repoAccess,
+  repos,
   users,
   type Database,
   type MembershipRole,
   type Organization,
+  type RepoPermission,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { authorize } from "@/lib/authorize";
@@ -65,6 +69,7 @@ describe("authorize", () => {
       status: "allowed",
       organization: acme,
       role: "member",
+      readableRepos: [],
     });
   });
 
@@ -99,11 +104,13 @@ describe("authorize", () => {
       status: "allowed",
       organization: acme,
       role: "owner",
+      readableRepos: [],
     });
     expect(await authorize(database, mona, "globex")).toEqual({
       status: "allowed",
       organization: globex,
       role: "member",
+      readableRepos: [],
     });
   });
 
@@ -112,6 +119,104 @@ describe("authorize", () => {
     await join(await insertUser(1, "mona"), acme, "owner");
 
     expect(await authorize(database, mona, "acme")).toEqual({ status: "not-found" });
+  });
+
+  describe("repositories", () => {
+    let acme: Organization;
+    let monaId: number;
+    let widgets: number;
+    let vault: number;
+    let ledger: number;
+    let gone: number;
+
+    async function insertRepo(name: string, isPrivate: boolean): Promise<number> {
+      const [repo] = await database
+        .insert(repos)
+        .values({ organizationId: acme.id, owner: "acme", name, private: isPrivate })
+        .returning({ id: repos.id });
+      return repo!.id;
+    }
+
+    async function grant(userId: number, repoId: number, permission: RepoPermission) {
+      await database.insert(repoAccess).values({ userId, repoId, permission });
+    }
+
+    beforeEach(async () => {
+      acme = await insertOrganization(10, "acme");
+      monaId = await insertUser(1, "mona");
+      await join(monaId, acme, "member");
+      widgets = await insertRepo("widgets", false);
+      vault = await insertRepo("vault", true);
+      ledger = await insertRepo("ledger", true);
+      gone = await insertRepo("gone", false);
+      await database.update(repos).set({ removedAt: new Date() }).where(eq(repos.id, gone));
+    });
+
+    it("lets a member read public repos and the private ones they have access to, and no others", async () => {
+      await grant(monaId, ledger, "read");
+
+      expect(await authorize(database, mona, "acme")).toMatchObject({
+        status: "allowed",
+        readableRepos: [
+          { id: widgets, isOwner: false },
+          { id: ledger, isOwner: false },
+        ],
+      });
+    });
+
+    it("lets an organization owner read and own every live repo", async () => {
+      await join(await insertUser(2, "octo"), acme, "owner");
+
+      expect(await authorize(database, outsider, "acme")).toMatchObject({
+        status: "allowed",
+        readableRepos: [
+          { id: widgets, isOwner: true },
+          { id: vault, isOwner: true },
+          { id: ledger, isOwner: true },
+        ],
+      });
+    });
+
+    it("makes a member with admin or maintain a repository owner of that repo only", async () => {
+      await grant(monaId, ledger, "maintain");
+      await grant(monaId, widgets, "admin");
+      await grant(monaId, vault, "write");
+
+      const access = await authorize(database, mona, "acme", { owner: "acme", name: "ledger" });
+      expect(access).toMatchObject({
+        status: "allowed",
+        role: "member",
+        repo: { id: ledger, name: "ledger", isOwner: true },
+        readableRepos: [
+          { id: widgets, isOwner: true },
+          { id: vault, isOwner: false },
+          { id: ledger, isOwner: true },
+        ],
+      });
+    });
+
+    it("gives an unreadable, removed or unknown repo the same not-found as an unknown organization", async () => {
+      const unknownOrganization = await authorize(database, mona, "no-such-org");
+      const unreadable = await authorize(database, mona, "acme", { owner: "acme", name: "vault" });
+      const removed = await authorize(database, mona, "acme", { owner: "acme", name: "gone" });
+      const unknown = await authorize(database, mona, "acme", { owner: "acme", name: "nope" });
+
+      expect(unreadable).toEqual({ status: "not-found" });
+      expect(unreadable).toStrictEqual(unknownOrganization);
+      expect(removed).toStrictEqual(unknownOrganization);
+      expect(unknown).toStrictEqual(unknownOrganization);
+    });
+
+    it("keeps one user's access rows from reading another organization's repos", async () => {
+      const globex = await insertOrganization(20, "globex");
+      await join(monaId, globex, "member");
+      await grant(monaId, vault, "admin");
+
+      expect(await authorize(database, mona, "globex")).toMatchObject({
+        status: "allowed",
+        readableRepos: [],
+      });
+    });
   });
 
   it("matches the slug case-insensitively", async () => {

@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import type { Database } from "./client";
-import { memberships, organizations, users } from "./schema";
+import { memberships, organizations, repoAccess, repos, users } from "./schema";
 import { createTestDatabase } from "./test-database";
 
 let database: Database;
@@ -134,6 +134,31 @@ describe("migrations applied in order to an empty database", () => {
     await database.insert(memberships).values(membership);
     await expect(
       database.insert(memberships).values({ ...membership, role: "owner" }),
+    ).rejects.toThrow();
+  });
+
+  it("allow one repo_access row per user and repo", async () => {
+    const [user] = await database
+      .insert(users)
+      .values({ githubId: 2, login: "hubot" })
+      .returning();
+    const [organization] = await database
+      .insert(organizations)
+      .values({
+        githubAccountId: 20,
+        accountType: "organization",
+        slug: "globex",
+        name: "Globex",
+      })
+      .returning();
+    const [repo] = await database
+      .insert(repos)
+      .values({ organizationId: organization!.id, owner: "globex", name: "vault" })
+      .returning();
+    const access = { userId: user!.id, repoId: repo!.id, permission: "read" as const };
+    await database.insert(repoAccess).values(access);
+    await expect(
+      database.insert(repoAccess).values({ ...access, permission: "admin" }),
     ).rejects.toThrow();
   });
 });

@@ -14,6 +14,13 @@ import {
 export const severityEnum = pgEnum("severity", ["low", "medium", "high"]);
 export const accountTypeEnum = pgEnum("account_type", ["organization", "user"]);
 export const membershipRoleEnum = pgEnum("membership_role", ["owner", "member"]);
+export const repoPermissionEnum = pgEnum("repo_permission", [
+  "admin",
+  "maintain",
+  "write",
+  "triage",
+  "read",
+]);
 
 const createdAt = () =>
   timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -92,6 +99,25 @@ export const repos = pgTable(
   ],
 );
 
+// A user's GitHub permission on a repo; no row means no access to a private repo.
+export const repoAccess = pgTable(
+  "repo_access",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    repoId: integer("repo_id")
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+    permission: repoPermissionEnum("permission").notNull(),
+    syncedAt: timestamp("synced_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("repo_access_user_repo_idx").on(t.userId, t.repoId)],
+);
+
 // The unique index is the ingest upsert's conflict target: one row per commit.
 export const reviews = pgTable(
   "reviews",
@@ -159,6 +185,8 @@ export type NewMembership = typeof memberships.$inferInsert;
 export type MembershipRole = Membership["role"];
 export type Repo = typeof repos.$inferSelect;
 export type NewRepo = typeof repos.$inferInsert;
+export type RepoAccess = typeof repoAccess.$inferSelect;
+export type RepoPermission = RepoAccess["permission"];
 export type Review = typeof reviews.$inferSelect;
 export type NewReview = typeof reviews.$inferInsert;
 export type AgentRun = typeof agentRuns.$inferSelect;

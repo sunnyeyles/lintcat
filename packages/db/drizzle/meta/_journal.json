@@ -50,6 +50,13 @@
       "when": 1789783755956,
       "tag": "0006_soft_uninstall",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789784386994,
+      "tag": "0007_repo_access",
+      "breakpoints": true
     }
   ]
 }
