@@ -59,9 +59,11 @@ function isDivision(token: string): boolean {
   return token === ")" || token === "]" || token === "}" || token === "++";
 }
 
-/** Index just past the literal opened at `start`, or the source's end. */
-function endOfLiteral(source: string, start: number): number {
+/** Index just past the literal opened at `start`; undefined when unterminated.
+ * Only a template literal may span lines, so a lone `'` is JSX text, not a quote. */
+function endOfLiteral(source: string, start: number): number | undefined {
   const quote = source[start];
+  const multiline = quote === "`";
   let at = start + 1;
   while (at < source.length) {
     const char = source[at];
@@ -72,9 +74,12 @@ function endOfLiteral(source: string, start: number): number {
     if (char === quote) {
       return at + 1;
     }
+    if (char === "\n" && !multiline) {
+      return undefined;
+    }
     at += 1;
   }
-  return source.length;
+  return multiline ? source.length : undefined;
 }
 
 /** Index just past the regular expression opened at `start`. */
@@ -142,6 +147,12 @@ function maskSource(source: string): MaskedSource {
     }
     if (char === "'" || char === '"' || char === "`") {
       const stop = endOfLiteral(source, at);
+      if (stop === undefined) {
+        out.push(char);
+        token = char;
+        at += 1;
+        continue;
+      }
       const body = source.slice(at + 1, stop - 1);
       values.set(at, body);
       out.push(char, FILLER.repeat(body.length));

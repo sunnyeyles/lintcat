@@ -105,6 +105,22 @@ describe("parseImports", () => {
     expect(specifiers(source)).toEqual(["./a"]);
   });
 
+  it("is not derailed by an apostrophe in JSX text", () => {
+    const source = [
+      `import { Card } from "./card";`,
+      ``,
+      `export function Note() {`,
+      `  return <p>Don't do it</p>;`,
+      `}`,
+      ``,
+      `export { helper } from "./helper";`,
+      `const lazy = require("./lazy");`,
+      ``,
+    ].join("\n");
+
+    expect(specifiers(source)).toEqual(["./card", "./helper", "./lazy"]);
+  });
+
   it("does not run an export declaration on into the next statement", () => {
     const source = `export class Thing {}\nimport b from "./b";\n`;
 
