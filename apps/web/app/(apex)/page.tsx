@@ -18,14 +18,15 @@ import { redirect } from "next/navigation";
 import { RowLink } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
 import { membershipsForUser } from "@/lib/organization";
-import { organizationPath, signInPath } from "@/lib/paths";
+import { appDomain } from "@/lib/host";
+import { organizationPath, signInUrl } from "@/lib/paths";
 import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Organizations" };
 
 export default async function OrganizationsPage() {
   const session = await currentSession();
-  if (!session) redirect(signInPath("/"));
+  if (!session) redirect(signInUrl("/", appDomain()));
   const memberships = await membershipsForUser(db(), session.githubId);
 
   return (

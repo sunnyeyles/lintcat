@@ -5,7 +5,8 @@ import { cache } from "react";
 
 import { auth } from "@/auth";
 import { authorize } from "@/lib/authorize";
-import { organizationPath, REQUEST_PATH_HEADER, signInPath } from "@/lib/paths";
+import { appDomain } from "@/lib/host";
+import { organizationPath, REQUEST_PATH_HEADER, signInUrl } from "@/lib/paths";
 
 /** What a page needs about the signed-in user; `githubId` keys the `users` row. */
 export type AppSession = {
@@ -40,7 +41,7 @@ export const requireOrganization = cache(
     const session = await currentSession();
     if (!session) {
       const requested = (await headers()).get(REQUEST_PATH_HEADER);
-      redirect(signInPath(requested ?? organizationPath(slug)));
+      redirect(signInUrl(requested ?? organizationPath(slug), appDomain()));
     }
     const access = await authorize(db(), session, slug);
     if (access.status !== "allowed") notFound();
