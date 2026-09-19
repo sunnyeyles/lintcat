@@ -4,6 +4,7 @@
  */
 import { startActiveObservation } from "@langfuse/tracing";
 import type { GithubInstallationClient } from "@pr-review/github";
+import type { RepositoryIndex } from "@pr-review/index";
 import {
   createConsoleLogger,
   errorMessage,
@@ -21,6 +22,7 @@ import { extractAgentOutput } from "#src/agents/output";
 import type { ReviewModel } from "#src/model";
 import type { ReviewAgent, ReviewContext } from "#src/agent-contract";
 import type { ManagedPrompts } from "#src/prompts";
+import { renderRepositoryIndex } from "#src/agents/repository-index";
 import { createReviewTools } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
 import { addTokenUsage, emptyTokenUsage, toTokenUsage } from "#src/usage";
@@ -72,8 +74,11 @@ function scopeNote(context: ReviewContext): string[] {
   ];
 }
 
-/** Builds the opening user message (title + description + files + diff). */
-function buildOpeningMessage(context: ReviewContext): string {
+/** Builds the opening user message (title + description + files + index + diff). */
+function buildOpeningMessage(
+  context: ReviewContext,
+  index: RepositoryIndex | undefined,
+): string {
   const { pullRequest, changedFiles, diff } = context;
   const files = changedFiles
     .slice(0, MAX_LISTED_FILES)
@@ -101,6 +106,8 @@ function buildOpeningMessage(context: ReviewContext): string {
     ...files,
     "</changed_files>",
     "",
+    ...renderRepositoryIndex(index, changedFiles, MAX_LISTED_FILES),
+    "",
     "<diff>",
     truncateDiff(diff),
     "</diff>",
@@ -119,6 +126,8 @@ export interface ReviewAgentDeps {
   logger?: StructuredLogger | undefined;
   /** Pre-resolved system prompts; missing agents fall back to the in-code prompt. */
   systemPrompts?: ManagedPrompts | undefined;
+  /** The repository at the base commit; absent when off, failed or unbuilt. */
+  index?: RepositoryIndex | undefined;
 }
 
 /** Adds the hint block unless the prompt already carries it. */
@@ -198,7 +207,10 @@ export function createReviewAgent(
                 providerOptions: CACHE_BREAKPOINT,
               },
               messages: [
-                { role: "user", content: buildOpeningMessage(context) },
+                {
+                  role: "user",
+                  content: buildOpeningMessage(context, deps.index),
+                },
               ],
               tools: createReviewTools(deps.github, context),
               stopWhen: isStepCount(maxTurns),

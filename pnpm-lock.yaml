@@ -141,6 +141,9 @@ importers:
       '@pr-review/github':
         specifier: workspace:*
         version: link:../github
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../logging
@@ -237,6 +240,8 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+
+  packages/index: {}
 
   packages/logging: {}
 

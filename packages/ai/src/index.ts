@@ -19,7 +19,11 @@ export type {
   ReviewContext,
 } from "#src/agent-contract";
 export { emptyTokenUsage, type TokenUsage } from "#src/usage";
-export { createReviewAgent } from "#src/agents/runtime";
+export { createReviewAgent, type ReviewAgentDeps } from "#src/agents/runtime";
+export {
+  renderRepositoryIndex,
+  INDEX_ABSENT_LINE,
+} from "#src/agents/repository-index";
 export {
   renderRepositoryHints,
   withRepositoryHints,

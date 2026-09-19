@@ -2,6 +2,7 @@
  * The shared agent-runtime behaviours — loop, tool wiring, output
  * parsing, failure semantics — exercised through the Security agent.
  */
+import { buildRepositoryIndex } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it } from "vitest";
 
@@ -10,12 +11,15 @@ import {
   buildReviewSystemPrompt,
   withRepositoryHints,
 } from "#src/agents/definition";
+import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import {
   AgentRunError,
   createReviewAgent,
 } from "#src/agents/runtime";
 import {
   REVIEW_TOOL_NAMES,
+  archiveFiles,
+  baseSha,
   context,
   finalFindingsJson,
   headSha,
@@ -104,9 +108,18 @@ const finding = {
 
 const finalJson = JSON.stringify({ findings: [finding] });
 
+/** The index the fake archive builds, as the reviewer would build it. */
+function fakeIndex() {
+  return buildRepositoryIndex({ sha: baseSha, files: archiveFiles });
+}
+
 function makeAgent(
   responses: ScriptedResponse[],
-  options: { maxTurns?: number; systemPrompts?: ManagedPrompts } = {},
+  options: {
+    maxTurns?: number;
+    systemPrompts?: ManagedPrompts;
+    index?: ReturnType<typeof fakeIndex>;
+  } = {},
 ) {
   const { model, doGenerate: create, calls } = makeModel(responses);
   const github = makeGithub();
@@ -119,6 +132,7 @@ function makeAgent(
     ...(options.systemPrompts !== undefined
       ? { systemPrompts: options.systemPrompts }
       : {}),
+    ...(options.index !== undefined ? { index: options.index } : {}),
   });
   return { agent, create, calls: calls as unknown as Call[], github, entries };
 }
@@ -692,5 +706,103 @@ describe("pre-resolved system prompts", () => {
     await agent.run(context);
 
     expect(systemOf(calls[0])).toBe(buildReviewSystemPrompt(securityAgent));
+  });
+});
+
+describe("the repository index block", () => {
+  const scripted = [message([textBlock(finalJson)], "end_turn")];
+
+  async function openingWith(index?: ReturnType<typeof fakeIndex>) {
+    const { agent, calls } = makeAgent(
+      scripted,
+      index === undefined ? {} : { index },
+    );
+    await agent.run(context);
+    return openingOf(calls[0]);
+  }
+
+  it("says the index is absent when the reviewer built none", async () => {
+    const opening = await openingWith();
+
+    expect(opening).toContain("<repository_index>");
+    expect(opening).toContain(INDEX_ABSENT_LINE);
+    expect(opening).not.toContain("<repository_index sha=");
+  });
+
+  it("carries the commit and the truncation flag", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening).toContain(
+      `<repository_index sha="${baseSha}" truncated="false">`,
+    );
+  });
+
+  it("gives each changed file its role and covering test", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening).toContain(
+      "- src/sessions.ts — source, covered by src/sessions.test.ts",
+    );
+  });
+
+  it("says so for a changed file with no covering test", async () => {
+    const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        { filename: "src/untested.ts", status: "modified", additions: 1, deletions: 0 },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain("- src/untested.ts — source, no test");
+  });
+
+  it("says a file the base commit did not have is not in the index", async () => {
+    const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        { filename: "src/added.ts", status: "added", additions: 9, deletions: 0 },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain(
+      "- src/added.ts — not in the index at this commit",
+    );
+  });
+
+  it("reports a truncated index as truncated", async () => {
+    const opening = await openingWith(
+      buildRepositoryIndex({ sha: baseSha, files: archiveFiles, truncated: true }),
+    );
+
+    expect(opening).toContain(`truncated="true"`);
+  });
+
+  it("sits between the changed files and the diff", async () => {
+    const opening = await openingWith(fakeIndex());
+
+    expect(opening.indexOf("</changed_files>")).toBeLessThan(
+      opening.indexOf("<repository_index"),
+    );
+    expect(opening.indexOf("</repository_index>")).toBeLessThan(
+      opening.indexOf("<diff>"),
+    );
+  });
+
+  it("caps the list the same way the changed-files block does", async () => {
+    const changedFiles = Array.from({ length: 302 }, (_unused, at) => ({
+      filename: `src/file-${at}.ts`,
+      status: "modified",
+      additions: 1,
+      deletions: 0,
+    }));
+    const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
+
+    await agent.run({ ...context, changedFiles });
+
+    expect(openingOf(calls[0])).toContain("- [... 2 more files]");
   });
 });
