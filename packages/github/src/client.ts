@@ -35,6 +35,33 @@ export interface FileContentsRequest {
   ref: string;
 }
 
+/** A request for every file in the repository at one commit. */
+export interface RepositoryArchiveRequest {
+  owner: string;
+  repo: string;
+  /** Commit SHA the archive is taken at. */
+  ref: string;
+  limits?: RepositoryArchiveLimits | undefined;
+}
+
+/** Caps applied while reading an archive; reaching one truncates, never fails. */
+export interface RepositoryArchiveLimits {
+  maxTotalBytes?: number | undefined;
+  maxFiles?: number | undefined;
+  /** A file above this is skipped entirely, not read in part. */
+  maxFileBytes?: number | undefined;
+}
+
+/** The repository's text files at one commit. */
+export interface RepositoryArchive {
+  /** The commit the archive was taken at. */
+  sha: string;
+  /** Repository-relative path to decoded contents. */
+  files: Map<string, string>;
+  /** True when a cap stopped the read, so files are missing. */
+  truncated: boolean;
+}
+
 /** A code search request; always scoped to the single named repository. */
 export interface CodeSearchRequest {
   owner: string;
@@ -245,6 +272,10 @@ export interface GithubInstallationClient {
   getFileContents(request: FileContentsRequest): Promise<string>;
   /** Searches code within the single named repository. Read-only. */
   searchCode(request: CodeSearchRequest): Promise<CodeSearchResult>;
+  /** Every text file at one commit, from the tarball archive. Needs contents: read only. */
+  getRepositoryArchive(
+    request: RepositoryArchiveRequest,
+  ): Promise<RepositoryArchive>;
   /** Default-branch commits touching one path, newest first; an unmerged addition has none. */
   listCommitShas(request: CommitHistoryRequest): Promise<string[]>;
   /** Paths one commit changed; GitHub caps this at 300, so a sweep comes back short. */

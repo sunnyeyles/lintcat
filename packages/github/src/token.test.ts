@@ -151,6 +151,11 @@ function threadPage(
   };
 }
 
+/** Two zeroed blocks: a valid tar stream holding nothing. */
+function emptyTarball(): ArrayBuffer {
+  return new ArrayBuffer(1024);
+}
+
 interface StubOptions {
   filePages?: unknown[][];
   pullData?: unknown;
@@ -162,6 +167,8 @@ interface StubOptions {
   reviewData?: unknown;
   reviewCommentPages?: unknown[][];
   commitListData?: unknown;
+  /** The bytes repos.downloadTarballArchive hands back. */
+  tarballData?: unknown;
   pullCommitPages?: unknown[][];
   checkRunPages?: unknown[][];
   comparisonData?: unknown;
@@ -234,6 +241,13 @@ function makeOctokit(options: StubOptions = {}) {
             }
             return { data: options.contentData ?? fileContentsResponse };
           },
+        ),
+        downloadTarballArchive: vi.fn(
+          async (
+            _params: Parameters<
+              OctokitLike["rest"]["repos"]["downloadTarballArchive"]
+            >[0],
+          ) => ({ data: options.tarballData ?? emptyTarball() })
         ),
         listCommits: vi.fn(
           async (_params: Parameters<OctokitLike["rest"]["repos"]["listCommits"]>[0]) => ({
@@ -1247,5 +1261,36 @@ describe("writeFileOnBranch", () => {
     });
 
     await expect(client.writeFileOnBranch(writeRequest)).rejects.toThrow("boom");
+  });
+});
+
+describe("getRepositoryArchive", () => {
+  it("downloads the tarball at the requested commit", async () => {
+    const { octokit, client } = makeClient();
+
+    const archive = await client.getRepositoryArchive({
+      owner: "octo-org",
+      repo: "example-service",
+      ref: headSha,
+    });
+
+    expect(octokit.rest.repos.downloadTarballArchive).toHaveBeenCalledExactlyOnceWith({
+      owner: "octo-org",
+      repo: "example-service",
+      ref: headSha,
+    });
+    expect(archive).toEqual({ sha: headSha, files: new Map(), truncated: false });
+  });
+
+  it("rejects when the response body is not binary", async () => {
+    const { client } = makeClient({ tarballData: "not-a-tarball" });
+
+    await expect(
+      client.getRepositoryArchive({
+        owner: "octo-org",
+        repo: "example-service",
+        ref: headSha,
+      }),
+    ).rejects.toThrow(/not binary data/);
   });
 });

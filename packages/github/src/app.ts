@@ -25,9 +25,12 @@ import {
   type PullRequestDetails,
   type PullRequestRef,
   type PullRequestReview,
+  type RepositoryArchive,
+  type RepositoryArchiveRequest,
   type ReviewThread,
   type WriteFileRequest,
 } from "#src/client";
+import { archiveBytes, readRepositoryTarball } from "#src/archive";
 import { httpStatus } from "#src/errors";
 
 /**
@@ -87,6 +90,11 @@ export interface OctokitLike {
         owner: string;
         repo: string;
         path: string;
+        ref: string;
+      }): Promise<{ data: unknown }>;
+      downloadTarballArchive(params: {
+        owner: string;
+        repo: string;
         ref: string;
       }): Promise<{ data: unknown }>;
       listCommits(params: {
@@ -495,6 +503,21 @@ export function createInstallationClient(
         );
       }
       return Buffer.from(data.content, "base64").toString("utf8");
+    },
+
+    async getRepositoryArchive(
+      request: RepositoryArchiveRequest,
+    ): Promise<RepositoryArchive> {
+      const response = await octokit.rest.repos.downloadTarballArchive({
+        owner: request.owner,
+        repo: request.repo,
+        ref: request.ref,
+      });
+      const contents = readRepositoryTarball(
+        archiveBytes(response.data),
+        request.limits ?? {},
+      );
+      return { sha: request.ref, ...contents };
     },
 
     async searchCode(request: CodeSearchRequest): Promise<CodeSearchResult> {
