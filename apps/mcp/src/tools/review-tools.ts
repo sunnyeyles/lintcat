@@ -16,6 +16,7 @@ import { GitError } from "#src/git";
 import { openLocalRepository, type LocalRepository, type LocalScope } from "#src/local-git-client";
 import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
+import { selectReviewEngine } from "#src/review-engine";
 
 const agentsSchema = z
   .string()
@@ -216,10 +217,11 @@ export function registerReviewTools(
       }
       const result = await runReview(environment, {
         client: local.client,
-        connection,
         target: local.target,
-        baseSha: local.baseSha,
-        agents,
+        selected: selectReviewEngine(environment, connection, {
+          baseSha: local.baseSha,
+          select: agents ?? "",
+        }),
         index,
         memory: await openLocalMemoryStore(local.root),
         signal: extra.signal,
@@ -260,10 +262,11 @@ export function registerReviewTools(
       const pullRequest = await client.getPullRequest(ref);
       const result = await runReview(environment, {
         client,
-        connection,
         target: { ...ref, headSha: pullRequest.headSha },
-        baseSha: pullRequest.baseSha,
-        agents,
+        selected: selectReviewEngine(environment, connection, {
+          baseSha: pullRequest.baseSha,
+          select: agents ?? "",
+        }),
         ...(publish ? { publishTo: client } : {}),
         signal: extra.signal,
         onAgentEvent: progressReporter(extra),
