@@ -22,9 +22,18 @@ const agentsSchema = z
     'Comma-separated agent categories, e.g. "security,correctness". Omit to run the repository\'s configured agents.',
   );
 
+/** Said whenever sampling stood in for a provider key, so nobody reads this as a full review. */
+export const SINGLE_SHOT_NOTICE =
+  "Reduced single-shot review: no model API key is set, so this ran as one sampling request to your " +
+  "client instead of the tool-calling agents. One general pass over the diff, the changed-file list and " +
+  "the repository index, with no follow-up reads of the surrounding code and no synthesis. The " +
+  "repository's agent configuration and any `agents` argument do not apply: there is one pass, not one " +
+  "per agent. It is shallower than a key-backed review and misses anything that needs reading further.";
+
 function reviewResult(result: ReviewResult, heading: string): CallToolResult {
   const { outcome } = result;
   const details = {
+    singleShot: result.singleShot,
     agents: result.agents,
     agentFailures: outcome.agentFailures,
     synthesis: outcome.synthesis.outcome,
@@ -33,6 +42,9 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
   };
   return {
     content: [
+      ...(result.singleShot
+        ? [{ type: "text" as const, text: SINGLE_SHOT_NOTICE }]
+        : []),
       { type: "text", text: `${heading}\n\n${result.summary}` },
       { type: "text", text: JSON.stringify(details, null, 2) },
     ],
@@ -74,7 +86,7 @@ function agentHeadline(listing: AgentListing): string {
 export function registerReviewTools(
   server: McpServer,
   environment: McpEnvironment,
-  client: ConnectedClient,
+  connection: ConnectedClient,
 ): void {
   server.registerTool(
     "list_review_agents",
@@ -99,7 +111,7 @@ export function registerReviewTools(
     },
     async ({ repoPath, base }) => {
       const local = await openLocalRepository(
-        await resolveCheckoutPath(environment, client, repoPath),
+        await resolveCheckoutPath(environment, connection, repoPath),
         base,
       );
       const listing = await listAgents(local);
@@ -120,7 +132,8 @@ export function registerReviewTools(
         "Run the AI review agents over a local checkout's changes against its base branch: commits since " +
         "the merge-base plus uncommitted and untracked files. Returns only findings that passed the same " +
         "deterministic validation the GitHub Action applies. Calls the configured model provider and takes " +
-        "a minute or more; nothing is written anywhere.",
+        "a minute or more; nothing is written anywhere. With no provider key set, it asks you to run the " +
+        "model instead (MCP sampling), which gives a reduced single-shot review the result declares.",
       inputSchema: {
         repoPath: z
           .string()
@@ -140,7 +153,7 @@ export function registerReviewTools(
     },
     async ({ repoPath, base, agents, index }, extra) => {
       const local = await openLocalRepository(
-        await resolveCheckoutPath(environment, client, repoPath),
+        await resolveCheckoutPath(environment, connection, repoPath),
         base,
       );
       const files = await local.client.listChangedFiles(local.target);
@@ -153,6 +166,7 @@ export function registerReviewTools(
       }
       const result = await runReview(environment, {
         client: local.client,
+        connection,
         target: local.target,
         baseSha: local.baseSha,
         agents,
@@ -194,6 +208,7 @@ export function registerReviewTools(
       const pullRequest = await client.getPullRequest(ref);
       const result = await runReview(environment, {
         client,
+        connection,
         target: { ...ref, headSha: pullRequest.headSha },
         baseSha: pullRequest.baseSha,
         agents,

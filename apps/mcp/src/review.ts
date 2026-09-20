@@ -10,10 +10,14 @@ import {
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
-import { resolveModel, type McpEnvironment } from "#src/environment";
+import type { ConnectedClient } from "#src/client-capabilities";
+import type { McpEnvironment } from "#src/environment";
+import { selectReviewEngine } from "#src/review-engine";
 
 export interface ReviewRequest {
   client: ReviewClient;
+  /** What the MCP client can do; decides whether sampling can stand in for a key. */
+  connection: ConnectedClient;
   target: ReviewTarget;
   /** Agent configuration is read here, never at the head. */
   baseSha: string;
@@ -33,6 +37,8 @@ export interface ReviewResult {
   agents: string[];
   /** The check-run text the Action would have published. */
   summary: string;
+  /** The reduced review ran: one sampling request instead of the tool loop. */
+  singleShot: boolean;
 }
 
 /** Captures the check-run text on its way through, publishing or not. */
@@ -54,6 +60,7 @@ export async function runReview(
   environment: McpEnvironment,
   {
     client,
+    connection,
     target,
     baseSha,
     agents: selection = "",
@@ -64,7 +71,10 @@ export async function runReview(
   }: ReviewRequest,
 ): Promise<ReviewResult> {
   const { logger } = environment;
-  const { model, createModel } = resolveModel(environment);
+  const selected = selectReviewEngine(environment, connection, {
+    baseSha,
+    select: selection,
+  });
 
   let summary = "";
   const run = await runAssembledReview({
@@ -78,8 +88,8 @@ export async function runReview(
         summary = captured;
       },
     ),
-    agents: { readAt: baseSha, select: selection },
-    engine: { model, createModel },
+    agents: selected.agents,
+    engine: selected.engine,
     policy: { index },
     logger,
     signal,
@@ -89,5 +99,6 @@ export async function runReview(
     outcome: run.outcome,
     agents: run.agents.map((agent) => agent.category),
     summary,
+    singleShot: selected.singleShot,
   };
 }

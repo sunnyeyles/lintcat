@@ -17,8 +17,8 @@ Then pass that repository's checkout as `repoPath`, or start Claude Code in it.
 | Tool | What it does | Needs |
 |---|---|---|
 | `list_review_agents` | Lists the checkout's configured agents with their categories and path gates, and marks which the working tree's changes would wake. | Nothing |
-| `review_local_changes` | Runs the configured agents on commits since the merge-base with the base branch, plus uncommitted and untracked files. Returns only validated findings. | A model key |
-| `review_pull_request` | Reviews a GitHub PR at its head. It is a dry run unless `publish: true`, which posts the check run and review comments. It never commits fixes. | A model key and a GitHub token |
+| `review_local_changes` | Runs the configured agents on commits since the merge-base with the base branch, plus uncommitted and untracked files. Returns only validated findings. | A model key, or a sampling client |
+| `review_pull_request` | Reviews a GitHub PR at its head. It is a dry run unless `publish: true`, which posts the check run and review comments. It never commits fixes. | A model key or a sampling client, and a GitHub token |
 | `repository_overview` | Lists the workspace's packages and the per-language index coverage. | Nothing |
 | `find_references` | Lists the files that import a file, or one of its exported names. Same query, cap and result shape as the review agents' tool. | Nothing |
 | `describe_file` | Shows a file's role, package, importers, covering test, and imports. | Nothing |
@@ -37,6 +37,16 @@ History uses the dashboard's own access rules (`authorize` in `packages/db`).
 Your GitHub account must be a member of the organization, and private repos
 need a `repo_access` row.
 
+## Reviewing without a model key
+
+With no provider key set, a client that advertises MCP sampling runs the model
+instead. Sampling is one text completion with no tool calling, so this is not
+the tool loop: the diff, the changed files and the index render go into a
+single prompt, one general agent answers it, and nothing reads further. The
+findings pass the same validation, and the tool result opens by saying the
+review was the reduced one. A provider key always wins, and with neither a key
+nor sampling the tool fails naming both ways out.
+
 ## Configuration
 
 The server loads the nearest `.env.local` above its working directory. A
@@ -44,7 +54,7 @@ variable that is already set takes precedence.
 
 | Variable | Default |
 |---|---|
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | One is required for reviews |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | One is required for a tool-calling review; without either, a sampling client runs the reduced review |
 | `PR_REVIEW_MODEL_PROVIDER` | `openai` when its key is set, otherwise whichever provider has a key |
 | `PR_REVIEW_MODEL` | The provider's default. Haiku is weak here, so prefer `claude-sonnet-5` |
 | `PR_REVIEW_MODEL_BASE_URL` | Unset |

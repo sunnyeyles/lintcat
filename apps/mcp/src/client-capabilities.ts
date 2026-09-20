@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
+import type { SampleText } from "@pr-review/ai";
 
 /** What the connected client can do, negotiated at initialize and fixed for the connection. */
 export interface ClientFeatures {
@@ -20,6 +21,8 @@ export interface ConnectedClient {
   features(): ClientFeatures;
   /** Filesystem paths of the workspace the client has open; empty when it serves no roots. */
   roots(): Promise<readonly string[]>;
+  /** Runs one completion on the client's own model; only call it when features().sampling. */
+  sample: SampleText;
 }
 
 /** Before initialize, and for a client that advertises nothing. */
@@ -52,14 +55,38 @@ export function readClientFeatures(capabilities: ClientCapabilities | undefined)
 export function connectedClient(server: McpServer): ConnectedClient {
   const features = () => readClientFeatures(server.server.getClientCapabilities());
   const list = async () => (await server.server.listRoots()).roots.map(({ uri }) => fileURLToPath(uri));
-  return { features, roots: async () => (features().roots ? list() : []) };
+  return {
+    features,
+    roots: async () => (features().roots ? list() : []),
+    sample: async ({ systemPrompt, prompt, maxTokens, signal }) => {
+      const result = await server.server.createMessage(
+        {
+          systemPrompt,
+          messages: [{ role: "user", content: { type: "text", text: prompt } }],
+          maxTokens,
+        },
+        signal === undefined ? {} : { signal },
+      );
+      if (result.content.type !== "text") {
+        throw new Error(
+          `the client answered sampling/createMessage with ${result.content.type} content, not text`,
+        );
+      }
+      return result.content.text;
+    },
+  };
+}
+
+async function refuseSampling(): Promise<string> {
+  throw new Error("this client does not answer sampling/createMessage");
 }
 
 /** The fake: a client stuck at whatever features you name, nothing else. */
 export function staticClient(
   features: Partial<ClientFeatures> = {},
   roots: readonly string[] = [],
+  sample: SampleText = refuseSampling,
 ): ConnectedClient {
   const fixed: ClientFeatures = { ...NO_CLIENT_FEATURES, roots: roots.length > 0, ...features };
-  return { features: () => fixed, roots: async () => roots };
+  return { features: () => fixed, roots: async () => roots, sample };
 }
