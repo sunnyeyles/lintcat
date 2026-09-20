@@ -57,6 +57,24 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  apps/cli:
+    dependencies:
+      '@pr-review/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@pr-review/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@pr-review/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
+      '@pr-review/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@pr-review/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+
   apps/mcp:
     dependencies:
       '@modelcontextprotocol/sdk':

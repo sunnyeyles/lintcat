@@ -1,0 +1,26 @@
+{
+  "name": "@pr-review/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "pr-review": "./start.mjs"
+  },
+  "imports": {
+    "#src/*": "./src/*.ts"
+  },
+  "exports": {
+    ".": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node ../../scripts/build-bundle.mjs"
+  },
+  "dependencies": {
+    "@pr-review/ai": "workspace:*",
+    "@pr-review/db": "workspace:*",
+    "@pr-review/logging": "workspace:*",
+    "@pr-review/mcp": "workspace:*",
+    "@pr-review/schemas": "workspace:*"
+  }
+}
