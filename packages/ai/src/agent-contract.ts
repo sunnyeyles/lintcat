@@ -16,7 +16,21 @@ export interface ReviewContext {
   changedFiles: readonly ChangedFile[];
   diff: string;
   incremental?: IncrementalReview | undefined;
+  /** Aborts this review's model calls; absent means the run cannot be cancelled. */
+  signal?: AbortSignal | undefined;
 }
+
+/** One agent's step through a run, mirroring the runtime's agent.* log events. */
+export interface AgentLifecycleEvent {
+  agent: string;
+  phase: "started" | "completed" | "failed";
+  /** Agents that have finished, out of the run's total. */
+  finished: number;
+  total: number;
+}
+
+/** Observes agent progress; its own failures never reach the review. */
+export type AgentLifecycleListener = (event: AgentLifecycleEvent) => void;
 
 /**
  * One review agent. `run` resolves with untrusted candidate findings

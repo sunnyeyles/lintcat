@@ -1,10 +1,15 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  ProgressNotificationSchema,
+  type CallToolResult,
+  type Progress,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   finalFindingsJson,
   makeFinding,
   makeGithub,
+  makeHangingModel,
   makeModel,
   message,
   textBlock,
@@ -188,6 +193,39 @@ describe("review_local_changes", () => {
   });
 });
 
+describe("review progress", () => {
+  function reported(progress: Progress[]) {
+    return progress.map(({ progress: done, total, message }) => ({ done, total, message }));
+  }
+
+  it("reports each agent starting and finishing to a caller that sent a progress token", async () => {
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+    const progress: Progress[] = [];
+
+    await client.callTool(
+      { name: "review_local_changes", arguments: { base: "main", index: false } },
+      undefined,
+      { onprogress: (update) => progress.push(update) },
+    );
+
+    expect(reported(progress)).toEqual([
+      { done: 0, total: 1, message: "general started" },
+      { done: 1, total: 1, message: "general completed" },
+    ]);
+  });
+
+  it("sends nothing to a caller that sent no progress token", async () => {
+    const notified = vi.fn();
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+    client.setNotificationHandler(ProgressNotificationSchema, notified);
+
+    const { isError } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(false);
+    expect(notified).not.toHaveBeenCalled();
+  });
+});
+
 describe("review_pull_request", () => {
   function github() {
     const client = makeGithub();
@@ -235,6 +273,35 @@ describe("review_pull_request", () => {
 
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
     expect(client.createCommitOnBranch).not.toHaveBeenCalled();
+  });
+
+  it("stops the agents and publishes nothing when the tool call is cancelled", async () => {
+    const client = github();
+    const { model, firstCall } = makeHangingModel();
+    const { logger, entries } = createCapturingLogger();
+    const mcp = await connect(
+      environment({ createTokenClient: () => client, createLanguageModel: () => model, logger }),
+    );
+    const controller = new AbortController();
+
+    const pending = mcp.callTool(
+      {
+        name: "review_pull_request",
+        arguments: { owner: "octo-org", repo: "example-service", number: 42, publish: true },
+      },
+      undefined,
+      { signal: controller.signal },
+    );
+    await firstCall;
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+
+    await vi.waitFor(() =>
+      expect(entries.map((logged) => logged.event)).toContain("review.cancelled"),
+    );
+    expect(entries.map((logged) => logged.event)).toContain("agent.cancelled");
+    expect(client.createCheckRun).not.toHaveBeenCalled();
+    expect(client.createReview).not.toHaveBeenCalled();
   });
 });
 

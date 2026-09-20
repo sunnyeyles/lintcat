@@ -27,6 +27,7 @@ import {
   headSha,
   makeFinding,
   makeGithub,
+  makeHangingModel,
   makeModel,
   message,
   pullRequest,
@@ -1052,5 +1053,55 @@ describe("find_references through the agent runtime", () => {
     expect(await referencesResult({ path: "src/sessions.ts" })).toBe(
       INDEX_ABSENT_LINE,
     );
+  });
+});
+
+describe("cancellation", () => {
+  it("passes the review's abort signal to the model call", async () => {
+    const controller = new AbortController();
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run({ ...context, signal: controller.signal });
+
+    const { abortSignal } = calls[0] as { abortSignal?: AbortSignal };
+    expect(abortSignal?.aborted).toBe(false);
+    controller.abort();
+    expect(abortSignal?.aborted).toBe(true);
+  });
+
+  it("leaves the model call unsignalled when the review carries none", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run(context);
+
+    expect(
+      (calls[0] as { abortSignal?: AbortSignal }).abortSignal,
+    ).toBeUndefined();
+  });
+
+  it("emits agent.cancelled, not agent.failed, when the run is aborted", async () => {
+    const { model, firstCall } = makeHangingModel();
+    const { logger, entries } = createCapturingLogger();
+    const agent = createReviewAgent(securityAgent, {
+      model,
+      github: makeGithub(),
+      logger,
+    });
+    const controller = new AbortController();
+
+    const run = agent.run({ ...context, signal: controller.signal });
+    await firstCall;
+    controller.abort();
+    await expect(run).rejects.toThrow();
+
+    expect(entries.map((entry) => entry.event)).toEqual([
+      "agent.started",
+      "agent.cancelled",
+    ]);
+    expect(entries[1]).toMatchObject({ level: "info", agent: "security" });
   });
 });

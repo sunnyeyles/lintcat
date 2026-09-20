@@ -1,7 +1,13 @@
 import path from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
+import type {
+  CallToolResult,
+  ServerNotification,
+  ServerRequest,
+} from "@modelcontextprotocol/sdk/types.js";
+import type { AgentLifecycleListener } from "@pr-review/ai";
 import { z } from "zod";
 
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
@@ -32,6 +38,25 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
   };
 }
 
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
+
+/** Reports agent progress to the caller; undefined when it sent no progress token. */
+function progressReporter(extra: ToolExtra): AgentLifecycleListener | undefined {
+  const progressToken = extra._meta?.progressToken;
+  if (progressToken === undefined) {
+    return undefined;
+  }
+  return ({ agent, phase, finished, total }) => {
+    // A dropped notification must not disturb the review that is still running.
+    void extra
+      .sendNotification({
+        method: "notifications/progress",
+        params: { progressToken, progress: finished, total, message: `${agent} ${phase}` },
+      })
+      .catch(() => undefined);
+  };
+}
+
 export function registerReviewTools(server: McpServer, environment: McpEnvironment): void {
   server.registerTool(
     "review_local_changes",
@@ -59,7 +84,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ repoPath, base, agents, index }) => {
+    async ({ repoPath, base, agents, index }, extra) => {
       const local = await openLocalRepository(
         path.resolve(environment.cwd, repoPath ?? "."),
         base,
@@ -79,6 +104,8 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         agents,
         index,
         publish: false,
+        signal: extra.signal,
+        onAgentEvent: progressReporter(extra),
       });
       return reviewResult(
         result,
@@ -108,7 +135,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    async ({ owner, repo, number, agents, publish = false }) => {
+    async ({ owner, repo, number, agents, publish = false }, extra) => {
       const client = environment.createTokenClient({ token: await resolveGithubToken(environment) });
       const ref = { owner, repo, pullRequestNumber: number };
       const pullRequest = await client.getPullRequest(ref);
@@ -118,6 +145,8 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         baseSha: pullRequest.baseSha,
         agents,
         publish,
+        signal: extra.signal,
+        onAgentEvent: progressReporter(extra),
       });
       const where = `${owner}/${repo}#${number} at ${pullRequest.headSha.slice(0, 7)}`;
       return reviewResult(
