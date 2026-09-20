@@ -54,8 +54,9 @@ type ReviewScope =
 one value serves both readers: the agents get the narrowed pair, publishing
 gets the whole pair.
 
-`reviewPullRequest` calls it in place of today's `getDiff` / `listChangedFiles`
-pair, and reads `scope.diff` and `scope.changedFiles` from then on.
+`reviewWithDelivery` calls it in place of the `getDiff` / `listChangedFiles`
+pair, and reads `scope.diff` and `scope.changedFiles` from then on. A run asks
+for it with `policy.incremental` on the `runReview` spec.
 
 ### The base-merge trap
 
