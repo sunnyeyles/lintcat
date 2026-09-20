@@ -16,6 +16,11 @@ import type { ReviewContext } from "#src/agent-contract";
 import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import { truncateWithMarker } from "#src/agents/truncate";
 
+/** `listCommitFiles` is optional: without it, nothing co-changed, which is what a client with no commit graph means. */
+export type ReviewToolsClient = PullRequestReadClient &
+  Pick<RepositoryHistoryClient, "listCommitShas"> &
+  Partial<Pick<RepositoryHistoryClient, "listCommitFiles">>;
+
 /** Tool results larger than this are truncated to bound token usage. */
 const MAX_TOOL_RESULT_CHARS = 50_000;
 
@@ -169,7 +174,7 @@ function unknownReason(
 
 /** Exactly the eight read-only tools, bound to one pull request. */
 export function createReviewTools(
-  github: PullRequestReadClient & RepositoryHistoryClient,
+  github: ReviewToolsClient,
   context: ReviewContext,
   index?: RepositoryIndex | undefined,
 ): ToolSet {
@@ -181,7 +186,7 @@ export function createReviewTools(
   const filesOf = (sha: string): Promise<string[]> => {
     let files = commitFiles.get(sha);
     if (files === undefined) {
-      files = github.listCommitFiles({ owner, repo, sha });
+      files = github.listCommitFiles?.({ owner, repo, sha }) ?? Promise.resolve([]);
       commitFiles.set(sha, files);
     }
     return files;
