@@ -65,14 +65,17 @@ function ownerAndRepo(remoteUrl: string | undefined, root: string): { owner: str
   return match ? { owner: match[1]!, repo: match[2]! } : { owner: "local", repo: path.basename(root) };
 }
 
+/** The checkout holding `repoPath`, with symlinks resolved. */
+export async function repositoryRoot(repoPath: string): Promise<string> {
+  return realpathSync((await git(repoPath, ["rev-parse", "--show-toplevel"])).trim());
+}
+
 /** Resolves `repoPath` to its checkout and the base the working tree is compared against. */
 export async function openLocalRepository(
   repoPath: string,
   base?: string | undefined,
 ): Promise<LocalRepository> {
-  const root = realpathSync(
-    (await git(repoPath, ["rev-parse", "--show-toplevel"])).trim(),
-  );
+  const root = await repositoryRoot(repoPath);
   const baseRef = assertRef(base ?? (await defaultBaseRef(root)));
   const baseSha = (await git(root, ["merge-base", baseRef, "HEAD"])).trim();
   const branch = (await tryGit(root, ["branch", "--show-current"])) ?? "HEAD";
@@ -83,7 +86,7 @@ export async function openLocalRepository(
 }
 
 /** A path inside the checkout, with symlinks resolved; anything else is a 404. */
-function resolveInside(root: string, file: string): string {
+export function resolveInside(root: string, file: string): string {
   const resolved = path.resolve(root, file);
   let real: string;
   try {

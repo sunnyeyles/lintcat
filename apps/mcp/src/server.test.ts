@@ -1,3 +1,6 @@
+import { chmodSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
@@ -100,6 +103,7 @@ describe("the tool list", () => {
     const { tools } = await client.listTools();
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "apply_fix",
       "describe_file",
       "find_references",
       "get_review",
@@ -113,7 +117,9 @@ describe("the tool list", () => {
       "validate_agent_config",
     ]);
     const writes = tools.filter((tool) => tool.annotations?.readOnlyHint !== true);
-    expect(writes.map((tool) => tool.name)).toEqual(["review_pull_request"]);
+    expect(writes.map((tool) => tool.name).sort()).toEqual(["apply_fix", "review_pull_request"]);
+    const applyFix = tools.find((tool) => tool.name === "apply_fix");
+    expect(applyFix?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
   });
 });
 
@@ -423,6 +429,84 @@ describe("review_pull_request", () => {
     expect(entries.map((logged) => logged.event)).toContain("agent.cancelled");
     expect(client.createCheckRun).not.toHaveBeenCalled();
     expect(client.createReview).not.toHaveBeenCalled();
+  });
+});
+
+describe("apply_fix", () => {
+  const adminLine = "export const admin = true;";
+  const patch = {
+    file: "src/sessions.ts",
+    startLine: 3,
+    endLine: 3,
+    expected: adminLine,
+    replacement: "export const admin = false;",
+  };
+
+  function read(file: string): string {
+    return readFileSync(path.join(repo.root, file), "utf8");
+  }
+
+  it("writes the patch into the working tree without committing", async () => {
+    const client = await connect(environment());
+    const head = repo.git("rev-parse", "HEAD");
+
+    const { isError, texts } = await call(client, "apply_fix", { patches: [patch] });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("No commit was made and nothing was pushed");
+    expect(read("src/sessions.ts")).toContain("export const admin = false;");
+    expect(repo.git("rev-parse", "HEAD")).toBe(head);
+    expect(repo.git("status", "--porcelain")).toContain("src/sessions.ts");
+    expect(repo.git("diff", "--cached", "--name-only")).toBe("");
+  });
+
+  it("refuses when the file changed since the review that produced the patch", async () => {
+    const client = await connect(environment());
+    repo.write("src/sessions.ts", "export const sessions = [];\nexport function createSession() {}\n");
+
+    const { isError, texts } = await call(client, "apply_fix", { patches: [patch] });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("no longer holds the text the review proved the patch against");
+    expect(read("src/sessions.ts")).not.toContain("admin");
+  });
+
+  it("refuses a patch whose file is not in the working tree", async () => {
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "apply_fix", {
+      patches: [{ ...patch, file: "src/gone.ts" }],
+    });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("does not exist in the working tree");
+  });
+
+  it("leaves every file as it was when one of the writes fails", async () => {
+    repo.write("src/api.ts", 'import { createSession } from "./sessions";\nexport const port = 80;\n');
+    const locked = path.join(repo.root, "src/api.ts");
+    const before = { sessions: read("src/sessions.ts"), api: read("src/api.ts") };
+    chmodSync(locked, 0o444);
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "apply_fix", {
+      patches: [
+        patch,
+        {
+          file: "src/api.ts",
+          startLine: 2,
+          endLine: 2,
+          expected: "export const port = 80;",
+          replacement: "export const port = 443;",
+        },
+      ],
+    });
+    chmodSync(locked, 0o644);
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("put back as it was");
+    expect(read("src/sessions.ts")).toBe(before.sessions);
+    expect(read("src/api.ts")).toBe(before.api);
   });
 });
 
