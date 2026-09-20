@@ -532,11 +532,13 @@ The agents read the graph through `find_references(path, name?)`: without a
 name, every file importing `path` with the line each import sits on; with one,
 only the files importing that export, default and namespace (`*`) imports
 included and marked. It returns at most 50 files alongside the true `total`,
-and every result carries an `index` header — the commit, whether the index is
-truncated, and the per-language coverage — so an empty answer can be told from
-an unindexed one. A path this pull request added, or one the index does not
+and every result carries an `index` header — the commit, the file count,
+whether the index is truncated, and the per-language coverage — so an empty
+answer can be told from an unindexed one. A path this pull request added, or one the index does not
 hold, comes back as `known: false` with the reason rather than as a file that
-does not exist.
+does not exist. The query lives in `@pr-review/index`; the agent tool and the
+MCP tool of the same name both render what it returns, so there is one cap, one
+header and one unknown-path answer.
 
 The opening message carries two blocks. `<repository>` gives bearings in a
 monorepo: every workspace package with its root, the indexed commit, and what

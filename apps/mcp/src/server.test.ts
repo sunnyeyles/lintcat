@@ -23,6 +23,7 @@ import {
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import type { FileContentsRequest } from "@pr-review/github";
+import { MAX_REFERENCE_FILES, UNINDEXED_PATH_REASON } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -140,11 +141,25 @@ describe("index tools", () => {
     });
   });
 
-  it("says when a path is not in the index", async () => {
+  it("gives the shared unknown-path answer, header and all", async () => {
     const client = await connect(environment());
     const { texts } = await call(client, "find_references", { path: "src/missing.ts" });
 
-    expect(JSON.parse(texts[0]!)).toMatchObject({ known: false });
+    const payload = JSON.parse(texts[0]!);
+    expect(payload).toMatchObject({
+      path: "src/missing.ts",
+      known: false,
+      reason: UNINDEXED_PATH_REASON,
+    });
+    expect(Object.keys(payload.index).sort()).toEqual(["files", "languages", "sha", "truncated"]);
+  });
+
+  it("advertises the one cap the shared query enforces", async () => {
+    const client = await connect(environment());
+    const { tools } = await client.listTools();
+    const found = tools.find((tool) => tool.name === "find_references");
+
+    expect(found?.description).toContain(`At most ${MAX_REFERENCE_FILES} files`);
   });
 
   it("sees a file created after the first call", async () => {
