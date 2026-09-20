@@ -473,6 +473,7 @@ than failing, each logged on `review.scope_resolved` as its `reason`:
 | No earlier commit carries our check run | `no_baseline` — the first review, or `checks: write` was absent |
 | The commits or check runs could not be read | `baseline_unreadable` |
 | The baseline is not an ancestor of the head | `head_rewritten` — a force-push or a rebase |
+| The client declares no `compareCommits` | `no_commit_comparison` — a local checkout or the eval fixture |
 
 The files reviewed are those the comparison reports **intersected with the pull
 request's own changed files**. A merge of the base branch into the branch under
@@ -715,7 +716,7 @@ pnpm test
 
 ### Client conformance
 
-Four adapters implement `GithubInstallationClient`: Octokit
+Four adapters serve a repository through these interfaces: Octokit
 (`packages/github/src/app.ts`), the local checkout
 (`apps/mcp/src/local-git-client.ts`), the eval fixture
 (`evals/src/fixture-client.ts`), and the agent test fake
@@ -726,8 +727,9 @@ Four adapters implement `GithubInstallationClient`: Octokit
 they are allowed to differ, and every entry is asserted rather than skipped:
 the search match cap (20 / 30 / 25 / none), snippets per match (none / 3 /
 none / none), whether the query is honoured at all, the operations each adapter
-declares unsupported and the error name each rejects with, and how a file the
-repository does not have is reported. Moving a cap in an adapter fails a test.
+never declares (`absent`) or declares and rejects (`unsupported`, with the error
+name), and how a file the repository does not have is reported. Moving a cap in
+an adapter fails a test.
 
 ### The three client interfaces
 
@@ -741,11 +743,18 @@ table divides along:
 | `RepositoryHistoryClient` | commits: which exist, what they touched, what they say, what a branch points at, how two compare | the local checkout (`compareCommits`), the eval fixture (`compareCommits`, `listCommitFiles`, `getCommitMessage`) |
 | `ReviewPublishClient` | the check run, the review, a commit on a branch, a file written to a branch | the local checkout and the eval fixture, all four methods |
 
+The two repository-only adapters declare only what they honour — the local
+checkout `PullRequestReadClient & Omit<RepositoryHistoryClient, "compareCommits">`,
+the eval fixture that minus `listCommitFiles` and `getCommitMessage` — so what
+they decline is a compile error at the call, not a throw. A review run takes
+that narrow `ReviewClient` and writes only through its `ReviewDelivery`, so
+publishing is unreachable from a checkout or a fixture twice over: the client
+has no publish method, and the delivery closes over no client.
+
 `METHOD_GROUPS` in `conformance.ts` carries the same split at runtime, and
 `client-groups.test.ts` asserts it against `ADAPTER_PROFILES`: no adapter may
-declare a pull-request read unsupported, and the two repository-only adapters
-must decline publishing whole. Callers still take the wide interface; narrowing
-them is the contract half of the refactor.
+decline a pull-request read, and neither repository-only adapter may declare a
+publish method at all.
 
 ---
 

@@ -27,7 +27,8 @@ A local review reads the agent configuration (`.github/pr-review-agents.yml`)
 at the base commit, the same way the Action does. It then assembles the same
 `runReview` spec the Action does, with a git-backed client in place of GitHub's
 and the recording delivery adapter in place of the publishing one, so a dry run
-has nothing to write through. The index tools read the working tree and cache
+has nothing to write through — and the git-backed client declares no publish
+method to write through either. The index tools read the working tree and cache
 the index until it changes.
 
 History uses the dashboard's own access rules (`authorize` in `packages/db`).
