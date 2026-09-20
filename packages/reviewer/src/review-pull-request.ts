@@ -20,7 +20,7 @@ import {
   errorMessage,
   type StructuredLogger,
 } from "@pr-review/logging";
-import type { ReviewFinding } from "@pr-review/schemas";
+import type { ReviewFinding, ReviewMemory } from "@pr-review/schemas";
 
 import { buildReviewIndex } from "#src/build-index";
 import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
@@ -32,6 +32,7 @@ import {
   computeHints,
   computeSynthesisHints,
   emptyMemory,
+  partitionSuppressed,
   readMemory,
   type MemoryStore,
 } from "#src/memory";
@@ -111,10 +112,11 @@ async function openEarlierFindings(
   }
 }
 
-/** One memory read serves both readers: the agents and the synthesiser. */
+/** One memory read serves every reader: agents, synthesiser and suppressions. */
 interface HintedRun {
   agents: readonly AgentDefinition[];
   synthesisHints: SynthesisHints;
+  memory: ReviewMemory;
 }
 
 /** The run's hints; unhinted when there is no store or the read fails. */
@@ -125,7 +127,11 @@ async function attachRepositoryHints(
   logger: StructuredLogger,
   now: Date,
 ): Promise<HintedRun> {
-  const unhinted: HintedRun = { agents, synthesisHints: emptySynthesisHints() };
+  const unhinted: HintedRun = {
+    agents,
+    synthesisHints: emptySynthesisHints(),
+    memory: emptyMemory(),
+  };
   if (store === undefined) {
     return unhinted;
   }
@@ -163,6 +169,7 @@ async function attachRepositoryHints(
       withRepositoryHints(agent, hints.get(agent.category) ?? []),
     ),
     synthesisHints,
+    memory,
   };
 }
 
@@ -222,6 +229,8 @@ function noNewChangesNote(sinceSha: string): string {
 /** One review's outcome, plus how the patches its agents proposed fared. */
 export interface ReviewOutcome extends ReviewPipelineResult {
   patches: PatchSummary;
+  /** Validated findings the memory's suppressions hid from this review. */
+  suppressed: number;
 }
 
 /** The result of a review that never reached the pipeline. */
@@ -232,6 +241,7 @@ function unreviewed(): ReviewOutcome {
     synthesis: skippedSynthesis("no candidate findings", []),
     findings: [],
     patches: { proposed: 0, verified: 0 },
+    suppressed: 0,
   };
 }
 
@@ -312,7 +322,7 @@ export async function reviewWithDelivery(
     return unreviewed();
   }
 
-  const { agents: hinted, synthesisHints } = await attachRepositoryHints(
+  const { agents: hinted, synthesisHints, memory } = await attachRepositoryHints(
     agents,
     memoryStore,
     target,
@@ -385,9 +395,18 @@ export async function reviewWithDelivery(
     findingCount: review.findings.length,
   });
 
+  const { kept, suppressed } = partitionSuppressed(memory, review.findings);
+  if (suppressed.length > 0) {
+    logger.info("findings.suppressed", {
+      ...fields,
+      suppressedCount: suppressed.length,
+      titles: suppressed.map((finding) => finding.title),
+    });
+  }
+
   // Still inside the AI boundary: a patch is proved against the head commit
   // before any of it can be committed or offered.
-  const verified = await verifyPatches(review.findings, whole.changedFiles, {
+  const verified = await verifyPatches(kept, whole.changedFiles, {
     client,
     owner: target.owner,
     repo: target.repo,
@@ -435,5 +454,10 @@ export async function reviewWithDelivery(
     },
   );
 
-  return { ...review, findings: verified.findings, patches: verified.summary };
+  return {
+    ...review,
+    findings: verified.findings,
+    patches: verified.summary,
+    suppressed: suppressed.length,
+  };
 }
