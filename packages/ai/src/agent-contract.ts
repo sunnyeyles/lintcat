@@ -2,7 +2,7 @@
 import type { ChangedFile, PullRequestDetails } from "@pr-review/github";
 
 /** The whole pull request, when `diff` is narrowed. */
-export interface IncrementalReview {
+interface IncrementalReview {
   sinceSha: string;
   diff: string;
   changedFiles: readonly ChangedFile[];

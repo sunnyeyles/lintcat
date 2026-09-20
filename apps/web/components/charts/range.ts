@@ -14,7 +14,7 @@ export const RANGE_PHRASE: Record<Range, string> = {
   "90d": "the last 90 days",
 };
 
-export const DEFAULT_RANGE: Range = "30d";
+const DEFAULT_RANGE: Range = "30d";
 
 export function parseRange(value: string | string[] | undefined): Range {
   const first = Array.isArray(value) ? value[0] : value;

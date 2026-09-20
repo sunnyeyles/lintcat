@@ -1,15 +1,4 @@
-export { DocsArticle, type DocsArticleProps } from "./article";
+export { DocsArticle } from "./article";
 export { DocsNavDrawer, DocsSidebar } from "./docs-nav";
-export { DocsTable, type DocsTableProps } from "./docs-table";
-export {
-  Bullet,
-  Bullets,
-  Code,
-  Lede,
-  Note,
-  P,
-  Prose,
-  Section,
-  Subheading,
-} from "./prose";
-export { Toc } from "./toc";
+export { DocsTable } from "./docs-table";
+export { Bullet, Bullets, Code, Note, P, Section, Subheading } from "./prose";

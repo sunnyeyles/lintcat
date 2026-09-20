@@ -4,13 +4,13 @@ import type { ReactNode } from "react";
 
 import type { Heading } from "@/lib/docs";
 
-export function Lede({ children }: { children: ReactNode }) {
+function Lede({ children }: { children: ReactNode }) {
   return (
     <p className="max-w-measure font-mono text-lede leading-relaxed text-slate">{children}</p>
   );
 }
 
-export function Prose({ children, className }: { children: ReactNode; className?: string }) {
+function Prose({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div className={cn("flex max-w-measure flex-col gap-4", className)}>{children}</div>
   );

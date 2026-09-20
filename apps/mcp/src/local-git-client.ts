@@ -24,7 +24,7 @@ import { addedFileDiff, parseUnifiedDiff } from "#src/unified-diff";
 export const WORKING_TREE = "WORKING_TREE";
 
 /** No publishing, and no second commit to compare the working tree against. */
-export type LocalGitClient = PullRequestReadClient &
+type LocalGitClient = PullRequestReadClient &
   Omit<RepositoryHistoryClient, "compareCommits">;
 
 /** One local checkout, reviewed as if its uncommitted state were a pull request. */

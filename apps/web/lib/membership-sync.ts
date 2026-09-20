@@ -57,7 +57,7 @@ export function installedAccount(
   };
 }
 
-export function memberDecision(member: OrganizationMember | null): MembershipDecision {
+function memberDecision(member: OrganizationMember | null): MembershipDecision {
   if (!member) return { action: "revoke", reason: "not_github_org_member" };
   return member.role === "admin"
     ? { action: "grant", role: "owner", reason: "github_org_admin" }
@@ -73,7 +73,7 @@ function personalAccountDecision(
     : { action: "revoke", reason: "not_personal_account_owner" };
 }
 
-export function accountOf(member: OrganizationMember): GithubAccount {
+function accountOf(member: OrganizationMember): GithubAccount {
   return { githubId: member.id, login: member.login, avatarUrl: member.avatarUrl };
 }
 

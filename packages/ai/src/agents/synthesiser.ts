@@ -47,7 +47,7 @@ export function emptySynthesisHints(): SynthesisHints {
   return { keep: [], drop: [] };
 }
 
-export function hasSynthesisHints(
+function hasSynthesisHints(
   hints: SynthesisHints | undefined,
 ): hints is SynthesisHints {
   return hints !== undefined && hints.keep.length + hints.drop.length > 0;
