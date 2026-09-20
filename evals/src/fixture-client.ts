@@ -4,11 +4,11 @@
  */
 import process from "node:process";
 
+import { searchFiles } from "@pr-review/github";
 import type {
   ChangedFile,
   CheckRun,
   CheckRunSummary,
-  CodeSearchMatch,
   CodeSearchResult,
   CommitComparison,
   CommitMessageRequest,
@@ -30,45 +30,12 @@ import type {
 
 import type { LoadedFixture } from "#src/fixture";
 
-/** At most this many search matches come back from one query. */
-const MAX_SEARCH_MATCHES = 25;
-
 /** Set to `off` for the control arm: the archive is unavailable, so no index is built. */
 export const INDEX_ENV = "EVAL_INDEX";
 
 /** The control arm runs the identical suite with the index absent. */
 export function indexEnabled(env: Record<string, string | undefined>): boolean {
   return (env[INDEX_ENV] ?? "").trim().toLowerCase() !== "off";
-}
-
-/** Characters of context either side of a match, as GitHub's fragments have. */
-const FRAGMENT_PADDING = 120;
-
-/** Stands in for GitHub's text-match fragments: a window around each term. */
-function fragmentsAround(
-  contents: string,
-  lowered: string,
-  terms: string[],
-): string[] {
-  const windows = terms.flatMap((term) => {
-    const at = lowered.indexOf(term);
-    return at < 0
-      ? []
-      : [
-          contents.slice(
-            Math.max(0, at - FRAGMENT_PADDING),
-            at + term.length + FRAGMENT_PADDING,
-          ),
-        ];
-  });
-  return [...new Set(windows)];
-}
-
-/** GitHub's grammar: a quoted phrase is one term, everything else splits on space. */
-function searchTerms(query: string): string[] {
-  return (query.toLowerCase().match(/"[^"]*"|\S+/g) ?? [])
-    .map((term) => term.replaceAll('"', ""))
-    .filter((term) => term.length > 0);
 }
 
 /** One recorded read against the fixture repository. */
@@ -159,24 +126,7 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
         );
       }
       record("searchCode", request.query);
-      const terms = searchTerms(request.query);
-      const matches: CodeSearchMatch[] = [];
-      for (const [path, contents] of fixture.headFiles) {
-        const lowered = contents.toLowerCase();
-        const haystack = `${path.toLowerCase()}\n${lowered}`;
-        if (terms.every((term) => haystack.includes(term))) {
-          matches.push({
-            path,
-            name: path.slice(path.lastIndexOf("/") + 1),
-            snippets: fragmentsAround(contents, lowered, terms),
-          });
-        }
-      }
-      return {
-        matches: matches.slice(0, MAX_SEARCH_MATCHES),
-        totalCount: matches.length,
-        incompleteResults: false,
-      };
+      return searchFiles(request.query, fixture.headFiles);
     },
 
     async getRepositoryArchive(

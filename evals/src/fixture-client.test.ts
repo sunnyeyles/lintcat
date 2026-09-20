@@ -1,6 +1,7 @@
 /** The fixture GitHub client: what it serves, what it caps, what it refuses. */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { SEARCH_LIMITS } from "@pr-review/github";
 import type { ChangedFile, PullRequestDetails } from "@pr-review/github";
 
 import type { LoadedFixture } from "#src/fixture";
@@ -206,9 +207,13 @@ describe("searchCode", () => {
     expect(result.incompleteResults).toBe(false);
   });
 
-  it("matches on the path as well as the contents", async () => {
-    const result = await search("deliveries.ts");
+  it("matches on the contents alone, never on the path", async () => {
+    await expect(search("deliveries.ts")).resolves.toMatchObject({
+      matches: [],
+      totalCount: 0,
+    });
 
+    const result = await search("deliveries");
     expect(result.matches.map((match) => match.path)).toEqual(["src/routes/deliveries.ts"]);
     expect(result.matches[0]?.name).toBe("deliveries.ts");
   });
@@ -226,7 +231,7 @@ describe("searchCode", () => {
     expect(match?.snippets[0]).toBe(`${"x".repeat(120)}needle${"y".repeat(120)}`);
   });
 
-  it("caps the matches at 25 while still reporting the true total", async () => {
+  it("caps the matches at the shared limit while still reporting the true total", async () => {
     const files = Object.fromEntries(
       Array.from({ length: 30 }, (_unused, index) => [
         `src/file-${String(index).padStart(2, "0")}.ts`,
@@ -236,10 +241,10 @@ describe("searchCode", () => {
 
     const result = await search("needle", files);
 
-    expect(result.matches).toHaveLength(25);
+    expect(result.matches).toHaveLength(SEARCH_LIMITS.maxMatches);
     expect(result.totalCount).toBe(30);
     expect(result.matches[0]?.path).toBe("src/file-00.ts");
-    expect(result.matches[24]?.path).toBe("src/file-24.ts");
+    expect(result.matches.at(-1)?.path).toBe("src/file-19.ts");
   });
 
   it("refuses a repository that is not the fixture's", async () => {
