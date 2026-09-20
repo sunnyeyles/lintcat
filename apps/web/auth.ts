@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import GitHub, { type GitHubProfile } from "next-auth/providers/github";
 
 import { appDomain, sessionCookieDomain } from "@/lib/host";
-import { authRedirect } from "@/lib/paths";
+import { authRedirect, SIGN_IN_PATH } from "@/lib/paths";
 import { signInUser } from "@/lib/sign-in";
 
 declare module "next-auth" {
@@ -15,7 +15,7 @@ declare module "next-auth" {
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [GitHub],
   session: { strategy: "jwt" },
-  pages: { signIn: "/sign-in" },
+  pages: { signIn: SIGN_IN_PATH, error: SIGN_IN_PATH },
   // Scoped to the app domain so one sign-in on the apex covers every organization subdomain.
   cookies: { sessionToken: { options: { domain: sessionCookieDomain(appDomain()) } } },
   callbacks: {

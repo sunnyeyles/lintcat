@@ -9,6 +9,7 @@ export {
 export {
   createAppClient,
   createGithubAppClient,
+  type AppInstallation,
   type AppOctokitLike,
   type GithubAppClient,
   type GithubAppConfig,

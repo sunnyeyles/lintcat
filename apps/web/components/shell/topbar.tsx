@@ -1,5 +1,4 @@
 import { Button, cn } from "@pr-review/design";
-import { headers } from "next/headers";
 import Link from "next/link";
 
 import { SidebarDrawer } from "@/components/shell/sidebar";
@@ -7,13 +6,13 @@ import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { UserMenu } from "@/components/shell/user-menu";
 import { DOCS_HOME } from "@/lib/docs";
 import { appDomain } from "@/lib/host";
-import { apexUrl, DASHBOARD_PATH } from "@/lib/paths";
+import { apexUrl, DASHBOARD_PATH, topbarSignInHref } from "@/lib/paths";
+import { requestLocation } from "@/lib/request";
 
 export async function Topbar({ className }: { className?: string }) {
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("host");
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? "http";
+  const { host, protocol, path } = await requestLocation();
   const domain = appDomain();
+  const signInHref = topbarSignInHref(path, domain);
   const docs = apexUrl(DOCS_HOME, host, protocol, domain);
   const dashboard = apexUrl(DASHBOARD_PATH, host, protocol, domain);
 
@@ -48,7 +47,7 @@ export async function Topbar({ className }: { className?: string }) {
             <Link href={dashboard}>Dashboard</Link>
           </Button>
           <ThemeToggle />
-          <UserMenu />
+          <UserMenu signInHref={signInHref} />
         </div>
       </div>
     </header>

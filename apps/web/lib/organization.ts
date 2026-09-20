@@ -8,10 +8,19 @@ import {
 } from "@pr-review/db";
 import { and, asc, eq, isNull } from "drizzle-orm";
 
+import { organizationPath } from "@/lib/paths";
+
 export type OrganizationMembership = {
   organization: Organization;
   role: MembershipRole;
 };
+
+/** Where the picker sends a user with exactly one organization; the picker itself otherwise. */
+export function autoForwardPath(
+  list: readonly OrganizationMembership[],
+): string | undefined {
+  return list.length === 1 ? organizationPath(list[0]!.organization.slug) : undefined;
+}
 
 /** Every live organization the user belongs to, oldest membership first. */
 export async function membershipsForUser(

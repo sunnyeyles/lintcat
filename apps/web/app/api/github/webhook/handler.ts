@@ -7,24 +7,25 @@ import {
   markUninstalled,
   removeRepositories,
   removeRepository,
-  renameOrganization,
   replaceRepoAccess,
-  replaceRepositories,
   setInstallationSuspended,
   updateRepository,
   upsertAccountUser,
   upsertInstallation,
   upsertRepositories,
-  type Database,
   type InstallationInput,
   type Organization,
   type RepoPermission,
-  type RepositoryInput,
 } from "@pr-review/db";
-import type { GithubAppClient } from "@pr-review/github";
-import { errorMessage, type StructuredLogger } from "@pr-review/logging";
+import { errorMessage } from "@pr-review/logging";
 import { z } from "zod";
 
+import {
+  followRename,
+  installOrganization,
+  toInstallation,
+  type InstallationDeps,
+} from "@/lib/installation";
 import {
   applyMembership,
   installedAccount,
@@ -34,11 +35,7 @@ import {
 } from "@/lib/membership-sync";
 import { applyRepoAccess, lookupRepoPermission } from "@/lib/repo-access-sync";
 
-export interface GithubWebhookDeps {
-  /** Must support `.transaction()`: the WebSocket pool in production, PGlite in tests. */
-  database: Database;
-  github: GithubAppClient;
-  logger: StructuredLogger;
+export interface GithubWebhookDeps extends InstallationDeps {
   webhookSecret: string;
 }
 
@@ -56,6 +53,16 @@ const installationEventSchema = z.object({
   action: z.string(),
   installation: installationSchema,
 });
+
+function fromPayload({
+  suspended_at,
+  ...installation
+}: z.infer<typeof installationSchema>): InstallationInput | undefined {
+  return toInstallation({
+    ...installation,
+    suspendedAt: suspended_at ? new Date(suspended_at) : null,
+  });
+}
 
 const payloadRepositorySchema = z.object({
   id: z.number(),
@@ -203,34 +210,13 @@ async function onInstallation(
   payload: z.infer<typeof installationEventSchema>,
 ): Promise<boolean> {
   const { database, github } = deps;
-  const installation = toInstallation(payload.installation);
+  const installation = fromPayload(payload.installation);
   if (!installation) return false;
   const source = `installation.${payload.action}`;
   switch (payload.action) {
-    case "created": {
-      // Fetched before the transaction opens, so no connection idles on GitHub.
-      const listed = await github.listInstallationRepositories(
-        installation.installationId,
-      );
-      const members = await lookupMembers(github, installation);
-      const repositories = listed.map(
-        (repo): RepositoryInput => ({
-          githubRepoId: repo.id,
-          owner: repo.owner,
-          name: repo.name,
-          private: repo.private,
-        }),
-      );
-      await database.transaction(async (tx) => {
-        await followRename(deps, tx, installation, source);
-        const organization = await upsertInstallation(tx, installation, {
-          reinstall: true,
-        });
-        await replaceRepositories(tx, organization.id, repositories);
-        await replaceMembers({ ...deps, database: tx }, organization, members, source);
-      });
+    case "created":
+      await installOrganization(deps, installation, source);
       return true;
-    }
     case "deleted":
       await database.transaction(async (tx) => {
         await followRename(deps, tx, installation, source);
@@ -272,7 +258,7 @@ async function onInstallationRepositories(
   payload: z.infer<typeof installationRepositoriesEventSchema>,
 ): Promise<boolean> {
   const { database } = deps;
-  const installation = toInstallation(payload.installation);
+  const installation = fromPayload(payload.installation);
   if (!installation) return false;
   if (payload.action !== "added" && payload.action !== "removed") return false;
   // Only `created` brings an uninstalled organization back, so a late delivery cannot.
@@ -317,25 +303,6 @@ async function onOrganizationRenamed(
     });
   }
   return renamed;
-}
-
-// The payload's login is taken as current, so a stale redelivery can move the slug back.
-async function followRename(
-  deps: GithubWebhookDeps,
-  database: Database,
-  account: Pick<InstallationInput, "accountId" | "login">,
-  source: string,
-): Promise<boolean> {
-  const renamed = await renameOrganization(database, account.accountId, account.login);
-  if (renamed && renamed.from !== renamed.to) {
-    deps.logger.info("organization.renamed", {
-      source,
-      githubAccountId: account.accountId,
-      from: renamed.from,
-      to: renamed.to,
-    });
-  }
-  return renamed !== undefined;
 }
 
 // The payload's role is not trusted: GitHub is asked for the current one, so reordered deliveries converge.
@@ -471,24 +438,6 @@ async function listReaders(
     });
     return undefined;
   }
-}
-
-function toInstallation(
-  installation: z.infer<typeof installationSchema>,
-): InstallationInput | undefined {
-  const { type } = installation.account;
-  const accountType =
-    type === "Organization" ? "organization" : type === "User" ? "user" : undefined;
-  if (!accountType) return undefined;
-  return {
-    installationId: installation.id,
-    accountId: installation.account.id,
-    accountType,
-    login: installation.account.login,
-    suspendedAt: installation.suspended_at
-      ? new Date(installation.suspended_at)
-      : null,
-  };
 }
 
 function validSignature(

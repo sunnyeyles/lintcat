@@ -9,6 +9,7 @@ import {
   returnUrl,
   safeCallbackUrl,
   signInUrl,
+  topbarSignInHref,
   withinOrganization,
 } from "@/lib/paths";
 
@@ -171,11 +172,36 @@ describe("isApexOnly", () => {
     expect(isApexOnly("/docs")).toBe(true);
     expect(isApexOnly("/docs/quickstart")).toBe(true);
     expect(isApexOnly("/dashboard")).toBe(true);
+    expect(isApexOnly("/dashboard/setup")).toBe(true);
+    expect(isApexOnly("/sign-in")).toBe(true);
+    expect(isApexOnly("/sign-in/")).toBe(true);
   });
 
   it("leaves an organization's own pages alone", () => {
     expect(isApexOnly("/")).toBe(false);
     expect(isApexOnly("/repos")).toBe(false);
     expect(isApexOnly("/o/acme/usage")).toBe(false);
+  });
+});
+
+describe("topbarSignInHref", () => {
+  it("goes to the picker when no page is known", () => {
+    expect(topbarSignInHref(null, DOMAIN)).toBe("/sign-in?callbackUrl=%2Fdashboard");
+    expect(topbarSignInHref("/", DOMAIN)).toBe("/sign-in?callbackUrl=%2Fdashboard");
+  });
+
+  it("returns to the page being read", () => {
+    expect(topbarSignInHref("/docs/quickstart", DOMAIN)).toBe(
+      "/sign-in?callbackUrl=%2Fdocs%2Fquickstart",
+    );
+    expect(topbarSignInHref("https://acme.prreview.dev/usage?range=7d", DOMAIN)).toBe(
+      "https://prreview.dev/sign-in?callbackUrl=https%3A%2F%2Facme.prreview.dev%2Fusage%3Frange%3D7d",
+    );
+  });
+
+  it("offers nothing on the sign-in page, which has its own button", () => {
+    expect(topbarSignInHref("/sign-in?callbackUrl=%2Fx", DOMAIN)).toBeUndefined();
+    expect(topbarSignInHref("/sign-in/", DOMAIN)).toBeUndefined();
+    expect(topbarSignInHref("https://prreview.dev/sign-in", DOMAIN)).toBeUndefined();
   });
 });

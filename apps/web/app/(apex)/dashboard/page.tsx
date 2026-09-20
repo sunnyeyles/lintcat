@@ -1,5 +1,6 @@
 import { db } from "@pr-review/db";
 import {
+  Button,
   Card,
   Chip,
   EmptyState,
@@ -17,8 +18,9 @@ import { redirect } from "next/navigation";
 
 import { RowLink } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { membershipsForUser } from "@/lib/organization";
+import { installAppUrl } from "@/lib/github-app";
 import { appDomain } from "@/lib/host";
+import { autoForwardPath, membershipsForUser } from "@/lib/organization";
 import { DASHBOARD_PATH, organizationPath, signInUrl } from "@/lib/paths";
 import { currentSession } from "@/lib/session";
 
@@ -28,6 +30,9 @@ export default async function OrganizationsPage() {
   const session = await currentSession();
   if (!session) redirect(signInUrl(DASHBOARD_PATH, appDomain()));
   const memberships = await membershipsForUser(db(), session.githubId);
+  const forward = autoForwardPath(memberships);
+  if (forward) redirect(forward);
+  const install = installAppUrl();
 
   return (
     <div className="flex flex-col gap-8">
@@ -43,9 +48,18 @@ export default async function OrganizationsPage() {
           description={
             <>
               <code>{session.login}</code> is signed in but belongs to no organization, so
-              there is nothing to show. Ask an organization owner to add you, then reload
-              this page.
+              there is nothing to show.{" "}
+              {install
+                ? "Install the GitHub App on your organization, or ask an owner to add you."
+                : "Ask an organization owner to add you."}
             </>
+          }
+          action={
+            install ? (
+              <Button asChild>
+                <a href={install}>Install the GitHub App</a>
+              </Button>
+            ) : undefined
           }
         />
       ) : (

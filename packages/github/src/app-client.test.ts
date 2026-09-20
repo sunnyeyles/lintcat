@@ -12,6 +12,7 @@ import {
 const installationId = 4242;
 
 interface StubRoutes {
+  installation?: unknown;
   repositories?: unknown[];
   members?: Record<"admin" | "all", unknown[]>;
   membership?: unknown;
@@ -44,10 +45,14 @@ function stub(routes: StubRoutes) {
     if (routes.permissionLevel === undefined) throw notFound();
     return { data: routes.permissionLevel };
   });
+  const getInstallation = vi.fn(async () => {
+    if (routes.installation === undefined) throw notFound();
+    return { data: routes.installation };
+  });
   const octokit: AppOctokitLike = {
     paginate,
     rest: {
-      apps: { listReposAccessibleToInstallation: listRepos },
+      apps: { listReposAccessibleToInstallation: listRepos, getInstallation },
       orgs: { listMembers, getMembershipForUser },
       repos: { listCollaborators, getCollaboratorPermissionLevel },
     },
@@ -61,6 +66,29 @@ function collaborator(
 ): Record<string, unknown> {
   return { id: 1, login: "octocat", role_name: null, permissions: {}, ...overrides };
 }
+
+describe("getInstallation", () => {
+  it("returns the account behind the installation", async () => {
+    const { client, installation } = stub({
+      installation: {
+        id: installationId,
+        account: { id: 7, login: "octo-org", type: "Organization" },
+        suspended_at: "2026-09-01T12:00:00Z",
+      },
+    });
+    await expect(client.getInstallation(installationId)).resolves.toEqual({
+      id: installationId,
+      account: { id: 7, login: "octo-org", type: "Organization" },
+      suspendedAt: new Date("2026-09-01T12:00:00Z"),
+    });
+    expect(installation).toHaveBeenCalledWith(installationId);
+  });
+
+  it("rejects a response without an account", async () => {
+    const { client } = stub({ installation: { id: installationId } });
+    await expect(client.getInstallation(installationId)).rejects.toThrow();
+  });
+});
 
 describe("repositoryPermission", () => {
   it("prefers role_name, which alone carries maintain and triage", () => {
@@ -177,7 +205,7 @@ describe("getOrganizationMembership", () => {
     const client = createAppClient(() => ({
       paginate: async () => [],
       rest: {
-        apps: { listReposAccessibleToInstallation: null },
+        apps: { listReposAccessibleToInstallation: null, getInstallation: async () => ({ data: null }) },
         orgs: {
           listMembers: null,
           getMembershipForUser: async () => {
