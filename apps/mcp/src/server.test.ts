@@ -1,8 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
+  CreateMessageRequestSchema,
   ProgressNotificationSchema,
   type CallToolResult,
+  type CreateMessageRequest,
   type Progress,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
@@ -540,5 +542,77 @@ describe("the prompt list", () => {
     const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
     expect(text).toContain("the most severe finding");
     expect(text).toContain('`get_review` with org "acme" and id 12');
+  });
+});
+
+describe("a review through client sampling", () => {
+  /** A client that answers sampling/createMessage with `reply`, recording what it was asked. */
+  async function samplingClient(env: McpEnvironment, reply: string) {
+    const asked: CreateMessageRequest["params"][] = [];
+    const server = createServer(env);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: "test", version: "0.0.0" }, { capabilities: { sampling: {} } });
+    client.setRequestHandler(CreateMessageRequestSchema, (request) => {
+      asked.push(request.params);
+      return { model: "client-model", role: "assistant" as const, content: { type: "text" as const, text: reply } };
+    });
+    await client.connect(clientTransport);
+    return { client, asked };
+  }
+
+  it("reviews with no provider key at all, and says the review was reduced", async () => {
+    const { client, asked } = await samplingClient(
+      environment({ env: {} }),
+      finalFindingsJson([makeFinding("general", { file: "src/sessions.ts", line: 3, title: "Admin is always on" })]),
+    );
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reduced single-shot review");
+    expect(texts[1]).toContain("Reviewed 1 changed file(s)");
+    const details = JSON.parse(texts[2]!);
+    expect(details).toMatchObject({ singleShot: true, agents: ["general"], synthesis: "skipped" });
+    expect(details.findings.map((finding: { title: string }) => finding.title)).toEqual(["Admin is always on"]);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.messages[0]!.content).toMatchObject({ type: "text" });
+  });
+
+  it("validates a sampled finding exactly as it validates any other agent's", async () => {
+    const { client } = await samplingClient(
+      environment({ env: {} }),
+      finalFindingsJson([
+        makeFinding("general", { file: "src/sessions.ts", line: 1, title: "On an untouched line" }),
+        makeFinding("general", { file: "src/nowhere.ts", line: 3, title: "In an unchanged file" }),
+      ]),
+    );
+
+    const { texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(JSON.parse(texts[2]!).findings).toEqual([]);
+  });
+
+  it("leaves the sampling client alone whenever a provider key is present", async () => {
+    const { client, asked } = await samplingClient(
+      environment({ createLanguageModel: () => scriptedModel([]) }),
+      finalFindingsJson([]),
+    );
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).not.toContain("Reduced single-shot review");
+    expect(asked).toEqual([]);
+  });
+
+  it("names both ways out when there is neither a key nor sampling", async () => {
+    const client = await connect(environment({ env: {} }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("No model API key is set and this client does not offer sampling");
+    expect(texts[0]).toContain("sampling/createMessage");
   });
 });

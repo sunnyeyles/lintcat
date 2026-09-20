@@ -12,7 +12,7 @@ import { registerSearchTools } from "#src/tools/search-tools";
 
 const INSTRUCTIONS = `Tools for the pr-review-agents code reviewer.
 - list_review_agents: which agents a local checkout configures, their path gates, and which the current changes would wake. Fast; no model calls.
-- review_local_changes: review the working tree before pushing. Slow (model calls); read-only.
+- review_local_changes: review the working tree before pushing. Slow (model calls); read-only. With no provider key set it runs through your own model via sampling, and says the review was the reduced single-shot one.
 - review_pull_request: dry-run review of a GitHub PR; publish: true posts to GitHub, so only set it when the user asks.
 - repository_overview / find_references / describe_file: import-graph navigation of a local checkout; no network.
 - search_code: literal text search of a local checkout, with path and line number; no network.
@@ -57,7 +57,7 @@ export function createServer(environment: McpEnvironment, options: ServerOptions
   );
   const client = options.client ?? connectedClient(server);
   server.server.oninitialized = () => environment.logger.info("mcp.client", { ...client.features() });
-  registerReviewTools(server, environment);
+  registerReviewTools(server, environment, client);
   registerIndexTools(server, environment, options.loadIndex ?? createLocalIndexCache());
   registerSearchTools(server, environment);
   registerConfigTools(server, environment);
