@@ -42,7 +42,8 @@ h1, h2, h3 { text-wrap: balance; line-height: 1.15; font-weight: 600; }
 
 /* mono utility face — every label, path, number, and code sample */
 .mono, code, pre, th, .rail, .eyebrow, .chip, .stat-n, .stat-l, .badge, .node,
-.agent, .agents-note, .diagram-note, .stage-num, .code-head, ol.rules li::before, .foot {
+.agent, .agents-note, .diagram-note, .loop-note, .flow-replay, .stage-num, .code-head,
+ol.rules li::before, .foot {
   font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   font-feature-settings: "ss01", "cv02";
 }
@@ -184,6 +185,44 @@ h1, h2, h3 { text-wrap: balance; line-height: 1.15; font-weight: 600; }
   font-size: .68rem; color: var(--slate); line-height: 1.6; text-align: center;
 }
 .diagram-note b { color: var(--brand); }
+
+/* the model ⇄ tools loop: two nodes with an arrow between them */
+.loop { display: grid; grid-template-columns: 1fr auto 1fr; gap: .6rem; align-items: center; }
+.loop .arrow { font-size: 1.1rem; color: var(--slate-dim); line-height: 1; }
+.loop-note { text-align: center; font-size: .64rem; color: var(--slate-dim); margin-top: .4rem; }
+.stage .diagram { margin-top: 1.6rem; padding-top: 1.6rem; padding-bottom: 1.6rem; }
+
+/* ============================================================
+   FLOW — diagram.js dims [data-step] parts, then lights them in order
+   ============================================================ */
+.is-flowing [data-step] { opacity: .22; transition: opacity .3s ease; }
+.is-flowing [data-step].is-on { opacity: 1; }
+.is-flowing .link[data-step], .is-flowing .fan[data-step] {
+  transform: scaleY(0); transform-origin: top; transition: transform .22s ease-out, opacity .22s;
+}
+.is-flowing .link[data-step].is-on, .is-flowing .fan[data-step].is-on { transform: scaleY(1); }
+.is-flowing .fan.in[data-step] { transform-origin: bottom; }
+.is-flowing .node.is-now, .is-flowing .agent.is-now { animation: flow-pulse .7s ease-out; }
+@keyframes flow-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 55%, transparent); }
+  100% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--brand) 0%, transparent); }
+}
+.flow-caption {
+  min-height: 1.6em; margin-top: 1.2rem; text-align: center;
+  font-size: .78rem; font-style: italic; color: var(--slate); line-height: 1.6;
+}
+.flow-bar { display: flex; justify-content: center; margin-top: .6rem; }
+.flow-replay {
+  font: inherit; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--slate); background: transparent; border: 1px solid var(--rule);
+  border-radius: 2px; padding: .3rem .7rem; cursor: pointer;
+}
+.flow-replay:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); }
+.flow-replay:disabled { opacity: .45; cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .is-flowing [data-step] { opacity: 1; transform: none; }
+  .flow-bar { display: none; }
+}
 
 /* ============================================================
    SECTIONS
@@ -352,55 +391,57 @@ html { scroll-behavior: smooth; }
     </header>
 
     <!-- ========== DIAGRAM ========== -->
-    <section class="diagram" aria-label="Pipeline diagram">
+    <section class="diagram" aria-label="Pipeline diagram" data-flow>
       <div class="diagram-inner">
 
-        <div class="node terminal">pull_request event<span class="n-sub">GITHUB_EVENT_PATH</span></div>
-        <div class="link"></div>
+        <div class="node terminal" data-step="1" data-caption="A pull_request event lands on the runner.">pull_request event<span class="n-sub">GITHUB_EVENT_PATH</span></div>
+        <div class="link" data-step="2"></div>
 
-        <div class="node">inspectEvent<span class="n-sub">reviewable? otherwise a clean no-op</span></div>
-        <div class="link"></div>
+        <div class="node" data-step="3" data-caption="Is this a reviewable action? Anything else exits cleanly.">inspectEvent<span class="n-sub">reviewable? otherwise a clean no-op</span></div>
+        <div class="link" data-step="4"></div>
 
-        <div class="node">runAction<span class="n-sub">client · agents · model · tracing · prompts</span></div>
-        <div class="link"></div>
+        <div class="node" data-step="5" data-caption="Wire up the client, the configured agents, the model, tracing and prompts.">runAction<span class="n-sub">client · agents · model · tracing · prompts</span></div>
+        <div class="link" data-step="6"></div>
 
-        <div class="node">reviewPullRequest<span class="n-sub">load PR + changed files + diff</span></div>
-        <div class="link"></div>
+        <div class="node" data-step="7" data-caption="Load the pull request, its changed files and the diff.">reviewPullRequest<span class="n-sub">load PR + changed files + diff</span></div>
+        <div class="link" data-step="8"></div>
 
-        <div class="node">gateAgentsByPaths<span class="n-sub">who wakes · none ⇒ neutral check, no review</span></div>
-        <div class="link"></div>
+        <div class="node" data-step="9" data-caption="Path filters decide which agents wake. None ⇒ a neutral check and no review.">gateAgentsByPaths<span class="n-sub">who wakes · none ⇒ neutral check, no review</span></div>
+        <div class="link" data-step="10"></div>
 
-        <div class="node terminal">START<span class="n-sub">runReviewPipeline</span></div>
+        <div class="node terminal" data-step="11" data-caption="The pipeline starts.">START<span class="n-sub">runReviewPipeline</span></div>
 
-        <div class="fan out"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="fan out" data-step="12"><i></i><i></i><i></i><i></i><i></i></div>
 
         <div class="agents">
-          <div class="agent s"><b>security</b><span>authz · injection · leaks</span></div>
-          <div class="agent a"><b>correctness</b><span>logic · bounds · nulls</span></div>
-          <div class="agent p"><b>performance</b><span>N+1 · scans · blocking</span></div>
-          <div class="agent t"><b>test-coverage</b><span>untested branches</span></div>
-          <div class="agent c"><b>docs-drift</b><span>README · flags · examples</span></div>
+          <div class="agent s" data-step="13" data-caption="Every active agent starts at once and runs concurrently." data-hold="1100"><b>security</b><span>authz · injection · leaks</span></div>
+          <div class="agent a" data-step="13"><b>correctness</b><span>logic · bounds · nulls</span></div>
+          <div class="agent p" data-step="13"><b>performance</b><span>N+1 · scans · blocking</span></div>
+          <div class="agent t" data-step="13"><b>test-coverage</b><span>untested branches</span></div>
+          <div class="agent c" data-step="13"><b>docs-drift</b><span>README · flags · examples</span></div>
         </div>
-        <div class="agents-note">this repository's <code>.github/pr-review-agents.yml</code> — yours names its own subset of the shipped specialists</div>
+        <div class="agents-note" data-step="13">this repository's <code>.github/pr-review-agents.yml</code> — yours names its own subset of the shipped specialists</div>
 
-        <div class="fan in"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="fan in" data-step="14"><i></i><i></i><i></i><i></i><i></i></div>
 
-        <div class="node">join<span class="n-sub">fan-in, re-sorted to agent order</span></div>
-        <div class="link"></div>
+        <div class="node" data-step="15" data-caption="Fan-in waits for all of them, then re-sorts the candidates to agent order.">join<span class="n-sub">fan-in, re-sorted to agent order</span></div>
+        <div class="link" data-step="16"></div>
 
-        <div class="node">synthesise<span class="n-sub">one model call · no tools · no loop</span></div>
-        <div class="link"></div>
+        <div class="node" data-step="17" data-caption="One model call. No tools, no loop.">synthesise<span class="n-sub">one model call · no tools · no loop</span></div>
+        <div class="link" data-step="18"></div>
 
-        <div class="node trust">validate<span class="n-sub">the trust boundary · 7 deterministic steps</span></div>
-        <div class="link"></div>
+        <div class="node trust" data-step="19" data-caption="The trust boundary. Seven deterministic steps; nothing above this line can reach GitHub." data-hold="1000">validate<span class="n-sub">the trust boundary · 7 deterministic steps</span></div>
+        <div class="link" data-step="20"></div>
 
-        <div class="node">render<span class="n-sub">pure · no I/O</span></div>
-        <div class="link long"></div>
+        <div class="node" data-step="21" data-caption="Render is pure: no I/O.">render<span class="n-sub">pure · no I/O</span></div>
+        <div class="link long" data-step="22"></div>
 
         <div class="split">
-          <div class="node">review comments<span class="n-sub">then a check run</span></div>
-          <div class="node">job summary<span class="n-sub">fork fallback · 403/404</span></div>
+          <div class="node" data-step="23" data-caption="Review comments and a check run, or the job summary when a fork denies write access.">review comments<span class="n-sub">then a check run</span></div>
+          <div class="node" data-step="23">job summary<span class="n-sub">fork fallback · 403/404</span></div>
         </div>
+
+        <p class="flow-caption" data-flow-caption aria-hidden="true"></p>
 
         <p class="diagram-note">
           Everything above <b>validate</b> is untrusted model output.<br>
@@ -703,6 +744,38 @@ html { scroll-behavior: smooth; }
           hit, and refuse anything that is not the agent's own category.
         </p>
       </div>
+
+      <section class="diagram" aria-label="One agent's run" data-flow>
+        <div class="diagram-inner">
+
+          <div class="node terminal" data-step="1" data-caption="A YAML entry: the role, the focus text, and the one category it owns.">AgentDefinition<span class="n-sub">role · focus · category</span></div>
+          <div class="link" data-step="2"></div>
+
+          <div class="node" data-step="3" data-caption="The system prompt pins the shared, cached prefix; the opening message carries the PR.">system prompt + opening message<span class="n-sub">shared prefix cached · PR context</span></div>
+          <div class="link" data-step="4"></div>
+
+          <div class="loop">
+            <div class="node" data-step="5 7 9" data-caption="The model asks for a tool, reads the result, asks again. Twelve turns at most.">model<span class="n-sub">tool call or final answer</span></div>
+            <span class="arrow" data-step="6 8" aria-hidden="true">⇄</span>
+            <div class="node" data-step="6 8" data-hold="500">8 review tools<span class="n-sub">get_diff · get_file · search_repository · find_references …</span></div>
+          </div>
+          <div class="loop-note" data-step="5">stopWhen: isStepCount(maxTurns) · 12 by default</div>
+          <div class="link" data-step="10"></div>
+
+          <div class="node" data-step="11" data-caption="Still holding a tool call at the cap? That is a failure, not a truncated answer.">finishReason<span class="n-sub">"tool-calls" at the cap ⇒ AgentRunError</span></div>
+          <div class="link" data-step="12"></div>
+
+          <div class="node" data-step="13" data-caption="The outermost JSON object is taken from the final message and Zod-validated.">extractAgentOutput<span class="n-sub">outermost JSON object · Zod</span></div>
+          <div class="link" data-step="14"></div>
+
+          <div class="node trust" data-step="15" data-caption="Findings outside the agent's own category are dropped, never re-stamped." data-hold="900">filter to own category<span class="n-sub">cross-category leaks dropped</span></div>
+          <div class="link" data-step="16"></div>
+
+          <div class="node terminal" data-step="17" data-caption="What survives goes to join, alongside every other agent's candidates.">candidates<span class="n-sub">to join</span></div>
+
+          <p class="flow-caption" data-flow-caption aria-hidden="true"></p>
+        </div>
+      </section>
 
       <figure class="code">
         <div class="code-head"><span class="p">packages/ai/src/agents/runtime.ts</span><span class="ln">line 158</span></div>
@@ -1256,5 +1329,6 @@ ANTHROPIC_API_KEY=... pnpm eval</pre>
 
   </main>
 </div>
+<script src="diagram.js" defer></script>
 </body>
 </html>
