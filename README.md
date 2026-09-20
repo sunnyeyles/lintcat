@@ -1,33 +1,101 @@
 # pr-review-agents
 
-Reviews pull requests with AI agents, and publishes the result as inline pull
-request review comments, alongside an `AI PR Review` check run carrying the
-full summary.
+An AI pull request reviewer that runs as a GitHub Action in your own runner,
+against your own model key. It publishes inline review comments and an
+`AI PR Review` check run carrying the full summary.
 
-By default one **general** agent reviews the pull request for correctness,
-security, performance, test and documentation problems in a single pass. No
-configuration is needed.
+## What it finds
 
-Specialist agents are opt-in. They ship with the action, in
-[`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists):
-Security, Correctness, Performance, Test coverage and Docs drift. A repository
-that names them in [`.github/pr-review-agents.yml`](#choosing-your-agents) gets
-a review from exactly those, run in parallel and merged by a synthesiser. Any
-subset can be selected per run.
+One **general** agent reviews the whole pull request in a single pass, with no
+configuration. Its brief
+([`general-agent.ts`](packages/ai/src/agents/general-agent.ts)) is the problems
+a careful senior reviewer would block a merge on:
 
-This repository's own [`.github/pr-review-agents.yml`](.github/pr-review-agents.yml)
-opts into all five specialists and is a working starting point to copy.
+| | |
+| --- | --- |
+| **Correctness** | logic errors, wrong conditions or bounds, unhandled null or empty input, wrong return values, swallowed errors, missing awaits, ordering bugs |
+| **Security** | missing or bypassable authn/authz, cross-tenant access, injection, leaked secrets, sensitive data in logs, unsafely trusted input |
+| **Performance** | N+1 queries, unbounded reads on a per-request path, quadratic scans over growing data, blocking I/O on a request path |
+| **Tests** | a new or changed branch no existing test file exercises, or a test still asserting the old behaviour |
+| **Documentation** | README, docs, or code comments this change made wrong |
 
-The agents never touch GitHub. They propose structured findings; deterministic
-application code decides what actually gets published.
+Five specialists ship alongside it — Security, Correctness, Performance, Test
+coverage and Docs drift, one file each in
+[`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists).
+They are opt-in: a repository that names them in
+[`.github/pr-review-agents.yml`](#choosing-your-agents) gets a review from
+exactly those, run in parallel and merged by a synthesiser. Any subset can be
+selected per run. This repository's own
+[`.github/pr-review-agents.yml`](.github/pr-review-agents.yml) opts into all
+five and is a working starting point to copy.
 
 A finding may carry a **patch**: a replacement for a range of lines, quoted
-alongside the exact text it expects to replace. Deterministic code checks that
-quote against the file at the head commit character for character before the
-patch can go anywhere. With [`fix: true`](#fixes) the surviving patches are
-committed to the pull request branch in one commit; otherwise — and whenever
-the commit cannot be made — they arrive as one-click suggested changes on the
-review comments. The agent still never writes anything itself.
+alongside the exact text it expects to replace. With [`fix: true`](#fixes) the
+surviving patches are committed to the pull request branch in one commit;
+otherwise — and whenever the commit cannot be made — they arrive as one-click
+suggested changes on the review comments. The agent never writes anything
+itself: it proposes structured findings, and deterministic application code
+decides what actually gets published.
+
+## How noisy it is
+
+**What it deliberately stays silent about.** Every agent is told not to report
+style, formatting, naming, micro-optimisations, missing documentation for new
+work, or architectural preferences — those categories are discarded rather
+than ranked down. It is told to report a problem only after reading the code,
+and to prefer a few serious findings over many small ones.
+
+**What the code enforces, with no model in the path**
+([`validate-findings.ts`](packages/reviewer/src/validate-findings.ts)):
+
+- a finding whose `confidence` is below **0.70** is dropped
+- a finding must land on a line the diff actually **added**, in a file the pull
+  request touches
+- a finding must carry a category belonging to **this run's own agents**; a
+  security finding leaking out of the docs-drift agent is dropped, never
+  re-stamped
+- duplicates are removed and the survivors are **capped at 10**, strongest first
+- the check run's conclusion is always `neutral` — the review is advisory and
+  never blocks a merge
+
+**What is not yet measured.** There is no review-quality benchmark, and this
+README will not quote one. [`evals/`](evals/README.md) runs the real pipeline
+against six fixture repositories and asserts fourteen things — five anchored
+recall assertions, three precision assertions, six health checks — which is
+enough to catch a reviewer that has gone silent or gone haywire, and is not a
+false-positive rate. `docs-drift` has no recall fixture at all, no fixture
+requires a patch, and there is one sample per arm. The eval README states each
+gap; [#126](https://github.com/sunnyeyles/pr-review-agents/issues/126) is
+measuring one of them.
+
+## Where your code goes
+
+**Nowhere you did not configure.** There is no GitHub App to install and no
+vendor server in the path. The Action is a bundle that runs in your own Actions
+runner; the workflow's own `GITHUB_TOKEN` authenticates the reads and publishes
+the result. Nothing is read from a secrets store at runtime, and this project's
+maintainers operate no service a review touches.
+
+The one place your code does go is **the model provider you configure**. The
+diff, the files the agents read, and the pull request's own text are sent to
+`openai` or `anthropic` under your `api-key`. Setting
+[`model-base-url`](#model-providers) points that at a gateway, a proxy, or a
+self-hosted endpoint speaking the provider's API, which closes even that hop —
+no code then leaves infrastructure you control.
+
+Two optional integrations send data elsewhere. Both are **off unless you set
+their inputs**:
+
+| Setting | What leaves, and where to | Closing it |
+| --- | --- | --- |
+| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls. The AI SDK records call inputs and outputs by default and this action does not disable it, so the exported spans carry the prompts and tool results — diff and file contents included — to `langfuse-base-url` (`https://cloud.langfuse.com` by default). | Leave both keys unset, the default; or point `langfuse-base-url` at your own instance. |
+| [`dashboard-token`](#configuration) + `dashboard-url` | One `POST` to `<dashboard-url>/api/ingest` per review ([`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)): owner, repo, PR number, head SHA, agent names, timings, token counts, and every published finding — file path, line, title, explanation, suggested fix, and, where a patch survived, its `expected` and `replacement` text, which are verbatim lines of your source. | Leave both unset, the default; or point `dashboard-url` at your own deployment of [`apps/web`](apps/web). |
+
+Within GitHub, the Action asks for no more than it needs: `contents: read`,
+`pull-requests: write` and `checks: write`, each of which
+[degrades rather than fails](#token-permissions) when withheld, plus
+`contents: write` only for [`fix: true`](#fixes). It never merges and never
+approves.
 
 ---
 
@@ -853,6 +921,10 @@ no vector database, no repository embeddings. What memory there is stays a
 single JSON file of finding shapes — see [Review memory](#review-memory).
 
 Review history and a dashboard now live in [`apps/web`](apps/web), separately
-from the Action and optional to run. It reads the schema in
-[`packages/db`](packages/db) — which nothing writes to yet, so the dashboard
-currently renders seeded demo data and says so on every page.
+from the Action and optional to run. It reads and writes the schema in
+[`packages/db`](packages/db): a review reaches it only when both
+[`dashboard-token` and `dashboard-url`](#where-your-code-goes) are set, in
+which case [`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)
+posts the review record to `<dashboard-url>/api/ingest`, which
+[`packages/db/src/ingest.ts`](packages/db/src/ingest.ts) stores. Set neither,
+the default, and the review is published to GitHub only.
