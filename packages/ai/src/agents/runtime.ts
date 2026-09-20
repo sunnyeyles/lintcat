@@ -21,6 +21,7 @@ import {
 import { extractAgentOutput } from "#src/agents/output";
 import type { ReviewModel } from "#src/model";
 import type { ReviewAgent, ReviewContext } from "#src/agent-contract";
+import { isCancellation } from "#src/cancellation";
 import type { ManagedPrompts } from "#src/prompts";
 import {
   renderRepository,
@@ -216,6 +217,7 @@ export function createReviewAgent(
           try {
             const result = await generateText({
               model,
+              abortSignal: context.signal,
               // The system breakpoint pins the shared prefix, tools included;
               // the call-level one below follows the growing tail.
               instructions: {
@@ -275,13 +277,18 @@ export function createReviewAgent(
             return findings;
           } catch (error) {
             const durationMs = Date.now() - startedAt;
-            logger.error("agent.failed", {
+            const fields = {
               ...eventFields,
               durationMs,
               ...usage,
               error: errorMessage(error),
               errorName: errorName(error),
-            });
+            };
+            if (isCancellation(error, context.signal)) {
+              logger.info("agent.cancelled", fields);
+            } else {
+              logger.error("agent.failed", fields);
+            }
             deps.onUsage?.({ agent: agent.category, durationMs, usage });
             agentObservation.update({
               level: "ERROR",

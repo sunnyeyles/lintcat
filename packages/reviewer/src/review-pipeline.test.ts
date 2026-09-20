@@ -1,8 +1,10 @@
 import {
   emptyTokenUsage,
+  ReviewCancelledError,
   type ReviewAgent,
   type ReviewContext,
   type Synthesiser,
+  type SynthesisHints,
 } from "@pr-review/ai";
 import type { ChangedFile } from "@pr-review/github";
 import type { ReviewFinding } from "@pr-review/schemas";
@@ -376,5 +378,88 @@ describe("runReviewPipeline: deterministic validation (spec §17)", () => {
     expect(seenByAgent).toEqual([[otherFile]]);
     expect(result.candidates).toEqual([inThisPr, notInThisPr]);
     expect(result.findings).toEqual([inThisPr]);
+  });
+});
+
+describe("runReviewPipeline: cancellation", () => {
+  /** What an aborted model call rejects with. */
+  function abortError(): Error {
+    return new DOMException("The operation was aborted", "AbortError");
+  }
+
+  function cancellableSynthesiser() {
+    return {
+      synthesise: vi.fn(
+        async (
+          candidates: readonly unknown[],
+          _hints?: SynthesisHints,
+          _signal?: AbortSignal,
+        ) => ({
+          findings: candidates as ReviewFinding[],
+          usage: emptyTokenUsage(),
+        }),
+      ),
+    };
+  }
+
+  it("starts no agent when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = vi.fn(async () => [makeFinding()]);
+
+    await expect(
+      runReviewPipeline([agent("correctness", run)], passthroughSynthesiser(), {
+        ...context,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow(ReviewCancelledError);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("throws instead of returning a partial result when an agent is cancelled", async () => {
+    const controller = new AbortController();
+    const synthesiser = cancellableSynthesiser();
+
+    await expect(
+      runReviewPipeline(
+        [
+          agent("correctness", async () => [makeFinding()]),
+          agent("security", async () => {
+            controller.abort();
+            throw abortError();
+          }),
+        ],
+        synthesiser,
+        { ...context, signal: controller.signal },
+      ),
+    ).rejects.toThrow(ReviewCancelledError);
+    expect(synthesiser.synthesise).not.toHaveBeenCalled();
+  });
+
+  it("hands the signal to the synthesiser", async () => {
+    const controller = new AbortController();
+    const synthesiser = cancellableSynthesiser();
+
+    await runReviewPipeline(
+      [agent("correctness", async () => [makeFinding()])],
+      synthesiser,
+      { ...context, signal: controller.signal },
+    );
+
+    expect(synthesiser.synthesise.mock.calls[0]?.[2]).toBe(controller.signal);
+  });
+
+  it("completes normally while the signal stays live", async () => {
+    const controller = new AbortController();
+    const finding = makeFinding();
+
+    const result = await runReviewPipeline(
+      [agent("correctness", async () => [finding])],
+      passthroughSynthesiser(),
+      { ...context, signal: controller.signal },
+    );
+
+    expect(result.findings).toEqual([finding]);
+    expect(result.agentFailures).toEqual([]);
   });
 });

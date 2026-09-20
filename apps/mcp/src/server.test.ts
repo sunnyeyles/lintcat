@@ -5,6 +5,7 @@ import {
   finalFindingsJson,
   makeFinding,
   makeGithub,
+  makeHangingModel,
   makeModel,
   message,
   textBlock,
@@ -235,6 +236,35 @@ describe("review_pull_request", () => {
 
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
     expect(client.createCommitOnBranch).not.toHaveBeenCalled();
+  });
+
+  it("stops the agents and publishes nothing when the tool call is cancelled", async () => {
+    const client = github();
+    const { model, firstCall } = makeHangingModel();
+    const { logger, entries } = createCapturingLogger();
+    const mcp = await connect(
+      environment({ createTokenClient: () => client, createLanguageModel: () => model, logger }),
+    );
+    const controller = new AbortController();
+
+    const pending = mcp.callTool(
+      {
+        name: "review_pull_request",
+        arguments: { owner: "octo-org", repo: "example-service", number: 42, publish: true },
+      },
+      undefined,
+      { signal: controller.signal },
+    );
+    await firstCall;
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+
+    await vi.waitFor(() =>
+      expect(entries.map((logged) => logged.event)).toContain("review.cancelled"),
+    );
+    expect(entries.map((logged) => logged.event)).toContain("agent.cancelled");
+    expect(client.createCheckRun).not.toHaveBeenCalled();
+    expect(client.createReview).not.toHaveBeenCalled();
   });
 });
 

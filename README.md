@@ -690,6 +690,9 @@ runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
 | `repository_overview`, `find_references`, `describe_file` | The [repository index](#repository-index), built from the working tree, with no network |
 | `list_reviews`, `get_review`, `review_trends` | Stored review history, scoped by the dashboard's own access rules to your GitHub account |
 
+Cancelling a review — Ctrl-C in the client, or any `notifications/cancelled` —
+aborts the agents' model calls, and a cancelled run publishes nothing.
+
 A local review takes the same path as the Action, with a git-backed client in
 place of GitHub's, so the [trust boundary](#the-trust-boundary) is unchanged:
 the agent configuration is read at the base commit, and only validated findings
@@ -746,10 +749,10 @@ under event names, grouped by what they trace:
 
 | Stage | Events |
 | --- | --- |
-| Review | `review.skipped`, `review.started`, `review.model_selected`, `review.agents_selected`, `review.loaded`, `review.no_agents_matched`, `review.failed` |
+| Review | `review.skipped`, `review.started`, `review.model_selected`, `review.agents_selected`, `review.loaded`, `review.no_agents_matched`, `review.cancelled`, `review.failed` |
 | Scope | `review.scope_resolved`, `review.scope_unreadable`, `review.incremental.no_changes`, `review.carried_forward.unreadable` |
 | Index | `index.built`, `index.skipped`, `index.failed` |
-| Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.skipped` |
+| Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled`, `agent.skipped` |
 | Synthesis | `synthesis.started`, `synthesis.skipped`, `synthesis.completed`, `synthesis.failed` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
 | Langfuse | `langfuse.disabled_incomplete_credentials`, `langfuse.prompts.loaded`, `langfuse.prompts.unavailable`, `langfuse.prompts.fallback_used`, `tracing.flush_failed` |

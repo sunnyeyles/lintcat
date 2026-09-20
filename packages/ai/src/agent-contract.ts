@@ -16,6 +16,8 @@ export interface ReviewContext {
   changedFiles: readonly ChangedFile[];
   diff: string;
   incremental?: IncrementalReview | undefined;
+  /** Aborts this review's model calls; absent means the run cannot be cancelled. */
+  signal?: AbortSignal | undefined;
 }
 
 /**

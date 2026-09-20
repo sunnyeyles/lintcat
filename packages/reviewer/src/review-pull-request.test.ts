@@ -1,5 +1,6 @@
 import {
   emptyTokenUsage,
+  ReviewCancelledError,
   type AgentDefinition,
   type ReviewContext,
   type SynthesisHints,
@@ -1102,5 +1103,75 @@ describe("the repository index", () => {
 
     expect(indexPassedTo(runReviewPipeline)?.truncated).toBe(true);
     expect(entry(entries, "index.built")).toMatchObject({ truncated: true });
+  });
+});
+
+describe("cancellation", () => {
+  function entry(entries: ReturnType<typeof makeDeps>["entries"], event: string) {
+    return entries.find((logged) => logged["event"] === event);
+  }
+
+  it("puts the caller's signal on the context the agents receive", async () => {
+    const controller = new AbortController();
+    const { deps, runReviewPipeline } = makeDeps();
+
+    await reviewPullRequest(target, { ...deps, signal: controller.signal });
+
+    expect(runReviewPipeline.mock.calls[0]?.[1]).toMatchObject({
+      signal: controller.signal,
+    });
+  });
+
+  it("never starts a review whose signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const { deps, client, runReviewPipeline, entries } = makeDeps();
+
+    await expect(
+      reviewPullRequest(target, { ...deps, signal: controller.signal }),
+    ).rejects.toThrow(ReviewCancelledError);
+
+    expect(client.getPullRequest).not.toHaveBeenCalled();
+    expect(runReviewPipeline).not.toHaveBeenCalled();
+    expect(entry(entries, "review.cancelled")).toMatchObject({
+      stage: "before start",
+    });
+  });
+
+  it("publishes nothing when the pipeline is cancelled mid-run", async () => {
+    const controller = new AbortController();
+    const { deps, client, runReviewPipeline, entries } = makeDeps();
+    runReviewPipeline.mockImplementationOnce(async () => {
+      controller.abort();
+      throw new DOMException("The operation was aborted", "AbortError");
+    });
+
+    await expect(
+      reviewPullRequest(target, { ...deps, signal: controller.signal }),
+    ).rejects.toThrow(ReviewCancelledError);
+
+    expect(client.createCheckRun).not.toHaveBeenCalled();
+    expect(client.createReview).not.toHaveBeenCalled();
+    expect(entry(entries, "review.cancelled")).toMatchObject({
+      stage: "agents",
+    });
+  });
+
+  it("publishes nothing when the cancellation lands after the agents finished", async () => {
+    const controller = new AbortController();
+    const { deps, client, runReviewPipeline } = makeDeps(
+      reviewResult({ candidates: [finding] }),
+    );
+    runReviewPipeline.mockImplementationOnce(async () => {
+      controller.abort();
+      return reviewResult({ candidates: [finding] });
+    });
+
+    await expect(
+      reviewPullRequest(target, { ...deps, signal: controller.signal }),
+    ).rejects.toThrow(ReviewCancelledError);
+
+    expect(client.createCheckRun).not.toHaveBeenCalled();
+    expect(client.createReview).not.toHaveBeenCalled();
   });
 });

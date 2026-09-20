@@ -26,6 +26,8 @@ export interface ReviewRequest {
   index?: boolean | undefined;
   /** False keeps every GitHub write a no-op. */
   publish: boolean;
+  /** The caller's cancellation, as the MCP request handler receives it. */
+  signal?: AbortSignal | undefined;
 }
 
 export interface ReviewResult {
@@ -37,7 +39,15 @@ export interface ReviewResult {
 
 export async function runReview(
   environment: McpEnvironment,
-  { client, target, baseSha, agents: selection = "", index = true, publish }: ReviewRequest,
+  {
+    client,
+    target,
+    baseSha,
+    agents: selection = "",
+    index = true,
+    publish,
+    signal,
+  }: ReviewRequest,
 ): Promise<ReviewResult> {
   const { logger } = environment;
   const configured = await loadAgentDefinitions({
@@ -66,6 +76,7 @@ export async function runReview(
       logger,
     }),
     publishReview,
+    signal,
     ...(publish ? {} : { publishReviewComments: async () => "unavailable" as const }),
   });
   return { outcome, agents: agents.map((agent) => agent.category), summary };

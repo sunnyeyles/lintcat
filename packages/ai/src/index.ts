@@ -18,6 +18,11 @@ export type {
   ReviewAgent,
   ReviewContext,
 } from "#src/agent-contract";
+export {
+  ReviewCancelledError,
+  isCancellation,
+  throwIfCancelled,
+} from "#src/cancellation";
 export { emptyTokenUsage, type TokenUsage } from "#src/usage";
 export {
   createReviewAgent,

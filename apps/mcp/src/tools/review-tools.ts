@@ -59,7 +59,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ repoPath, base, agents, index }) => {
+    async ({ repoPath, base, agents, index }, { signal }) => {
       const local = await openLocalRepository(
         path.resolve(environment.cwd, repoPath ?? "."),
         base,
@@ -79,6 +79,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         agents,
         index,
         publish: false,
+        signal,
       });
       return reviewResult(
         result,
@@ -108,7 +109,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    async ({ owner, repo, number, agents, publish = false }) => {
+    async ({ owner, repo, number, agents, publish = false }, { signal }) => {
       const client = environment.createTokenClient({ token: await resolveGithubToken(environment) });
       const ref = { owner, repo, pullRequestNumber: number };
       const pullRequest = await client.getPullRequest(ref);
@@ -118,6 +119,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         baseSha: pullRequest.baseSha,
         agents,
         publish,
+        signal,
       });
       const where = `${owner}/${repo}#${number} at ${pullRequest.headSha.slice(0, 7)}`;
       return reviewResult(
