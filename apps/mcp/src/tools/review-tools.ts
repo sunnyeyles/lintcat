@@ -14,6 +14,7 @@ import type { ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { GitError } from "#src/git";
 import { openLocalRepository, type LocalRepository, type LocalScope } from "#src/local-git-client";
+import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
 
 const agentsSchema = z
@@ -99,14 +100,19 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
     agentFailures: outcome.agentFailures,
     synthesis: outcome.synthesis.outcome,
     patches: outcome.patches,
+    suppressed: outcome.suppressed,
     findings: outcome.findings,
   };
+  const suppressed =
+    outcome.suppressed === 0
+      ? ""
+      : ` ${outcome.suppressed} finding(s) were hidden by suppressions in this checkout's review memory.`;
   return {
     content: [
       ...(result.singleShot
         ? [{ type: "text" as const, text: SINGLE_SHOT_NOTICE }]
         : []),
-      { type: "text", text: `${heading}\n\n${result.summary}` },
+      { type: "text", text: `${heading}${suppressed}\n\n${result.summary}` },
       { type: "text", text: JSON.stringify(details, null, 2) },
     ],
   };
@@ -181,7 +187,8 @@ export function registerReviewTools(
         "Run the AI review agents over a local checkout: by default commits since the merge-base with the " +
         "base branch plus uncommitted and untracked files, or only the staged changes, or an explicit " +
         "commit range. Returns only findings that passed the same " +
-        "deterministic validation the GitHub Action applies. Calls the configured model provider and takes " +
+        "deterministic validation the GitHub Action applies. Findings suppressed with suppress_finding are " +
+        "excluded and counted. Calls the configured model provider and takes " +
         "a minute or more; nothing is written anywhere. With no provider key set, it asks you to run the " +
         "model instead (MCP sampling), which gives a reduced single-shot review the result declares.",
       inputSchema: {
@@ -214,6 +221,7 @@ export function registerReviewTools(
         baseSha: local.baseSha,
         agents,
         index,
+        memory: await openLocalMemoryStore(local.root),
         signal: extra.signal,
         onAgentEvent: progressReporter(extra),
       });

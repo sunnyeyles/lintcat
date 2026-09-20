@@ -133,6 +133,7 @@ describe("learnFromMergedPullRequest", () => {
           lastSignalAt: NOW.toISOString(),
         },
       ],
+      suppressions: [],
     };
     const store = fakeStore(JSON.stringify(existing));
 

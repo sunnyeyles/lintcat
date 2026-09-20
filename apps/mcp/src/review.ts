@@ -4,6 +4,7 @@ import {
   recordingDelivery,
   runReview as runAssembledReview,
   type GithubDeliveryConfig,
+  type MemoryStore,
   type ReviewClient,
   type ReviewDelivery,
   type ReviewOutcome,
@@ -26,6 +27,8 @@ export interface ReviewRequest {
   index?: boolean | undefined;
   /** Where the run writes back; absent is a dry run, and a local checkout has nothing to pass. */
   publishTo?: GithubDeliveryConfig["client"] | undefined;
+  /** The memory whose hints and suppressions this run consults; absent reads none. */
+  memory?: MemoryStore | undefined;
   /** The caller's cancellation, as the MCP request handler receives it. */
   signal?: AbortSignal | undefined;
   /** Reports each agent's start and finish while the review runs. */
@@ -66,6 +69,7 @@ export async function runReview(
     agents: selection = "",
     index = true,
     publishTo,
+    memory,
     signal,
     onAgentEvent,
   }: ReviewRequest,
@@ -91,6 +95,7 @@ export async function runReview(
     agents: selected.agents,
     engine: selected.engine,
     policy: { index },
+    ...(memory === undefined ? {} : { memory: { store: memory } }),
     logger,
     signal,
     onAgentEvent,

@@ -76,11 +76,14 @@ export {
   type LearnFromMergeDeps,
 } from "#src/learn-from-merge";
 export {
+  addSuppression,
   computeHints,
   computeSynthesisHints,
   createBranchMemoryStore,
   emptyMemory,
+  isSuppressed,
   MEMORY_FILE_PATH,
+  partitionSuppressed,
   readMemory,
   recordSignals,
   titleShape,
@@ -93,6 +96,7 @@ export {
   type FindingOutcome,
   type FindingSignal,
   type MemoryStore,
+  type SuppressibleFinding,
 } from "#src/memory";
 export {
   categoryMarker,

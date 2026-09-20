@@ -31,7 +31,7 @@ import {
 } from "@pr-review/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { MemoryStore } from "#src/memory";
+import { titleShape, type MemoryStore } from "#src/memory";
 import type { ReviewPipelineRun } from "#src/pipeline-runner";
 import type { PublishReview } from "#src/publish-review";
 import { findingMarker } from "#src/render-review";
@@ -287,6 +287,7 @@ describe("reviewWithDelivery", () => {
     await expect(reviewWithDelivery(target, deps)).resolves.toEqual({
       ...review,
       patches: { proposed: 0, verified: 0 },
+      suppressed: 0,
     });
   });
 
@@ -1189,5 +1190,56 @@ describe("cancellation", () => {
 
     expect(client.createCheckRun).not.toHaveBeenCalled();
     expect(client.createReview).not.toHaveBeenCalled();
+  });
+});
+
+/** A memory file whose only content is one suppression. */
+function suppressionFile(title: string): string {
+  return JSON.stringify(
+    reviewMemorySchema.parse({
+      version: 1,
+      shapes: [],
+      suppressions: [
+        {
+          category: "correctness",
+          shape: titleShape(title),
+          title,
+          createdAt: NOW.toISOString(),
+        },
+      ],
+    }),
+  );
+}
+
+describe("reviewWithDelivery: suppressions", () => {
+  it("excludes a suppressed finding and reports how many it hid", async () => {
+    const elsewhere = { ...finding, title: "Assignment instead of comparison in isAdmin" };
+    const { deps, client, entries } = makeDeps(reviewResult({ candidates: [elsewhere] }), {
+      memoryStore: readOnlyStore(suppressionFile("Assignment instead of comparison in hasAccess")),
+      now: () => NOW,
+    });
+
+    const outcome = await reviewWithDelivery(target, deps);
+
+    expect(outcome.findings).toEqual([]);
+    expect(outcome.suppressed).toBe(1);
+    expect(client.createReview).not.toHaveBeenCalled();
+    expect(entries).toContainEqual(
+      expect.objectContaining({ event: "findings.suppressed", suppressedCount: 1 }),
+    );
+  });
+
+  it("publishes a finding the suppression no longer matches", async () => {
+    const { deps, client, entries } = makeDeps(reviewResult({ candidates: [finding] }), {
+      memoryStore: readOnlyStore(suppressionFile("Unbounded query in the session list")),
+      now: () => NOW,
+    });
+
+    const outcome = await reviewWithDelivery(target, deps);
+
+    expect(outcome.findings).toEqual([finding]);
+    expect(outcome.suppressed).toBe(0);
+    expect(client.createReview).toHaveBeenCalledTimes(1);
+    expect(entries.map((entry) => entry["event"])).not.toContain("findings.suppressed");
   });
 });
