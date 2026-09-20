@@ -38,6 +38,11 @@ export const DOCS_NAV: DocsSection[] = [
         title: "Agents",
         summary: "The general agent, the five specialists, and how a repository picks.",
       },
+      {
+        href: "/docs/walkthrough",
+        title: "Propose, refine, decide",
+        summary: "The whole run traced in execution order, with the file that owns each step.",
+      },
     ],
   },
   {
