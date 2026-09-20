@@ -1,25 +1,21 @@
 /**
  * Drives the real review pipeline for one fixture. Only the GitHub client and
- * the publish step differ from production.
+ * the delivery adapter differ from production.
  */
 import {
   createLanguageModel,
   createReviewAgents,
   createSynthesiser,
-  type ReviewAgent,
   type AgentDefinition,
   type Synthesiser,
 } from "@pr-review/ai";
-import type {
-  PullRequestReadClient,
-  RepositoryHistoryClient,
-} from "@pr-review/github";
-import type { RepositoryIndex } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
 import {
-  reviewPullRequest,
-  runReviewPipeline,
+  recordingDelivery,
+  runReview,
+  type CreateReviewAgents,
   type RenderedCheckRun,
+  type ReviewMemory,
   type ReviewOutcome,
 } from "@pr-review/reviewer";
 
@@ -32,14 +28,11 @@ export interface FixtureReviewDeps {
   /** The agent set the review gates by path and then runs. */
   agents: readonly AgentDefinition[];
   /** Built over the review's own logger, so every event of one fixture lands together. */
-  createAgents: (
-    github: PullRequestReadClient & RepositoryHistoryClient,
-    logger: StructuredLogger,
-    agents: readonly AgentDefinition[],
-    index: RepositoryIndex | undefined,
-  ) => readonly ReviewAgent[];
+  createAgents: CreateReviewAgents;
   synthesiser: Synthesiser;
   logger: StructuredLogger;
+  /** The repository memory the fixture reviews against; absent means none. */
+  memory?: ReviewMemory | undefined;
 }
 
 /** Everything one fixture review produced, for expectations to judge. */
@@ -69,10 +62,10 @@ export function modelBackedDeps(
   const model = createModel(access.model);
   return {
     agents,
-    createAgents: (github, reviewLogger, activeAgents, index) =>
+    createAgents: ({ client, agents: active, index, logger: reviewLogger }) =>
       createReviewAgents(
-        { model, createModel, github, logger: reviewLogger, index },
-        activeAgents,
+        { model, createModel, github: client, logger: reviewLogger, index },
+        active,
       ),
     synthesiser: createSynthesiser({ model, agents }),
     logger,
@@ -85,41 +78,28 @@ export async function runFixtureReview(
   deps: FixtureReviewDeps,
 ): Promise<FixtureReview> {
   const { client } = createFixtureClient(fixture);
-  const { logger } = deps;
+  const { delivery, recorded } = recordingDelivery();
 
-  let rendered: RenderedCheckRun | undefined;
-  const result = await reviewPullRequest(
-    {
+  const run = await runReview({
+    client,
+    target: {
       owner: fixture.context.owner,
       repo: fixture.context.repo,
       pullRequestNumber: fixture.pullRequest.number,
       headSha: fixture.pullRequest.headSha,
     },
-    {
-      client,
-      agents: deps.agents,
-      runReviewPipeline: ({ client: reviewClient, context, agents: activeAgents, index }) =>
-        runReviewPipeline(
-          deps.createAgents(reviewClient, logger, activeAgents, index),
-          deps.synthesiser,
-          context,
-        ),
-      // The steps an evaluation replaces.
-      publishReview: async (_target, checkRun) => {
-        rendered = checkRun;
-      },
-      // An evaluation has no comment surface, so the check run keeps the
-      // annotations it judges.
-      publishReviewComments: async () => "unavailable",
-      logger,
-    },
-  );
+    delivery,
+    agents: { use: deps.agents },
+    engine: { createAgents: deps.createAgents, synthesiser: deps.synthesiser },
+    logger: deps.logger,
+    ...(deps.memory === undefined ? {} : { memory: deps.memory }),
+  });
 
-  if (rendered === undefined) {
+  if (recorded.checkRun === undefined) {
     throw new Error(
       `the review of fixture ${fixture.name} finished without rendering a check run`,
     );
   }
 
-  return { fixture, result, rendered };
+  return { fixture, result: run.outcome, rendered: recorded.checkRun };
 }
