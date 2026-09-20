@@ -15,8 +15,10 @@ import {
 import { db, type Database } from "@pr-review/db";
 import {
   createTokenClient,
-  type GithubInstallationClient,
   type GithubTokenConfig,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
 } from "@pr-review/github";
 import { createStderrLogger, type StructuredLogger } from "@pr-review/logging";
 
@@ -27,7 +29,9 @@ export interface McpEnvironment {
   cwd: string;
   logger: StructuredLogger;
   createLanguageModel: (config: LanguageModelConfig) => ReviewModel;
-  createTokenClient: (config: GithubTokenConfig) => GithubInstallationClient;
+  createTokenClient: (
+    config: GithubTokenConfig,
+  ) => PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
   /** Runs the `gh` CLI and returns its stdout. */
   gh: (args: readonly string[]) => Promise<string>;
   database: () => Database;

@@ -2,17 +2,19 @@ import { emptyTokenUsage, type AgentDefinition } from "@pr-review/ai";
 import { ArchiveTooLargeError } from "@pr-review/github";
 import type {
   ChangedFile,
-  CreateCheckRunInput,
-  CreateCommitInput,
-  CreateReviewInput,
   CheckRunSummary,
   CheckRunsRequest,
   CommitComparison,
+  CreateCheckRunInput,
+  CreateCommitInput,
+  CreateReviewInput,
   ExistingReviewComment,
-  GithubInstallationClient,
   PullRequestDetails,
+  PullRequestReadClient,
   PullRequestRef,
   RepositoryArchiveRequest,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -124,7 +126,9 @@ function makeClient() {
       sha: "fix1234",
     })),
     writeFileOnBranch: vi.fn(async (_request: WriteFileRequest) => {}),
-  } satisfies GithubInstallationClient;
+  } satisfies PullRequestReadClient &
+    RepositoryHistoryClient &
+    ReviewPublishClient;
 }
 
 function reviewResult(

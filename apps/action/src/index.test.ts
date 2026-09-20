@@ -16,7 +16,9 @@ import {
 import { createCapturingLogger } from "@pr-review/logging";
 import type {
   FileContentsRequest,
-  GithubInstallationClient,
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -177,7 +179,9 @@ function harness(
         content: request.content,
       });
     }),
-  } satisfies GithubInstallationClient;
+  } satisfies PullRequestReadClient &
+    RepositoryHistoryClient &
+    ReviewPublishClient;
 
   return {
     client,

@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 
 import type {
-  GithubInstallationClient,
   PullRequestReadClient,
   RepositoryHistoryClient,
   ReviewPublishClient,
@@ -17,7 +16,7 @@ import {
 const SHA = "a".repeat(40);
 const REF = { owner: "octo-org", repo: "example-service", pullRequestNumber: 1 };
 
-/** Four methods and nothing else: what the wide interface had no way to say. */
+/** Four methods and nothing else: a publisher that reads nothing. */
 const publisher: ReviewPublishClient = {
   createCheckRun: () => Promise.resolve({ id: 1 }),
   createReview: () => Promise.resolve({ id: 2 }),
@@ -26,13 +25,18 @@ const publisher: ReviewPublishClient = {
 };
 
 /** Answers every method with the same stand-in, recording the name reached for. */
-function recordingClient(calls: ClientMethod[]): GithubInstallationClient {
-  return new Proxy({} as GithubInstallationClient, {
-    get: (_target, name: string) => () => {
-      calls.push(name as ClientMethod);
-      return Promise.resolve({ id: 0 });
+function recordingClient(
+  calls: ClientMethod[],
+): PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient {
+  return new Proxy(
+    {} as PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient,
+    {
+      get: (_target, name: string) => () => {
+        calls.push(name as ClientMethod);
+        return Promise.resolve({ id: 0 });
+      },
     },
-  });
+  );
 }
 
 async function readTitle(reads: PullRequestReadClient): Promise<void> {
@@ -67,7 +71,7 @@ describe("client method groups", () => {
     expect([...grouped].sort()).toEqual([...CLIENT_METHODS].sort());
   });
 
-  it("serves all three narrow consumers from one wide client", async () => {
+  it("serves all three narrow consumers from one object declaring all three", async () => {
     const calls: ClientMethod[] = [];
     const client = recordingClient(calls);
 

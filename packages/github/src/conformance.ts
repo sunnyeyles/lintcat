@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 
 import type {
-  GithubInstallationClient,
   PullRequestReadClient,
   PullRequestRef,
   RepositoryHistoryClient,
@@ -10,7 +9,10 @@ import type {
 } from "#src/client";
 import { SEARCH_LIMITS } from "#src/search";
 
-export type ClientMethod = keyof GithubInstallationClient;
+export type ClientMethod =
+  | keyof PullRequestReadClient
+  | keyof RepositoryHistoryClient
+  | keyof ReviewPublishClient;
 
 // Records, not arrays: the compiler rejects a list once its interface grows.
 const READ_METHOD_SET: Record<keyof PullRequestReadClient, true> = {
@@ -41,7 +43,7 @@ const PUBLISH_METHOD_SET: Record<keyof ReviewPublishClient, true> = {
   writeFileOnBranch: true,
 };
 
-/** The three narrow interfaces, as method names; together they are the wide client. */
+/** The three narrow interfaces, as method names; together they are every client method. */
 export const METHOD_GROUPS = {
   "pull-request-read": Object.keys(READ_METHOD_SET) as ClientMethod[],
   "repository-history": Object.keys(HISTORY_METHOD_SET) as ClientMethod[],

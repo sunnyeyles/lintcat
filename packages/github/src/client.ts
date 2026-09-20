@@ -319,9 +319,3 @@ export interface ReviewPublishClient {
   /** Writes one file to a branch, creating the branch from default if absent. */
   writeFileOnBranch(request: WriteFileRequest): Promise<void>;
 }
-
-/** One installation's client: every repository-scoped operation, read and write. */
-export interface GithubInstallationClient
-  extends PullRequestReadClient,
-    RepositoryHistoryClient,
-    ReviewPublishClient {}

@@ -8,17 +8,19 @@ import {
 } from "@pr-review/ai";
 import type {
   ChangedFile,
-  CheckRunsRequest,
   CheckRunSummary,
+  CheckRunsRequest,
   CommitComparison,
   CreateCheckRunInput,
   CreateCommitInput,
   CreateReviewInput,
   ExistingReviewComment,
-  GithubInstallationClient,
   PullRequestDetails,
+  PullRequestReadClient,
   PullRequestRef,
   RepositoryArchiveRequest,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -131,7 +133,9 @@ function makeClient(config: string | undefined = agentConfig) {
       sha: "fix1234",
     })),
     writeFileOnBranch: vi.fn(async (_request: WriteFileRequest) => {}),
-  } satisfies GithubInstallationClient;
+  } satisfies PullRequestReadClient &
+    RepositoryHistoryClient &
+    ReviewPublishClient;
 }
 
 type FakeClient = ReturnType<typeof makeClient>;

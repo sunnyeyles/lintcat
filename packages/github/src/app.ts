@@ -27,12 +27,14 @@ import {
   type CreateReviewInput,
   type ExistingReviewComment,
   type FileContentsRequest,
-  type GithubInstallationClient,
   type PullRequestDetails,
+  type PullRequestReadClient,
   type PullRequestRef,
   type PullRequestReview,
   type RepositoryArchive,
   type RepositoryArchiveRequest,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
   type ReviewThread,
   type WriteFileRequest,
 } from "#src/client";
@@ -440,7 +442,7 @@ async function existingFileSha(
  */
 export function createInstallationClient(
   octokit: OctokitLike,
-): GithubInstallationClient {
+): PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient {
   return {
     async getPullRequest(ref: PullRequestRef): Promise<PullRequestDetails> {
       const response = await octokit.rest.pulls.get({

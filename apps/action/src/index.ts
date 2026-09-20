@@ -27,8 +27,10 @@ import {
 } from "@pr-review/ai";
 import {
   createTokenClient,
-  type GithubInstallationClient,
   type GithubTokenConfig,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
 } from "@pr-review/github";
 import {
   createConsoleLogger,
@@ -69,7 +71,9 @@ export interface ActionEnvironment {
   /** Reads the workflow event payload file as UTF-8 text. */
   readEventFile: (path: string) => Promise<string>;
   createLanguageModel: (config: LanguageModelConfig) => ReviewModel;
-  createTokenClient: (config: GithubTokenConfig) => GithubInstallationClient;
+  createTokenClient: (
+    config: GithubTokenConfig,
+  ) => PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
   /** Builds the managed-prompt retrieval seam. */
   createPromptClient: (config: LangfusePromptClientConfig) => LangfusePromptClient;
   /** Starts span export for this run and returns its flush handle. */
@@ -196,7 +200,7 @@ function resolveDashboardInputs(
 }
 
 interface DeliveryInputs {
-  client: GithubInstallationClient;
+  client: RepositoryHistoryClient & ReviewPublishClient;
   /** Verified patches are committed to the head branch. */
   commitFixes: boolean;
   /** Absent publishes to GitHub only. */
@@ -297,7 +301,7 @@ function resolveModelInputs(
  * an unreadable head commit disables the step rather than risking one.
  */
 async function fixesAllowed(
-  client: GithubInstallationClient,
+  client: Pick<RepositoryHistoryClient, "getCommitMessage">,
   target: ReviewTarget,
   logger: StructuredLogger,
 ): Promise<boolean> {

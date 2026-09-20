@@ -52,7 +52,6 @@ export {
   type CreateReviewInput,
   type ExistingReviewComment,
   type FileContentsRequest,
-  type GithubInstallationClient,
   type PullRequestDetails,
   type PullRequestReadClient,
   type PullRequestRef,

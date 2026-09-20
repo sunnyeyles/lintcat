@@ -7,10 +7,12 @@ import { readFileSync } from "node:fs";
 import type {
   ChangedFile,
   FileContentsRequest,
-  GithubInstallationClient,
   PullRequestDetails,
+  PullRequestReadClient,
   PullRequestRef,
   RepositoryArchive,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -252,7 +254,9 @@ export function makeGithub() {
     writeFileOnBranch: vi.fn(async (request: WriteFileRequest): Promise<void> => {
       throw new Error(`unexpected write to ${request.path}`);
     }),
-  } satisfies GithubInstallationClient;
+  } satisfies PullRequestReadClient &
+    RepositoryHistoryClient &
+    ReviewPublishClient;
 }
 
 /** A remote prompt that satisfies promptContractProblems. */
