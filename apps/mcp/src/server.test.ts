@@ -377,3 +377,47 @@ describe("history tools", () => {
     expect(texts[0]).toContain('No organization "acme"');
   });
 });
+
+describe("the prompt list", () => {
+  it("offers every workflow prompt, described and with arguments", async () => {
+    const client = await connect(environment());
+    const { prompts } = await client.listPrompts();
+
+    expect(prompts.map((prompt) => prompt.name).sort()).toEqual([
+      "review_branch",
+      "review_history",
+      "triage_finding",
+    ]);
+    for (const prompt of prompts) {
+      expect(prompt.description).toMatch(/Use this /);
+      expect(prompt.arguments?.length ?? 0).toBeGreaterThan(0);
+    }
+    const triage = prompts.find((prompt) => prompt.name === "triage_finding");
+    expect(triage?.arguments).toContainEqual(expect.objectContaining({ name: "org", required: true }));
+  });
+
+  it("renders the branch review with the arguments it was given", async () => {
+    const client = await connect(environment());
+
+    const { messages } = await client.getPrompt({
+      name: "review_branch",
+      arguments: { base: "origin/main", agents: "security" },
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.role).toBe("user");
+    const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
+    expect(text).toContain('`review_local_changes` with base "origin/main", agents "security"');
+    expect(text).toContain("find_references");
+  });
+
+  it("names the most severe finding when none is given", async () => {
+    const client = await connect(environment());
+
+    const { messages } = await client.getPrompt({ name: "triage_finding", arguments: { org: "acme", review: "12" } });
+
+    const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
+    expect(text).toContain("the most severe finding");
+    expect(text).toContain('`get_review` with org "acme" and id 12');
+  });
+});

@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
+import { registerWorkflowPrompts } from "#src/prompts/workflow-prompts";
 import { registerHistoryTools } from "#src/tools/history-tools";
 import { registerIndexTools } from "#src/tools/index-tools";
 import { registerReviewTools } from "#src/tools/review-tools";
@@ -10,7 +11,10 @@ const INSTRUCTIONS = `Tools for the pr-review-agents code reviewer.
 - review_local_changes: review the working tree before pushing. Slow (model calls); read-only.
 - review_pull_request: dry-run review of a GitHub PR; publish: true posts to GitHub, so only set it when the user asks.
 - repository_overview / find_references / describe_file: import-graph navigation of a local checkout; no network.
-- list_reviews / get_review / review_trends: stored review history, scoped to the user's GitHub account.`;
+- list_reviews / get_review / review_trends: stored review history, scoped to the user's GitHub account.
+
+Prompts for the workflows these tools serve: review_branch (review this branch before pushing),
+triage_finding (is one stored finding worth fixing), review_history (what the stored reviews show over time).`;
 
 export interface ServerOptions {
   loadIndex?: (repoPath: string) => Promise<LocalIndex>;
@@ -46,5 +50,6 @@ export function createServer(environment: McpEnvironment, options: ServerOptions
   registerReviewTools(server, environment);
   registerIndexTools(server, environment, options.loadIndex ?? createLocalIndexCache());
   registerHistoryTools(server, environment, options.githubId ?? githubUserId(environment));
+  registerWorkflowPrompts(server);
   return server;
 }
