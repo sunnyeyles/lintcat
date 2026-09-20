@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { connectedClient, type ConnectedClient } from "#src/client-capabilities";
+import { createClientLogger } from "#src/client-logger";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
 import { registerWorkflowPrompts } from "#src/prompts/workflow-prompts";
@@ -50,12 +51,16 @@ function githubUserId(environment: McpEnvironment): () => Promise<number> {
   };
 }
 
-export function createServer(environment: McpEnvironment, options: ServerOptions = {}): McpServer {
+export function createServer(base: McpEnvironment, options: ServerOptions = {}): McpServer {
   const server = new McpServer(
     { name: "pr-review-agents", version: "0.1.0" },
-    { instructions: INSTRUCTIONS },
+    { instructions: INSTRUCTIONS, capabilities: { logging: {} } },
   );
   const client = options.client ?? connectedClient(server);
+  const environment: McpEnvironment = {
+    ...base,
+    logger: createClientLogger(server, client, base.logger),
+  };
   server.server.oninitialized = () => environment.logger.info("mcp.client", { ...client.features() });
   registerReviewTools(server, environment);
   registerIndexTools(server, environment, options.loadIndex ?? createLocalIndexCache());
