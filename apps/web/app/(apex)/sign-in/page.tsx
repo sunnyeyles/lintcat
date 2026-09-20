@@ -1,5 +1,6 @@
 import {
-  Button,
+  Alert,
+  AlertDescription,
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -13,6 +14,8 @@ import { redirect } from "next/navigation";
 
 import { signInWithGithub } from "@/app/auth-actions";
 import { PageHeader } from "@/components/shell";
+import { SubmitButton } from "@/components/ui/submit-button";
+import { signInErrorMessage } from "@/lib/auth-errors";
 import { appDomain } from "@/lib/host";
 import { DASHBOARD_PATH, returnUrl, safeCallbackUrl } from "@/lib/paths";
 import { currentSession } from "@/lib/session";
@@ -27,12 +30,14 @@ export default async function SignInPage({
   searchParams: SearchParams;
 }) {
   const domain = appDomain();
-  const requested = safeCallbackUrl((await searchParams).callbackUrl, domain);
+  const params = await searchParams;
+  const requested = safeCallbackUrl(params.callbackUrl, domain);
   const callbackUrl = returnUrl(
     requested === "/" ? DASHBOARD_PATH : requested,
     domain,
   );
   if (await currentSession()) redirect(callbackUrl);
+  const error = signInErrorMessage(params.error);
 
   return (
     <div className="flex flex-col gap-8">
@@ -41,6 +46,11 @@ export default async function SignInPage({
         title="Sign in"
         description="Every review the action publishes for your organization, read from the dashboard's database."
       />
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
@@ -55,7 +65,7 @@ export default async function SignInPage({
         <EmptyContent>
           <form action={signInWithGithub}>
             <input type="hidden" name="callbackUrl" value={callbackUrl} />
-            <Button type="submit">Sign in with GitHub</Button>
+            <SubmitButton pendingLabel="Redirecting to GitHub">Sign in with GitHub</SubmitButton>
           </form>
         </EmptyContent>
       </Empty>

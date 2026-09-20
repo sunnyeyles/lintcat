@@ -19,12 +19,15 @@ export function withinOrganization(pathname: string): string {
   return pathname.replace(/^\/o\/[^/]+/, "") || "/";
 }
 
-/** Docs and the picker exist only on the apex; `/` on a subdomain is still that organization. */
+export const SIGN_IN_PATH = "/sign-in";
+
+/** Docs, sign-in and the picker exist only on the apex; `/` on a subdomain is still that organization. */
 export function isApexOnly(pathname: string): boolean {
   const page = pathname.replace(/\/$/, "") || "/";
   return (
     page === DASHBOARD_PATH ||
     page.startsWith(`${DASHBOARD_PATH}/`) ||
+    page === SIGN_IN_PATH ||
     page === "/docs" ||
     page.startsWith("/docs/")
   );
@@ -78,11 +81,21 @@ export function authRedirect(url: string, baseUrl: string, domain: string): stri
 
 /** The sign-in page; for a subdomain URL, the one on the apex, since sign-in happens there. */
 export function signInUrl(callbackUrl: string, domain: string): string {
-  const query = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  const query = `${SIGN_IN_PATH}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
   if (callbackUrl.startsWith("/")) return query;
   const url = new URL(callbackUrl);
   const port = url.port ? `:${url.port}` : "";
   return `${url.protocol}//${hostname(domain)}${port}${query}`;
+}
+
+/** The topbar's sign-in link for the page being served; none on the sign-in page itself. */
+export function topbarSignInHref(requestPath: string | null, domain: string): string | undefined {
+  if (!requestPath || requestPath === "/") return signInUrl(DASHBOARD_PATH, domain);
+  const pathname = requestPath.startsWith("/")
+    ? requestPath.replace(/[?#].*$/, "")
+    : new URL(requestPath).pathname;
+  if (pathname.replace(/\/$/, "") === SIGN_IN_PATH) return undefined;
+  return signInUrl(requestPath, domain);
 }
 
 /** Where to land after sign-in; without a shared cookie a subdomain becomes its /o/ path. */

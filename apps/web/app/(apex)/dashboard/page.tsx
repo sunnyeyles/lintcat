@@ -1,8 +1,10 @@
 import { db } from "@pr-review/db";
 import {
   Badge,
+  Button,
   Card,
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -21,8 +23,9 @@ import { redirect } from "next/navigation";
 
 import { RowLink } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
+import { installAppUrl } from "@/lib/github-app";
 import { appDomain } from "@/lib/host";
-import { membershipsForUser } from "@/lib/organization";
+import { autoForwardPath, membershipsForUser } from "@/lib/organization";
 import { DASHBOARD_PATH, organizationPath, signInUrl } from "@/lib/paths";
 import { currentSession } from "@/lib/session";
 
@@ -32,6 +35,9 @@ export default async function OrganizationsPage() {
   const session = await currentSession();
   if (!session) redirect(signInUrl(DASHBOARD_PATH, appDomain()));
   const memberships = await membershipsForUser(db(), session.githubId);
+  const forward = autoForwardPath(memberships);
+  if (forward) redirect(forward);
+  const install = installAppUrl();
 
   return (
     <div className="flex flex-col gap-8">
@@ -49,10 +55,19 @@ export default async function OrganizationsPage() {
             <EmptyTitle>You are not in an organization yet</EmptyTitle>
             <EmptyDescription>
               <code>{session.login}</code> is signed in but belongs to no organization, so
-              there is nothing to show. Ask an organization owner to add you, then reload
-              this page.
+              there is nothing to show.{" "}
+              {install
+                ? "Install the GitHub App on your organization, or ask an owner to add you."
+                : "Ask an organization owner to add you."}
             </EmptyDescription>
           </EmptyHeader>
+          {install ? (
+            <EmptyContent>
+              <Button asChild>
+                <a href={install}>Install the GitHub App</a>
+              </Button>
+            </EmptyContent>
+          ) : null}
         </Empty>
       ) : (
         <Card className="py-0">

@@ -10,7 +10,26 @@ import { createTestDatabase } from "@pr-review/db/test-database";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { membershipsForUser } from "@/lib/organization";
+import { autoForwardPath, membershipsForUser } from "@/lib/organization";
+
+describe("autoForwardPath", () => {
+  const organization = { slug: "acme" } as Organization;
+  const other = { slug: "globex" } as Organization;
+
+  it("sends a user with exactly one organization straight to it", () => {
+    expect(autoForwardPath([{ organization, role: "member" }])).toBe("/o/acme");
+  });
+
+  it("keeps the picker for none or several", () => {
+    expect(autoForwardPath([])).toBeUndefined();
+    expect(
+      autoForwardPath([
+        { organization, role: "owner" },
+        { organization: other, role: "member" },
+      ]),
+    ).toBeUndefined();
+  });
+});
 
 let database: Database;
 
