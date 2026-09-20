@@ -35,7 +35,11 @@ export {
   type FixOutcome,
 } from "#src/apply-fixes";
 export {
+  applyVerifiedPatches,
   verifyPatches,
+  MAX_PATCHED_FILES,
+  MAX_PATCHED_LINES,
+  type PatchApplication,
   type PatchSummary,
   type PatchedFile,
 } from "#src/validate-patches";

@@ -78,6 +78,40 @@ function overlaps(a: FindingPatch, b: FindingPatch): boolean {
   return a.startLine <= b.endLine && b.startLine <= a.endLine;
 }
 
+/** Whether the range still holds, byte for byte, the text the patch was proved against. */
+function matchesExpected(text: FileText, patch: FindingPatch): boolean {
+  const actual = rangeText(text, patch);
+  return actual !== undefined && actual === withoutTrailingNewline(patch.expected);
+}
+
+export type PatchApplication =
+  | { status: "applied"; content: string }
+  /** The file moved under the patch, so its line numbers no longer describe it. */
+  | { status: "stale"; patch: FindingPatch }
+  | { status: "overlapping"; patch: FindingPatch };
+
+/**
+ * Re-proves every patch against `content` before replaying it, so a file that
+ * changed since the review is refused whole rather than edited in part.
+ */
+export function applyVerifiedPatches(
+  content: string,
+  patches: readonly FindingPatch[],
+): PatchApplication {
+  const text = splitLines(content);
+  const seen: FindingPatch[] = [];
+  for (const patch of patches) {
+    if (seen.some((other) => overlaps(other, patch))) {
+      return { status: "overlapping", patch };
+    }
+    if (!matchesExpected(text, patch)) {
+      return { status: "stale", patch };
+    }
+    seen.push(patch);
+  }
+  return { status: "applied", content: joinLines(applyPatches(text, patches)) };
+}
+
 /** Whether the range touches at least one line this pull request adds. */
 function touchesDiff(patch: FindingPatch, changed: ReadonlySet<number>): boolean {
   for (let line = patch.startLine; line <= patch.endLine; line += 1) {
@@ -172,8 +206,7 @@ export async function verifyPatches(
     if (text === undefined) {
       continue;
     }
-    const actual = rangeText(text, patch);
-    if (actual === undefined || actual !== withoutTrailingNewline(patch.expected)) {
+    if (!matchesExpected(text, patch)) {
       continue;
     }
 
