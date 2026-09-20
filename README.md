@@ -177,6 +177,7 @@ apps/
   action/     Event parsing → review pipeline → check run (or job summary)
   mcp/        Local MCP server: the same pipeline over a working tree,
               plus index lookups and review history, for coding agents
+  web/        The documentation site at /, and the dashboard behind it
 packages/
   ai/         Provider selection (model.ts), prompts, agent
               configuration, and agents/: agent definition, runtime loop,
@@ -188,7 +189,8 @@ packages/
 evals/        Fixture repositories and the harness that runs the real
               pipeline against them without touching GitHub
 docs/         index.html — the architecture walkthrough, published to
-              Pages; claude/ — how the agent skills read this repo
+              Pages and now also served by apps/web at /docs/walkthrough;
+              claude/ — how the agent skills read this repo
               (.nojekyll beside it, so Pages serves the file as written)
 scripts/      esbuild bundler for apps/action, its smoke test, and the
               Langfuse prompt seeder
@@ -771,9 +773,13 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 
 ## Further reading
 
-- **[Propose, Refine, Decide](https://sunnyeyles.github.io/pr-review-agents/)**
-  — the pipeline traced stage by stage, with a diagram, the file that owns each
-  step, and the failure modes. Source: [`docs/index.html`](docs/index.html).
+- **Propose, refine, decide** — the pipeline traced stage by stage, with a
+  diagram, the file that owns each step, and the failure modes. It lives in the
+  dashboard's documentation at `/docs/walkthrough`
+  ([`apps/web/app/(docs)/`](apps/web/app/(docs))), and the standalone
+  [`docs/index.html`](docs/index.html) still serves the same walkthrough on
+  [Pages](https://sunnyeyles.github.io/pr-review-agents/) until that site has a
+  public URL to retire it to.
 - **[Incremental review](docs/incremental-review.md)** — the design behind the
   `incremental` input: where the baseline comes from, every way it widens back
   to a full review, and what recall it costs.

@@ -1,0 +1,95 @@
+"use client";
+
+import {
+  cn,
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@pr-review/design";
+import { BookText } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+
+import { DOCS_NAV, isDocsPageActive } from "@/lib/docs";
+
+const LINK_CLASS =
+  "block rounded-sm border border-transparent px-2.5 py-1.5 font-mono text-label tracking-ui transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+
+function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
+  return (
+    <nav aria-label="Documentation" className="flex flex-col gap-5">
+      {DOCS_NAV.map((section) => (
+        <div key={section.title} className="flex flex-col gap-0.5">
+          <p className="eyebrow px-2.5 pb-1.5">{section.title}</p>
+          {section.pages.map((page) => {
+            const active = isDocsPageActive(pathname, page.href);
+            return (
+              <Link
+                key={page.href}
+                href={page.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  LINK_CLASS,
+                  active
+                    ? "border-rule-soft bg-accent-wash font-semibold text-accent"
+                    : "text-slate hover:border-rule-soft hover:bg-surface-2 hover:text-ink",
+                )}
+              >
+                {page.title}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+export function DocsSidebar({ className }: { className?: string }) {
+  return (
+    <aside
+      className={cn(
+        "hidden w-[15rem] shrink-0 border-r border-rule bg-paper md:block",
+        className,
+      )}
+    >
+      <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto px-3 py-6">
+        <NavLinks />
+      </div>
+    </aside>
+  );
+}
+
+export function DocsNavDrawer({ className }: { className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger
+        className={cn(
+          "inline-flex items-center gap-2 rounded-sm border border-rule bg-surface px-2.5 py-1.5 font-mono text-label tracking-ui text-slate transition-colors outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper md:hidden",
+          className,
+        )}
+      >
+        <BookText className="size-3.5" />
+        Documentation
+      </SheetTrigger>
+      <SheetContent side="left" className="max-w-[17rem]">
+        <SheetHeader>
+          <SheetTitle>Documentation</SheetTitle>
+          <SheetDescription>pr-review-agents</SheetDescription>
+        </SheetHeader>
+        <div className="overflow-y-auto px-3 py-4">
+          <NavLinks onNavigate={() => setOpen(false)} />
+        </div>
+        <SheetClose className="sr-only">Close documentation menu</SheetClose>
+      </SheetContent>
+    </Sheet>
+  );
+}

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  apexUrl,
   authRedirect,
+  isApexOnly,
   organizationPath,
   renamedOrganizationUrl,
   returnUrl,
@@ -145,5 +147,35 @@ describe("renamedOrganizationUrl", () => {
 
   it("falls back to the organization's root without a recorded request", () => {
     expect(renamedOrganizationUrl(null, "acme-corp", DOMAIN)).toBe("/o/acme-corp");
+  });
+});
+
+describe("apexUrl", () => {
+  it("keeps a path as it is on the apex", () => {
+    expect(apexUrl("/docs/quickstart", "prreview.dev", "https", DOMAIN)).toBe("/docs/quickstart");
+    expect(apexUrl("/dashboard", null, "https", DOMAIN)).toBe("/dashboard");
+  });
+
+  it("makes it absolute on an organization subdomain, keeping the port", () => {
+    expect(apexUrl("/dashboard", "acme.prreview.dev", "https", DOMAIN)).toBe(
+      "https://prreview.dev/dashboard",
+    );
+    expect(apexUrl("/", "acme.localhost:3000", "http", "localhost")).toBe(
+      "http://localhost:3000/",
+    );
+  });
+});
+
+describe("isApexOnly", () => {
+  it("claims the docs and the organization picker", () => {
+    expect(isApexOnly("/docs")).toBe(true);
+    expect(isApexOnly("/docs/quickstart")).toBe(true);
+    expect(isApexOnly("/dashboard")).toBe(true);
+  });
+
+  it("leaves an organization's own pages alone", () => {
+    expect(isApexOnly("/")).toBe(false);
+    expect(isApexOnly("/repos")).toBe(false);
+    expect(isApexOnly("/o/acme/usage")).toBe(false);
   });
 });
