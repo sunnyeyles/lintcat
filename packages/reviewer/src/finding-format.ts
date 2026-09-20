@@ -8,7 +8,7 @@ import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
 import type { AgentFailure } from "#src/review-pipeline";
 
 /** `file` alone, or `file:line` when the finding is line-anchored. */
-export function location(finding: ReviewFinding): string {
+function location(finding: ReviewFinding): string {
   return finding.line === undefined
     ? finding.file
     : `${finding.file}:${finding.line}`;

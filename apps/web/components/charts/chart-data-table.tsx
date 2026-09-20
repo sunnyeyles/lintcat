@@ -10,7 +10,7 @@ import {
 } from "@pr-review/design";
 import type { ReactNode } from "react";
 
-export type ChartDataRow = { key: string; cells: ReactNode[] };
+type ChartDataRow = { key: string; cells: ReactNode[] };
 
 export type ChartDataTableProps = {
   caption: string;

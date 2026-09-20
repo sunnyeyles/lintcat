@@ -41,7 +41,7 @@ export function changedLinesFromPatch(patch: string): Set<number> {
  * Every new-side line a patch shows, context included. GitHub accepts a
  * comment only on these, which is a wider set than the added lines alone.
  */
-export function diffLinesFromPatch(patch: string): Set<number> {
+function diffLinesFromPatch(patch: string): Set<number> {
   const shown = new Set<number>();
   let newLine: number | undefined;
 

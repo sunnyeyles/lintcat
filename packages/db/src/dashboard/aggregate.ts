@@ -53,7 +53,7 @@ export function costOf(t: TokenCounts): number {
   );
 }
 
-export function dayKey(d: Date): string {
+function dayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
@@ -68,7 +68,7 @@ export function windowStart(range: Range): number {
   return midnight.getTime() - (rangeDays(range) - 1) * 864e5;
 }
 
-export function median(xs: number[]): number {
+function median(xs: number[]): number {
   if (xs.length === 0) return 0;
   const s = [...xs].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);

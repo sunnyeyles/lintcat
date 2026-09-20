@@ -12,10 +12,10 @@ import {
 } from "@pr-review/ai";
 
 /** Environment variable selecting the provider under evaluation. */
-export const PROVIDER_ENV = "MODEL_PROVIDER";
+const PROVIDER_ENV = "MODEL_PROVIDER";
 
 /** Environment variable overriding the model under evaluation. */
-export const MODEL_ENV = "MODEL_ID";
+const MODEL_ENV = "MODEL_ID";
 
 /**
  * Narrows which agents the evaluations run, spelled like the action's `agents`

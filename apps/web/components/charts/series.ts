@@ -16,7 +16,7 @@ export const SEVERITY_CONFIG = {
   high: { label: "High", color: "var(--destructive)" },
 } satisfies ChartConfig;
 
-export const AGENT_SERIES: readonly SeriesDef<AgentName>[] = [
+const AGENT_SERIES: readonly SeriesDef<AgentName>[] = [
   { key: "security", label: "Security" },
   { key: "correctness", label: "Correctness" },
   { key: "performance", label: "Performance" },
