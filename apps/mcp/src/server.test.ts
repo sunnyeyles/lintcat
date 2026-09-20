@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
@@ -110,10 +112,11 @@ describe("the tool list", () => {
       "review_pull_request",
       "review_trends",
       "search_code",
+      "suppress_finding",
       "validate_agent_config",
     ]);
     const writes = tools.filter((tool) => tool.annotations?.readOnlyHint !== true);
-    expect(writes.map((tool) => tool.name)).toEqual(["review_pull_request"]);
+    expect(writes.map((tool) => tool.name)).toEqual(["review_pull_request", "suppress_finding"]);
   });
 });
 
@@ -540,5 +543,79 @@ describe("the prompt list", () => {
     const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
     expect(text).toContain("the most severe finding");
     expect(text).toContain('`get_review` with org "acme" and id 12');
+  });
+});
+
+describe("suppress_finding", () => {
+  const TITLE = "Admin is always on";
+
+  function reviewing(title: string) {
+    return environment({
+      createLanguageModel: () =>
+        scriptedModel([makeFinding("general", { file: "src/sessions.ts", line: 3, title })]),
+    });
+  }
+
+  async function review(client: Client) {
+    const { texts } = await call(client, "review_local_changes", { base: "main", index: false });
+    return { heading: texts[0]!, details: JSON.parse(texts[1]!) };
+  }
+
+  it("records the suppression under .git, where no review reads it as a change", async () => {
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "suppress_finding", {
+      category: "general",
+      title: TITLE,
+      reason: "the flag is deliberate here",
+    });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("1 suppression(s) now live in");
+    expect(texts[0]).toContain(path.join(repo.root, ".git", "pr-review-agents", "memory.json"));
+    expect(JSON.parse(texts[1]!)).toEqual([
+      {
+        category: "general",
+        shape: "admin is always on",
+        title: TITLE,
+        reason: "the flag is deliberate here",
+        createdAt: expect.any(String),
+      },
+    ]);
+  });
+
+  it("excludes the finding from a later review and says how many it hid", async () => {
+    await call(await connect(environment()), "suppress_finding", { category: "general", title: TITLE });
+
+    const { heading, details } = await review(await connect(reviewing(TITLE)));
+
+    expect(details.findings).toEqual([]);
+    expect(details.suppressed).toBe(1);
+    expect(heading).toContain("1 finding(s) were hidden by suppressions");
+  });
+
+  it("suppresses the same problem under another identifier", async () => {
+    await call(await connect(environment()), "suppress_finding", {
+      category: "general",
+      title: "Admin is always on in adminFlag",
+    });
+
+    const { details } = await review(await connect(reviewing("Admin is always on in isAdmin")));
+
+    expect(details.findings).toEqual([]);
+    expect(details.suppressed).toBe(1);
+  });
+
+  it("leaves a finding the suppression no longer matches alone", async () => {
+    await call(await connect(environment()), "suppress_finding", {
+      category: "general",
+      title: "Unbounded query in the session list",
+    });
+
+    const { heading, details } = await review(await connect(reviewing(TITLE)));
+
+    expect(details.findings.map((found: { title: string }) => found.title)).toEqual([TITLE]);
+    expect(details.suppressed).toBe(0);
+    expect(heading).not.toContain("hidden by suppressions");
   });
 });

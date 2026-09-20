@@ -13,6 +13,7 @@ import { z } from "zod";
 import { listAgents, type AgentListing } from "#src/agent-listing";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { openLocalRepository } from "#src/local-git-client";
+import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
 
 const agentsSchema = z
@@ -29,11 +30,16 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
     agentFailures: outcome.agentFailures,
     synthesis: outcome.synthesis.outcome,
     patches: outcome.patches,
+    suppressed: outcome.suppressed,
     findings: outcome.findings,
   };
+  const suppressed =
+    outcome.suppressed === 0
+      ? ""
+      : ` ${outcome.suppressed} finding(s) were hidden by suppressions in this checkout's review memory.`;
   return {
     content: [
-      { type: "text", text: `${heading}\n\n${result.summary}` },
+      { type: "text", text: `${heading}${suppressed}\n\n${result.summary}` },
       { type: "text", text: JSON.stringify(details, null, 2) },
     ],
   };
@@ -112,8 +118,8 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       description:
         "Run the AI review agents over a local checkout's changes against its base branch: commits since " +
         "the merge-base plus uncommitted and untracked files. Returns only findings that passed the same " +
-        "deterministic validation the GitHub Action applies. Calls the configured model provider and takes " +
-        "a minute or more; nothing is written anywhere.",
+        "deterministic validation the GitHub Action applies. Findings suppressed with suppress_finding are " +
+        "excluded and counted. Calls the configured model provider and takes a minute or more; nothing is written.",
       inputSchema: {
         repoPath: z
           .string()
@@ -150,6 +156,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         baseSha: local.baseSha,
         agents,
         index,
+        memory: await openLocalMemoryStore(local.root),
         signal: extra.signal,
         onAgentEvent: progressReporter(extra),
       });
