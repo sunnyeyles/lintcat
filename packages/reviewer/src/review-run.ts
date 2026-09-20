@@ -13,15 +13,16 @@ import {
   type ReviewModel,
   type Synthesiser,
 } from "@pr-review/ai";
-import type {
-  PullRequestReadClient,
-  RepositoryHistoryClient,
-} from "@pr-review/github";
+import type { PullRequestReadClient } from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 import { createConsoleLogger, type StructuredLogger } from "@pr-review/logging";
 
 import type { MemoryStore } from "#src/memory";
-import { createPipelineRunner, type RunReviewPipeline } from "#src/pipeline-runner";
+import {
+  createPipelineRunner,
+  type ReviewClient,
+  type RunReviewPipeline,
+} from "#src/pipeline-runner";
 import { readAtCommit } from "#src/read-at-commit";
 import type { FinishedReviewRun, ReviewDelivery } from "#src/review-delivery";
 import { runReviewPipeline } from "#src/review-pipeline";
@@ -52,7 +53,7 @@ export type ReviewAgentSource =
 
 /** What an agent set is built over, once the run has resolved it. */
 export interface ReviewAgentRequest {
-  client: PullRequestReadClient & RepositoryHistoryClient;
+  client: ReviewClient;
   /** The subset the path gate woke. */
   agents: readonly AgentDefinition[];
   index: RepositoryIndex | undefined;
@@ -86,7 +87,7 @@ export interface ReviewMemory {
 
 export interface ReviewRunSpec {
   /** Reads only: every write this run makes goes through `delivery`. */
-  client: PullRequestReadClient & RepositoryHistoryClient;
+  client: ReviewClient;
   target: ReviewTarget;
   delivery: ReviewDelivery;
   agents: ReviewAgentSource;

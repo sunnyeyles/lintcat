@@ -9,6 +9,7 @@ export {
 export {
   createPipelineRunner,
   type PipelineRunnerDeps,
+  type ReviewClient,
   type ReviewPipelineRun,
   type RunReviewPipeline,
 } from "#src/pipeline-runner";

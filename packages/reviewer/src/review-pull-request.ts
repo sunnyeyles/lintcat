@@ -12,7 +12,6 @@ import {
 import type {
   ExistingReviewComment,
   PullRequestReadClient,
-  RepositoryHistoryClient,
 } from "@pr-review/github";
 import {
   createConsoleLogger,
@@ -22,7 +21,7 @@ import {
 import type { ReviewFinding } from "@pr-review/schemas";
 
 import { buildReviewIndex } from "#src/build-index";
-import type { RunReviewPipeline } from "#src/pipeline-runner";
+import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
 import { countLabel } from "#src/finding-format";
 import { deliverReview } from "#src/publish-review";
@@ -52,7 +51,7 @@ import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 /** What one review needs once its delivery has already been chosen. */
 export interface ReviewWithDeliveryDeps {
   /** Reads only; every write this review makes goes through `delivery`. */
-  client: PullRequestReadClient & RepositoryHistoryClient;
+  client: ReviewClient;
   /** The run's agent set, already narrowed by the `agents` input. */
   agents: readonly AgentDefinition[];
   /** Throws only when every agent failed; a synthesis failure is reported on the result. */

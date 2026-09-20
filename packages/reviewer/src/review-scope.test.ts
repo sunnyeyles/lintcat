@@ -136,6 +136,16 @@ describe("resolveReviewScope", () => {
     expect(scope).toMatchObject({ kind: "full", reason: "head_rewritten" });
   });
 
+  it("reviews it all when the client declares no commit comparison", async () => {
+    const { listPullRequestCommitShas, listCheckRuns } = makeClient();
+    const client = { listPullRequestCommitShas, listCheckRuns };
+
+    const scope = await resolveReviewScope(target, { ...deps(makeClient()), client });
+
+    expect(scope).toMatchObject({ kind: "full", reason: "no_commit_comparison" });
+    expect(listPullRequestCommitShas).not.toHaveBeenCalled();
+  });
+
   it("reviews it all, logging the reason, when the baseline cannot be read", async () => {
     const capture = createCapturingLogger();
     const client = makeClient({ failOn: "commits" });

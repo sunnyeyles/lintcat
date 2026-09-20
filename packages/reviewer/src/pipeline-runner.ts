@@ -17,9 +17,14 @@ import {
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
 
+/** What one review reads. The two optional methods are absent on an adapter with no commit graph. */
+export type ReviewClient = PullRequestReadClient &
+  Pick<RepositoryHistoryClient, "listCommitShas" | "listPullRequestCommitShas"> &
+  Partial<Pick<RepositoryHistoryClient, "listCommitFiles" | "compareCommits">>;
+
 /** One pipeline run's inputs, named rather than positional. */
 export interface ReviewPipelineRun {
-  client: PullRequestReadClient & RepositoryHistoryClient;
+  client: ReviewClient;
   context: ReviewContext;
   /** The subset of the run's agents the path gate woke. */
   agents: readonly AgentDefinition[];
