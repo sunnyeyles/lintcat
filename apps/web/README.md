@@ -193,12 +193,12 @@ it also returns that repo. An unknown slug, a suspended or uninstalled
 organization, a non-member and an unreadable or unknown repo get the same
 not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
 every organization layout and page calls: a signed-out visitor goes to
-`/sign-in?callbackUrl=<the page>` (the path comes from `middleware.ts`), and a
+`/sign-in?callbackUrl=<the page>` (the path comes from `proxy.ts`), and a
 not-found renders the 404.
 
 ## Subdomains
 
-Each organization is also served at `<slug>.<APP_DOMAIN>`. `middleware.ts`
+Each organization is also served at `<slug>.<APP_DOMAIN>`. `proxy.ts`
 rewrites `acme.example.com/repos` onto `/o/acme/repos`; the mapping is
 `organizationSlugFromHost` in `lib/host.ts`. The apex, the reserved names
 `www app api auth admin docs status mail`, and every other host (Vercel preview
