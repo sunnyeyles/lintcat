@@ -35,6 +35,7 @@ import {
   type PublishReview,
   type PublishReviewComments,
 } from "#src/publish-review";
+import type { ReviewDelivery } from "#src/review-delivery";
 import {
   computeHints,
   computeSynthesisHints,
@@ -74,6 +75,27 @@ interface ReviewPullRequestDeps {
   applyFixes?: boolean | undefined;
   /** Defaults to committing through `client`, when applyFixes is on. */
   publishFixes?: PublishFixes | undefined;
+  /** Every event carries repository, PR number, and head SHA. */
+  logger?: StructuredLogger | undefined;
+  /** Where this repository's review memory lives; undefined means no hints. */
+  memoryStore?: MemoryStore | undefined;
+  /** Injectable clock, so a test can pin what counts as a fresh signal. */
+  now?: (() => Date) | undefined;
+  incremental?: boolean | undefined;
+  /** Whether the repository index is built for this review; on by default. */
+  index?: boolean | undefined;
+}
+
+/** What one review needs once its delivery has already been chosen. */
+export interface ReviewWithDeliveryDeps {
+  /** Reads only; every write this review makes goes through `delivery`. */
+  client: PullRequestReadClient & RepositoryHistoryClient;
+  /** The run's agent set, already narrowed by the `agents` input. */
+  agents: readonly AgentDefinition[];
+  /** Throws only when every agent failed; a synthesis failure is reported on the result. */
+  runReviewPipeline: RunReviewPipeline;
+  /** The only route to a publisher: there is no default, and no live fallback. */
+  delivery: ReviewDelivery;
   /** Every event carries repository, PR number, and head SHA. */
   logger?: StructuredLogger | undefined;
   /** Where this repository's review memory lives; undefined means no hints. */
@@ -247,23 +269,23 @@ function unreviewed(): ReviewOutcome {
   };
 }
 
-/** Throws when the pipeline or the publish step fails; retries are the caller's. */
-export async function reviewPullRequest(
+/**
+ * One review against a delivery that was already chosen. Throws when the
+ * pipeline or the publish step fails; retries are the caller's.
+ */
+export async function reviewWithDelivery(
   target: ReviewTarget,
   {
     client,
     agents,
     runReviewPipeline,
-    publishReview,
-    publishReviewComments,
-    applyFixes = false,
-    publishFixes,
+    delivery,
     logger = createConsoleLogger(),
     memoryStore,
     now = () => new Date(),
     incremental = false,
     index = true,
-  }: ReviewPullRequestDeps,
+  }: ReviewWithDeliveryDeps,
 ): Promise<ReviewOutcome> {
   const fields = reviewCorrelation(target);
   const [pullRequest, changedFiles, diff] = await Promise.all([
@@ -285,7 +307,7 @@ export async function reviewPullRequest(
     logger,
   });
   const whole = wholePullRequest(scope);
-  const publish = publishReview ?? createCheckRunPublisher(client);
+  const publish = delivery.publishCheckRun;
   // Agents see the scope; publishing sees the whole PR, so comments anchor anywhere.
   const filenames = scope.changedFiles.map((file) => file.filename);
   const carriedForward =
@@ -352,9 +374,9 @@ export async function reviewPullRequest(
   });
 
   // The AI boundary: only the validate step's output reaches GitHub.
-  const review = await runReviewPipeline(
+  const review = await runReviewPipeline({
     client,
-    {
+    context: {
       owner: target.owner,
       repo: target.repo,
       pullRequest,
@@ -365,10 +387,10 @@ export async function reviewPullRequest(
           ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
           : undefined,
     },
-    active,
-    synthesisHints,
-    repositoryIndex,
-  );
+    agents: active,
+    hints: synthesisHints,
+    index: repositoryIndex,
+  });
   logSynthesisOutcome(logger, target, review);
 
   logger.info("findings.validated", {
@@ -415,14 +437,42 @@ export async function reviewPullRequest(
     },
     {
       publishCheckRun: publish,
-      publishComments:
-        publishReviewComments ?? createReviewCommentPublisher(client, logger),
-      ...(applyFixes
-        ? { publishFixes: publishFixes ?? createFixPublisher(client, logger) }
-        : {}),
+      publishComments: delivery.publishComments,
+      ...(delivery.publishFixes === undefined
+        ? {}
+        : { publishFixes: delivery.publishFixes }),
       logger,
     },
   );
 
   return { ...review, findings: verified.findings, patches: verified.summary };
+}
+
+/** Throws when the pipeline or the publish step fails; retries are the caller's. */
+export async function reviewPullRequest(
+  target: ReviewTarget,
+  deps: ReviewPullRequestDeps,
+): Promise<ReviewOutcome> {
+  const {
+    client,
+    publishReview,
+    publishReviewComments,
+    applyFixes = false,
+    publishFixes,
+    logger = createConsoleLogger(),
+    ...rest
+  } = deps;
+  return reviewWithDelivery(target, {
+    ...rest,
+    client,
+    logger,
+    delivery: {
+      publishCheckRun: publishReview ?? createCheckRunPublisher(client),
+      publishComments:
+        publishReviewComments ?? createReviewCommentPublisher(client, logger),
+      ...(applyFixes
+        ? { publishFixes: publishFixes ?? createFixPublisher(client, logger) }
+        : {}),
+    },
+  });
 }

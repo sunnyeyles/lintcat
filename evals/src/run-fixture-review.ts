@@ -98,7 +98,7 @@ export async function runFixtureReview(
     {
       client,
       agents: deps.agents,
-      runReviewPipeline: (reviewClient, context, activeAgents, _hints, index) =>
+      runReviewPipeline: ({ client: reviewClient, context, agents: activeAgents, index }) =>
         runReviewPipeline(
           deps.createAgents(reviewClient, logger, activeAgents, index),
           deps.synthesiser,

@@ -1,9 +1,4 @@
-import {
-  emptyTokenUsage,
-  type AgentDefinition,
-  type ReviewContext,
-  type SynthesisHints,
-} from "@pr-review/ai";
+import { emptyTokenUsage, type AgentDefinition } from "@pr-review/ai";
 import { ArchiveTooLargeError } from "@pr-review/github";
 import type {
   ChangedFile,
@@ -16,10 +11,8 @@ import type {
   ExistingReviewComment,
   GithubInstallationClient,
   PullRequestDetails,
-  PullRequestReadClient,
   PullRequestRef,
   RepositoryArchiveRequest,
-  RepositoryHistoryClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -33,6 +26,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { MemoryStore } from "#src/memory";
+import type { ReviewPipelineRun } from "#src/pipeline-runner";
 import type { PublishReview } from "#src/publish-review";
 import { findingMarker } from "#src/render-review";
 import {
@@ -180,15 +174,7 @@ function makeDeps(
   { agents = [makeAgent("correctness")], ...options }: DepsOptions = {},
 ) {
   const client = makeClient();
-  const runReviewPipeline = vi.fn(
-    async (
-      _client: PullRequestReadClient & RepositoryHistoryClient,
-      _context: ReviewContext,
-      _agents: readonly AgentDefinition[],
-      _hints: SynthesisHints,
-      _index: RepositoryIndex | undefined,
-    ) => review,
-  );
+  const runReviewPipeline = vi.fn(async (_run: ReviewPipelineRun) => review);
   const { logger, entries } = createCapturingLogger();
   return {
     client,
@@ -221,9 +207,9 @@ describe("reviewPullRequest", () => {
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline).toHaveBeenCalledExactlyOnceWith(
+    expect(runReviewPipeline).toHaveBeenCalledExactlyOnceWith({
       client,
-      {
+      context: {
         owner: target.owner,
         repo: target.repo,
         pullRequest,
@@ -231,9 +217,9 @@ describe("reviewPullRequest", () => {
         diff,
       },
       agents,
-      { keep: [], drop: [] },
-      expect.objectContaining({ sha: pullRequest.baseSha }),
-    );
+      hints: { keep: [], drop: [] },
+      index: expect.objectContaining({ sha: pullRequest.baseSha }),
+    });
   });
 
   it("publishes a check run through the client by default", async () => {
@@ -538,7 +524,7 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
 
     await reviewPullRequest(target, deps);
 
-    const context = runReviewPipeline.mock.calls[0]?.[1];
+    const context = runReviewPipeline.mock.calls[0]?.[0].context;
     expect(context).toMatchObject({
       changedFiles: [sinceFile],
       incremental: { sinceSha: "old111", diff, changedFiles },
@@ -554,11 +540,11 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[1]).toMatchObject({
+    expect(runReviewPipeline.mock.calls[0]?.[0].context).toMatchObject({
       changedFiles,
       diff,
     });
-    expect(runReviewPipeline.mock.calls[0]?.[1].incremental).toBeUndefined();
+    expect(runReviewPipeline.mock.calls[0]?.[0].context.incremental).toBeUndefined();
   });
 
   it("runs no agent when nothing this pull request changed has moved", async () => {
@@ -644,7 +630,7 @@ describe("reviewPullRequest: path filters", () => {
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[2]).toEqual([ungated]);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents).toEqual([ungated]);
   });
 
   it("wakes an agent whose pattern one changed file matches", async () => {
@@ -655,7 +641,7 @@ describe("reviewPullRequest: path filters", () => {
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[2]).toEqual([matching]);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents).toEqual([matching]);
   });
 
   it("logs each skipped agent with the paths it waited for", async () => {
@@ -882,7 +868,7 @@ describe("reviewPullRequest: repository hints", () => {
 
     await reviewPullRequest(target, deps);
 
-    const [hinted] = runReviewPipeline.mock.calls[0]?.[2] ?? [];
+    const [hinted] = runReviewPipeline.mock.calls[0]?.[0].agents ?? [];
     expect(hinted?.repositoryHints).toHaveLength(1);
     expect(hinted?.repositoryHints?.[0]).toContain(
       '"assignment instead of comparison in"',
@@ -915,7 +901,7 @@ describe("reviewPullRequest: repository hints", () => {
 
     await reviewPullRequest(target, deps);
 
-    const [unhinted] = runReviewPipeline.mock.calls[0]?.[2] ?? [];
+    const [unhinted] = runReviewPipeline.mock.calls[0]?.[0].agents ?? [];
     expect(unhinted?.repositoryHints).toBeUndefined();
     expect(entries).toContainEqual(
       expect.objectContaining({
@@ -934,7 +920,7 @@ describe("reviewPullRequest: repository hints", () => {
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[2]?.[0]).toBe(agent);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents?.[0]).toBe(agent);
     expect(entries.map((entry) => entry["event"])).not.toContain(
       "memory.hints_attached",
     );
@@ -956,7 +942,7 @@ describe("reviewPullRequest: repository hints", () => {
     await reviewPullRequest(target, deps);
 
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
-    expect(runReviewPipeline.mock.calls[0]?.[2]?.[0]).toBe(agent);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents?.[0]).toBe(agent);
     // readMemory absorbs the transport error, so it surfaces as memory.invalid.
     expect(entries).toContainEqual(
       expect.objectContaining({ level: "error", event: "memory.invalid" }),
@@ -973,7 +959,7 @@ describe("reviewPullRequest: orchestrator memory", () => {
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[3]).toEqual({
+    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({
       keep: [],
       drop: ['Correctness: Findings like "assignment instead of comparison in".'],
     });
@@ -994,7 +980,7 @@ describe("reviewPullRequest: orchestrator memory", () => {
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[3]).toEqual({
+    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({
       keep: ['Correctness: Findings like "assignment instead of comparison in".'],
       drop: [],
     });
@@ -1005,7 +991,7 @@ describe("reviewPullRequest: orchestrator memory", () => {
 
     await reviewPullRequest(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[3]).toEqual({ keep: [], drop: [] });
+    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({ keep: [], drop: [] });
   });
 });
 
@@ -1014,7 +1000,7 @@ describe("the repository index", () => {
   function indexPassedTo(
     runReviewPipeline: ReturnType<typeof makeDeps>["runReviewPipeline"],
   ): RepositoryIndex | undefined {
-    return runReviewPipeline.mock.calls[0]?.[4];
+    return runReviewPipeline.mock.calls[0]?.[0].index;
   }
 
   function entry(entries: ReturnType<typeof makeDeps>["entries"], event: string) {

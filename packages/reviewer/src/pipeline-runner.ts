@@ -17,13 +17,19 @@ import {
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
 
-/** Runs one review's agents; `agents` is the subset the path gate woke. */
+/** One pipeline run's inputs, named rather than positional. */
+export interface ReviewPipelineRun {
+  client: PullRequestReadClient & RepositoryHistoryClient;
+  context: ReviewContext;
+  /** The subset of the run's agents the path gate woke. */
+  agents: readonly AgentDefinition[];
+  hints: SynthesisHints;
+  index: RepositoryIndex | undefined;
+}
+
+/** Runs one review's agents, then synthesise and validate. */
 export type RunReviewPipeline = (
-  client: PullRequestReadClient & RepositoryHistoryClient,
-  context: ReviewContext,
-  agents: readonly AgentDefinition[],
-  hints: SynthesisHints,
-  index: RepositoryIndex | undefined,
+  run: ReviewPipelineRun,
 ) => Promise<ReviewPipelineResult>;
 
 export interface PipelineRunnerDeps
@@ -36,7 +42,7 @@ export function createPipelineRunner({
   synthesiser,
   ...agentDeps
 }: PipelineRunnerDeps): RunReviewPipeline {
-  return (client, context, agents, hints, index) =>
+  return ({ client, context, agents, hints, index }) =>
     runReviewPipeline(
       createReviewAgents(
         { ...agentDeps, github: client, ...(index === undefined ? {} : { index }) },
