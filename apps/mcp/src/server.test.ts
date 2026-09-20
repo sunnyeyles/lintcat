@@ -33,7 +33,7 @@ import { createCapturingLogger } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { McpEnvironment } from "#src/environment";
-import { createServer } from "#src/server";
+import { createServer, type ServerOptions } from "#src/server";
 import { createTestRepo, type TestRepo } from "#src/test-repo";
 
 let repo: TestRepo;
@@ -73,8 +73,12 @@ function environment(overrides: Partial<McpEnvironment> = {}): McpEnvironment {
   };
 }
 
-async function connect(env: McpEnvironment, githubId?: () => Promise<number>): Promise<Client> {
-  const server = createServer(env, githubId ? { githubId } : {});
+async function connect(
+  env: McpEnvironment,
+  githubId?: () => Promise<number>,
+  extra: ServerOptions = {},
+): Promise<Client> {
+  const server = createServer(env, { ...(githubId ? { githubId } : {}), ...extra });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   const client = new Client({ name: "test", version: "0.0.0" });
@@ -128,6 +132,48 @@ describe("the tool list", () => {
     expect(writes.map((tool) => tool.name).sort()).toEqual(["apply_fix", "review_pull_request", "suppress_finding"]);
     const applyFix = tools.find((tool) => tool.name === "apply_fix");
     expect(applyFix?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+  });
+});
+
+describe("read-only mode", () => {
+  const WRITES = ["apply_fix", "review_pull_request", "suppress_finding"];
+
+  it("lists no write tool", async () => {
+    const client = await connect(environment(), undefined, { readOnly: true });
+    const { tools } = await client.listTools();
+
+    expect(tools.length).toBeGreaterThan(0);
+    expect(tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true);
+    expect(tools.map((tool) => tool.name)).not.toEqual(expect.arrayContaining(WRITES));
+  });
+
+  it("refuses a hidden tool called directly", async () => {
+    const client = await connect(environment(), undefined, { readOnly: true });
+
+    for (const name of WRITES) {
+      const result = await call(client, name, {});
+      expect(result.isError).toBe(true);
+      expect(result.texts.join(" ")).toMatch(/disabled/);
+    }
+  });
+
+  it("hides write tools registered later", async () => {
+    const server = createServer(environment(), { readOnly: true });
+    server.registerTool("later_write", { annotations: { readOnlyHint: false } }, async () => ({ content: [] }));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: "test", version: "0.0.0" });
+    await client.connect(clientTransport);
+
+    expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain("later_write");
+  });
+
+  it("is off by default and switched on by PR_REVIEW_MCP_READ_ONLY", async () => {
+    const off = await connect(environment());
+    expect((await off.listTools()).tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(WRITES));
+
+    const on = await connect(environment({ env: { PR_REVIEW_MCP_READ_ONLY: "1" } }));
+    expect((await on.listTools()).tools.map((tool) => tool.name)).not.toContain("apply_fix");
   });
 });
 
