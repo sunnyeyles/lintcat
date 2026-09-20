@@ -19,7 +19,7 @@ import { truncateWithMarker } from "#src/agents/truncate";
 const MAX_TOOL_RESULT_CHARS = 50_000;
 
 // Bounded by these, not by truncate(): truncation would cut the JSON mid-string.
-const MAX_SEARCH_MATCHES = 20;
+export const MAX_SEARCH_MATCHES = 20;
 
 const MAX_SNIPPETS_PER_MATCH = 2;
 
