@@ -7,7 +7,8 @@
     "#src/*": "./src/*.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./conformance": "./src/conformance.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
