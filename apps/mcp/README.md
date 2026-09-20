@@ -16,6 +16,7 @@ Then pass that repository's checkout as `repoPath`, or start Claude Code in it.
 
 | Tool | What it does | Needs |
 |---|---|---|
+| `list_review_agents` | Lists the checkout's configured agents with their categories and path gates, and marks which the working tree's changes would wake. | Nothing |
 | `review_local_changes` | Runs the configured agents on commits since the merge-base with the base branch, plus uncommitted and untracked files. Returns only validated findings. | A model key |
 | `review_pull_request` | Reviews a GitHub PR at its head. It is a dry run unless `publish: true`, which posts the check run and review comments. It never commits fixes. | A model key and a GitHub token |
 | `repository_overview` | Lists the workspace's packages and the per-language index coverage. | Nothing |

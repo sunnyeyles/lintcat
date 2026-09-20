@@ -685,6 +685,7 @@ runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
 
 | Tool | What it does |
 | --- | --- |
+| `list_review_agents` | Lists the agents a checkout configures, each one's category and path gate, and which the working tree's changes would wake; no model key needed |
 | `review_local_changes` | Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed |
 | `review_pull_request` | Reviews a GitHub pull request; a dry run unless `publish: true`, which posts the check run and comments as the Action would |
 | `repository_overview`, `find_references`, `describe_file` | The [repository index](#repository-index), built from the working tree, with no network |
