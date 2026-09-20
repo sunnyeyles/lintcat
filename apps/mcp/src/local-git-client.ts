@@ -107,20 +107,69 @@ function searchTerms(query: string): string[] {
     .filter((term) => term !== "");
 }
 
-function groupMatches(output: string): CodeSearchMatch[] {
-  const byPath = new Map<string, string[]>();
+/** One matching line, as `git grep -n` reports it. */
+export interface SearchHit {
+  path: string;
+  line: number;
+  text: string;
+}
+
+function parseGrepLines(output: string): SearchHit[] {
+  const hits: SearchHit[] = [];
   for (const line of output.split("\n")) {
     const match = /^(.+?):(\d+):(.*)$/.exec(line);
-    if (!match) continue;
-    const snippets = byPath.get(match[1]!) ?? [];
-    if (snippets.length < MAX_SNIPPETS_PER_FILE) snippets.push(match[3]!.trim());
-    byPath.set(match[1]!, snippets);
+    if (match) hits.push({ path: match[1]!, line: Number(match[2]), text: match[3]!.trim() });
+  }
+  return hits;
+}
+
+function groupMatches(hits: readonly SearchHit[]): CodeSearchMatch[] {
+  const byPath = new Map<string, string[]>();
+  for (const hit of hits) {
+    const snippets = byPath.get(hit.path) ?? [];
+    if (snippets.length < MAX_SNIPPETS_PER_FILE) snippets.push(hit.text);
+    byPath.set(hit.path, snippets);
   }
   return [...byPath].map(([file, snippets]) => ({
     path: file,
     name: path.posix.basename(file),
     snippets,
   }));
+}
+
+/** The checkout-relative form of a path, or a 404 if it escapes the checkout. */
+function relativeInside(root: string, file: string): string {
+  const real = resolveInside(root, file);
+  return real === root ? "." : path.relative(root, real);
+}
+
+/** Case-insensitive fixed-string search of the working tree, one entry per matching line. */
+export async function searchWorkingTree(
+  root: string,
+  query: string,
+  scope?: string | undefined,
+): Promise<SearchHit[]> {
+  const terms = searchTerms(query);
+  if (terms.length === 0) {
+    return [];
+  }
+  const pathspec = scope === undefined ? [] : ["--", relativeInside(root, scope)];
+  const output = await git(
+    root,
+    [
+      "grep",
+      "-I",
+      "-n",
+      "-i",
+      "-F",
+      "--untracked",
+      "--all-match",
+      ...terms.flatMap((term) => ["-e", term]),
+      ...pathspec,
+    ],
+    { okExitCodes: [1] },
+  );
+  return parseGrepLines(output);
 }
 
 function* workingTreeFiles(root: string, paths: readonly string[]): Generator<RepositoryFileEntry> {
@@ -209,16 +258,7 @@ function createLocalGitClient(
     },
     getFileContents: ({ path: file, ref }) => readAt(ref, file),
     async searchCode({ query }) {
-      const terms = searchTerms(query);
-      if (terms.length === 0) {
-        return { matches: [], totalCount: 0, incompleteResults: false };
-      }
-      const output = await git(
-        root,
-        ["grep", "-I", "-n", "-i", "-F", "--untracked", "--all-match", ...terms.flatMap((term) => ["-e", term])],
-        { okExitCodes: [1] },
-      );
-      const matches = groupMatches(output);
+      const matches = groupMatches(await searchWorkingTree(root, query));
       return {
         matches: matches.slice(0, MAX_SEARCH_FILES),
         totalCount: matches.length,

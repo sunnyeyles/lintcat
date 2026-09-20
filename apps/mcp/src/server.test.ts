@@ -100,6 +100,7 @@ describe("the tool list", () => {
       "review_local_changes",
       "review_pull_request",
       "review_trends",
+      "search_code",
     ]);
     const writes = tools.filter((tool) => tool.annotations?.readOnlyHint !== true);
     expect(writes.map((tool) => tool.name)).toEqual(["review_pull_request"]);
@@ -144,6 +145,46 @@ describe("index tools", () => {
 
     const { texts } = await call(client, "find_references", { path: "src/sessions.ts" });
     expect(JSON.parse(texts[0]!).references.map((ref: { path: string }) => ref.path)).toContain("src/admin.ts");
+  });
+});
+
+describe("search_code", () => {
+  it("returns every matching line with its path and line number", async () => {
+    const client = await connect(environment());
+    const { isError, texts } = await call(client, "search_code", { query: "createSession" });
+
+    expect(isError).toBe(false);
+    const result = JSON.parse(texts[0]!);
+    expect(result).toMatchObject({ query: "createSession", total: 2, truncated: false });
+    expect(result.matches).toEqual([
+      { path: "src/api.ts", line: 1, text: 'import { createSession } from "./sessions";' },
+      { path: "src/sessions.ts", line: 2, text: "export function createSession() {}" },
+    ]);
+  });
+
+  it("searches the working tree, not the commit", async () => {
+    const client = await connect(environment());
+    const { texts } = await call(client, "search_code", { query: "admin", path: "src" });
+
+    expect(JSON.parse(texts[0]!).matches).toEqual([
+      { path: "src/sessions.ts", line: 3, text: "export const admin = true;" },
+    ]);
+  });
+
+  it("returns an empty result rather than an error when nothing matches", async () => {
+    const client = await connect(environment());
+    const { isError, texts } = await call(client, "search_code", { query: "nowhereInThisRepo" });
+
+    expect(isError).toBe(false);
+    expect(JSON.parse(texts[0]!)).toMatchObject({ total: 0, matches: [] });
+  });
+
+  it("refuses a path that escapes the checkout", async () => {
+    const client = await connect(environment());
+    const { isError, texts } = await call(client, "search_code", { query: "sessions", path: "../.." });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("outside the repository");
   });
 });
 
