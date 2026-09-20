@@ -316,6 +316,85 @@ describe("review_local_changes", () => {
   });
 });
 
+describe("review scopes", () => {
+  const admin = makeFinding("general", { file: "src/sessions.ts", line: 3, title: "Admin is always on" });
+
+  it("reviews only the index, leaving unstaged work out", async () => {
+    repo.git("add", "src/sessions.ts");
+    repo.write("src/api.ts", 'import { createSession } from "./sessions";\nexport const unstaged = 1;\n');
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([admin]) }));
+
+    const { isError, texts } = await call(client, "review_local_changes", {
+      scope: "staged",
+      index: false,
+    });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reviewed 1 changed file(s)");
+    expect(texts[0]).toContain("the staged changes");
+    expect(JSON.parse(texts[1]!).findings).toMatchObject([{ title: "Admin is always on" }]);
+  });
+
+  it("reviews an explicit commit range, leaving the working tree out", async () => {
+    repo.commit("admin");
+    repo.write("src/api.ts", "export const notReviewed = 1;\n");
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([admin]) }));
+
+    const { isError, texts } = await call(client, "review_local_changes", {
+      range: "main..feature",
+      index: false,
+    });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reviewed 1 changed file(s)");
+    expect(JSON.parse(texts[1]!).findings).toMatchObject([{ title: "Admin is always on" }]);
+  });
+
+  it("names an unknown ref before calling the model", async () => {
+    const createLanguageModel = vi.fn(() => scriptedModel([]));
+    const client = await connect(environment({ createLanguageModel }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { range: "main..nope" });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain('unknown commit "nope"');
+    expect(createLanguageModel).not.toHaveBeenCalled();
+  });
+
+  it("refuses a range handed to a scope that cannot take one", async () => {
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "review_local_changes", {
+      scope: "staged",
+      range: "main..feature",
+    });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("drop one of them");
+  });
+
+  it("makes no model call when the range is empty", async () => {
+    const createLanguageModel = vi.fn(() => scriptedModel([]));
+    const client = await connect(environment({ createLanguageModel }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { range: "HEAD..HEAD" });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("No changes between");
+    expect(createLanguageModel).not.toHaveBeenCalled();
+  });
+
+  it("gates the agents on the scope's changed files, not the working tree's", async () => {
+    repo.git("add", "src/sessions.ts");
+    repo.write("src/api.ts", "export const unstaged = 1;\n");
+    const client = await connect(environment({ env: {} }));
+
+    const { texts } = await call(client, "list_review_agents", { scope: "staged" });
+
+    expect(JSON.parse(texts[1]!).changedFiles).toEqual(["src/sessions.ts"]);
+  });
+});
+
 describe("review progress", () => {
   function reported(progress: Progress[]) {
     return progress.map(({ progress: done, total, message }) => ({ done, total, message }));
