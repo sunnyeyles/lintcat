@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { connectedClient, type ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
 import { registerWorkflowPrompts } from "#src/prompts/workflow-prompts";
@@ -24,6 +25,8 @@ triage_finding (is one stored finding worth fixing), review_history (what the st
 export interface ServerOptions {
   loadIndex?: (repoPath: string) => Promise<LocalIndex>;
   githubId?: () => Promise<number>;
+  /** What the connected client can do; defaults to asking the live connection. */
+  client?: ConnectedClient;
 }
 
 /** The signed-in user's numeric GitHub id, read once per server. */
@@ -52,6 +55,8 @@ export function createServer(environment: McpEnvironment, options: ServerOptions
     { name: "pr-review-agents", version: "0.1.0" },
     { instructions: INSTRUCTIONS },
   );
+  const client = options.client ?? connectedClient(server);
+  server.server.oninitialized = () => environment.logger.info("mcp.client", { ...client.features() });
   registerReviewTools(server, environment);
   registerIndexTools(server, environment, options.loadIndex ?? createLocalIndexCache());
   registerSearchTools(server, environment);
