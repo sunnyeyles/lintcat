@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
 
@@ -16,6 +18,8 @@ export interface ClientFeatures {
 /** The seam tools branch on; the raw capability record is read in one place, here. */
 export interface ConnectedClient {
   features(): ClientFeatures;
+  /** Filesystem paths of the workspace the client has open; empty when it serves no roots. */
+  roots(): Promise<readonly string[]>;
 }
 
 /** Before initialize, and for a client that advertises nothing. */
@@ -46,13 +50,16 @@ export function readClientFeatures(capabilities: ClientCapabilities | undefined)
 
 /** The live adapter; reads on every call because nothing is negotiated until initialize. */
 export function connectedClient(server: McpServer): ConnectedClient {
-  return {
-    features: () => readClientFeatures(server.server.getClientCapabilities()),
-  };
+  const features = () => readClientFeatures(server.server.getClientCapabilities());
+  const list = async () => (await server.server.listRoots()).roots.map(({ uri }) => fileURLToPath(uri));
+  return { features, roots: async () => (features().roots ? list() : []) };
 }
 
 /** The fake: a client stuck at whatever features you name, nothing else. */
-export function staticClient(features: Partial<ClientFeatures> = {}): ConnectedClient {
-  const fixed: ClientFeatures = { ...NO_CLIENT_FEATURES, ...features };
-  return { features: () => fixed };
+export function staticClient(
+  features: Partial<ClientFeatures> = {},
+  roots: readonly string[] = [],
+): ConnectedClient {
+  const fixed: ClientFeatures = { ...NO_CLIENT_FEATURES, roots: roots.length > 0, ...features };
+  return { features: () => fixed, roots: async () => roots };
 }
