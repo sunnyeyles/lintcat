@@ -1,34 +1,55 @@
 /** One suite every GithubInstallationClient adapter runs; ADAPTER_PROFILES records each divergence. */
 import { describe, expect, it } from "vitest";
 
-import type { GithubInstallationClient, PullRequestRef } from "#src/client";
+import type {
+  GithubInstallationClient,
+  PullRequestReadClient,
+  PullRequestRef,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
+} from "#src/client";
 
 export type ClientMethod = keyof GithubInstallationClient;
 
-// A Record, not an array: the compiler rejects the list once the interface grows.
-const METHOD_SET: Record<ClientMethod, true> = {
+// Records, not arrays: the compiler rejects a list once its interface grows.
+const READ_METHOD_SET: Record<keyof PullRequestReadClient, true> = {
   getPullRequest: true,
   listChangedFiles: true,
   getDiff: true,
   getFileContents: true,
   searchCode: true,
   getRepositoryArchive: true,
+  listCheckRuns: true,
+  listReviewComments: true,
+  listReviewThreads: true,
+};
+
+const HISTORY_METHOD_SET: Record<keyof RepositoryHistoryClient, true> = {
   listCommitShas: true,
   listCommitFiles: true,
   listPullRequestCommitShas: true,
-  listCheckRuns: true,
   compareCommits: true,
-  listReviewComments: true,
   getBranchTip: true,
   getCommitMessage: true,
-  listReviewThreads: true,
+};
+
+const PUBLISH_METHOD_SET: Record<keyof ReviewPublishClient, true> = {
   createCheckRun: true,
   createReview: true,
   createCommitOnBranch: true,
   writeFileOnBranch: true,
 };
 
-export const CLIENT_METHODS = Object.keys(METHOD_SET) as ClientMethod[];
+/** The three narrow interfaces, as method names; together they are the wide client. */
+export const METHOD_GROUPS = {
+  "pull-request-read": Object.keys(READ_METHOD_SET) as ClientMethod[],
+  "repository-history": Object.keys(HISTORY_METHOD_SET) as ClientMethod[],
+  "review-publish": Object.keys(PUBLISH_METHOD_SET) as ClientMethod[],
+};
+
+export type ClientGroup = keyof typeof METHOD_GROUPS;
+
+export const CLIENT_METHODS = Object.values(METHOD_GROUPS).flat();
 
 /** Matches packages/ai keeps from any adapter; capping below it silently narrows what the agent sees. */
 export const AGENT_TOOL_SEARCH_MATCHES = 20;
