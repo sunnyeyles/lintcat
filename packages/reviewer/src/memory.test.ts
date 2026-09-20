@@ -3,9 +3,12 @@ import type { MemoryShape, ReviewMemory } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
 import {
+  addSuppression,
   computeHints,
   computeSynthesisHints,
   emptyMemory,
+  isSuppressed,
+  partitionSuppressed,
   readMemory,
   recordSignals,
   titleShape,
@@ -35,7 +38,7 @@ function shape(overrides: Partial<MemoryShape> = {}): MemoryShape {
 }
 
 function memory(shapes: readonly MemoryShape[]): ReviewMemory {
-  return { version: 1, shapes: [...shapes] };
+  return { version: 1, shapes: [...shapes], suppressions: [] };
 }
 
 function signal(overrides: Partial<FindingSignal> = {}): FindingSignal {
@@ -243,5 +246,66 @@ describe("computeSynthesisHints", () => {
     const injected = memory([shape({ shape: 'a"\nb', ignored: 5 })]);
 
     expect(computeSynthesisHints(injected, NOW).drop[0]).toContain('like "ab"');
+  });
+});
+
+describe("suppressions", () => {
+  const finding = { category: "security", title: "Missing tenant check in getCustomer" };
+
+  it("hides the same problem in another file once it is suppressed", () => {
+    const suppressed = addSuppression(emptyMemory(), finding, NOW);
+
+    expect(
+      isSuppressed(suppressed, {
+        category: "security",
+        title: "Missing tenant check in listOrders",
+      }),
+    ).toBe(true);
+  });
+
+  it("leaves a different category or a different shape alone", () => {
+    const suppressed = addSuppression(emptyMemory(), finding, NOW);
+
+    expect(isSuppressed(suppressed, { ...finding, category: "performance" })).toBe(false);
+    expect(isSuppressed(suppressed, { ...finding, title: "Unbounded query in getCustomer" })).toBe(
+      false,
+    );
+  });
+
+  it("records the shape once, however often the same finding is marked", () => {
+    const once = addSuppression(emptyMemory(), finding, NOW);
+    const twice = addSuppression(once, { ...finding, reason: "intentional" }, NOW);
+
+    expect(twice.suppressions).toEqual([
+      {
+        category: "security",
+        shape: titleShape(finding.title),
+        title: finding.title,
+        reason: "intentional",
+        createdAt: NOW.toISOString(),
+      },
+    ]);
+  });
+
+  it("survives a round trip through the store, unlike a shape past its TTL", async () => {
+    const { logger } = createCapturingLogger();
+    const store = fakeStore();
+    const stored = addSuppression(memory([shape({ lastSignalAt: daysBefore(91) })]), finding, NOW);
+
+    await writeMemory(store, recordSignals(stored, [], NOW));
+    const reread = await readMemory(fakeStore(store.written[0]), logger);
+
+    expect(reread.shapes).toEqual([]);
+    expect(reread.suppressions).toHaveLength(1);
+  });
+
+  it("splits findings into the kept and the hidden", () => {
+    const suppressed = addSuppression(emptyMemory(), finding, NOW);
+    const other = { category: "security", title: "Unbounded query in getCustomer" };
+
+    const { kept, suppressed: hidden } = partitionSuppressed(suppressed, [finding, other]);
+
+    expect(kept).toEqual([other]);
+    expect(hidden).toEqual([finding]);
   });
 });

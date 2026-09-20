@@ -1,9 +1,9 @@
-import path from "node:path";
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
+import { resolveCheckoutPath } from "#src/checkout-path";
+import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
 import { openLocalRepository, searchWorkingTree } from "#src/local-git-client";
 
@@ -14,7 +14,11 @@ function json(value: unknown): CallToolResult {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
 }
 
-export function registerSearchTools(server: McpServer, environment: McpEnvironment): void {
+export function registerSearchTools(
+  server: McpServer,
+  environment: McpEnvironment,
+  client: ConnectedClient,
+): void {
   server.registerTool(
     "search_code",
     {
@@ -40,7 +44,8 @@ export function registerSearchTools(server: McpServer, environment: McpEnvironme
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ query, path: scope, repoPath }) => {
-      const { root } = await openLocalRepository(path.resolve(environment.cwd, repoPath ?? "."), "HEAD");
+      const checkout = await resolveCheckoutPath(environment, client, repoPath);
+      const { root } = await openLocalRepository(checkout, "HEAD");
       const hits = await searchWorkingTree(root, query, scope);
       return json({
         root,

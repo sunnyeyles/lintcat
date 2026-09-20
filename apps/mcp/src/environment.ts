@@ -84,6 +84,12 @@ function selectProvider(env: Record<string, string | undefined>): ModelProvider 
   return [DEFAULT_MODEL_PROVIDER, ...MODEL_PROVIDERS].find(hasKey) ?? DEFAULT_MODEL_PROVIDER;
 }
 
+/** Whether resolveModel would find a key; a named but unknown provider still throws. */
+export function hasModelApiKey(environment: McpEnvironment): boolean {
+  const { env } = environment;
+  return (env[apiKeyEnvFor(selectProvider(env))]?.trim() ?? "") !== "";
+}
+
 /** Reads PR_REVIEW_MODEL_PROVIDER / PR_REVIEW_MODEL / PR_REVIEW_MODEL_BASE_URL and the provider's key. */
 export function resolveModel(environment: McpEnvironment): ModelSelection {
   const { env } = environment;

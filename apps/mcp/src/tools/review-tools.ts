@@ -1,5 +1,3 @@
-import path from "node:path";
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
@@ -11,8 +9,12 @@ import type { AgentLifecycleListener } from "@pr-review/ai";
 import { z } from "zod";
 
 import { listAgents, type AgentListing } from "#src/agent-listing";
+import { resolveCheckoutPath } from "#src/checkout-path";
+import type { ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
-import { openLocalRepository } from "#src/local-git-client";
+import { GitError } from "#src/git";
+import { openLocalRepository, type LocalRepository, type LocalScope } from "#src/local-git-client";
+import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
 
 const agentsSchema = z
@@ -22,18 +24,95 @@ const agentsSchema = z
     'Comma-separated agent categories, e.g. "security,correctness". Omit to run the repository\'s configured agents.',
   );
 
+/** Said whenever sampling stood in for a provider key, so nobody reads this as a full review. */
+export const SINGLE_SHOT_NOTICE =
+  "Reduced single-shot review: no model API key is set, so this ran as one sampling request to your " +
+  "client instead of the tool-calling agents. One general pass over the diff, the changed-file list and " +
+  "the repository index, with no follow-up reads of the surrounding code and no synthesis. The " +
+  "repository's agent configuration and any `agents` argument do not apply: there is one pass, not one " +
+  "per agent. It is shallower than a key-backed review and misses anything that needs reading further.";
+
+const scopeSchema = {
+  repoPath: z
+    .string()
+    .optional()
+    .describe("Path to the git checkout; defaults to the server's working directory."),
+  base: z
+    .string()
+    .optional()
+    .describe(
+      'Branch or commit to compare against, e.g. "origin/main"; defaults to the remote default branch, ' +
+        'or to HEAD for scope "staged". Not allowed with a range.',
+    ),
+  scope: z
+    .enum(["working-tree", "staged", "range"])
+    .optional()
+    .describe(
+      'What to review: "working-tree" (default) is commits since the base plus uncommitted and ' +
+        'untracked files, "staged" is only the index, "range" is the commits named by `range`.',
+    ),
+  range: z
+    .string()
+    .optional()
+    .describe(
+      'Commit range, e.g. "HEAD~3..HEAD", "main...feature" or a single commit. Implies scope "range".',
+    ),
+};
+
+interface ScopeArgs {
+  repoPath?: string | undefined;
+  base?: string | undefined;
+  scope?: "working-tree" | "staged" | "range" | undefined;
+  range?: string | undefined;
+}
+
+function chooseScope({ scope, range }: ScopeArgs): LocalScope {
+  const kind = scope ?? (range === undefined ? "working-tree" : "range");
+  if (kind === "range") {
+    if (range === undefined) {
+      throw new GitError('scope "range" needs a `range`, e.g. "HEAD~3..HEAD"');
+    }
+    return { kind, range };
+  }
+  if (range !== undefined) {
+    throw new GitError(`a \`range\` cannot be reviewed with scope "${kind}"; drop one of them`);
+  }
+  return { kind };
+}
+
+async function openScoped(
+  environment: McpEnvironment,
+  connection: ConnectedClient,
+  args: ScopeArgs,
+): Promise<LocalRepository> {
+  return openLocalRepository(
+    await resolveCheckoutPath(environment, connection, args.repoPath),
+    args.base,
+    chooseScope(args),
+  );
+}
+
 function reviewResult(result: ReviewResult, heading: string): CallToolResult {
   const { outcome } = result;
   const details = {
+    singleShot: result.singleShot,
     agents: result.agents,
     agentFailures: outcome.agentFailures,
     synthesis: outcome.synthesis.outcome,
     patches: outcome.patches,
+    suppressed: outcome.suppressed,
     findings: outcome.findings,
   };
+  const suppressed =
+    outcome.suppressed === 0
+      ? ""
+      : ` ${outcome.suppressed} finding(s) were hidden by suppressions in this checkout's review memory.`;
   return {
     content: [
-      { type: "text", text: `${heading}\n\n${result.summary}` },
+      ...(result.singleShot
+        ? [{ type: "text" as const, text: SINGLE_SHOT_NOTICE }]
+        : []),
+      { type: "text", text: `${heading}${suppressed}\n\n${result.summary}` },
       { type: "text", text: JSON.stringify(details, null, 2) },
     ],
   };
@@ -71,30 +150,25 @@ function agentHeadline(listing: AgentListing): string {
   return `${listing.agents.length} agent(s) from ${source}; ${wakes}.`;
 }
 
-export function registerReviewTools(server: McpServer, environment: McpEnvironment): void {
+export function registerReviewTools(
+  server: McpServer,
+  environment: McpEnvironment,
+  connection: ConnectedClient,
+): void {
   server.registerTool(
     "list_review_agents",
     {
       title: "List the review agents",
       description:
         "List the review agents configured for a local checkout: each agent's category, its path gate, " +
-        "and whether the working tree's current changes would wake it. Reads the configuration at the " +
+        "and whether the reviewed changes would wake it. Reads the configuration at the " +
         "base commit exactly as a review does, so an uncommitted config is not yet in effect. A " +
         "repository with no configuration gets the default agent. Makes no model or network calls.",
-      inputSchema: {
-        repoPath: z
-          .string()
-          .optional()
-          .describe("Path to the git checkout; defaults to the server's working directory."),
-        base: z
-          .string()
-          .optional()
-          .describe('Branch or commit to compare against, e.g. "origin/main"; defaults to the remote default branch.'),
-      },
+      inputSchema: scopeSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async ({ repoPath, base }) => {
-      const local = await openLocalRepository(path.resolve(environment.cwd, repoPath ?? "."), base);
+    async (args) => {
+      const local = await openScoped(environment, connection, args);
       const listing = await listAgents(local);
       return {
         content: [
@@ -110,19 +184,15 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
     {
       title: "Review local changes",
       description:
-        "Run the AI review agents over a local checkout's changes against its base branch: commits since " +
-        "the merge-base plus uncommitted and untracked files. Returns only findings that passed the same " +
-        "deterministic validation the GitHub Action applies. Calls the configured model provider and takes " +
-        "a minute or more; nothing is written anywhere.",
+        "Run the AI review agents over a local checkout: by default commits since the merge-base with the " +
+        "base branch plus uncommitted and untracked files, or only the staged changes, or an explicit " +
+        "commit range. Returns only findings that passed the same " +
+        "deterministic validation the GitHub Action applies. Findings suppressed with suppress_finding are " +
+        "excluded and counted. Calls the configured model provider and takes " +
+        "a minute or more; nothing is written anywhere. With no provider key set, it asks you to run the " +
+        "model instead (MCP sampling), which gives a reduced single-shot review the result declares.",
       inputSchema: {
-        repoPath: z
-          .string()
-          .optional()
-          .describe("Path to the git checkout; defaults to the server's working directory."),
-        base: z
-          .string()
-          .optional()
-          .describe('Branch or commit to compare against, e.g. "origin/main"; defaults to the remote default branch.'),
+        ...scopeSchema,
         agents: agentsSchema,
         index: z
           .boolean()
@@ -131,31 +201,34 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ repoPath, base, agents, index }, extra) => {
-      const local = await openLocalRepository(
-        path.resolve(environment.cwd, repoPath ?? "."),
-        base,
-      );
+    async ({ agents, index, ...args }, extra) => {
+      const local = await openScoped(environment, connection, args);
       const files = await local.client.listChangedFiles(local.target);
       if (files.length === 0) {
         return {
           content: [
-            { type: "text", text: `No changes between ${local.baseRef} and the working tree of ${local.root}.` },
+            {
+              type: "text",
+              text: `No changes between ${local.baseRef} and ${local.scope.headLabel} of ${local.root}.`,
+            },
           ],
         };
       }
       const result = await runReview(environment, {
         client: local.client,
+        connection,
         target: local.target,
         baseSha: local.baseSha,
         agents,
         index,
+        memory: await openLocalMemoryStore(local.root),
         signal: extra.signal,
         onAgentEvent: progressReporter(extra),
       });
       return reviewResult(
         result,
-        `Reviewed ${files.length} changed file(s) in ${local.root} against ${local.baseRef} (${local.baseSha.slice(0, 7)}).`,
+        `Reviewed ${files.length} changed file(s) in ${local.root}: ${local.scope.headLabel} against ` +
+          `${local.baseRef} (${local.baseSha.slice(0, 7)}).`,
       );
     },
   );
@@ -187,6 +260,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       const pullRequest = await client.getPullRequest(ref);
       const result = await runReview(environment, {
         client,
+        connection,
         target: { ...ref, headSha: pullRequest.headSha },
         baseSha: pullRequest.baseSha,
         agents,

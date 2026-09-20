@@ -16,8 +16,10 @@ export {
 export {
   memoryShapeSchema,
   reviewMemorySchema,
+  suppressionSchema,
   type MemoryShape,
   type ReviewMemory,
+  type Suppression,
 } from "#src/review-memory";
 export {
   reviewRecordAgentRunSchema,

@@ -14,6 +14,7 @@ import {
   reviewMemorySchema,
   type MemoryShape,
   type ReviewMemory,
+  type Suppression,
 } from "@pr-review/schemas";
 
 export type FindingOutcome = "resolved" | "outdated" | "ignored";
@@ -112,7 +113,7 @@ export function createBranchMemoryStore(
 }
 
 export function emptyMemory(): ReviewMemory {
-  return { version: 1, shapes: [] };
+  return { version: 1, shapes: [], suppressions: [] };
 }
 
 export async function readMemory(
@@ -190,7 +191,59 @@ export function recordSignals(
   return {
     version: 1,
     shapes: [...byKey.values()].filter((shape) => isFresh(shape, now)),
+    suppressions: memory.suppressions,
   };
+}
+
+/** What a suppression is matched against: one finding, or one recorded title. */
+export interface SuppressibleFinding {
+  category: string;
+  title: string;
+}
+
+/** Keyed by shape, and never expired: a human, not a count, recorded it. */
+export function addSuppression(
+  memory: ReviewMemory,
+  finding: SuppressibleFinding & { reason?: string | undefined },
+  now: Date,
+): ReviewMemory {
+  const shape = titleShape(finding.title);
+  const suppression: Suppression = {
+    category: finding.category,
+    shape,
+    title: finding.title,
+    ...(finding.reason === undefined ? {} : { reason: finding.reason }),
+    createdAt: now.toISOString(),
+  };
+  const others = memory.suppressions.filter(
+    (existing) =>
+      existing.category !== finding.category || existing.shape !== shape,
+  );
+  return { ...memory, suppressions: [...others, suppression] };
+}
+
+export function isSuppressed(
+  memory: ReviewMemory,
+  finding: SuppressibleFinding,
+): boolean {
+  const shape = titleShape(finding.title);
+  return memory.suppressions.some(
+    (suppression) =>
+      suppression.category === finding.category && suppression.shape === shape,
+  );
+}
+
+/** Splits findings into the ones that survive the memory and the ones it hides. */
+export function partitionSuppressed<T extends SuppressibleFinding>(
+  memory: ReviewMemory,
+  findings: readonly T[],
+): { kept: T[]; suppressed: T[] } {
+  const kept: T[] = [];
+  const suppressed: T[] = [];
+  for (const finding of findings) {
+    (isSuppressed(memory, finding) ? suppressed : kept).push(finding);
+  }
+  return { kept, suppressed };
 }
 
 function hintSentence(shape: string): string {

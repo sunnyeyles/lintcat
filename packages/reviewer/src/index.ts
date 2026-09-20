@@ -35,7 +35,11 @@ export {
   type FixOutcome,
 } from "#src/apply-fixes";
 export {
+  applyVerifiedPatches,
   verifyPatches,
+  MAX_PATCHED_FILES,
+  MAX_PATCHED_LINES,
+  type PatchApplication,
   type PatchSummary,
   type PatchedFile,
 } from "#src/validate-patches";
@@ -72,11 +76,14 @@ export {
   type LearnFromMergeDeps,
 } from "#src/learn-from-merge";
 export {
+  addSuppression,
   computeHints,
   computeSynthesisHints,
   createBranchMemoryStore,
   emptyMemory,
+  isSuppressed,
   MEMORY_FILE_PATH,
+  partitionSuppressed,
   readMemory,
   recordSignals,
   titleShape,
@@ -89,6 +96,7 @@ export {
   type FindingOutcome,
   type FindingSignal,
   type MemoryStore,
+  type SuppressibleFinding,
 } from "#src/memory";
 export {
   categoryMarker,
