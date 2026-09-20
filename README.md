@@ -729,6 +729,24 @@ none / none), whether the query is honoured at all, the operations each adapter
 declares unsupported and the error name each rejects with, and how a file the
 repository does not have is reported. Moving a cap in an adapter fails a test.
 
+### The three client interfaces
+
+`GithubInstallationClient` is the union of three narrower interfaces declared
+beside it in `packages/github/src/client.ts`, and they are what the profiles
+table divides along:
+
+| Interface | What it covers | Who declines part of it |
+| --- | --- | --- |
+| `PullRequestReadClient` | the pull request, its diff, its existing review state, and repository contents, search and archive at a ref | nobody — all four adapters serve every method |
+| `RepositoryHistoryClient` | commits: which exist, what they touched, what they say, what a branch points at, how two compare | the local checkout (`compareCommits`), the eval fixture (`compareCommits`, `listCommitFiles`, `getCommitMessage`) |
+| `ReviewPublishClient` | the check run, the review, a commit on a branch, a file written to a branch | the local checkout and the eval fixture, all four methods |
+
+`METHOD_GROUPS` in `conformance.ts` carries the same split at runtime, and
+`client-groups.test.ts` asserts it against `ADAPTER_PROFILES`: no adapter may
+declare a pull-request read unsupported, and the two repository-only adapters
+must decline publishing whole. Callers still take the wide interface; narrowing
+them is the contract half of the refactor.
+
 ---
 
 ## Publishing the Action
