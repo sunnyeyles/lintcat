@@ -34,7 +34,7 @@
       for (const p of this.parts) {
         if (!p.steps.includes(step)) continue;
         const own = Number(p.el.dataset.hold);
-        const dflt = p.el.matches(".link, .fan") ? 240 : 640;
+        const dflt = p.el.matches(".edge-g") ? 240 : 640;
         hold = Math.max(hold, Number.isFinite(own) && own > 0 ? own : dflt);
       }
       return hold || 240;
@@ -43,7 +43,10 @@
     reset() {
       clearTimeout(this.timer);
       this.root.classList.add("is-flowing");
-      for (const p of this.parts) p.el.classList.remove("is-on", "is-now");
+      for (const p of this.parts) {
+        p.el.classList.remove("is-on", "is-now");
+        for (const a of p.el.querySelectorAll("animateMotion")) a.endElement();
+      }
       if (this.caption) this.caption.textContent = "";
     }
 
@@ -66,6 +69,7 @@
           if (!now) continue;
           void p.el.offsetWidth; // restart the pulse when a step re-fires
           p.el.classList.add("is-on", "is-now");
+          for (const a of p.el.querySelectorAll("animateMotion")) a.beginElement();
           if (p.el.dataset.caption && this.caption) {
             this.caption.textContent = p.el.dataset.caption;
           }
