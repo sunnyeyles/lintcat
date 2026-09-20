@@ -144,6 +144,7 @@ export interface Synthesiser {
   synthesise(
     candidates: readonly unknown[],
     hints?: SynthesisHints,
+    signal?: AbortSignal,
   ): Promise<SynthesisResult>;
 }
 
@@ -154,7 +155,7 @@ export function createSynthesiser(deps: SynthesiserDeps): Synthesiser {
   const basePrompt = buildSynthesisSystemPrompt(deps.agents);
 
   return {
-    async synthesise(candidates, hints) {
+    async synthesise(candidates, hints, signal) {
       const systemPrompt = hasSynthesisHints(hints)
         ? buildSynthesisSystemPrompt(deps.agents, hints)
         : basePrompt;
@@ -192,6 +193,7 @@ export function createSynthesiser(deps: SynthesiserDeps): Synthesiser {
 
             const result = await generateText({
               model: deps.model,
+              abortSignal: signal,
               instructions: systemPrompt,
               messages: [
                 { role: "user", content: buildSynthesisMessage(wellFormed) },

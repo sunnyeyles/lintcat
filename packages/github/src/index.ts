@@ -7,9 +7,12 @@ export {
   type TarballContents,
 } from "#src/archive";
 export {
+  createAppClient,
   createGithubAppClient,
+  type AppOctokitLike,
   type GithubAppClient,
   type GithubAppConfig,
+  type InstallationOctokit,
   type InstallationRepository,
   type OrganizationMember,
   type OrganizationRole,

@@ -1,6 +1,7 @@
 import {
   createReviewAgents,
   type AgentDefinition,
+  type AgentLifecycleListener,
   type ReviewAgentDeps,
   type ReviewContext,
   type Synthesiser,
@@ -40,11 +41,14 @@ export type RunReviewPipeline = (
 export interface PipelineRunnerDeps
   extends Omit<ReviewAgentDeps, "github" | "index"> {
   synthesiser: Synthesiser;
+  /** Receives each agent's started / completed / failed step. */
+  onAgentEvent?: AgentLifecycleListener | undefined;
 }
 
 /** Binds the agents to each review's client and index, then runs the pipeline. */
 export function createPipelineRunner({
   synthesiser,
+  onAgentEvent,
   ...agentDeps
 }: PipelineRunnerDeps): RunReviewPipeline {
   return ({ client, context, agents, hints, index }) =>
@@ -56,5 +60,6 @@ export function createPipelineRunner({
       synthesiser,
       context,
       hints,
+      onAgentEvent,
     );
 }

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { signInWithGithub } from "@/app/auth-actions";
 import { PageHeader } from "@/components/shell";
 import { appDomain } from "@/lib/host";
-import { returnUrl, safeCallbackUrl } from "@/lib/paths";
+import { DASHBOARD_PATH, returnUrl, safeCallbackUrl } from "@/lib/paths";
 import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -19,7 +19,8 @@ export default async function SignInPage({
   searchParams: SearchParams;
 }) {
   const domain = appDomain();
-  const callbackUrl = returnUrl(safeCallbackUrl((await searchParams).callbackUrl, domain), domain);
+  const requested = safeCallbackUrl((await searchParams).callbackUrl, domain);
+  const callbackUrl = returnUrl(requested === "/" ? DASHBOARD_PATH : requested, domain);
   if (await currentSession()) redirect(callbackUrl);
 
   return (

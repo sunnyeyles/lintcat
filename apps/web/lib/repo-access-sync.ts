@@ -9,9 +9,9 @@ import {
   type RepoPermission,
 } from "@pr-review/db";
 import type { GithubAppClient } from "@pr-review/github";
-import { errorMessage } from "@pr-review/logging";
 
 import { installedAccount, type MembershipSyncDeps } from "@/lib/membership-sync";
+import { reconcile } from "@/lib/reconcile";
 
 export interface RepoAccessLookup {
   organization: Organization;
@@ -20,8 +20,6 @@ export interface RepoAccessLookup {
 }
 
 type SyncDeps = MembershipSyncDeps & { github: GithubAppClient };
-
-const LOOKUP_CONCURRENCY = 8;
 
 /** The user's current permission on one repo; null is no access. */
 export async function lookupRepoPermission(
@@ -61,6 +59,11 @@ export async function applyRepoAccess(
   });
 }
 
+interface RepoCandidate {
+  organization: Organization;
+  repo: Repo;
+}
+
 // One call per private repo in each installed organization the user is a plain member of.
 export async function syncSignInRepoAccess(
   deps: SyncDeps,
@@ -78,41 +81,34 @@ export async function syncSignInRepoAccess(
       memberOf.some((membership) => membership.organizationId === organization.id),
   );
 
-  const pending: { organization: Organization; repo: Repo }[] = [];
+  const candidates: RepoCandidate[] = [];
   for (const organization of organizations) {
     for (const repo of await listPrivateRepos(deps.database, organization.id)) {
-      pending.push({ organization, repo });
+      candidates.push({ organization, repo });
     }
   }
 
-  const found: RepoAccessLookup[] = [];
-  const lookup = async ({ organization, repo }: { organization: Organization; repo: Repo }) => {
-    try {
-      found.push({
+  await reconcile<RepoCandidate, RepoAccessLookup>({
+    database: deps.database,
+    logger: deps.logger,
+    skippedEvent: "repo_access.skipped",
+    candidates,
+    fields: ({ organization, repo }) => ({
+      source,
+      organization: organization.slug,
+      repo: `${repo.owner}/${repo.name}`,
+      githubUserId: account.githubId,
+      login: account.login,
+    }),
+    order: ({ repo }) => repo.id,
+    async lookup({ organization, repo }) {
+      return {
         organization,
         repo,
         permission: await lookupRepoPermission(deps.github, organization, repo, account),
-      });
-    } catch (error) {
-      deps.logger.error("repo_access.skipped", {
-        source,
-        organization: organization.slug,
-        repo: `${repo.owner}/${repo.name}`,
-        githubUserId: account.githubId,
-        login: account.login,
-        reason: "github_lookup_failed",
-        error: errorMessage(error),
-      });
-    }
-  };
-  for (let start = 0; start < pending.length; start += LOOKUP_CONCURRENCY) {
-    await Promise.all(pending.slice(start, start + LOOKUP_CONCURRENCY).map(lookup));
-  }
-
-  found.sort((a, b) => a.repo.id - b.repo.id);
-  await deps.database.transaction(async (tx) => {
-    for (const entry of found) {
-      await applyRepoAccess({ ...deps, database: tx }, userId, account, entry, source);
-    }
+      };
+    },
+    apply: (database, entry) =>
+      applyRepoAccess({ ...deps, database }, userId, account, entry, source),
   });
 }

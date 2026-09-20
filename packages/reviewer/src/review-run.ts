@@ -7,6 +7,7 @@ import {
   loadAgentDefinitions,
   resolveAgentDefinitions,
   type AgentDefinition,
+  type AgentLifecycleListener,
   type AgentUsageReport,
   type ManagedPrompts,
   type ReviewAgent,
@@ -96,6 +97,10 @@ export interface ReviewRunSpec {
   /** Omitted, the run reads no memory and attaches no hints. */
   memory?: ReviewMemory | undefined;
   logger?: StructuredLogger | undefined;
+  /** Aborting it stops the agents and publishes nothing. */
+  signal?: AbortSignal | undefined;
+  /** Reports each agent's start and finish while the run is still going. */
+  onAgentEvent?: AgentLifecycleListener | undefined;
 }
 
 async function resolveAgents(
@@ -118,6 +123,7 @@ function pipelineRunner(
   agents: readonly AgentDefinition[],
   logger: StructuredLogger,
   usage: AgentUsageReport[],
+  onAgentEvent: AgentLifecycleListener | undefined,
 ): RunReviewPipeline {
   if ("createAgents" in engine) {
     const { createAgents, synthesiser } = engine;
@@ -127,6 +133,7 @@ function pipelineRunner(
         synthesiser,
         context,
         hints,
+        onAgentEvent,
       );
   }
   return createPipelineRunner({
@@ -134,6 +141,7 @@ function pipelineRunner(
     synthesiser: createSynthesiser({ model: engine.model, agents }),
     logger,
     onUsage: (report) => usage.push(report),
+    ...(onAgentEvent === undefined ? {} : { onAgentEvent }),
     ...(engine.createModel === undefined ? {} : { createModel: engine.createModel }),
     ...(engine.systemPrompts === undefined
       ? {}
@@ -163,6 +171,8 @@ export async function runReview({
   policy = {},
   memory,
   logger = createConsoleLogger(),
+  signal,
+  onAgentEvent,
 }: ReviewRunSpec): Promise<FinishedReviewRun> {
   const agents = await resolveAgents(client, target, source);
   // A supplied set was selected by the caller, which logs what it knows of it.
@@ -179,8 +189,9 @@ export async function runReview({
     client,
     agents,
     delivery,
-    runReviewPipeline: pipelineRunner(engine, agents, logger, usage),
+    runReviewPipeline: pipelineRunner(engine, agents, logger, usage, onAgentEvent),
     logger,
+    signal,
     ...(memory === undefined
       ? {}
       : {

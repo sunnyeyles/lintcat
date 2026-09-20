@@ -11,7 +11,9 @@ import {
   type Organization,
 } from "@pr-review/db";
 import type { GithubAppClient, OrganizationMember } from "@pr-review/github";
-import { errorMessage, type StructuredLogger } from "@pr-review/logging";
+import type { StructuredLogger } from "@pr-review/logging";
+
+import { reconcile } from "@/lib/reconcile";
 
 export type MembershipDecision =
   | {
@@ -181,57 +183,46 @@ export async function replaceMembers(
   }
 }
 
-const LOOKUP_CONCURRENCY = 8;
+interface DecidedMembership {
+  organization: Organization;
+  decision: MembershipDecision;
+}
 
-// Lookups finish before the transaction opens; a failed or suspended one keeps what was stored.
 export async function syncSignInMemberships(
   deps: MembershipSyncDeps & { github: GithubAppClient },
   account: GithubAccount,
 ): Promise<void> {
   const source = "sign_in";
-  const organizations = await listInstalledOrganizations(deps.database);
-  const decided: { organization: Organization; decision: MembershipDecision }[] = [];
-
-  const lookup = async (organization: Organization) => {
-    const fields = {
-      source,
-      organization: organization.slug,
-      organizationId: organization.id,
-      githubUserId: account.githubId,
-      login: account.login,
-    };
-    const installed = installedAccount(organization);
-    if (!installed) return;
-    if (organization.suspendedAt) {
-      deps.logger.info("membership.skipped", { ...fields, reason: "installation_suspended" });
-      return;
-    }
-    try {
-      decided.push({
+  const fields = (organization: Organization) => ({
+    source,
+    organization: organization.slug,
+    organizationId: organization.id,
+    githubUserId: account.githubId,
+    login: account.login,
+  });
+  await reconcile<Organization, DecidedMembership>({
+    database: deps.database,
+    logger: deps.logger,
+    skippedEvent: "membership.skipped",
+    candidates: await listInstalledOrganizations(deps.database),
+    fields,
+    order: ({ organization }) => organization.id,
+    async lookup(organization) {
+      const installed = installedAccount(organization);
+      if (!installed) return undefined;
+      if (organization.suspendedAt) {
+        deps.logger.info("membership.skipped", {
+          ...fields(organization),
+          reason: "installation_suspended",
+        });
+        return undefined;
+      }
+      return {
         organization,
         decision: await lookupMembership(deps.github, installed, account),
-      });
-    } catch (error) {
-      deps.logger.error("membership.skipped", {
-        ...fields,
-        reason: "github_lookup_failed",
-        error: errorMessage(error),
-      });
-    }
-  };
-  for (let start = 0; start < organizations.length; start += LOOKUP_CONCURRENCY) {
-    await Promise.all(organizations.slice(start, start + LOOKUP_CONCURRENCY).map(lookup));
-  }
-
-  decided.sort((a, b) => a.organization.id - b.organization.id);
-  await deps.database.transaction(async (tx) => {
-    for (const { organization, decision } of decided) {
-      await applyMembership(
-        { ...deps, database: tx },
-        organization,
-        { account, decision },
-        source,
-      );
-    }
+      };
+    },
+    apply: (database, { organization, decision }) =>
+      applyMembership({ ...deps, database }, organization, { account, decision }, source),
   });
 }

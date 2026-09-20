@@ -1,3 +1,4 @@
+import type { AgentLifecycleListener } from "@pr-review/ai";
 import {
   githubDelivery,
   recordingDelivery,
@@ -21,6 +22,10 @@ export interface ReviewRequest {
   index?: boolean | undefined;
   /** Where the run writes back; absent is a dry run, and a local checkout has nothing to pass. */
   publishTo?: GithubDeliveryConfig["client"] | undefined;
+  /** The caller's cancellation, as the MCP request handler receives it. */
+  signal?: AbortSignal | undefined;
+  /** Reports each agent's start and finish while the review runs. */
+  onAgentEvent?: AgentLifecycleListener | undefined;
 }
 
 export interface ReviewResult {
@@ -47,7 +52,16 @@ function capturingSummary(
 
 export async function runReview(
   environment: McpEnvironment,
-  { client, target, baseSha, agents: selection = "", index = true, publishTo }: ReviewRequest,
+  {
+    client,
+    target,
+    baseSha,
+    agents: selection = "",
+    index = true,
+    publishTo,
+    signal,
+    onAgentEvent,
+  }: ReviewRequest,
 ): Promise<ReviewResult> {
   const { logger } = environment;
   const { model, createModel } = resolveModel(environment);
@@ -68,6 +82,8 @@ export async function runReview(
     engine: { model, createModel },
     policy: { index },
     logger,
+    signal,
+    onAgentEvent,
   });
   return {
     outcome: run.outcome,

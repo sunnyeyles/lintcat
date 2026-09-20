@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   collectRepositoryFiles,
   DEFAULT_ARCHIVE_LIMITS,
+  matchesTerms,
   parseSearchQuery,
   readRepositoryTarball,
   searchMatchedPaths,
@@ -94,6 +95,59 @@ function resolveInside(root: string, file: string): string {
     throw new GitError(`${file} is outside the repository`, 404);
   }
   return real;
+}
+
+/** One matching line, as `git grep -n` reports it. */
+export interface SearchHit {
+  path: string;
+  line: number;
+  text: string;
+}
+
+/** The checkout-relative form of a path, or a 404 if it escapes the checkout. */
+function relativeInside(root: string, file: string): string {
+  const real = resolveInside(root, file);
+  return real === root ? "." : path.relative(root, real);
+}
+
+/**
+ * The shared search semantics, line-oriented: `parseSearchQuery` reads the
+ * query and `matchesTerms` judges each line rather than each file.
+ */
+export async function searchWorkingTree(
+  root: string,
+  query: string,
+  scope?: string | undefined,
+): Promise<SearchHit[]> {
+  const terms = parseSearchQuery(query);
+  if (terms.length === 0) {
+    return [];
+  }
+  const pathspec = scope === undefined ? [] : ["--", relativeInside(root, scope)];
+  // git narrows to files holding every term; matchesTerms then keeps the lines that do.
+  const output = await git(
+    root,
+    [
+      "grep",
+      "-I",
+      "-n",
+      "-i",
+      "-F",
+      "--untracked",
+      "--all-match",
+      ...terms.flatMap((term) => ["-e", term]),
+      ...pathspec,
+    ],
+    { okExitCodes: [1] },
+  );
+  const hits: SearchHit[] = [];
+  for (const line of output.split("\n")) {
+    const match = /^(.+?):(\d+):(.*)$/.exec(line);
+    if (match && matchesTerms(match[3]!, terms)) {
+      hits.push({ path: match[1]!, line: Number(match[2]), text: match[3]!.trim() });
+    }
+  }
+  return hits;
 }
 
 function* workingTreeFiles(root: string, paths: readonly string[]): Generator<RepositoryFileEntry> {

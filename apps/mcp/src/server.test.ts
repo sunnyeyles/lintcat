@@ -1,10 +1,15 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  ProgressNotificationSchema,
+  type CallToolResult,
+  type Progress,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   finalFindingsJson,
   makeFinding,
   makeGithub,
+  makeHangingModel,
   makeModel,
   message,
   textBlock,
@@ -18,6 +23,7 @@ import {
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import type { FileContentsRequest } from "@pr-review/github";
+import { MAX_REFERENCE_FILES, UNINDEXED_PATH_REASON } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -77,6 +83,13 @@ async function call(client: Client, name: string, args: Record<string, unknown>)
   return { isError: result.isError === true, texts };
 }
 
+/** Replaces the fixture repository, so `afterEach` still removes exactly one. */
+function useRepo(files: Record<string, string>): TestRepo {
+  repo.remove();
+  repo = createTestRepo(files);
+  return repo;
+}
+
 function scriptedModel(findings: ReturnType<typeof makeFinding>[]) {
   return makeModel([message([textBlock(finalFindingsJson(findings))], "end_turn")]).model;
 }
@@ -90,11 +103,14 @@ describe("the tool list", () => {
       "describe_file",
       "find_references",
       "get_review",
+      "list_review_agents",
       "list_reviews",
       "repository_overview",
       "review_local_changes",
       "review_pull_request",
       "review_trends",
+      "search_code",
+      "validate_agent_config",
     ]);
     const writes = tools.filter((tool) => tool.annotations?.readOnlyHint !== true);
     expect(writes.map((tool) => tool.name)).toEqual(["review_pull_request"]);
@@ -125,11 +141,25 @@ describe("index tools", () => {
     });
   });
 
-  it("says when a path is not in the index", async () => {
+  it("gives the shared unknown-path answer, header and all", async () => {
     const client = await connect(environment());
     const { texts } = await call(client, "find_references", { path: "src/missing.ts" });
 
-    expect(JSON.parse(texts[0]!)).toMatchObject({ known: false });
+    const payload = JSON.parse(texts[0]!);
+    expect(payload).toMatchObject({
+      path: "src/missing.ts",
+      known: false,
+      reason: UNINDEXED_PATH_REASON,
+    });
+    expect(Object.keys(payload.index).sort()).toEqual(["files", "languages", "sha", "truncated"]);
+  });
+
+  it("advertises the one cap the shared query enforces", async () => {
+    const client = await connect(environment());
+    const { tools } = await client.listTools();
+    const found = tools.find((tool) => tool.name === "find_references");
+
+    expect(found?.description).toContain(`At most ${MAX_REFERENCE_FILES} files`);
   });
 
   it("sees a file created after the first call", async () => {
@@ -139,6 +169,102 @@ describe("index tools", () => {
 
     const { texts } = await call(client, "find_references", { path: "src/sessions.ts" });
     expect(JSON.parse(texts[0]!).references.map((ref: { path: string }) => ref.path)).toContain("src/admin.ts");
+  });
+});
+
+describe("search_code", () => {
+  it("returns every matching line with its path and line number", async () => {
+    const client = await connect(environment());
+    const { isError, texts } = await call(client, "search_code", { query: "createSession" });
+
+    expect(isError).toBe(false);
+    const result = JSON.parse(texts[0]!);
+    expect(result).toMatchObject({ query: "createSession", total: 2, truncated: false });
+    expect(result.matches).toEqual([
+      { path: "src/api.ts", line: 1, text: 'import { createSession } from "./sessions";' },
+      { path: "src/sessions.ts", line: 2, text: "export function createSession() {}" },
+    ]);
+  });
+
+  it("searches the working tree, not the commit", async () => {
+    const client = await connect(environment());
+    const { texts } = await call(client, "search_code", { query: "admin", path: "src" });
+
+    expect(JSON.parse(texts[0]!).matches).toEqual([
+      { path: "src/sessions.ts", line: 3, text: "export const admin = true;" },
+    ]);
+  });
+
+  it("returns an empty result rather than an error when nothing matches", async () => {
+    const client = await connect(environment());
+    const { isError, texts } = await call(client, "search_code", { query: "nowhereInThisRepo" });
+
+    expect(isError).toBe(false);
+    expect(JSON.parse(texts[0]!)).toMatchObject({ total: 0, matches: [] });
+  });
+
+  it("refuses a path that escapes the checkout", async () => {
+    const client = await connect(environment());
+    const { isError, texts } = await call(client, "search_code", { query: "sessions", path: "../.." });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("outside the repository");
+  });
+});
+
+describe("list_review_agents", () => {
+  function configuredRepo(config: string): void {
+    useRepo({
+      ".github/pr-review-agents.yml": config,
+      "src/sessions.ts": "export const sessions = [];\n",
+      "packages/api/server.ts": "export const server = {};\n",
+    });
+    repo.git("checkout", "-q", "-b", "feature");
+    repo.write("src/sessions.ts", "export const sessions = [1];\n");
+  }
+
+  it("reports each agent's category and gate, and which the changes wake", async () => {
+    configuredRepo(
+      ["agents:", "  - agent: security", "    paths:", "      - packages/**", "  - correctness", ""].join("\n"),
+    );
+    const client = await connect(environment({ env: {} }));
+
+    const { isError, texts } = await call(client, "list_review_agents", { base: "main" });
+
+    expect(isError).toBe(false);
+    const listing = JSON.parse(texts[1]!);
+    expect(listing.configured).toBe(true);
+    expect(listing.changedFiles).toEqual(["src/sessions.ts"]);
+    expect(listing.agents).toMatchObject([
+      { category: "security", paths: ["packages/**"], wakes: false },
+      { category: "correctness", paths: null, wakes: true },
+    ]);
+    expect(texts[0]).toContain("correctness would run on the current changes");
+  });
+
+  it("says nothing would run when every gate misses the changes", async () => {
+    configuredRepo(["agents:", "  - agent: security", "    paths:", "      - packages/**", ""].join("\n"));
+    const client = await connect(environment({ env: {} }));
+
+    const { texts } = await call(client, "list_review_agents", { base: "main" });
+
+    const listing = JSON.parse(texts[1]!);
+    expect(listing.agents).toMatchObject([
+      { category: "security", wakes: false, reason: "no changed file matches its paths" },
+    ]);
+    expect(texts[0]).toContain("none would run on the current changes");
+  });
+
+  it("reports the defaults for a repository that configures nothing", async () => {
+    const client = await connect(environment({ env: {} }));
+
+    const { isError, texts } = await call(client, "list_review_agents", { base: "main" });
+
+    expect(isError).toBe(false);
+    const listing = JSON.parse(texts[1]!);
+    expect(listing.configured).toBe(false);
+    expect(listing.agents).toMatchObject([{ category: "general", paths: null, wakes: true }]);
+    expect(texts[0]).toContain("no .github/pr-review-agents.yml, so these are the defaults");
   });
 });
 
@@ -185,6 +311,39 @@ describe("review_local_changes", () => {
     const { isError, texts } = await call(client, "review_local_changes", { base: "main" });
     expect(isError).toBe(true);
     expect(texts[0]).toContain("No model API key is set");
+  });
+});
+
+describe("review progress", () => {
+  function reported(progress: Progress[]) {
+    return progress.map(({ progress: done, total, message }) => ({ done, total, message }));
+  }
+
+  it("reports each agent starting and finishing to a caller that sent a progress token", async () => {
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+    const progress: Progress[] = [];
+
+    await client.callTool(
+      { name: "review_local_changes", arguments: { base: "main", index: false } },
+      undefined,
+      { onprogress: (update) => progress.push(update) },
+    );
+
+    expect(reported(progress)).toEqual([
+      { done: 0, total: 1, message: "general started" },
+      { done: 1, total: 1, message: "general completed" },
+    ]);
+  });
+
+  it("sends nothing to a caller that sent no progress token", async () => {
+    const notified = vi.fn();
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+    client.setNotificationHandler(ProgressNotificationSchema, notified);
+
+    const { isError } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(false);
+    expect(notified).not.toHaveBeenCalled();
   });
 });
 
@@ -235,6 +394,35 @@ describe("review_pull_request", () => {
 
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
     expect(client.createCommitOnBranch).not.toHaveBeenCalled();
+  });
+
+  it("stops the agents and publishes nothing when the tool call is cancelled", async () => {
+    const client = github();
+    const { model, firstCall } = makeHangingModel();
+    const { logger, entries } = createCapturingLogger();
+    const mcp = await connect(
+      environment({ createTokenClient: () => client, createLanguageModel: () => model, logger }),
+    );
+    const controller = new AbortController();
+
+    const pending = mcp.callTool(
+      {
+        name: "review_pull_request",
+        arguments: { owner: "octo-org", repo: "example-service", number: 42, publish: true },
+      },
+      undefined,
+      { signal: controller.signal },
+    );
+    await firstCall;
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+
+    await vi.waitFor(() =>
+      expect(entries.map((logged) => logged.event)).toContain("review.cancelled"),
+    );
+    expect(entries.map((logged) => logged.event)).toContain("agent.cancelled");
+    expect(client.createCheckRun).not.toHaveBeenCalled();
+    expect(client.createReview).not.toHaveBeenCalled();
   });
 });
 
@@ -308,5 +496,49 @@ describe("history tools", () => {
     const { isError, texts } = await call(client, "list_reviews", { org: "acme" });
     expect(isError).toBe(true);
     expect(texts[0]).toContain('No organization "acme"');
+  });
+});
+
+describe("the prompt list", () => {
+  it("offers every workflow prompt, described and with arguments", async () => {
+    const client = await connect(environment());
+    const { prompts } = await client.listPrompts();
+
+    expect(prompts.map((prompt) => prompt.name).sort()).toEqual([
+      "review_branch",
+      "review_history",
+      "triage_finding",
+    ]);
+    for (const prompt of prompts) {
+      expect(prompt.description).toMatch(/Use this /);
+      expect(prompt.arguments?.length ?? 0).toBeGreaterThan(0);
+    }
+    const triage = prompts.find((prompt) => prompt.name === "triage_finding");
+    expect(triage?.arguments).toContainEqual(expect.objectContaining({ name: "org", required: true }));
+  });
+
+  it("renders the branch review with the arguments it was given", async () => {
+    const client = await connect(environment());
+
+    const { messages } = await client.getPrompt({
+      name: "review_branch",
+      arguments: { base: "origin/main", agents: "security" },
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.role).toBe("user");
+    const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
+    expect(text).toContain('`review_local_changes` with base "origin/main", agents "security"');
+    expect(text).toContain("find_references");
+  });
+
+  it("names the most severe finding when none is given", async () => {
+    const client = await connect(environment());
+
+    const { messages } = await client.getPrompt({ name: "triage_finding", arguments: { org: "acme", review: "12" } });
+
+    const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
+    expect(text).toContain("the most severe finding");
+    expect(text).toContain('`get_review` with org "acme" and id 12');
   });
 });

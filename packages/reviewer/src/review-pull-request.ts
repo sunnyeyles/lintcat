@@ -5,6 +5,8 @@
 import {
   emptySynthesisHints,
   gateAgentsByPaths,
+  isCancellation,
+  ReviewCancelledError,
   withRepositoryHints,
   type AgentDefinition,
   type SynthesisHints,
@@ -24,7 +26,7 @@ import { buildReviewIndex } from "#src/build-index";
 import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
 import { countLabel } from "#src/finding-format";
-import { deliverReview } from "#src/publish-review";
+import { deliverReview, type PublishReview } from "#src/publish-review";
 import type { ReviewDelivery } from "#src/review-delivery";
 import {
   computeHints,
@@ -67,6 +69,8 @@ export interface ReviewWithDeliveryDeps {
   incremental?: boolean | undefined;
   /** Whether the repository index is built for this review; on by default. */
   index?: boolean | undefined;
+  /** Aborting it stops the agents and publishes nothing. */
+  signal?: AbortSignal | undefined;
 }
 
 /** The comments already on the pull request; none if they cannot be read. */
@@ -247,9 +251,17 @@ export async function reviewWithDelivery(
     now = () => new Date(),
     incremental = false,
     index = true,
+    signal,
   }: ReviewWithDeliveryDeps,
 ): Promise<ReviewOutcome> {
   const fields = reviewCorrelation(target);
+  const cancelled = (stage: string): never => {
+    logger.info("review.cancelled", { ...fields, stage });
+    throw new ReviewCancelledError();
+  };
+  if (signal?.aborted === true) {
+    cancelled("before start");
+  }
   const [pullRequest, changedFiles, diff] = await Promise.all([
     client.getPullRequest(target),
     client.listChangedFiles(target),
@@ -269,7 +281,13 @@ export async function reviewWithDelivery(
     logger,
   });
   const whole = wholePullRequest(scope);
-  const publish = delivery.publishCheckRun;
+  // The early returns below publish too, so the guard sits on the publisher.
+  const publish: PublishReview = async (reviewed, rendered) => {
+    if (signal?.aborted === true) {
+      cancelled("before publish");
+    }
+    await delivery.publishCheckRun(reviewed, rendered);
+  };
   // Agents see the scope; publishing sees the whole PR, so comments anchor anywhere.
   const filenames = scope.changedFiles.map((file) => file.filename);
   const carriedForward =
@@ -348,10 +366,16 @@ export async function reviewWithDelivery(
         scope.kind === "incremental"
           ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
           : undefined,
+      signal,
     },
     agents: active,
     hints: synthesisHints,
     index: repositoryIndex,
+  }).catch((error: unknown) => {
+    if (isCancellation(error, signal)) {
+      cancelled("agents");
+    }
+    throw error;
   });
   logSynthesisOutcome(logger, target, review);
 
@@ -375,6 +399,10 @@ export async function reviewWithDelivery(
     verifiedCount: verified.summary.verified,
     files: verified.files.map((file) => file.path),
   });
+
+  if (signal?.aborted === true) {
+    cancelled("before publish");
+  }
 
   await deliverReview(
     target,
