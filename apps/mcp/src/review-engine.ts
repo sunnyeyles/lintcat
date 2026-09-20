@@ -35,6 +35,19 @@ export function noModelAccessMessage(): string {
   );
 }
 
+/** The key-backed engine: tool-calling agents, read from the repository at the base commit. */
+export function modelReviewEngine(
+  environment: McpEnvironment,
+  request: { baseSha: string; select: string },
+): SelectedEngine {
+  const { model, createModel } = resolveModel(environment);
+  return {
+    engine: { model, createModel },
+    agents: { readAt: request.baseSha, select: request.select },
+    singleShot: false,
+  };
+}
+
 /**
  * A provider key always wins: the tool-calling agents read the repository,
  * and sampling is the fallback for a machine that has no key at all.
@@ -45,12 +58,7 @@ export function selectReviewEngine(
   request: { baseSha: string; select: string },
 ): SelectedEngine {
   if (hasModelApiKey(environment)) {
-    const { model, createModel } = resolveModel(environment);
-    return {
-      engine: { model, createModel },
-      agents: { readAt: request.baseSha, select: request.select },
-      singleShot: false,
-    };
+    return modelReviewEngine(environment, request);
   }
   if (!client.features().sampling) {
     throw new Error(noModelAccessMessage());

@@ -42,6 +42,11 @@ export function createStderrLogger(): StructuredLogger {
   };
 }
 
+/** Drops every line, for a command whose own output is the only thing worth reading. */
+export function createSilentLogger(): StructuredLogger {
+  return { info() {}, error() {} };
+}
+
 /** One event recorded by the capturing logger: level + event + fields, flattened. */
 export interface CapturedLogEvent extends LogFields {
   level: LogLevel;

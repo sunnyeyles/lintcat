@@ -243,6 +243,8 @@ Reinforcing rules:
 ```text
 apps/
   action/     Event parsing → review pipeline → check run (or job summary)
+  cli/        `pr-review`: the same pipeline over a working tree from a
+              command line, and the pre-push hook that blocks on it
   mcp/        Local MCP server: the same pipeline over a working tree,
               plus index lookups and review history, for coding agents
   web/        The documentation site at /, and the dashboard behind it
@@ -746,6 +748,40 @@ and is superseded, not erased, the next time the seeder runs. A prompt that
 would fail the contract guard in `packages/ai/src/prompts.ts` is never
 published, since installing one would mean every review silently falling back
 from it.
+
+---
+
+## Command line
+
+[`apps/cli`](apps/cli) is the reviewer as a plain command, for a git hook, a
+pre-commit framework or a CI step — anything that is not an MCP client. It
+reviews a working tree against its base branch and exits non-zero when it finds
+something at or above a severity you choose.
+
+```sh
+node apps/cli/start.mjs review                   # commits since the merge-base, plus uncommitted work
+node apps/cli/start.mjs review --fail-on medium  # stricter than the default `high`
+node apps/cli/start.mjs install-hook             # block a push that carries a high finding
+```
+
+It exits `0` when nothing reaches the threshold, `1` when something does, and
+`2` when the review could not run — a missing model key is reported before any
+git or model work begins. Findings print to stdout, one location each;
+progress and errors go to stderr.
+
+The installed `pre-push` hook is bypassed without editing it:
+
+```sh
+PR_REVIEW_SKIP=1 git push      # skips the review
+git push --no-verify           # skips every pre-push hook
+```
+
+The command is a second entry point onto the local review path the MCP server
+already serves, not a second implementation: the same git-backed client, the
+same agent configuration read at the base commit, and the same
+[validation chain](#the-trust-boundary) between the model and your terminal.
+Options, exit codes and hook installation are in
+[`apps/cli/README.md`](apps/cli/README.md).
 
 ---
 

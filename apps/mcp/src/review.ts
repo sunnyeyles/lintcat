@@ -11,25 +11,20 @@ import {
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
-import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
-import { selectReviewEngine } from "#src/review-engine";
+import type { SelectedEngine } from "#src/review-engine";
 
 export interface ReviewRequest {
   client: ReviewClient;
-  /** What the MCP client can do; decides whether sampling can stand in for a key. */
-  connection: ConnectedClient;
   target: ReviewTarget;
-  /** Agent configuration is read here, never at the head. */
-  baseSha: string;
-  /** Comma-separated agent categories; empty runs the configured set. */
-  agents?: string | undefined;
+  /** What runs the review, and over which agent set; chosen by the caller. */
+  selected: SelectedEngine;
   index?: boolean | undefined;
   /** Where the run writes back; absent is a dry run, and a local checkout has nothing to pass. */
   publishTo?: GithubDeliveryConfig["client"] | undefined;
   /** The memory whose hints and suppressions this run consults; absent reads none. */
   memory?: MemoryStore | undefined;
-  /** The caller's cancellation, as the MCP request handler receives it. */
+  /** Aborting it stops the agents, and a cancelled run publishes nothing. */
   signal?: AbortSignal | undefined;
   /** Reports each agent's start and finish while the review runs. */
   onAgentEvent?: AgentLifecycleListener | undefined;
@@ -63,10 +58,8 @@ export async function runReview(
   environment: McpEnvironment,
   {
     client,
-    connection,
     target,
-    baseSha,
-    agents: selection = "",
+    selected,
     index = true,
     publishTo,
     memory,
@@ -75,11 +68,6 @@ export async function runReview(
   }: ReviewRequest,
 ): Promise<ReviewResult> {
   const { logger } = environment;
-  const selected = selectReviewEngine(environment, connection, {
-    baseSha,
-    select: selection,
-  });
-
   let summary = "";
   const run = await runAssembledReview({
     client,
