@@ -6,7 +6,10 @@ import {
   type Synthesiser,
   type SynthesisHints,
 } from "@pr-review/ai";
-import type { GithubInstallationClient } from "@pr-review/github";
+import type {
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+} from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 
 import {
@@ -16,7 +19,7 @@ import {
 
 /** Runs one review's agents; `agents` is the subset the path gate woke. */
 export type RunReviewPipeline = (
-  client: GithubInstallationClient,
+  client: PullRequestReadClient & RepositoryHistoryClient,
   context: ReviewContext,
   agents: readonly AgentDefinition[],
   hints: SynthesisHints,

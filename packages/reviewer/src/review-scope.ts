@@ -2,7 +2,8 @@
 import {
   CHECK_RUN_NAME,
   type ChangedFile,
-  type GithubInstallationClient,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
 } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
@@ -39,9 +40,10 @@ export function wholePullRequest(scope: ReviewScope): {
 }
 
 type ScopeClient = Pick<
-  GithubInstallationClient,
-  "listPullRequestCommitShas" | "listCheckRuns" | "compareCommits"
->;
+  RepositoryHistoryClient,
+  "listPullRequestCommitShas" | "compareCommits"
+> &
+  Pick<PullRequestReadClient, "listCheckRuns">;
 
 export interface ResolveReviewScopeDeps {
   client: ScopeClient;

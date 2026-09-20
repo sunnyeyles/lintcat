@@ -2,14 +2,14 @@
  * Builds one review's repository index. Never throws: the index can only
  * improve a review, never fail one.
  */
-import type { GithubInstallationClient } from "@pr-review/github";
+import type { PullRequestReadClient } from "@pr-review/github";
 import { buildRepositoryIndex, type RepositoryIndex } from "@pr-review/index";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
 export interface ReviewIndexRequest {
-  client: GithubInstallationClient;
+  client: PullRequestReadClient;
   target: ReviewTarget;
   /** Always the pull request's base: a branch must not shape its own index. */
   baseSha: string;

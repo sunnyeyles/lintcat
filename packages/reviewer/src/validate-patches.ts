@@ -2,7 +2,7 @@
  * Proves a proposed patch against the file it claims to edit. A patch whose
  * `expected` text does not match the head commit is discarded, never applied.
  */
-import type { ChangedFile, GithubInstallationClient } from "@pr-review/github";
+import type { ChangedFile, PullRequestReadClient } from "@pr-review/github";
 import type { FindingPatch, ReviewFinding } from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
@@ -35,7 +35,7 @@ export interface PatchVerification {
 }
 
 interface VerifyPatchDeps {
-  client: GithubInstallationClient;
+  client: PullRequestReadClient;
   owner: string;
   repo: string;
   /** The commit patches are proved against and built on. */

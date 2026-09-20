@@ -11,7 +11,9 @@ import {
 } from "@pr-review/ai";
 import type {
   ExistingReviewComment,
-  GithubInstallationClient,
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
 } from "@pr-review/github";
 import {
   createConsoleLogger,
@@ -57,7 +59,9 @@ import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 
 interface ReviewPullRequestDeps {
   /** Authenticated GitHub client for this repository. */
-  client: GithubInstallationClient;
+  client: PullRequestReadClient &
+    RepositoryHistoryClient &
+    ReviewPublishClient;
   /** The run's agent set, already narrowed by the `agents` input. */
   agents: readonly AgentDefinition[];
   /** Throws only when every agent failed; a synthesis failure is reported on the result. */
@@ -83,7 +87,7 @@ interface ReviewPullRequestDeps {
 
 /** The comments already on the pull request; none if they cannot be read. */
 async function listPostedComments(
-  client: GithubInstallationClient,
+  client: PullRequestReadClient,
   target: ReviewTarget,
   logger: StructuredLogger,
 ): Promise<ExistingReviewComment[]> {
@@ -100,7 +104,7 @@ async function listPostedComments(
 }
 
 async function openEarlierFindings(
-  client: GithubInstallationClient,
+  client: PullRequestReadClient,
   target: ReviewTarget,
   logger: StructuredLogger,
 ): Promise<PostedFinding[]> {

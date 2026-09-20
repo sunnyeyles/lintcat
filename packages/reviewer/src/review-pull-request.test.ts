@@ -16,8 +16,10 @@ import type {
   ExistingReviewComment,
   GithubInstallationClient,
   PullRequestDetails,
+  PullRequestReadClient,
   PullRequestRef,
   RepositoryArchiveRequest,
+  RepositoryHistoryClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -180,7 +182,7 @@ function makeDeps(
   const client = makeClient();
   const runReviewPipeline = vi.fn(
     async (
-      _client: GithubInstallationClient,
+      _client: PullRequestReadClient & RepositoryHistoryClient,
       _context: ReviewContext,
       _agents: readonly AgentDefinition[],
       _hints: SynthesisHints,
