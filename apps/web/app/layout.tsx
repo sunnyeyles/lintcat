@@ -21,9 +21,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PR Review Agents",
+  title: { default: "pr-review-agents", template: "%s · pr-review-agents" },
   description:
-    "Dashboard for the PR review agents: reviews, findings by severity and agent, model usage and cost.",
+    "Documentation for the PR review agents, and the dashboard: reviews, findings by severity and agent, model usage and cost.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

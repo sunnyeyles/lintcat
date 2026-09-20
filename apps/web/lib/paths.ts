@@ -7,6 +7,9 @@ import {
 
 export const REQUEST_PATH_HEADER = "x-request-path";
 
+/** The organization picker: the dashboard's own front door, on the apex beside the docs. */
+export const DASHBOARD_PATH = "/dashboard";
+
 export function organizationPath(slug: string, path = ""): string {
   return `/o/${encodeURIComponent(slug)}${path}`;
 }
@@ -14,6 +17,29 @@ export function organizationPath(slug: string, path = ""): string {
 /** Strips `/o/<slug>` so a page is recognised whichever organization it is in. */
 export function withinOrganization(pathname: string): string {
   return pathname.replace(/^\/o\/[^/]+/, "") || "/";
+}
+
+/** Docs and the picker exist only on the apex; `/` on a subdomain is still that organization. */
+export function isApexOnly(pathname: string): boolean {
+  const page = pathname.replace(/\/$/, "") || "/";
+  return (
+    page === DASHBOARD_PATH ||
+    page.startsWith(`${DASHBOARD_PATH}/`) ||
+    page === "/docs" ||
+    page.startsWith("/docs/")
+  );
+}
+
+/** Docs and the organization picker live on the apex, so a subdomain request needs an absolute link. */
+export function apexUrl(
+  path: string,
+  host: string | null | undefined,
+  protocol: string,
+  domain: string,
+): string {
+  if (organizationSlugFromHost(host, domain) === undefined) return path;
+  const port = host?.match(/:(\d+)$/)?.[0] ?? "";
+  return `${protocol}://${hostname(domain)}${port}${path}`;
 }
 
 function onAppDomain(url: URL, domain: string): boolean {

@@ -1,9 +1,13 @@
 # @pr-review/web
 
-The dashboard: review history, trends, token spend, and an editor for
-`.github/pr-review-agents.yml`. Also `POST /api/ingest`, where the action
-records each review, and `POST /api/github/webhook`, where the GitHub App
-reports installations and organization members.
+The public documentation at `/`, and the dashboard behind it: review history,
+trends, token spend, and an editor for `.github/pr-review-agents.yml`. Also
+`POST /api/ingest`, where the action records each review, and
+`POST /api/github/webhook`, where the GitHub App reports installations and
+organization members.
+
+The docs need no session; the dashboard starts at `/dashboard`, which every
+page links to from the topbar.
 
 ```bash
 pnpm --filter @pr-review/web dev     # http://localhost:3000
@@ -140,7 +144,7 @@ sessions and no auth tables; the GitHub provider works unchanged with an App's
 client id and secret. The sign-in pass (`lib/sign-in.ts`) upserts the `users`
 row by GitHub id, then refreshes the user's membership in every installed
 organization. A user can have memberships in several organizations, each with
-its own role; `/` lists them (`lib/organization.ts`).
+its own role; `/dashboard` lists them (`lib/organization.ts`).
 
 The refresh costs one `GET /orgs/{org}/memberships/{username}` per installed
 organization, up to eight at a time, before one transaction writes the results.
@@ -174,7 +178,9 @@ rewrites `acme.example.com/repos` onto `/o/acme/repos`; the mapping is
 `organizationSlugFromHost` in `lib/host.ts`. The apex, the reserved names
 `www app api auth admin docs status mail`, and every other host (Vercel preview
 URLs included) pass through, so previews keep using `/o/` paths. `/api/*` and
-`/_next/*` are never rewritten. Links inside an organization still use
+`/_next/*` are never rewritten, and `/docs/*` and `/dashboard` are redirected to
+the apex, since those pages exist only there (`isApexOnly` in `lib/paths.ts`;
+the topbar links to them with `apexUrl`). Links inside an organization still use
 `/o/<slug>/...`, and on a subdomain that form is served as is, so both work;
 `acme.example.com/o/globex/...` is a 404.
 
@@ -234,7 +240,9 @@ are illustrative.
 
 ```text
 app/
-  (apex)/page.tsx       the signed-in user's organizations
+  (docs)/page.tsx       the docs home, and the site's own homepage
+  (docs)/docs/          one page per section; /docs redirects to the home
+  (apex)/dashboard/     the signed-in user's organizations
   (apex)/sign-in/       sign-in, returning to callbackUrl
   o/[slug]/             one organization, guarded by requireOrganization
     page.tsx            overview
@@ -246,8 +254,10 @@ app/
   api/github/webhook/   the GitHub App's webhook
 components/
   ui/ shell/ charts/ overview/ review/ config/
+  docs/                 the docs shell: nav, table of contents, prose
 lib/
   data/                 the seam above
+  docs.ts               the docs nav, its ordering and active-page rules
   authorize.ts          slug + session -> organization, role, readable repos, or not-found
   session.ts            session and the requireOrganization guard
   sign-in.ts            the sign-in pass: user row, then membership refresh
