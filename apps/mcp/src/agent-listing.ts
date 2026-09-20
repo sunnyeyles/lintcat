@@ -8,7 +8,7 @@ import { readAtCommit } from "@pr-review/reviewer";
 import type { LocalRepository } from "#src/local-git-client";
 
 /** One configured agent and whether the working tree's changes reach it. */
-export interface ListedAgent {
+interface ListedAgent {
   category: string;
   role: string;
   /** The agent's own model override, or null for the run's default. */

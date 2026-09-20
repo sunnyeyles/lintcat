@@ -19,9 +19,9 @@ import { useState } from "react";
 import { organizationPath, withinOrganization } from "@/lib/paths";
 
 // `href` is relative to the organization, e.g. "/repos" under `/o/<slug>`.
-export type NavItem = { href: string; label: string; icon: LucideIcon };
+type NavItem = { href: string; label: string; icon: LucideIcon };
 
-export const NAV_ITEMS: NavItem[] = [
+const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
   { href: "/analytics", label: "Analytics", icon: ChartLine },

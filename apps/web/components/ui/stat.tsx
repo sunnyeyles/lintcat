@@ -10,7 +10,7 @@ import {
 } from "@pr-review/design";
 import type { ReactNode } from "react";
 
-export type StatDelta = {
+type StatDelta = {
   value: string;
   trend?: "up" | "down" | "flat";
   tone?: "neutral" | "ok" | "warn" | "stop";

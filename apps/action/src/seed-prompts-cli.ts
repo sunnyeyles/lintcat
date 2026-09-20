@@ -134,7 +134,7 @@ interface SeedCliEnvironment {
 }
 
 /** The real environment: the live process and the Langfuse SDK. */
-export function seedCliEnvironment(): SeedCliEnvironment {
+function seedCliEnvironment(): SeedCliEnvironment {
   return {
     env: process.env,
     createWriter: createLangfusePromptWriter,

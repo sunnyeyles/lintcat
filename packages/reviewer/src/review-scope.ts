@@ -9,7 +9,7 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
-export interface FullReviewScope {
+interface FullReviewScope {
   kind: "full";
   reason: string;
   diff: string;
@@ -17,7 +17,7 @@ export interface FullReviewScope {
 }
 
 /** `pullRequest` keeps the whole diff beside the narrowed one. */
-export interface IncrementalReviewScope {
+interface IncrementalReviewScope {
   kind: "incremental";
   sinceSha: string;
   diff: string;
