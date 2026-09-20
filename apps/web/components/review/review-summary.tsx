@@ -16,12 +16,12 @@ export function ReviewSummaryPanel({ summary, bySeverity }: ReviewSummaryPanelPr
   return (
     <Card className="border-l-2 border-l-accent">
       <CardContent className="py-5">
-        <h2 className="eyebrow mb-2.5 font-mono">Synthesiser summary</h2>
-        <p className="max-w-measure font-display text-lede leading-[1.62] text-ink">
+        <h2 className="text-muted-foreground text-xs tracking-wide uppercase mb-2.5 font-mono">Synthesiser summary</h2>
+        <p className="max-w-prose font-sans text-base leading-[1.62] text-foreground">
           {summary}
         </p>
         {present.length > 0 ? (
-          <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-rule-soft pt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-border pt-4">
             {present.map((s) => (
               <SeverityBadge key={s} severity={s} count={bySeverity[s]} />
             ))}

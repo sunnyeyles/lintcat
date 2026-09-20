@@ -55,7 +55,7 @@ export function RepoTable({ slug, repos, caption, limit }: RepoTableProps) {
           <TableRow key={repo.id} className="group relative">
             <TableCell className="whitespace-nowrap">
               <RowLink href={organizationPath(slug, `/repos/${repo.owner}/${repo.name}`)}>
-                <span className="text-slate">{repo.owner}/</span>
+                <span className="text-muted-foreground">{repo.owner}/</span>
                 {repo.name}
               </RowLink>
             </TableCell>
@@ -68,7 +68,7 @@ export function RepoTable({ slug, repos, caption, limit }: RepoTableProps) {
             <TableCell
               className={cn(
                 "text-right font-semibold tabular-nums",
-                repo.highSeverity > 0 ? "text-sev-high" : "text-slate",
+                repo.highSeverity > 0 ? "text-destructive" : "text-muted-foreground",
               )}
             >
               {formatNumber(repo.highSeverity)}
@@ -79,7 +79,7 @@ export function RepoTable({ slug, repos, caption, limit }: RepoTableProps) {
                   {formatRelative(repo.lastReviewedAt)}
                 </time>
               ) : (
-                <span className="text-slate">never</span>
+                <span className="text-muted-foreground">never</span>
               )}
             </TableCell>
             <TableCell className="text-right tabular-nums">

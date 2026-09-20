@@ -1,16 +1,23 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  type ChartConfig,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@pr-review/design";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatUsd } from "@/lib/format";
 import type { UsagePoint } from "@pr-review/db/dashboard";
 
-import { axisLineProps, cursorProps, gridProps, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
-import { ChartTooltip } from "./chart-tooltip";
 import { formatAxisDate } from "./series";
-import { useChartColors } from "./use-chart-colors";
+import { formatWith } from "./tooltip-format";
+
+const CONFIG = {
+  costUsd: { label: "Cost", color: "var(--chart-1)" },
+} satisfies ChartConfig;
 
 export function SpendTrendChart({
   points,
@@ -19,8 +26,6 @@ export function SpendTrendChart({
   points: UsagePoint[];
   rangePhrase: string;
 }) {
-  const colors = useChartColors();
-
   const total = points.reduce((sum, point) => sum + point.costUsd, 0);
   const peak = points.reduce(
     (best, point) => (point.costUsd > best.costUsd ? point : best),
@@ -37,6 +42,7 @@ export function SpendTrendChart({
       title="Spend over time"
       description="Daily review cost."
       summary={summary}
+      config={CONFIG}
       table={
         <ChartDataTable
           caption="Spend by day"
@@ -49,36 +55,39 @@ export function SpendTrendChart({
       }
     >
       <AreaChart data={points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid {...gridProps(colors)} />
+        <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={formatAxisDate}
-          tick={tickProps(colors)}
           tickLine={false}
-          axisLine={axisLineProps(colors)}
+          axisLine={false}
+          tickMargin={8}
           minTickGap={28}
           interval="preserveStartEnd"
         />
         <YAxis
           width={52}
-          tick={tickProps(colors)}
           tickLine={false}
           axisLine={false}
+          tickMargin={8}
           tickFormatter={formatUsd}
         />
-        <Tooltip
-          cursor={cursorProps(colors)}
-          content={<ChartTooltip formatValue={formatUsd} formatHeading={formatAxisDate} />}
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              labelFormatter={(l) => formatAxisDate(String(l))}
+              formatter={formatWith(formatUsd)}
+            />
+          }
         />
         <Area
           type="monotone"
           dataKey="costUsd"
           name="Cost"
-          stroke={colors.accent}
+          stroke="var(--color-costUsd)"
           strokeWidth={2}
-          fill={colors.accent}
+          fill="var(--color-costUsd)"
           fillOpacity={0.1}
-          activeDot={{ r: 4, stroke: colors.surface, strokeWidth: 2 }}
           isAnimationActive={false}
         />
       </AreaChart>

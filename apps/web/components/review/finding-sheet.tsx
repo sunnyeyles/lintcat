@@ -2,7 +2,7 @@
 
 import type { Finding } from "@pr-review/db";
 import {
-  Chip,
+  Badge,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -24,7 +24,7 @@ export type FindingSheetProps = {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="eyebrow mb-2 font-mono">{title}</h3>
+      <h3 className="text-muted-foreground text-xs tracking-wide uppercase mb-2 font-mono">{title}</h3>
       {children}
     </section>
   );
@@ -39,14 +39,14 @@ export function FindingSheet({ finding, onClose }: FindingSheetProps) {
             <SheetHeader className="shrink-0">
               <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
                 <SeverityBadge severity={finding.severity} />
-                <Chip variant="soft" caps>{finding.category}</Chip>
+                <Badge variant="secondary">{finding.category}</Badge>
               </div>
               <SheetTitle>{finding.title}</SheetTitle>
               <SheetDescription asChild>
                 <FilePath
                   file={finding.file}
                   line={finding.line}
-                  className="mt-2 text-label"
+                  className="mt-2 text-sm"
                 />
               </SheetDescription>
             </SheetHeader>
@@ -57,14 +57,14 @@ export function FindingSheet({ finding, onClose }: FindingSheetProps) {
               </Section>
 
               <Section title="Why it matters">
-                <p className="max-w-measure font-display text-lede leading-relaxed text-ink">
+                <p className="max-w-prose font-sans text-base leading-relaxed text-foreground">
                   {finding.explanation}
                 </p>
               </Section>
 
               {finding.suggestedFix ? (
                 <Section title="Suggested fix">
-                  <pre className="overflow-x-auto rounded-sm border border-rule bg-surface-2 px-3.5 py-3 font-mono text-label leading-relaxed whitespace-pre-wrap text-ink">
+                  <pre className="overflow-x-auto rounded-sm border border-border bg-muted px-3.5 py-3 font-mono text-sm leading-relaxed whitespace-pre-wrap text-foreground">
                     <code>{finding.suggestedFix}</code>
                   </pre>
                 </Section>

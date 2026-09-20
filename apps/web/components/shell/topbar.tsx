@@ -9,7 +9,7 @@ export function Topbar({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 border-b border-rule bg-paper/90 backdrop-blur",
+        "sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur",
         className,
       )}
     >
@@ -17,13 +17,13 @@ export function Topbar({ className }: { className?: string }) {
         <SidebarDrawer />
         <Link
           href="/"
-          className="flex min-w-0 items-center gap-2 rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+          className="flex min-w-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <span aria-hidden className="size-2 shrink-0 bg-brand" />
-          <span className="truncate font-mono text-body font-semibold tracking-ui text-ink">
+          <span aria-hidden className="size-2 shrink-0 bg-primary" />
+          <span className="truncate font-mono text-sm font-semibold tracking-wide text-foreground">
             pr-review-agents
           </span>
-          <span className="hidden font-mono text-caption text-slate sm:inline">
+          <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
             / dashboard
           </span>
         </Link>

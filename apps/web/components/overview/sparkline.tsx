@@ -33,7 +33,7 @@ export function Sparkline({ points, label, className }: SparklineProps) {
         points={`0,${H} ${line} ${W},${H}`}
         fill="currentColor"
         stroke="none"
-        className="text-accent/10"
+        className="text-primary/10"
       />
       <polyline
         points={line}
@@ -43,9 +43,9 @@ export function Sparkline({ points, label, className }: SparklineProps) {
         strokeLinejoin="round"
         strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
-        className="text-accent"
+        className="text-primary"
       />
-      <circle cx={W - 2} cy={y(last)} r="1.8" fill="currentColor" className="text-accent" />
+      <circle cx={W - 2} cy={y(last)} r="1.8" fill="currentColor" className="text-primary" />
     </svg>
   );
 }

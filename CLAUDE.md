@@ -72,6 +72,24 @@ No `.js` suffixes. Inside a package import with `#src/foo` (package.json
 `imports`); `packages/db` uses extensionless relative paths, and `apps/web`
 uses `@/`.
 
+## Design system
+
+`packages/design` is stock shadcn/ui (`new-york`, base colour `slate`, Radix
+primitives, Tailwind v4). Add or update components with the CLI from inside
+that package, never by hand-writing a component or fetching files from GitHub:
+
+```bash
+cd packages/design && pnpm dlx shadcn@latest add <component>
+```
+
+The CLI mis-resolves the `#src/cn` alias and emits `from "cn"` — rewrite those
+to `#src/cn` after every `add`, and drop the stray `cn` npm dependency if it
+reappears in `package.json`. Re-export anything new from `src/index.ts`.
+
+`src/theme.css` holds the palette and is the single source of truth: edit it
+directly. There is no token generator. `docs/tokens.css` is a separate,
+unrelated palette for the standalone `docs/index.html` explainer page.
+
 ## Commands
 
 ```bash

@@ -18,7 +18,7 @@ export function ConfidenceMeter({
   labelled = true,
 }: ConfidenceMeterProps) {
   const pct = Math.round(clamp01(value) * 100);
-  const tone = pct >= 85 ? "bg-ok" : "bg-slate";
+  const tone = pct >= 85 ? "bg-primary" : "bg-muted-foreground";
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <span
@@ -29,17 +29,17 @@ export function ConfidenceMeter({
         aria-valuenow={pct}
         aria-valuetext={`${pct}% confidence`}
         className={cn(
-          "block h-1.5 w-full min-w-10 overflow-hidden rounded-xs bg-surface-2 ring-1 ring-rule-soft ring-inset",
+          "block h-1.5 w-full min-w-10 overflow-hidden rounded-sm bg-muted ring-border ring-1 ring-inset",
           barClassName,
         )}
       >
         <span
-          className={cn("block h-full rounded-xs", tone)}
+          className={cn("block h-full rounded-sm", tone)}
           style={{ width: `${pct}%` }}
         />
       </span>
       {labelled ? (
-        <span className="shrink-0 font-mono text-caption tabular-nums text-slate">
+        <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
           {pct}%
         </span>
       ) : null}

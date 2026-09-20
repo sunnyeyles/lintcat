@@ -1,4 +1,11 @@
-import { Button, EmptyState } from "@pr-review/design";
+import {
+  Button,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@pr-review/design";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -53,7 +60,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         title={`${review.repo.owner}/${review.repo.name} #${review.prNumber}`}
         description={
           <>
-            <code className="rounded-xs border border-rule-soft bg-surface-2 px-1 py-0.5 text-ink">
+            <code className="rounded-sm border border-border bg-muted px-1 py-0.5 text-foreground">
               {shortSha(review.headSha)}
             </code>{" "}
             · ran{" "}
@@ -78,12 +85,18 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       {review.runs.length > 0 ? <AgentRunStrip runs={review.runs} /> : null}
 
       {review.findings.length === 0 ? (
-        <EmptyState
-          className="border-ok/40 bg-ok/5"
-          icon={<ShieldCheck className="text-ok" />}
-          title="Nothing survived validation on this head"
-          description="Every agent ran and every candidate finding was dropped before publish. That is the clean outcome, not a failure."
-        />
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ShieldCheck />
+            </EmptyMedia>
+            <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
+            <EmptyDescription>
+              Every agent ran and every candidate finding was dropped before publish.
+              That is the clean outcome, not a failure.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <FindingsTable findings={review.findings} />
       )}

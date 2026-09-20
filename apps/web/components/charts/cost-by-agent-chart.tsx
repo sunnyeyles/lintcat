@@ -1,16 +1,16 @@
 "use client";
 
-import { Bar, BarChart, Cell, LabelList, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartTooltip, ChartTooltipContent } from "@pr-review/design";
+import type { ReactNode } from "react";
+import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts";
 
 import { formatTokens, formatUsd } from "@/lib/format";
 import type { AgentBreakdown } from "@pr-review/db/dashboard";
 
-import { axisLineProps, barCursorProps, TICK_FONT_SIZE, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
-import { ChartTooltip } from "./chart-tooltip";
-import { AGENT_COLOR, sumTokens } from "./series";
-import { useChartColors } from "./use-chart-colors";
+import { AGENT_COLOR, AGENT_CONFIG, sumTokens } from "./series";
+import { formatWith } from "./tooltip-format";
 
 export function CostByAgentChart({
   byAgent,
@@ -19,7 +19,6 @@ export function CostByAgentChart({
   byAgent: AgentBreakdown[];
   rangePhrase: string;
 }) {
-  const colors = useChartColors();
   const rows = [...byAgent].sort((a, b) => b.costUsd - a.costUsd);
   const total = rows.reduce((sum, row) => sum + row.costUsd, 0);
   const top = rows[0];
@@ -34,6 +33,7 @@ export function CostByAgentChart({
       title="Cost by agent"
       description="Where the spend goes, per reviewer."
       summary={summary}
+      config={AGENT_CONFIG}
       height={Math.max(180, rows.length * 42)}
       table={
         <ChartDataTable
@@ -61,13 +61,12 @@ export function CostByAgentChart({
           type="category"
           dataKey="agent"
           width={92}
-          tick={tickProps(colors)}
           tickLine={false}
-          axisLine={axisLineProps(colors)}
+          axisLine={false}
+          tickMargin={8}
         />
-        <Tooltip
-          cursor={barCursorProps(colors)}
-          content={<ChartTooltip formatValue={formatUsd} />}
+        <ChartTooltip
+          content={<ChartTooltipContent hideLabel formatter={formatWith(formatUsd)} />}
         />
         <Bar
           dataKey="costUsd"
@@ -77,14 +76,14 @@ export function CostByAgentChart({
           isAnimationActive={false}
         >
           {rows.map((row) => (
-            <Cell key={row.agent} fill={colors[AGENT_COLOR[row.agent]]} />
+            <Cell key={row.agent} fill={AGENT_COLOR[row.agent]} />
           ))}
           <LabelList
             dataKey="costUsd"
             position="right"
-            fill={colors.slate}
-            fontSize={TICK_FONT_SIZE}
-            formatter={formatUsd}
+            className="fill-muted-foreground"
+            fontSize={11}
+            formatter={(value: ReactNode) => formatUsd(Number(value))}
           />
         </Bar>
       </BarChart>

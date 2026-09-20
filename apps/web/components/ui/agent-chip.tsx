@@ -1,14 +1,7 @@
-import { Chip, ChipDot, type ChipProps, cn } from "@pr-review/design";
+import { Badge, cn } from "@pr-review/design";
 
+import { AGENT_COLOR } from "@/components/charts/series";
 import type { AgentName } from "@pr-review/db/dashboard";
-
-const AGENT_TONES: Record<AgentName, ChipProps["tone"]> = {
-  security: "agent-security",
-  correctness: "agent-correctness",
-  performance: "agent-performance",
-  "test-coverage": "agent-tests",
-  "docs-drift": "agent-docs",
-};
 
 export const AGENT_LABELS: Record<AgentName, string> = {
   security: "security",
@@ -26,9 +19,13 @@ export type AgentChipProps = {
 
 export function AgentChip({ agent, label, className }: AgentChipProps) {
   return (
-    <Chip tone={AGENT_TONES[agent]} className={cn("font-normal", className)}>
-      <ChipDot />
+    <Badge variant="outline" className={cn("font-normal", className)}>
+      <span
+        aria-hidden
+        className="size-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: AGENT_COLOR[agent] }}
+      />
       {label ?? AGENT_LABELS[agent]}
-    </Chip>
+    </Badge>
   );
 }

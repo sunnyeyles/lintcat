@@ -1,10 +1,11 @@
 import {
+  Badge,
   Card,
-  Chip,
   cn,
-  EmptyState,
-  Stat,
-  StatGrid,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
   Table,
   TableBody,
   TableCaption,
@@ -17,6 +18,7 @@ import { notFound } from "next/navigation";
 
 import { AgentChips, RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import type { ReviewSummary } from "@pr-review/db/dashboard";
 import { data } from "@/lib/data/server";
 import {
@@ -66,7 +68,7 @@ export default async function RepoDetailPage({
         eyebrow="Repository"
         title={
           <span className="font-mono text-[0.85em]">
-            <span className="text-slate">{repo.owner}/</span>
+            <span className="text-muted-foreground">{repo.owner}/</span>
             {repo.name}
           </span>
         }
@@ -105,13 +107,13 @@ export default async function RepoDetailPage({
         title="Review history"
         action={
           revisited > 0 ? (
-            <span className="font-mono text-caption text-slate">
+            <span className="text-muted-foreground font-mono text-xs">
               Grouped by pull request
             </span>
           ) : undefined
         }
       >
-        <Card padding="table">
+        <Card className="py-0">
           {reviews.length > 0 ? (
             <Table className="min-w-[40rem]">
               <TableCaption className="sr-only">
@@ -138,19 +140,19 @@ export default async function RepoDetailPage({
                 return (
                   <TableBody
                     key={group.prNumber}
-                    className={cn(grouped && "border-b border-rule last:border-b-0")}
+                    className={cn(grouped && "border-b border-border last:border-b-0")}
                   >
                     {grouped ? (
                       <tr>
                         <th
                           scope="rowgroup"
                           colSpan={6}
-                          className="pt-4 pb-1.5 text-left font-mono text-label font-medium text-ink"
+                          className="pt-4 pb-1.5 text-left font-mono text-sm font-medium"
                         >
                           PR #{group.prNumber}{" "}
-                          <Chip variant="soft" className="ml-1.5">
+                          <Badge variant="secondary" className="ml-1.5">
                             {total} reviews
-                          </Chip>
+                          </Badge>
                         </th>
                       </tr>
                     ) : null}
@@ -161,7 +163,7 @@ export default async function RepoDetailPage({
                           <TableCell
                             className={cn(
                               "whitespace-nowrap",
-                              grouped && "border-l-2 border-accent/30 pl-3",
+                              grouped && "border-l-2 border-primary/30 pl-3",
                             )}
                           >
                             <RowLink
@@ -176,7 +178,7 @@ export default async function RepoDetailPage({
                             </RowLink>
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            <code className="rounded-xs border border-rule-soft bg-surface-2 px-1 py-0.5 text-label">
+                            <code className="rounded-sm border border-border bg-muted px-1 py-0.5 text-sm">
                               {shortSha(review.headSha)}
                             </code>
                           </TableCell>
@@ -202,10 +204,14 @@ export default async function RepoDetailPage({
               })}
             </Table>
           ) : (
-            <EmptyState
-              title="No reviews for this repository"
-              description="The agents have not published a review here yet."
-            />
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No reviews for this repository</EmptyTitle>
+                <EmptyDescription>
+                  The agents have not published a review here yet.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
         </Card>
       </Section>

@@ -1,18 +1,12 @@
 import { TooltipProvider } from "@pr-review/design";
 import type { Metadata } from "next";
-import { JetBrains_Mono, Newsreader } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { ThemeProvider } from "@/components/shell/theme-provider";
 import { Topbar } from "@/components/shell/topbar";
 
 import "./globals.css";
-
-const newsreader = Newsreader({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-newsreader",
-});
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -28,11 +22,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${newsreader.variable} ${jetbrainsMono.variable}`}
-    >
+    <html lang="en" suppressHydrationWarning className={jetbrainsMono.variable}>
       <body>
         <ThemeProvider>
           <TooltipProvider>

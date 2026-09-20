@@ -1,6 +1,10 @@
 import {
   Card,
-  EmptyState,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   Table,
   TableBody,
   TableCell,
@@ -38,13 +42,19 @@ export default async function ReviewsIndexPage({
       />
 
       {reviews.length === 0 ? (
-        <EmptyState
-          icon={<GitPullRequest />}
-          title="No reviews yet"
-          description="Once a pull request event reaches the pipeline, its review lands here."
-        />
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <GitPullRequest />
+            </EmptyMedia>
+            <EmptyTitle>No reviews yet</EmptyTitle>
+            <EmptyDescription>
+              Once a pull request event reaches the pipeline, its review lands here.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <Card padding="table">
+        <Card className="py-0">
           <Table className="min-w-[48rem]">
             <TableHeader>
               <TableRow>
@@ -63,12 +73,12 @@ export default async function ReviewsIndexPage({
                   <TableCell>
                     <Link
                       href={organizationPath(slug, `/reviews/${review.id}`)}
-                      className="text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                      className="focus-visible:ring-ring underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-offset-2"
                     >
                       {review.repo.owner}/{review.repo.name} #{review.prNumber}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-slate">
+                  <TableCell className="text-muted-foreground">
                     {shortSha(review.headSha)}
                   </TableCell>
                   <TableCell>
@@ -80,7 +90,7 @@ export default async function ReviewsIndexPage({
                   </TableCell>
                   <TableCell>
                     {review.findingCount === 0 ? (
-                      <span className="text-ok">clean</span>
+                      <span className="text-muted-foreground">clean</span>
                     ) : (
                       <span className="flex flex-wrap gap-1">
                         {SEVERITIES.filter((s) => review.bySeverity[s] > 0).map((s) => (
