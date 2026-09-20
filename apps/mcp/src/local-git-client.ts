@@ -236,6 +236,22 @@ function relativeInside(root: string, file: string): string {
   return real === root ? "." : path.relative(root, real);
 }
 
+export interface WorkingTreeFile {
+  root: string;
+  path: string;
+  text: string;
+}
+
+/** One file's text as it is on disk now; a directory or an escape is a 404. */
+export async function readWorkingTreeFile(repoPath: string, file: string): Promise<WorkingTreeFile> {
+  const root = realpathSync((await git(repoPath, ["rev-parse", "--show-toplevel"])).trim());
+  const absolute = resolveInside(root, file);
+  if (!statSync(absolute).isFile()) {
+    throw new GitError(`${file} is not a file in the working tree`, 404);
+  }
+  return { root, path: path.relative(root, absolute), text: readFileSync(absolute, "utf8") };
+}
+
 /**
  * The shared search semantics, line-oriented: `parseSearchQuery` reads the
  * query and `matchesTerms` judges each line rather than each file.

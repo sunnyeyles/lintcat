@@ -5,6 +5,7 @@ import { createClientLogger } from "#src/client-logger";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
 import { registerWorkflowPrompts } from "#src/prompts/workflow-prompts";
+import { registerContextResources } from "#src/resources/context-resources";
 import { registerConfigTools } from "#src/tools/config-tools";
 import { registerHistoryTools } from "#src/tools/history-tools";
 import { registerIndexTools } from "#src/tools/index-tools";
@@ -21,7 +22,11 @@ const INSTRUCTIONS = `Tools for the pr-review-agents code reviewer.
 - list_reviews / get_review / review_trends: stored review history, scoped to the user's GitHub account.
 
 Prompts for the workflows these tools serve: review_branch (review this branch before pushing),
-triage_finding (is one stored finding worth fixing), review_history (what the stored reviews show over time).`;
+triage_finding (is one stored finding worth fixing), review_history (what the stored reviews show over time).
+
+Resources to attach rather than fetch: pr-review://config (this checkout's agent configuration),
+pr-review://review/{org}/{id} (a stored review, as list_reviews links it), pr-review://file/{path}
+(a file of this checkout, read from the working tree).`;
 
 export interface ServerOptions {
   loadIndex?: (repoPath: string) => Promise<LocalIndex>;
@@ -66,7 +71,9 @@ export function createServer(base: McpEnvironment, options: ServerOptions = {}):
   registerIndexTools(server, environment, client, options.loadIndex ?? createLocalIndexCache());
   registerSearchTools(server, environment, client);
   registerConfigTools(server, environment, client);
-  registerHistoryTools(server, environment, options.githubId ?? githubUserId(environment));
+  const githubId = options.githubId ?? githubUserId(environment);
+  registerHistoryTools(server, environment, githubId);
+  registerContextResources(server, environment, githubId);
   registerWorkflowPrompts(server);
   return server;
 }

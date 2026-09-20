@@ -23,7 +23,17 @@ Then pass that repository's checkout as `repoPath`, or start Claude Code in it.
 | `find_references` | Lists the files that import a file, or one of its exported names. Same query, cap and result shape as the review agents' tool. | Nothing |
 | `describe_file` | Shows a file's role, package, importers, covering test, and imports. | Nothing |
 | `validate_agent_config` | Parses `.github/pr-review-agents.yml` and reports the agents it resolves to, or the error with its location. No file means the default agent. | Nothing |
-| `list_reviews`, `get_review`, `review_trends` | Stored reviews, findings, trends and cost. | `DATABASE_URL` and a GitHub token |
+| `list_reviews`, `get_review`, `review_trends` | Stored reviews, findings, trends and cost. `list_reviews` also returns a resource link per review. | `DATABASE_URL` and a GitHub token |
+
+## Resources
+
+Things an agent can attach to its context instead of calling a tool for.
+
+| URI | What it is |
+|---|---|
+| `pr-review://config` | The resolved agent configuration of the checkout the server runs in, or the parse error and its location. |
+| `pr-review://review/{org}/{id}` | One stored review with every finding and agent run, as `get_review` returns it. `list_reviews` links each review here. |
+| `pr-review://file/{path}` | One repository-relative file of that checkout, read from the working tree. A path that escapes the checkout is refused. |
 
 A local review reads the agent configuration (`.github/pr-review-agents.yml`)
 at the base commit, the same way the Action does. It then assembles the same

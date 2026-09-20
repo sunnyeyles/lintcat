@@ -82,7 +82,12 @@ async function connect(env: McpEnvironment, githubId?: () => Promise<number>): P
 async function call(client: Client, name: string, args: Record<string, unknown>) {
   const result = (await client.callTool({ name, arguments: args })) as CallToolResult;
   const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
-  return { isError: result.isError === true, texts };
+  return { isError: result.isError === true, texts, content: result.content };
+}
+
+async function readResource(client: Client, uri: string) {
+  const { contents } = await client.readResource({ uri });
+  return contents[0] as { uri: string; mimeType?: string; text: string };
 }
 
 /** Replaces the fixture repository, so `afterEach` still removes exactly one. */
@@ -557,11 +562,44 @@ describe("history tools", () => {
   it("lists and opens reviews for a member", async () => {
     const client = await connect(environment({ database: () => database }), async () => member);
 
-    const listed = JSON.parse((await call(client, "list_reviews", { org: "acme" })).texts[0]!);
+    const listing = await call(client, "list_reviews", { org: "acme" });
+    const listed = JSON.parse(listing.texts[0]!);
     expect(listed).toMatchObject([{ repo: "acme/widgets", prNumber: 7, findingCount: 1 }]);
 
     const review = JSON.parse((await call(client, "get_review", { org: "acme", id: listed[0].id })).texts[0]!);
     expect(review.findings).toMatchObject([{ title: "Token compared with ==", severity: "high" }]);
+  });
+
+  it("links each listed review as a resource instead of inlining its findings", async () => {
+    const client = await connect(environment({ database: () => database }), async () => member);
+
+    const listing = await call(client, "list_reviews", { org: "acme" });
+    const [id] = JSON.parse(listing.texts[0]!).map((review: { id: number }) => review.id);
+    const links = listing.content.filter((part) => part.type === "resource_link");
+
+    expect(links).toMatchObject([
+      { uri: `pr-review://review/acme/${id}`, name: `acme/widgets#7 review ${id}`, mimeType: "application/json" },
+    ]);
+    expect(listing.texts.join("")).not.toContain("Token compared with ==");
+  });
+
+  it("resolves a stored review through its resource URI", async () => {
+    const client = await connect(environment({ database: () => database }), async () => member);
+    const [{ id }] = JSON.parse((await call(client, "list_reviews", { org: "acme" })).texts[0]!);
+
+    const contents = await readResource(client, `pr-review://review/acme/${id}`);
+
+    expect(contents.mimeType).toBe("application/json");
+    expect(JSON.parse(contents.text)).toMatchObject({
+      repo: "acme/widgets",
+      findings: [{ title: "Token compared with ==", severity: "high" }],
+    });
+  });
+
+  it("refuses a review resource for someone who is not a member", async () => {
+    const client = await connect(environment({ database: () => database }), async () => 999);
+
+    await expect(readResource(client, "pr-review://review/acme/1")).rejects.toThrow(/No organization "acme"/);
   });
 
   it("aggregates trends for a member", async () => {
@@ -577,6 +615,75 @@ describe("history tools", () => {
     const { isError, texts } = await call(client, "list_reviews", { org: "acme" });
     expect(isError).toBe(true);
     expect(texts[0]).toContain('No organization "acme"');
+  });
+});
+
+describe("resources", () => {
+  it("offers the configuration resource and a template per addressable kind", async () => {
+    const client = await connect(environment());
+
+    const { resources } = await client.listResources();
+    const { resourceTemplates } = await client.listResourceTemplates();
+
+    expect(resources.map((resource) => resource.uri)).toEqual(["pr-review://config"]);
+    expect(resourceTemplates.map((template) => template.uriTemplate).sort()).toEqual([
+      "pr-review://file/{+path}",
+      "pr-review://review/{org}/{id}",
+    ]);
+  });
+
+  it("resolves the checkout's agent configuration", async () => {
+    const client = await connect(environment());
+
+    const contents = await readResource(client, "pr-review://config");
+
+    expect(contents.mimeType).toBe("application/json");
+    expect(JSON.parse(contents.text)).toMatchObject({
+      checkout: repo.root,
+      present: false,
+      valid: true,
+      usingDefaults: true,
+      agents: [{ agent: "general" }],
+    });
+  });
+
+  it("reads a file from the working tree, not the commit", async () => {
+    const client = await connect(environment());
+
+    const contents = await readResource(client, "pr-review://file/src/sessions.ts");
+
+    expect(contents.mimeType).toBe("text/plain");
+    expect(contents.text).toContain("export const admin = true;");
+  });
+
+  it("refuses a file path that escapes the checkout", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://file//etc/hosts")).rejects.toThrow(
+      /outside the repository/,
+    );
+  });
+
+  it("says which file is missing", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://file/src/missing.ts")).rejects.toThrow(
+      /does not exist in the working tree/,
+    );
+  });
+
+  it("rejects a review URI whose id is not a number", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://review/acme/latest")).rejects.toThrow(
+      /non-numeric review id "latest"/,
+    );
+  });
+
+  it("rejects a URI no scheme covers", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://nonsense/1")).rejects.toThrow(/not found/);
   });
 });
 
