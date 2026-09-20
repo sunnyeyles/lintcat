@@ -59,6 +59,37 @@ export interface GithubAppClient {
   ): Promise<RepositoryCollaborator[]>;
 }
 
+/**
+ * The slice of Octokit this module consumes. Octokit satisfies it
+ * structurally; tests inject a stub so no real network calls happen.
+ */
+export interface AppOctokitLike {
+  paginate(route: unknown, params: Record<string, unknown>): Promise<unknown[]>;
+  rest: {
+    apps: {
+      listReposAccessibleToInstallation: unknown;
+    };
+    orgs: {
+      listMembers: unknown;
+      getMembershipForUser(params: {
+        org: string;
+        username: string;
+      }): Promise<{ data: unknown }>;
+    };
+    repos: {
+      listCollaborators: unknown;
+      getCollaboratorPermissionLevel(params: {
+        owner: string;
+        repo: string;
+        username: string;
+      }): Promise<{ data: unknown }>;
+    };
+  };
+}
+
+/** Resolves the Octokit authenticated for one installation. */
+export type InstallationOctokit = (installationId: number) => AppOctokitLike;
+
 const PERMISSIONS: readonly RepositoryPermission[] = [
   "admin",
   "maintain",
@@ -68,7 +99,7 @@ const PERMISSIONS: readonly RepositoryPermission[] = [
 ];
 
 // role_name carries maintain and triage; a custom role falls back to the legacy base permission.
-function repositoryPermission(
+export function repositoryPermission(
   roleName: string | null | undefined,
   permission: string | null | undefined,
 ): RepositoryPermission | null {
@@ -88,7 +119,7 @@ const FLAG_PERMISSIONS: readonly [string, RepositoryPermission][] = [
 ];
 
 // For a custom role: the highest permission flag set wins.
-function highestFlag(
+export function highestFlag(
   flags: Record<string, boolean> | null | undefined,
 ): RepositoryPermission | null {
   return FLAG_PERMISSIONS.find(([flag]) => flags?.[flag])?.[1] ?? null;
@@ -136,25 +167,8 @@ const membershipSchema = z.object({
   user: memberSchema.nullable(),
 });
 
-/** Signs a JWT as the App; each installation's token is cached and refreshed by its Octokit. */
-export function createGithubAppClient(config: GithubAppConfig): GithubAppClient {
-  const clients = new Map<number, Octokit>();
-  const installation = (installationId: number): Octokit => {
-    let octokit = clients.get(installationId);
-    if (!octokit) {
-      octokit = new Octokit({
-        authStrategy: createAppAuth,
-        auth: {
-          appId: config.appId,
-          privateKey: config.privateKey,
-          installationId,
-        },
-      });
-      clients.set(installationId, octokit);
-    }
-    return octokit;
-  };
-
+/** Wraps per-installation Octokits in the App client; authentication is the caller's only job. */
+export function createAppClient(installation: InstallationOctokit): GithubAppClient {
   return {
     async listInstallationRepositories(installationId) {
       const octokit = installation(installationId);
@@ -252,4 +266,24 @@ export function createGithubAppClient(config: GithubAppConfig): GithubAppClient 
         });
     },
   };
+}
+
+/** Signs a JWT as the App; each installation's token is cached and refreshed by its Octokit. */
+export function createGithubAppClient(config: GithubAppConfig): GithubAppClient {
+  const clients = new Map<number, AppOctokitLike>();
+  return createAppClient((installationId) => {
+    let octokit = clients.get(installationId);
+    if (!octokit) {
+      octokit = new Octokit({
+        authStrategy: createAppAuth,
+        auth: {
+          appId: config.appId,
+          privateKey: config.privateKey,
+          installationId,
+        },
+      });
+      clients.set(installationId, octokit);
+    }
+    return octokit;
+  });
 }

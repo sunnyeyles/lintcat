@@ -23,14 +23,14 @@ import { RowLink } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
 import { appDomain } from "@/lib/host";
 import { membershipsForUser } from "@/lib/organization";
-import { organizationPath, signInUrl } from "@/lib/paths";
+import { DASHBOARD_PATH, organizationPath, signInUrl } from "@/lib/paths";
 import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Organizations" };
 
 export default async function OrganizationsPage() {
   const session = await currentSession();
-  if (!session) redirect(signInUrl("/", appDomain()));
+  if (!session) redirect(signInUrl(DASHBOARD_PATH, appDomain()));
   const memberships = await membershipsForUser(db(), session.githubId);
 
   return (

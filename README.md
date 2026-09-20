@@ -177,6 +177,7 @@ apps/
   action/     Event parsing → review pipeline → check run (or job summary)
   mcp/        Local MCP server: the same pipeline over a working tree,
               plus index lookups and review history, for coding agents
+  web/        The documentation site at /, and the dashboard behind it
 packages/
   ai/         Provider selection (model.ts), prompts, agent
               configuration, and agents/: agent definition, runtime loop,
@@ -188,7 +189,8 @@ packages/
 evals/        Fixture repositories and the harness that runs the real
               pipeline against them without touching GitHub
 docs/         index.html — the architecture walkthrough, published to
-              Pages; claude/ — how the agent skills read this repo
+              Pages and now also served by apps/web at /docs/walkthrough;
+              claude/ — how the agent skills read this repo
               (.nojekyll beside it, so Pages serves the file as written)
 scripts/      esbuild bundler for apps/action, its smoke test, and the
               Langfuse prompt seeder
@@ -530,11 +532,13 @@ The agents read the graph through `find_references(path, name?)`: without a
 name, every file importing `path` with the line each import sits on; with one,
 only the files importing that export, default and namespace (`*`) imports
 included and marked. It returns at most 50 files alongside the true `total`,
-and every result carries an `index` header — the commit, whether the index is
-truncated, and the per-language coverage — so an empty answer can be told from
-an unindexed one. A path this pull request added, or one the index does not
+and every result carries an `index` header — the commit, the file count,
+whether the index is truncated, and the per-language coverage — so an empty
+answer can be told from an unindexed one. A path this pull request added, or one the index does not
 hold, comes back as `known: false` with the reason rather than as a file that
-does not exist.
+does not exist. The query lives in `@pr-review/index`; the agent tool and the
+MCP tool of the same name both render what it returns, so there is one cap, one
+header and one unknown-path answer.
 
 The opening message carries two blocks. `<repository>` gives bearings in a
 monorepo: every workspace package with its root, the indexed commit, and what
@@ -771,9 +775,13 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 
 ## Further reading
 
-- **[Propose, Refine, Decide](https://sunnyeyles.github.io/pr-review-agents/)**
-  — the pipeline traced stage by stage, with a diagram, the file that owns each
-  step, and the failure modes. Source: [`docs/index.html`](docs/index.html).
+- **Propose, refine, decide** — the pipeline traced stage by stage, with a
+  diagram, the file that owns each step, and the failure modes. It lives in the
+  dashboard's documentation at `/docs/walkthrough`
+  ([`apps/web/app/(docs)/`](apps/web/app/(docs))), and the standalone
+  [`docs/index.html`](docs/index.html) still serves the same walkthrough on
+  [Pages](https://sunnyeyles.github.io/pr-review-agents/) until that site has a
+  public URL to retire it to.
 - **[Incremental review](docs/incremental-review.md)** — the design behind the
   `incremental` input: where the baseline comes from, every way it widens back
   to a full review, and what recall it costs.
