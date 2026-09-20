@@ -679,7 +679,7 @@ describe("searchCode", () => {
         {
           path: "src/sessions.ts",
           name: "sessions.ts",
-          snippets: ["  createSession(id);\n"],
+          snippets: ["createSession(id);"],
         },
       ],
       totalCount: 2,
@@ -714,14 +714,14 @@ describe("searchCode", () => {
       [],
     ],
     [
-      "content fragments, kept verbatim and in order",
+      "content fragments, trimmed by the shared snippet rule but kept in order",
       {
         text_matches: [
           { property: "content", fragment: "  second()\n" },
           { property: "content", fragment: "first()" },
         ],
       },
-      ["  second()\n", "first()"],
+      ["second()", "first()"],
     ],
   ])("maps %s", async (_label, extra, snippets) => {
     const { client } = makeClient({ searchData: oneItemSearchResponse(extra) });

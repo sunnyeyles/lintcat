@@ -5,7 +5,8 @@
 import {
   httpStatus,
   isPermissionError,
-  type GithubInstallationClient,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
 } from "@pr-review/github";
 import type { StructuredLogger } from "@pr-review/logging";
 
@@ -39,7 +40,7 @@ export interface FixInput {
 }
 
 interface FixDeps {
-  client: GithubInstallationClient;
+  client: RepositoryHistoryClient & ReviewPublishClient;
   logger: StructuredLogger;
 }
 

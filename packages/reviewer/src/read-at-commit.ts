@@ -1,12 +1,12 @@
 import type { ReadOptionalFile } from "@pr-review/ai";
-import { httpStatus, type GithubInstallationClient } from "@pr-review/github";
+import { httpStatus, type PullRequestReadClient } from "@pr-review/github";
 
 /**
  * Reads repository files at one commit. The agent configuration is read at the
  * base commit, so the branch under review cannot choose its own reviewers.
  */
 export function readAtCommit(
-  client: GithubInstallationClient,
+  client: PullRequestReadClient,
   repository: { owner: string; repo: string },
   ref: string,
 ): ReadOptionalFile {

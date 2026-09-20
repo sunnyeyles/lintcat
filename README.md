@@ -475,6 +475,7 @@ than failing, each logged on `review.scope_resolved` as its `reason`:
 | No earlier commit carries our check run | `no_baseline` — the first review, or `checks: write` was absent |
 | The commits or check runs could not be read | `baseline_unreadable` |
 | The baseline is not an ancestor of the head | `head_rewritten` — a force-push or a rebase |
+| The client declares no `compareCommits` | `no_commit_comparison` — a local checkout or the eval fixture |
 
 The files reviewed are those the comparison reports **intersected with the pull
 request's own changed files**. A merge of the base branch into the branch under
@@ -721,6 +722,63 @@ suite makes no network calls and runs in under two seconds.
 ```sh
 pnpm test
 ```
+
+### Client conformance
+
+Four adapters serve a repository through these interfaces: Octokit
+(`packages/github/src/app.ts`), the local checkout
+(`apps/mcp/src/local-git-client.ts`), the eval fixture
+(`evals/src/fixture-client.ts`), and the agent test fake
+(`packages/ai/src/agent-test-support.ts`). One shared suite,
+`@pr-review/github/conformance`, runs against all four in `pnpm test`.
+
+Search semantics are not among the differences. `packages/github/src/search.ts`
+owns the query grammar, what counts as a match (every term, case-insensitively,
+in the contents and never the path), the snippet windows and the caps
+(`SEARCH_LIMITS`: 20 matches, 2 snippets of 400 characters each), and all four
+adapters call it. `totalCount` stays uncapped, so it is what tells the model a
+query was not selective enough.
+
+`ADAPTER_PROFILES` in `packages/github/src/conformance.ts` is the single place
+they are still allowed to differ, and every entry is asserted rather than
+skipped: how a file is decided to match (`shared` for the local checkout and
+the eval fixture; `github-code-index` for Octokit, whose index is GitHub's to
+define; `canned` for the test fake), what fills a match's snippets before the
+shared cap trims them, the operations each adapter never declares (`absent`) or
+declares and rejects (`unsupported`, with the error name), and how a file the
+repository does not have is reported. Moving a cap in `SEARCH_LIMITS` fails a
+test in every adapter at once.
+
+### The three client interfaces
+
+`packages/github/src/client.ts` declares three interfaces and no wider one;
+they are what the profiles table divides along. A caller that needs more than
+one names the intersection it needs, so no type says "everything" any more:
+
+| Interface | What it covers | Who declines part of it |
+| --- | --- | --- |
+| `PullRequestReadClient` | the pull request, its diff, its existing review state, and repository contents, search and archive at a ref | nobody — all four adapters serve every method |
+| `RepositoryHistoryClient` | commits: which exist, what they touched, what they say, what a branch points at, how two compare | the local checkout (`compareCommits`), the eval fixture (`compareCommits`, `listCommitFiles`, `getCommitMessage`) |
+| `ReviewPublishClient` | the check run, the review, a commit on a branch, a file written to a branch | the local checkout and the eval fixture, all four methods |
+
+The two repository-only adapters declare only what they honour — the local
+checkout `PullRequestReadClient & Omit<RepositoryHistoryClient, "compareCommits">`,
+the eval fixture that minus `listCommitFiles` and `getCommitMessage` — so what
+they decline is a compile error at the call, not a throw. A review run takes
+that narrow `ReviewClient` and writes only through its `ReviewDelivery`, so
+publishing is unreachable from a checkout or a fixture twice over: the client
+has no publish method, and the delivery closes over no client.
+
+Only the Octokit-backed adapters — `createInstallationClient` and
+`createTokenClient` — return all three intersected, because an installation
+token really can do all of it; the Action and the MCP server take that
+intersection through their environment seams and hand each half to the
+narrower consumer that wants it.
+
+`METHOD_GROUPS` in `conformance.ts` carries the same split at runtime, and
+`client-groups.test.ts` asserts it against `ADAPTER_PROFILES`: no adapter may
+decline a pull-request read, and neither repository-only adapter may declare a
+publish method at all.
 
 ---
 

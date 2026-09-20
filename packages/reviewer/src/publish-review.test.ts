@@ -2,13 +2,7 @@ import type {
   CreateCheckRunInput,
   CreateCommitInput,
   CreateReviewInput,
-  CheckRunSummary,
-  CommitComparison,
-  ExistingReviewComment,
-  GithubInstallationClient,
-  PullRequestDetails,
-  RepositoryArchiveRequest,
-  ReviewThread,
+  ReviewPublishClient,
   WriteFileRequest,
 } from "@pr-review/github";
 import { describe, expect, it, vi } from "vitest";
@@ -26,38 +20,13 @@ const target: ReviewTarget = {
 
 function makeClient() {
   return {
-    getPullRequest: vi.fn(async () => ({}) as PullRequestDetails),
-    listChangedFiles: vi.fn(async () => []),
-    getDiff: vi.fn(async () => ""),
-    getFileContents: vi.fn(async () => ""),
-    searchCode: vi.fn(async () => ({
-      matches: [],
-      totalCount: 0,
-      incompleteResults: false,
-    })),
-    getRepositoryArchive: vi.fn(async (request: RepositoryArchiveRequest) => ({
-      sha: request.ref,
-      files: new Map<string, string>(),
-      truncated: false,
-    })),
-    listCommitShas: vi.fn(async () => []),
-    listCommitFiles: vi.fn(async () => []),
-    listReviewComments: vi.fn(async (): Promise<ExistingReviewComment[]> => []),
-    listPullRequestCommitShas: vi.fn(async (): Promise<string[]> => [target.headSha]),
-    listCheckRuns: vi.fn(async (): Promise<CheckRunSummary[]> => []),
-    compareCommits: vi.fn(
-      async (): Promise<CommitComparison> => ({ status: "ahead", files: [] }),
-    ),
-    getBranchTip: vi.fn(async () => target.headSha),
-    getCommitMessage: vi.fn(async () => "Rate limit sessions"),
-    listReviewThreads: vi.fn(async (): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async (_input: CreateCheckRunInput) => ({ id: 987 })),
     createReview: vi.fn(async (_input: CreateReviewInput) => ({ id: 654 })),
     createCommitOnBranch: vi.fn(async (_input: CreateCommitInput) => ({
       sha: "fix1234",
     })),
     writeFileOnBranch: vi.fn(async (_request: WriteFileRequest) => {}),
-  } satisfies GithubInstallationClient;
+  } satisfies ReviewPublishClient;
 }
 
 describe("createCheckRunPublisher", () => {

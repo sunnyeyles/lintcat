@@ -33,6 +33,7 @@ reason, when:
 | No check run on any earlier commit | `no_baseline` — the first review, or `checks: write` was absent |
 | The commit list or check runs cannot be read | `baseline_unreadable` |
 | `sinceSha` is not an ancestor of the head | `head_rewritten` |
+| The client declares no `compareCommits` | `no_commit_comparison` |
 
 The third is the important one. A force-push or a rebase leaves a `sinceSha`
 that describes commits no longer on the branch, and a diff against it would be
@@ -54,8 +55,9 @@ type ReviewScope =
 one value serves both readers: the agents get the narrowed pair, publishing
 gets the whole pair.
 
-`reviewPullRequest` calls it in place of today's `getDiff` / `listChangedFiles`
-pair, and reads `scope.diff` and `scope.changedFiles` from then on.
+`reviewWithDelivery` calls it in place of the `getDiff` / `listChangedFiles`
+pair, and reads `scope.diff` and `scope.changedFiles` from then on. A run asks
+for it with `policy.incremental` on the `runReview` spec.
 
 ### The base-merge trap
 
@@ -143,9 +145,9 @@ Four events, alongside the existing set:
 
 ## Client additions
 
-Three read-only methods on `GithubInstallationClient`:
-`listPullRequestCommitShas`, `listCheckRuns`, `compareCommits`. Nothing gains a
-write. The narrowed diff is rebuilt from the comparison's file patches rather
+Three read-only methods: `listPullRequestCommitShas` and `compareCommits` on
+`RepositoryHistoryClient`, `listCheckRuns` on `PullRequestReadClient`. Nothing
+gains a write. The narrowed diff is rebuilt from the comparison's file patches rather
 than fetched: the intersection has to happen anyway, and a raw compare diff
 would carry the base-branch files back in.
 

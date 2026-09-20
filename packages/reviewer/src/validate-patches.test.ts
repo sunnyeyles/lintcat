@@ -1,4 +1,4 @@
-import type { ChangedFile, GithubInstallationClient } from "@pr-review/github";
+import type { ChangedFile, PullRequestReadClient } from "@pr-review/github";
 import type { FindingPatch, ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it, vi } from "vitest";
 
@@ -81,7 +81,7 @@ function makeDeps(contents: Record<string, string> = {}) {
     }
     return found;
   });
-  const client = { getFileContents } as unknown as GithubInstallationClient;
+  const client = { getFileContents } as unknown as PullRequestReadClient;
   return { client, owner: "octo-org", repo: "example-service", headSha, getFileContents };
 }
 

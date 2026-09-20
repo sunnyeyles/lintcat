@@ -43,7 +43,7 @@ inspectEvent          reviewable? otherwise a clean no-op
 runAction             client · agents · model · tracing · prompts
    │
    ▼
-reviewPullRequest     load PR + changed files + diff
+runReview             delivery adapter + policy in · load PR, changed files, diff
    │
    ▼
 gateAgentsByPaths     who wakes · none => neutral check, no review

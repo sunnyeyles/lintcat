@@ -13,6 +13,7 @@
         "$TURBO_DEFAULT$",
         "apps/**",
         "packages/**",
+        "evals/**",
         "vitest.config.ts"
       ],
       "outputs": []

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import {
+  SEARCH_LIMITS,
+  buildMatch,
+  formatSearchQuery,
+  parseSearchQuery,
+} from "#src/search";
+import {
   CHECK_RUN_NAME,
   type BranchTipRequest,
   type ChangedFile,
@@ -21,12 +27,14 @@ import {
   type CreateReviewInput,
   type ExistingReviewComment,
   type FileContentsRequest,
-  type GithubInstallationClient,
   type PullRequestDetails,
+  type PullRequestReadClient,
   type PullRequestRef,
   type PullRequestReview,
   type RepositoryArchive,
   type RepositoryArchiveRequest,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
   type ReviewThread,
   type WriteFileRequest,
 } from "#src/client";
@@ -198,9 +206,6 @@ export interface OctokitLike {
 
 const PAGE_SIZE = 100;
 
-/** Code search results returned per query; agents need hints, not dumps. */
-const SEARCH_RESULTS_PER_PAGE = 20;
-
 /** The fields of a pulls.get response we map into PullRequestDetails. */
 const pullResponseSchema = z.object({
   number: z.number(),
@@ -331,7 +336,7 @@ const codeSearchSchema = z.object({
   ),
 });
 
-/** Verbatim. Path-property fragments only repeat the path, so they are dropped. */
+/** Path-property fragments only repeat the path, so they are dropped. */
 function contentFragments(
   textMatches: z.infer<typeof textMatchesSchema>,
 ): string[] {
@@ -437,7 +442,7 @@ async function existingFileSha(
  */
 export function createInstallationClient(
   octokit: OctokitLike,
-): GithubInstallationClient {
+): PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient {
   return {
     async getPullRequest(ref: PullRequestRef): Promise<PullRequestDetails> {
       const response = await octokit.rest.pulls.get({
@@ -522,9 +527,10 @@ export function createInstallationClient(
 
     async searchCode(request: CodeSearchRequest): Promise<CodeSearchResult> {
       const repository = `${request.owner}/${request.repo}`;
+      const terms = parseSearchQuery(request.query);
       const response = await octokit.rest.search.code({
-        q: `${request.query} repo:${repository}`,
-        per_page: SEARCH_RESULTS_PER_PAGE,
+        q: `${formatSearchQuery(terms)} repo:${repository}`,
+        per_page: SEARCH_LIMITS.maxMatches,
         mediaType: { format: "text-match" },
       });
       const data = codeSearchSchema.parse(response.data);
@@ -535,11 +541,12 @@ export function createInstallationClient(
             item.repository.full_name.toLowerCase() ===
             repository.toLowerCase(),
         )
-        .map((item) => ({
-          path: item.path,
-          name: item.name,
-          snippets: contentFragments(item.text_matches),
-        }));
+        .slice(0, SEARCH_LIMITS.maxMatches)
+        .map((item) =>
+          buildMatch(item.path, terms, {
+            snippets: contentFragments(item.text_matches),
+          }),
+        );
       return {
         matches,
         totalCount: data.total_count,

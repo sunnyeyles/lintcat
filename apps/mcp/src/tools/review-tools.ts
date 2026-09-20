@@ -150,7 +150,6 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         baseSha: local.baseSha,
         agents,
         index,
-        publish: false,
         signal: extra.signal,
         onAgentEvent: progressReporter(extra),
       });
@@ -191,7 +190,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         target: { ...ref, headSha: pullRequest.headSha },
         baseSha: pullRequest.baseSha,
         agents,
-        publish,
+        ...(publish ? { publishTo: client } : {}),
         signal: extra.signal,
         onAgentEvent: progressReporter(extra),
       });

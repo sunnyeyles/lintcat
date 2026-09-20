@@ -3,6 +3,12 @@
 `pnpm eval` — real pipeline, real model, real token spend. Needs an API key;
 `pnpm test` never calls a model.
 
+The harness itself is not model-backed, and `pnpm test` covers it: the
+`*.test.ts` files beside the sources below run in the fast suite, so a bug in
+diff construction or fixture loading fails there rather than showing up as a
+quality regression in the paid run. `vitest.config.ts` is that project;
+`vitest.eval.config.ts` still matches only `*.eval.ts`.
+
 ## What is evaluated
 
 Six fixtures, fourteen assertions. Eight of them are quality signals; six
@@ -111,11 +117,13 @@ proves nothing on its own: the gate needs both halves.
 cases.ts               the spec: fixtures and their expectations
 expectations.ts        the judge: category + anchored location
 fixture.ts             loads repo/ (head) and base/ into the pipeline's inputs
-fixture-client.ts      GithubInstallationClient over a fixture; writes throw,
+fixture-client.ts      the reads a fixture can serve; publishing is undeclared,
                        and EVAL_INDEX=off withholds the archive
+*.conformance.test.ts  the shared adapter suite, @pr-review/github/conformance
 unified-diff.ts        synthesises patches from the two trees
 run-fixture-review.ts  drives the real pipeline; only client and publish differ
 model-access.ts        credentials, and the fail-fast before any spend
+*.test.ts              the harness's own unit tests, run by pnpm test
 ```
 
 ## Adding a fixture

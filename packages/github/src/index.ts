@@ -20,6 +20,17 @@ export {
   type RepositoryPermission,
 } from "#src/app-client";
 export { httpStatus, isPermissionError } from "#src/errors";
+export {
+  SEARCH_LIMITS,
+  boundSnippets,
+  buildMatch,
+  formatSearchQuery,
+  matchesTerms,
+  parseSearchQuery,
+  searchFiles,
+  searchMatchedPaths,
+  snippetWindows,
+} from "#src/search";
 export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
   CHECK_RUN_NAME,
@@ -44,14 +55,16 @@ export {
   type CreateReviewInput,
   type ExistingReviewComment,
   type FileContentsRequest,
-  type GithubInstallationClient,
   type PullRequestDetails,
+  type PullRequestReadClient,
   type PullRequestRef,
   type PullRequestReview,
   type RepositoryArchive,
   type RepositoryArchiveLimits,
   type RepositoryArchiveRequest,
+  type RepositoryHistoryClient,
   type ReviewComment,
+  type ReviewPublishClient,
   type ReviewThread,
   type WriteFileRequest,
 } from "#src/client";

@@ -16,7 +16,9 @@ import {
 import { createCapturingLogger } from "@pr-review/logging";
 import type {
   FileContentsRequest,
-  GithubInstallationClient,
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -24,6 +26,8 @@ import {
   FIX_COMMIT_MARKER,
   MEMORY_FILE_PATH,
   createDashboardPublisher,
+  runReview,
+  type ReviewRunSpec,
 } from "@pr-review/reviewer";
 import { reviewRecordSchema } from "@pr-review/schemas";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -105,6 +109,8 @@ interface Harness {
   fileReads: { path: string; ref: string }[];
   /** How many times a review agent called the model. */
   modelCalls: () => number;
+  /** The run the inputs assembled; the real review still runs on it. */
+  specs: ReviewRunSpec[];
   /** Pull requests whose review threads were listed. */
   threadListings: number[];
   /** Every file written to a branch, in order. */
@@ -146,6 +152,7 @@ function harness(
   const threadListings: number[] = [];
   const writes: Harness["writes"] = [];
   const exitCodes: number[] = [];
+  const specs: ReviewRunSpec[] = [];
 
   const configured = options.config ?? agentConfigYaml;
   const client = {
@@ -172,7 +179,9 @@ function harness(
         content: request.content,
       });
     }),
-  } satisfies GithubInstallationClient;
+  } satisfies PullRequestReadClient &
+    RepositoryHistoryClient &
+    ReviewPublishClient;
 
   return {
     client,
@@ -189,6 +198,7 @@ function harness(
     readPaths,
     fileReads,
     modelCalls: () => modelCalls,
+    specs,
     exitCodes,
     environment: {
       env,
@@ -270,6 +280,10 @@ function harness(
               : await options.dashboardResponse();
           },
         }),
+      runReview: (spec) => {
+        specs.push(spec);
+        return runReview(spec);
+      },
       logger,
       setExitCode: (code) => exitCodes.push(code),
     },
@@ -660,22 +674,23 @@ describe("review memory", () => {
   });
 
   it("gives the review a memory store that reads the branch", async () => {
-    const { environment, fileReads } = harness(memoryEnv);
+    const { environment, specs, fileReads } = harness(memoryEnv);
 
     await runAction(environment);
 
+    expect(specs[0]?.memory).toBeDefined();
     expect(fileReads).toContainEqual({
       path: MEMORY_FILE_PATH,
       ref: "pr-review-memory",
     });
   });
 
-  it("reads no memory file when no branch is configured", async () => {
-    const { environment, fileReads } = harness(reviewEnv);
+  it("gives the review no memory at all when no branch is configured", async () => {
+    const { environment, specs } = harness(reviewEnv);
 
     await runAction(environment);
 
-    expect(fileReads.every((read) => read.path !== MEMORY_FILE_PATH)).toBe(true);
+    expect(specs[0]?.memory).toBeUndefined();
   });
 });
 
@@ -732,88 +747,59 @@ describe("agent configuration", () => {
  * Selecting which agents run — the wiring only. Selection itself is pinned in
  * @pr-review/ai's agents.test.ts.
  */
-describe("agent selection", () => {
-  /** The `review.agents_selected` entry, which every reviewed run emits. */
-  const selection = (entries: Record<string, unknown>[]) =>
-    entries.find((entry) => entry["event"] === "review.agents_selected");
+describe("the agents input", () => {
+  /** The set the run was assembled with, which the caller selected. */
+  const selected = (specs: ReviewRunSpec[]): unknown =>
+    specs[0]?.agents !== undefined && "use" in specs[0].agents
+      ? specs[0].agents.use.map((agent) => agent.category)
+      : undefined;
 
-  it("records the configured set when the default runs", async () => {
-    const { environment, entries } = harness(reviewEnv);
+  const everyAgent = [
+    "security",
+    "correctness",
+    "performance",
+    "test-coverage",
+    "docs-drift",
+  ];
+
+  it("runs the configured set when the input is absent", async () => {
+    const { environment, specs, entries } = harness(reviewEnv);
 
     await runAction(environment);
 
-    expect(selection(entries)).toEqual({
+    expect(selected(specs)).toEqual(everyAgent);
+    expect(entries).toContainEqual({
       level: "info",
       event: "review.agents_selected",
-      agents: [
-      "security",
-      "correctness",
-      "performance",
-      "test-coverage",
-      "docs-drift",
-    ],
-      configuredAgents: [
-      "security",
-      "correctness",
-      "performance",
-      "test-coverage",
-      "docs-drift",
-    ],
-      pathFilteredAgents: [
-      "security",
-      "correctness",
-      "performance",
-      "test-coverage",
-      "docs-drift",
-    ],
+      agents: everyAgent,
+      configuredAgents: everyAgent,
+      pathFilteredAgents: everyAgent,
     });
   });
 
-  it("reports the narrowed set, in spec order", async () => {
-    const { environment, entries, modelCalls } = harness({
+  it("narrows the run to the agents the workflow named, in spec order", async () => {
+    const { environment, specs, entries } = harness({
       ...reviewEnv,
       INPUT_AGENTS: "docs-drift,security",
     });
 
     await runAction(environment);
 
-    expect(selection(entries)).toEqual({
-      level: "info",
-      event: "review.agents_selected",
-      agents: ["security", "docs-drift"],
-      configuredAgents: [
-      "security",
-      "correctness",
-      "performance",
-      "test-coverage",
-      "docs-drift",
-    ],
-      pathFilteredAgents: [],
-    });
-    expect(modelCalls()).toBe(2);
-  });
-
-  it("treats an explicit `all` as the default", async () => {
-    const { environment, entries } = harness({
-      ...reviewEnv,
-      INPUT_AGENTS: "all",
-    });
-
-    await runAction(environment);
-
-    expect(selection(entries)?.["agents"]).toEqual([
-      "security",
-      "correctness",
-      "performance",
-      "test-coverage",
-      "docs-drift",
-    ]);
+    expect(selected(specs)).toEqual(["security", "docs-drift"]);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        event: "review.agents_selected",
+        configuredAgents: everyAgent,
+        // Naming an agent drops its path gate, so none is left gated.
+        pathFilteredAgents: [],
+      }),
+    );
   });
 
   it("fails on an unknown name before building the model client", async () => {
     // The whole point of resolving the input first: a typo in the
     // workflow file must not cost a model call.
-    const { environment, modelConfigs, modelCalls } = harness({
+    const { environment, modelConfigs, specs } = harness({
       ...reviewEnv,
       INPUT_AGENTS: "secuirty",
     });
@@ -822,45 +808,10 @@ describe("agent selection", () => {
       /Unknown review agent: secuirty/,
     );
     expect(modelConfigs).toEqual([]);
-    expect(modelCalls()).toBe(0);
+    expect(specs).toEqual([]);
   });
 });
 
-// The fixture pull request changes only `src/sessions.ts`.
-const gatedConfigYaml = `agents:
-  - agent: security
-    paths:
-      - "packages/github/**"
-`;
-
-describe("path filters", () => {
-  it("costs no model call when nothing matched, and says so on the check run", async () => {
-    const { environment, modelCalls, entries } = harness(
-      reviewEnv,
-      pullRequestEvent(),
-      { config: gatedConfigYaml },
-    );
-
-    await runAction(environment);
-
-    expect(modelCalls()).toBe(0);
-    expect(entries).toContainEqual(
-      expect.objectContaining({ event: "review.no_agents_matched" }),
-    );
-  });
-
-  it("ignores the gate when the workflow named the agent", async () => {
-    const { environment, modelCalls } = harness(
-      { ...reviewEnv, INPUT_AGENTS: "security" },
-      pullRequestEvent(),
-      { config: gatedConfigYaml },
-    );
-
-    await runAction(environment);
-
-    expect(modelCalls()).toBe(1);
-  });
-});
 
 const remotePrompts = {
   security_system: validRemotePrompt("security", "REMOTE SECURITY"),
@@ -1260,86 +1211,112 @@ describe("actionEnvironment", () => {
   });
 });
 
-describe("the incremental input", () => {
-  function scope(entries: Harness["entries"]): unknown {
-    return entries.find((entry) => entry["event"] === "review.scope_resolved")?.[
-      "reason"
-    ];
-  }
+/** What each input becomes in the run the Action assembles. */
+describe("the review policy", () => {
+  const policy = (specs: ReviewRunSpec[]) => specs[0]?.policy;
 
-  it("reads the whole pull request when the input is absent", async () => {
-    const { environment, client } = harness({ ...reviewEnv });
+  it("reads the whole pull request when the incremental input is absent", async () => {
+    const { environment, specs } = harness({ ...reviewEnv });
 
     await runAction(environment);
 
-    expect(client.listPullRequestCommitShas).not.toHaveBeenCalled();
+    expect(policy(specs)?.incremental).toBe(false);
   });
 
   it.each(["false", "yes", "TRUE", "1"])(
-    "reads the whole pull request for the value %s",
+    "reads the whole pull request for the incremental value %s",
     async (value) => {
-      const { environment, client } = harness({
+      const { environment, specs } = harness({
         ...reviewEnv,
         INPUT_INCREMENTAL: value,
       });
 
       await runAction(environment);
 
-      expect(client.listPullRequestCommitShas).not.toHaveBeenCalled();
+      expect(policy(specs)?.incremental).toBe(false);
     },
   );
 
-  it("looks for a baseline when the input is true", async () => {
-    const { environment, entries, client } = harness({
+  it("narrows to the commits since the last review when the input is true", async () => {
+    const { environment, specs } = harness({
       ...reviewEnv,
       INPUT_INCREMENTAL: "true",
     });
 
     await runAction(environment);
 
-    expect(client.listPullRequestCommitShas).toHaveBeenCalledTimes(1);
-    // The stub pull request has only its head commit.
-    expect(scope(entries)).toBe("no_baseline");
+    expect(policy(specs)?.incremental).toBe(true);
+  });
+
+  it("builds the index when the index input is absent", async () => {
+    const { environment, specs } = harness({ ...reviewEnv });
+
+    await runAction(environment);
+
+    expect(policy(specs)?.index).toBe(true);
+  });
+
+  it.each(["true", "yes", "1", ""])(
+    "leaves the index on for the value %s",
+    async (value) => {
+      const { environment, specs } = harness({ ...reviewEnv, INPUT_INDEX: value });
+
+      await runAction(environment);
+
+      expect(policy(specs)?.index).toBe(true);
+    },
+  );
+
+  it("switches the index off only for an explicit false", async () => {
+    const { environment, specs } = harness({
+      ...reviewEnv,
+      INPUT_INDEX: "false",
+    });
+
+    await runAction(environment);
+
+    expect(policy(specs)?.index).toBe(false);
   });
 });
 
 describe("the fix input", () => {
-  /** Whether the run decided it may commit fixes. */
-  function applyFixes(entries: Harness["entries"]): unknown {
-    return entries.find((entry) => entry["event"] === "review.started")?.[
-      "applyFixes"
-    ];
+  /** Supplying a committer is the only way to ask for a fix commit. */
+  function commitsFixes(specs: ReviewRunSpec[]): boolean {
+    return specs[0]?.delivery.publishFixes !== undefined;
   }
 
   it("leaves fixes off when the input is absent", async () => {
-    const { environment, entries, client } = harness({ ...reviewEnv });
+    const { environment, specs, client } = harness({ ...reviewEnv });
 
     await runAction(environment);
 
-    expect(applyFixes(entries)).toBe(false);
+    expect(commitsFixes(specs)).toBe(false);
     expect(client.getCommitMessage).not.toHaveBeenCalled();
   });
 
   it.each(["false", "yes", "TRUE", "1"])(
     "leaves fixes off for the value %s",
     async (value) => {
-      const { environment, entries } = harness({ ...reviewEnv, INPUT_FIX: value });
+      const { environment, specs } = harness({ ...reviewEnv, INPUT_FIX: value });
 
       await runAction(environment);
 
-      expect(applyFixes(entries)).toBe(false);
+      expect(commitsFixes(specs)).toBe(false);
     },
   );
 
   it("turns fixes on for an ordinary head commit", async () => {
-    const { environment, entries, client } = harness({
+    const { environment, specs, entries, client } = harness({
       ...reviewEnv,
       INPUT_FIX: "true",
     });
 
     await runAction(environment);
 
-    expect(applyFixes(entries)).toBe(true);
+    expect(commitsFixes(specs)).toBe(true);
+    expect(
+      entries.find((entry) => entry["event"] === "review.started"),
+    ).toMatchObject({ applyFixes: true });
     expect(client.getCommitMessage).toHaveBeenCalledWith({
       owner: "octo-org",
       repo: "example-service",
@@ -1348,7 +1325,7 @@ describe("the fix input", () => {
   });
 
   it("refuses to fix its own fix commit", async () => {
-    const { environment, entries, client } = harness({
+    const { environment, specs, entries, client } = harness({
       ...reviewEnv,
       INPUT_FIX: "true",
     });
@@ -1358,14 +1335,14 @@ describe("the fix input", () => {
 
     await runAction(environment);
 
-    expect(applyFixes(entries)).toBe(false);
+    expect(commitsFixes(specs)).toBe(false);
     expect(
       entries.find((entry) => entry["event"] === "review.fixes.disabled"),
     ).toMatchObject({ reason: "the head commit is this action's own fix" });
   });
 
   it("leaves fixes off when the head commit cannot be read", async () => {
-    const { environment, entries, client } = harness({
+    const { environment, specs, client } = harness({
       ...reviewEnv,
       INPUT_FIX: "true",
     });
@@ -1374,54 +1351,6 @@ describe("the fix input", () => {
     await runAction(environment);
 
     // Fail closed: an unreadable head commit could be one of ours.
-    expect(applyFixes(entries)).toBe(false);
-  });
-});
-
-describe("the index input", () => {
-  /** The index event this run logged, if any. */
-  function indexEvent(entries: Harness["entries"]): string | undefined {
-    return entries
-      .map((entry) => String(entry["event"]))
-      .find((event) => event.startsWith("index."));
-  }
-
-  it("builds the index at the base commit when the input is absent", async () => {
-    const { environment, entries, client } = harness({ ...reviewEnv });
-
-    await runAction(environment);
-
-    expect(client.getRepositoryArchive).toHaveBeenCalledExactlyOnceWith({
-      owner: "octo-org",
-      repo: "example-service",
-      ref: baseSha,
-    });
-    expect(indexEvent(entries)).toBe("index.built");
-  });
-
-  it.each(["true", "yes", "1", ""])(
-    "leaves the index on for the value %s",
-    async (value) => {
-      const { environment, client } = harness({
-        ...reviewEnv,
-        INPUT_INDEX: value,
-      });
-
-      await runAction(environment);
-
-      expect(client.getRepositoryArchive).toHaveBeenCalledTimes(1);
-    },
-  );
-
-  it("skips the build entirely when the input is false", async () => {
-    const { environment, entries, client } = harness({
-      ...reviewEnv,
-      INPUT_INDEX: "false",
-    });
-
-    await runAction(environment);
-
-    expect(client.getRepositoryArchive).not.toHaveBeenCalled();
-    expect(indexEvent(entries)).toBe("index.skipped");
+    expect(commitsFixes(specs)).toBe(false);
   });
 });

@@ -2,7 +2,11 @@
  * What a repository has done with our findings, aggregated per (category,
  * title shape). The stored file is untrusted: a bad read degrades to empty.
  */
-import { httpStatus, type GithubInstallationClient } from "@pr-review/github";
+import {
+  httpStatus,
+  type PullRequestReadClient,
+  type ReviewPublishClient,
+} from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { type SynthesisHints } from "@pr-review/ai";
 import {
@@ -75,7 +79,8 @@ export const MEMORY_FILE_PATH = "memory.json";
 
 /** The store the action uses: one JSON file on a branch it owns. */
 export function createBranchMemoryStore(
-  client: Pick<GithubInstallationClient, "getFileContents" | "writeFileOnBranch">,
+  client: Pick<PullRequestReadClient, "getFileContents"> &
+    Pick<ReviewPublishClient, "writeFileOnBranch">,
   repository: { owner: string; repo: string },
   branch: string,
 ): MemoryStore {

@@ -1,6 +1,6 @@
 /**
  * The GitHub Action entrypoint. Wiring only: read action inputs, build
- * the clients, hand off to reviewPullRequest.
+ * the clients, hand off to runReview.
  */
 import { readFile } from "node:fs/promises";
 import process from "node:process";
@@ -12,7 +12,6 @@ import {
   createLangfusePromptClient,
   apiKeyEnvFor,
   createLanguageModel,
-  createSynthesiser,
   defaultModelFor,
   loadAgentDefinitions,
   loadManagedPrompts,
@@ -25,12 +24,13 @@ import {
   type LanguageModelConfig,
   type ReviewModel,
   type AgentDefinition,
-  type AgentUsageReport,
 } from "@pr-review/ai";
 import {
   createTokenClient,
-  type GithubInstallationClient,
   type GithubTokenConfig,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
 } from "@pr-review/github";
 import {
   createConsoleLogger,
@@ -40,18 +40,19 @@ import {
 } from "@pr-review/logging";
 import {
   createBranchMemoryStore,
-  createCheckRunPublisher,
   createDashboardPublisher,
-  createPipelineRunner,
+  dashboardDelivery,
+  githubDelivery,
   isFixCommit,
   learnFromMergedPullRequest,
   readAtCommit,
   reviewCorrelation,
-  reviewPullRequest,
+  runReview,
   type DashboardPublisherConfig,
-  type DashboardReview,
+  type FinishedReviewRun,
   type PublishToDashboard,
-  type ReviewOutcome,
+  type ReviewDelivery,
+  type ReviewRunSpec,
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
@@ -70,7 +71,9 @@ export interface ActionEnvironment {
   /** Reads the workflow event payload file as UTF-8 text. */
   readEventFile: (path: string) => Promise<string>;
   createLanguageModel: (config: LanguageModelConfig) => ReviewModel;
-  createTokenClient: (config: GithubTokenConfig) => GithubInstallationClient;
+  createTokenClient: (
+    config: GithubTokenConfig,
+  ) => PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
   /** Builds the managed-prompt retrieval seam. */
   createPromptClient: (config: LangfusePromptClientConfig) => LangfusePromptClient;
   /** Starts span export for this run and returns its flush handle. */
@@ -78,6 +81,8 @@ export interface ActionEnvironment {
   createDashboardPublisher: (
     config: DashboardPublisherConfig,
   ) => PublishToDashboard;
+  /** Runs the review the inputs assembled. */
+  runReview: (spec: ReviewRunSpec) => Promise<FinishedReviewRun>;
   logger: StructuredLogger;
   /** Marks the process as failed without exiting it. */
   setExitCode: (code: number) => void;
@@ -93,6 +98,7 @@ export function actionEnvironment(): ActionEnvironment {
     createPromptClient: createLangfusePromptClient,
     createLangfuseRuntime,
     createDashboardPublisher,
+    runReview,
     logger: createConsoleLogger(),
     setExitCode: (code) => {
       process.exitCode = code;
@@ -193,36 +199,38 @@ function resolveDashboardInputs(
   return { baseUrl, token };
 }
 
-/** The dashboard's record of one run; a finding's category is the agent that found it. */
-function dashboardReview(
-  outcome: ReviewOutcome,
-  reports: readonly AgentUsageReport[],
-  agents: readonly AgentDefinition[],
-  durationMs: number,
-): DashboardReview {
-  const order = agents.map((agent) => agent.category);
-  const ran = [...reports].sort(
-    (left, right) => order.indexOf(left.agent) - order.indexOf(right.agent),
-  );
-  const names = ran.map((report) => report.agent);
-  const count = outcome.findings.length;
-  return {
-    agents: names,
-    summary: `${count === 1 ? "1 finding" : `${count} findings`} from ${names.join(", ") || "no agent"}`,
-    durationMs,
-    agentRuns: ran.map((report) => ({
-      agent: report.agent,
-      durationMs: report.durationMs,
-      findingCount: outcome.findings.filter(
-        (finding) => finding.category === report.agent,
-      ).length,
-      ...report.usage,
-    })),
-    findings: outcome.findings.map((finding) => ({
-      ...finding,
-      agent: finding.category,
-    })),
+interface DeliveryInputs {
+  client: RepositoryHistoryClient & ReviewPublishClient;
+  /** Verified patches are committed to the head branch. */
+  commitFixes: boolean;
+  /** Absent publishes to GitHub only. */
+  dashboard: DashboardInputs | undefined;
+  /** Value of GITHUB_STEP_SUMMARY; absent outside a real runner. */
+  summaryPath: string | undefined;
+  logger: StructuredLogger;
+}
+
+/** GitHub, with the fork fallback over its check run and the dashboard behind it. */
+function actionDelivery(
+  environment: Pick<ActionEnvironment, "createDashboardPublisher">,
+  { client, commitFixes, dashboard, summaryPath, logger }: DeliveryInputs,
+): ReviewDelivery {
+  const github = githubDelivery({ client, logger, commitFixes });
+  const delivery: ReviewDelivery = {
+    ...github,
+    // Check run first; job summary when the token cannot create one (forks).
+    publishCheckRun: createFallbackPublisher({
+      publishCheckRun: github.publishCheckRun,
+      summaryPath,
+      logger,
+    }),
   };
+  return dashboard === undefined
+    ? delivery
+    : dashboardDelivery(
+        delivery,
+        environment.createDashboardPublisher({ ...dashboard, logger }),
+      );
 }
 
 /** Covers the one part loadManagedPrompts cannot: building the client. */
@@ -293,7 +301,7 @@ function resolveModelInputs(
  * an unreadable head commit disables the step rather than risking one.
  */
 async function fixesAllowed(
-  client: GithubInstallationClient,
+  client: Pick<RepositoryHistoryClient, "getCommitMessage">,
   target: ReviewTarget,
   logger: StructuredLogger,
 ): Promise<boolean> {
@@ -419,8 +427,6 @@ export async function runAction(
         ? undefined
         : await resolveManagedPrompts(environment, langfuse, agents);
 
-    // Repository-independent, so one instance serves the whole run.
-    const synthesiser = createSynthesiser({ model, agents });
     // Event-inspection knowledge: the reviewer only ever sees the permission
     // failure a fork's token causes, never the fork itself.
     const applyFixes =
@@ -432,41 +438,36 @@ export async function runAction(
       applyFixes,
     });
 
-    const usageReports: AgentUsageReport[] = [];
-    const startedAt = Date.now();
-    const outcome = await reviewPullRequest(target, {
-      applyFixes,
+    await environment.runReview({
       client,
-      agents,
-      incremental: getInput(env, "incremental") === "true",
-      // On unless it is switched off, which is the opposite of the others.
-      index: getInput(env, "index") !== "false",
-      runReviewPipeline: createPipelineRunner({
-        model,
-        createModel,
-        synthesiser,
-        onUsage: (report) => usageReports.push(report),
-        ...(prompts === undefined ? {} : { systemPrompts: prompts }),
-      }),
-      // Check run first; job summary when the token cannot create one (forks).
-      publishReview: createFallbackPublisher({
-        publishCheckRun: createCheckRunPublisher(client),
+      target,
+      delivery: actionDelivery(environment, {
+        client,
+        commitFixes: applyFixes,
+        dashboard,
         summaryPath: env["GITHUB_STEP_SUMMARY"],
         logger,
       }),
+      agents: { use: agents },
+      engine: {
+        model,
+        createModel,
+        ...(prompts === undefined ? {} : { systemPrompts: prompts }),
+      },
+      policy: {
+        incremental: getInput(env, "incremental") === "true",
+        // On unless it is switched off, which is the opposite of the others.
+        index: getInput(env, "index") !== "false",
+      },
+      ...(memoryBranch === ""
+        ? {}
+        : {
+            memory: {
+              store: createBranchMemoryStore(client, target, memoryBranch),
+            },
+          }),
       logger,
-      memoryStore:
-        memoryBranch === ""
-          ? undefined
-          : createBranchMemoryStore(client, target, memoryBranch),
     });
-
-    if (dashboard !== undefined) {
-      await environment.createDashboardPublisher({ ...dashboard, logger })(
-        target,
-        dashboardReview(outcome, usageReports, agents, Date.now() - startedAt),
-      );
-    }
   } finally {
     // A flush failure never fails a review that already ran.
     if (tracing !== undefined) {

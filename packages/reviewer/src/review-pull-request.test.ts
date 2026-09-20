@@ -2,23 +2,23 @@ import {
   emptyTokenUsage,
   ReviewCancelledError,
   type AgentDefinition,
-  type ReviewContext,
-  type SynthesisHints,
 } from "@pr-review/ai";
 import { ArchiveTooLargeError } from "@pr-review/github";
 import type {
   ChangedFile,
-  CreateCheckRunInput,
-  CreateCommitInput,
-  CreateReviewInput,
   CheckRunSummary,
   CheckRunsRequest,
   CommitComparison,
+  CreateCheckRunInput,
+  CreateCommitInput,
+  CreateReviewInput,
   ExistingReviewComment,
-  GithubInstallationClient,
   PullRequestDetails,
+  PullRequestReadClient,
   PullRequestRef,
   RepositoryArchiveRequest,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
@@ -32,13 +32,15 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { MemoryStore } from "#src/memory";
+import type { ReviewPipelineRun } from "#src/pipeline-runner";
 import type { PublishReview } from "#src/publish-review";
 import { findingMarker } from "#src/render-review";
 import {
   skippedSynthesis,
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
-import { reviewPullRequest } from "#src/review-pull-request";
+import { githubDelivery } from "#src/review-delivery";
+import { reviewWithDelivery } from "#src/review-pull-request";
 import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
@@ -128,7 +130,9 @@ function makeClient() {
       sha: "fix1234",
     })),
     writeFileOnBranch: vi.fn(async (_request: WriteFileRequest) => {}),
-  } satisfies GithubInstallationClient;
+  } satisfies PullRequestReadClient &
+    RepositoryHistoryClient &
+    ReviewPublishClient;
 }
 
 function reviewResult(
@@ -167,7 +171,9 @@ function makeAgent(
 
 interface DepsOptions {
   agents?: readonly AgentDefinition[];
+  /** Replaces the GitHub adapter's check-run publisher, as the fork fallback does. */
   publishReview?: PublishReview;
+  commitFixes?: boolean;
   memoryStore?: MemoryStore;
   now?: () => Date;
   incremental?: boolean;
@@ -176,24 +182,32 @@ interface DepsOptions {
 
 function makeDeps(
   review: ReviewPipelineResult = reviewResult(),
-  { agents = [makeAgent("correctness")], ...options }: DepsOptions = {},
+  {
+    agents = [makeAgent("correctness")],
+    publishReview,
+    commitFixes = false,
+    ...options
+  }: DepsOptions = {},
 ) {
   const client = makeClient();
-  const runReviewPipeline = vi.fn(
-    async (
-      _client: GithubInstallationClient,
-      _context: ReviewContext,
-      _agents: readonly AgentDefinition[],
-      _hints: SynthesisHints,
-      _index: RepositoryIndex | undefined,
-    ) => review,
-  );
+  const runReviewPipeline = vi.fn(async (_run: ReviewPipelineRun) => review);
   const { logger, entries } = createCapturingLogger();
+  const github = githubDelivery({ client, logger, commitFixes });
   return {
     client,
     runReviewPipeline,
     entries,
-    deps: { client, agents, runReviewPipeline, logger, ...options },
+    deps: {
+      client,
+      agents,
+      runReviewPipeline,
+      logger,
+      delivery:
+        publishReview === undefined
+          ? github
+          : { ...github, publishCheckRun: publishReview },
+      ...options,
+    },
   };
 }
 
@@ -201,11 +215,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("reviewPullRequest", () => {
+describe("reviewWithDelivery", () => {
   it("loads the PR, its changed files, and its diff concurrently", async () => {
     const { deps, client } = makeDeps();
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.getPullRequest).toHaveBeenCalledExactlyOnceWith(target);
     expect(client.listChangedFiles).toHaveBeenCalledExactlyOnceWith(target);
@@ -218,11 +232,11 @@ describe("reviewPullRequest", () => {
       agents,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline).toHaveBeenCalledExactlyOnceWith(
+    expect(runReviewPipeline).toHaveBeenCalledExactlyOnceWith({
       client,
-      {
+      context: {
         owner: target.owner,
         repo: target.repo,
         pullRequest,
@@ -230,15 +244,15 @@ describe("reviewPullRequest", () => {
         diff,
       },
       agents,
-      { keep: [], drop: [] },
-      expect.objectContaining({ sha: pullRequest.baseSha }),
-    );
+      hints: { keep: [], drop: [] },
+      index: expect.objectContaining({ sha: pullRequest.baseSha }),
+    });
   });
 
-  it("publishes a check run through the client by default", async () => {
+  it("publishes a check run through the GitHub adapter", async () => {
     const { deps, client } = makeDeps(reviewResult({ candidates: [finding] }));
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
     expect(client.createCheckRun.mock.calls[0]?.[0]).toMatchObject({
@@ -249,13 +263,13 @@ describe("reviewPullRequest", () => {
     });
   });
 
-  it("uses an injected publisher instead of the check run when given one", async () => {
+  it("publishes through the check-run publisher the delivery carries", async () => {
     const publishReview = vi.fn<PublishReview>(async () => undefined);
     const { deps, client } = makeDeps(reviewResult({ candidates: [finding] }), {
       publishReview,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createCheckRun).not.toHaveBeenCalled();
     expect(publishReview).toHaveBeenCalledTimes(1);
@@ -270,7 +284,7 @@ describe("reviewPullRequest", () => {
 
     // Not the same object: patch verification may strip an unprovable patch,
     // and it adds its own tally.
-    await expect(reviewPullRequest(target, deps)).resolves.toEqual({
+    await expect(reviewWithDelivery(target, deps)).resolves.toEqual({
       ...review,
       patches: { proposed: 0, verified: 0 },
     });
@@ -279,7 +293,7 @@ describe("reviewPullRequest", () => {
   it("emits the lifecycle events for one review (spec §26)", async () => {
     const { deps, entries } = makeDeps(reviewResult({ candidates: [finding] }));
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(entries.map((entry) => entry["event"])).toEqual([
       "review.loaded",
@@ -299,7 +313,7 @@ describe("reviewPullRequest", () => {
   it("logs synthesis.skipped for a clean review rather than a synthesis pair", async () => {
     const { deps, entries } = makeDeps();
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     const events = entries.map((entry) => entry["event"]);
     expect(events).toContain("synthesis.skipped");
@@ -320,7 +334,7 @@ describe("reviewPullRequest", () => {
       }),
     );
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(entries).toContainEqual(
       expect.objectContaining({
@@ -336,7 +350,7 @@ describe("reviewPullRequest", () => {
     const { deps, client, runReviewPipeline } = makeDeps();
     runReviewPipeline.mockRejectedValueOnce(new Error("every agent failed"));
 
-    await expect(reviewPullRequest(target, deps)).rejects.toThrow(
+    await expect(reviewWithDelivery(target, deps)).rejects.toThrow(
       "every agent failed",
     );
     expect(client.createCheckRun).not.toHaveBeenCalled();
@@ -348,7 +362,7 @@ describe("reviewPullRequest", () => {
     });
     const { deps, entries } = makeDeps(reviewResult(), { publishReview });
 
-    await expect(reviewPullRequest(target, deps)).rejects.toThrow(
+    await expect(reviewWithDelivery(target, deps)).rejects.toThrow(
       "check run rejected",
     );
     expect(entries.map((entry) => entry["event"])).not.toContain(
@@ -357,11 +371,11 @@ describe("reviewPullRequest", () => {
   });
 });
 
-describe("reviewPullRequest inline comments", () => {
-  it("publishes a review through the client by default", async () => {
+describe("reviewWithDelivery inline comments", () => {
+  it("publishes a review through the GitHub adapter", async () => {
     const { deps, client } = makeDeps(reviewResult({ candidates: [finding] }));
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createReview).toHaveBeenCalledExactlyOnceWith({
       owner: target.owner,
@@ -382,7 +396,7 @@ describe("reviewPullRequest inline comments", () => {
   it("drops the check run annotations once the comments carry them", async () => {
     const { deps, client } = makeDeps(reviewResult({ candidates: [finding] }));
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(
       client.createCheckRun.mock.calls[0]?.[0].output.annotations,
@@ -395,7 +409,7 @@ describe("reviewPullRequest inline comments", () => {
     );
     client.createReview.mockRejectedValueOnce(permissionError(403));
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(
       client.createCheckRun.mock.calls[0]?.[0].output.annotations,
@@ -409,7 +423,7 @@ describe("reviewPullRequest inline comments", () => {
     const { deps, client } = makeDeps(reviewResult({ candidates: [finding] }));
     client.createReview.mockRejectedValueOnce(permissionError(500));
 
-    await expect(reviewPullRequest(target, deps)).rejects.toThrow("boom");
+    await expect(reviewWithDelivery(target, deps)).rejects.toThrow("boom");
     expect(client.createCheckRun).not.toHaveBeenCalled();
   });
 
@@ -419,7 +433,7 @@ describe("reviewPullRequest inline comments", () => {
       { body: `stale text\n\n${findingMarker(finding)}` },
     ]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createReview).not.toHaveBeenCalled();
   });
@@ -430,7 +444,7 @@ describe("reviewPullRequest inline comments", () => {
       { body: `stale text\n\n${findingMarker(finding)}` },
     ]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(
       client.createCheckRun.mock.calls[0]?.[0].output.annotations,
@@ -445,7 +459,7 @@ describe("reviewPullRequest inline comments", () => {
       { body: `stale text\n\n${findingMarker(finding)}` },
     ]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(entries).toContainEqual(
       expect.objectContaining({
@@ -459,7 +473,7 @@ describe("reviewPullRequest inline comments", () => {
   it("names a clean review nothing-to-post rather than already-posted", async () => {
     const { deps, entries } = makeDeps();
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(entries).toContainEqual(
       expect.objectContaining({
@@ -475,7 +489,7 @@ describe("reviewPullRequest inline comments", () => {
     );
     client.listReviewComments.mockRejectedValueOnce(new Error("boom"));
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createReview).toHaveBeenCalledTimes(1);
     expect(entries).toContainEqual(
@@ -489,7 +503,7 @@ describe("reviewPullRequest inline comments", () => {
   it("posts no review on a clean pull request", async () => {
     const { deps, client } = makeDeps();
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createReview).not.toHaveBeenCalled();
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
@@ -520,7 +534,7 @@ function incrementalClient(
   client.compareCommits.mockResolvedValue({ status: "ahead", files: since });
 }
 
-describe("reviewPullRequest, narrowed to the commits since the last review", () => {
+describe("reviewWithDelivery, narrowed to the commits since the last review", () => {
   const sinceFile: ChangedFile = {
     filename: "src/sessions.ts",
     status: "modified",
@@ -535,9 +549,9 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
     });
     incrementalClient(client, [sinceFile]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    const context = runReviewPipeline.mock.calls[0]?.[1];
+    const context = runReviewPipeline.mock.calls[0]?.[0].context;
     expect(context).toMatchObject({
       changedFiles: [sinceFile],
       incremental: { sinceSha: "old111", diff, changedFiles },
@@ -551,13 +565,13 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
     });
     client.listPullRequestCommitShas.mockResolvedValue([target.headSha]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[1]).toMatchObject({
+    expect(runReviewPipeline.mock.calls[0]?.[0].context).toMatchObject({
       changedFiles,
       diff,
     });
-    expect(runReviewPipeline.mock.calls[0]?.[1].incremental).toBeUndefined();
+    expect(runReviewPipeline.mock.calls[0]?.[0].context.incremental).toBeUndefined();
   });
 
   it("runs no agent when nothing this pull request changed has moved", async () => {
@@ -567,7 +581,7 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
     );
     incrementalClient(client, []);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(runReviewPipeline).not.toHaveBeenCalled();
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
@@ -581,7 +595,7 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
     incrementalClient(client, []);
     client.listReviewThreads.mockResolvedValue([postedThread(finding)]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     const published = client.createCheckRun.mock.calls[0]?.[0];
     expect(published).toMatchObject({ conclusion: "neutral" });
@@ -596,7 +610,7 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
       postedThread(finding, { isResolved: true }),
     ]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createCheckRun.mock.calls[0]?.[0]).toMatchObject({
       conclusion: "success",
@@ -610,7 +624,7 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
     incrementalClient(client, [sinceFile]);
     client.listReviewThreads.mockResolvedValue([postedThread(finding)]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
     expect(summary).not.toContain("still open from earlier commits");
@@ -620,7 +634,7 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
     const { deps, client } = makeDeps(reviewResult(), { incremental: true });
     incrementalClient(client, [sinceFile]);
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createCheckRun.mock.calls[0]?.[0].output.summary).toContain(
       "changed since `old111`",
@@ -632,7 +646,7 @@ describe("reviewPullRequest, narrowed to the commits since the last review", () 
  * The changed file every fixture carries is `src/sessions.ts`, so
  * `packages/**` is the pattern nothing here matches.
  */
-describe("reviewPullRequest: path filters", () => {
+describe("reviewWithDelivery: path filters", () => {
   const gated = makeAgent("security", ["packages/**"]);
   const ungated = makeAgent("correctness");
 
@@ -641,9 +655,9 @@ describe("reviewPullRequest: path filters", () => {
       agents: [ungated, gated],
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[2]).toEqual([ungated]);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents).toEqual([ungated]);
   });
 
   it("wakes an agent whose pattern one changed file matches", async () => {
@@ -652,9 +666,9 @@ describe("reviewPullRequest: path filters", () => {
       agents: [matching],
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[2]).toEqual([matching]);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents).toEqual([matching]);
   });
 
   it("logs each skipped agent with the paths it waited for", async () => {
@@ -662,7 +676,7 @@ describe("reviewPullRequest: path filters", () => {
       agents: [ungated, gated],
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(entries).toContainEqual(
       expect.objectContaining({
@@ -679,7 +693,7 @@ describe("reviewPullRequest: path filters", () => {
       agents: [ungated, gated],
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createCheckRun.mock.calls[0]?.[0].output.summary).toMatch(
       /security review did not run/i,
@@ -692,7 +706,7 @@ describe("reviewPullRequest: path filters", () => {
     it("never calls the pipeline, so the review costs nothing", async () => {
       const { deps, runReviewPipeline } = makeDeps(reviewResult(), only);
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(runReviewPipeline).not.toHaveBeenCalled();
     });
@@ -702,7 +716,7 @@ describe("reviewPullRequest: path filters", () => {
       // indistinguishable from one that came back clean.
       const { deps, client } = makeDeps(reviewResult(), only);
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       const published = client.createCheckRun.mock.calls[0]?.[0];
       expect(published?.conclusion).toBe("neutral");
@@ -716,7 +730,7 @@ describe("reviewPullRequest: path filters", () => {
     it("posts no review comments", async () => {
       const { deps, client } = makeDeps(reviewResult(), only);
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(client.createReview).not.toHaveBeenCalled();
       expect(client.listReviewComments).not.toHaveBeenCalled();
@@ -725,7 +739,7 @@ describe("reviewPullRequest: path filters", () => {
     it("reports the skip to the caller as an empty review", async () => {
       const { deps } = makeDeps(reviewResult(), only);
 
-      await expect(reviewPullRequest(target, deps)).resolves.toMatchObject({
+      await expect(reviewWithDelivery(target, deps)).resolves.toMatchObject({
         findings: [],
         candidates: [],
         agentFailures: [],
@@ -736,7 +750,7 @@ describe("reviewPullRequest: path filters", () => {
     it("logs the lifecycle of a review that never ran", async () => {
       const { deps, entries } = makeDeps(reviewResult(), only);
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(entries.map((entry) => entry["event"])).toEqual([
         "review.loaded",
@@ -745,14 +759,14 @@ describe("reviewPullRequest: path filters", () => {
       ]);
     });
 
-    it("uses the injected publisher, so the fork fallback still applies", async () => {
+    it("publishes through the delivery, so the fork fallback still applies", async () => {
       const publishReview = vi.fn<PublishReview>(async () => undefined);
       const { deps, client } = makeDeps(reviewResult(), {
         ...only,
         publishReview,
       });
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(client.createCheckRun).not.toHaveBeenCalled();
       expect(publishReview).toHaveBeenCalledTimes(1);
@@ -781,17 +795,19 @@ describe("reviewPullRequest: path filters", () => {
       },
     };
 
-    function makeFixDeps(applyFixes: boolean) {
-      const made = makeDeps(reviewResult({ candidates: [patchedFinding] }));
+    function makeFixDeps(commitFixes: boolean) {
+      const made = makeDeps(reviewResult({ candidates: [patchedFinding] }), {
+        commitFixes,
+      });
       made.client.listChangedFiles.mockResolvedValue(patchedFiles);
       made.client.getFileContents.mockResolvedValue(contents);
-      return { ...made, deps: { ...made.deps, applyFixes } };
+      return made;
     }
 
     it("commits the verified patch when fixes are enabled", async () => {
       const { deps, client } = makeFixDeps(true);
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(client.createCommitOnBranch).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({
@@ -808,7 +824,7 @@ describe("reviewPullRequest: path filters", () => {
     it("offers the patch as a suggestion when fixes are disabled", async () => {
       const { deps, client } = makeFixDeps(false);
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(client.createCommitOnBranch).not.toHaveBeenCalled();
       const review = client.createReview.mock.calls[0]?.[0];
@@ -820,7 +836,7 @@ describe("reviewPullRequest: path filters", () => {
       const { deps, client } = makeFixDeps(true);
       client.getFileContents.mockResolvedValue("const a = 99;\nconst b = 2;\n");
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(client.createCommitOnBranch).not.toHaveBeenCalled();
       const review = client.createReview.mock.calls[0]?.[0];
@@ -832,7 +848,7 @@ describe("reviewPullRequest: path filters", () => {
       const { deps, client } = makeFixDeps(true);
       client.getBranchTip.mockResolvedValue("movedon1");
 
-      await reviewPullRequest(target, deps);
+      await reviewWithDelivery(target, deps);
 
       expect(client.createCommitOnBranch).not.toHaveBeenCalled();
       const review = client.createReview.mock.calls[0]?.[0];
@@ -872,16 +888,16 @@ function readOnlyStore(content: string): MemoryStore {
   };
 }
 
-describe("reviewPullRequest: repository hints", () => {
+describe("reviewWithDelivery: repository hints", () => {
   it("hands the pipeline agents carrying the memory's qualifying shapes", async () => {
     const { deps, runReviewPipeline } = makeDeps(reviewResult(), {
       memoryStore: readOnlyStore(memoryFile()),
       now: () => NOW,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    const [hinted] = runReviewPipeline.mock.calls[0]?.[2] ?? [];
+    const [hinted] = runReviewPipeline.mock.calls[0]?.[0].agents ?? [];
     expect(hinted?.repositoryHints).toHaveLength(1);
     expect(hinted?.repositoryHints?.[0]).toContain(
       '"assignment instead of comparison in"',
@@ -894,7 +910,7 @@ describe("reviewPullRequest: repository hints", () => {
       now: () => NOW,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(entries).toContainEqual(
       expect.objectContaining({
@@ -912,9 +928,9 @@ describe("reviewPullRequest: repository hints", () => {
       now: () => NOW,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    const [unhinted] = runReviewPipeline.mock.calls[0]?.[2] ?? [];
+    const [unhinted] = runReviewPipeline.mock.calls[0]?.[0].agents ?? [];
     expect(unhinted?.repositoryHints).toBeUndefined();
     expect(entries).toContainEqual(
       expect.objectContaining({
@@ -931,9 +947,9 @@ describe("reviewPullRequest: repository hints", () => {
       agents: [agent],
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[2]?.[0]).toBe(agent);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents?.[0]).toBe(agent);
     expect(entries.map((entry) => entry["event"])).not.toContain(
       "memory.hints_attached",
     );
@@ -952,10 +968,10 @@ describe("reviewPullRequest: repository hints", () => {
       },
     );
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
-    expect(runReviewPipeline.mock.calls[0]?.[2]?.[0]).toBe(agent);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agents?.[0]).toBe(agent);
     // readMemory absorbs the transport error, so it surfaces as memory.invalid.
     expect(entries).toContainEqual(
       expect.objectContaining({ level: "error", event: "memory.invalid" }),
@@ -963,16 +979,16 @@ describe("reviewPullRequest: repository hints", () => {
   });
 });
 
-describe("reviewPullRequest: orchestrator memory", () => {
+describe("reviewWithDelivery: orchestrator memory", () => {
   it("hands the pipeline the synthesis hints the memory earns", async () => {
     const { deps, runReviewPipeline, entries } = makeDeps(reviewResult(), {
       memoryStore: readOnlyStore(memoryFile()),
       now: () => NOW,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[3]).toEqual({
+    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({
       keep: [],
       drop: ['Correctness: Findings like "assignment instead of comparison in".'],
     });
@@ -991,9 +1007,9 @@ describe("reviewPullRequest: orchestrator memory", () => {
       now: () => NOW,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[3]).toEqual({
+    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({
       keep: ['Correctness: Findings like "assignment instead of comparison in".'],
       drop: [],
     });
@@ -1002,9 +1018,9 @@ describe("reviewPullRequest: orchestrator memory", () => {
   it("synthesises unhinted when there is no memory store", async () => {
     const { deps, runReviewPipeline } = makeDeps(reviewResult());
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[3]).toEqual({ keep: [], drop: [] });
+    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({ keep: [], drop: [] });
   });
 });
 
@@ -1013,7 +1029,7 @@ describe("the repository index", () => {
   function indexPassedTo(
     runReviewPipeline: ReturnType<typeof makeDeps>["runReviewPipeline"],
   ): RepositoryIndex | undefined {
-    return runReviewPipeline.mock.calls[0]?.[4];
+    return runReviewPipeline.mock.calls[0]?.[0].index;
   }
 
   function entry(entries: ReturnType<typeof makeDeps>["entries"], event: string) {
@@ -1023,7 +1039,7 @@ describe("the repository index", () => {
   it("builds it from the base commit, never the head", async () => {
     const { deps, client, runReviewPipeline, entries } = makeDeps();
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.getRepositoryArchive).toHaveBeenCalledExactlyOnceWith({
       owner: target.owner,
@@ -1041,7 +1057,7 @@ describe("the repository index", () => {
   it("pairs the changed source file with its test", async () => {
     const { deps, runReviewPipeline } = makeDeps();
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(
       indexPassedTo(runReviewPipeline)?.files.get("src/sessions.ts")?.coveredBy,
@@ -1054,7 +1070,7 @@ describe("the repository index", () => {
       { index: false },
     );
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(client.getRepositoryArchive).not.toHaveBeenCalled();
     expect(indexPassedTo(runReviewPipeline)).toBeUndefined();
@@ -1066,7 +1082,7 @@ describe("the repository index", () => {
     const { deps, client, runReviewPipeline, entries } = makeDeps();
     client.getRepositoryArchive.mockRejectedValue(new Error("archive too large"));
 
-    await expect(reviewPullRequest(target, deps)).resolves.toBeDefined();
+    await expect(reviewWithDelivery(target, deps)).resolves.toBeDefined();
 
     expect(runReviewPipeline).toHaveBeenCalledTimes(1);
     expect(indexPassedTo(runReviewPipeline)).toBeUndefined();
@@ -1082,7 +1098,7 @@ describe("the repository index", () => {
       new ArchiveTooLargeError("the repository archive inflates past the cap"),
     );
 
-    await expect(reviewPullRequest(target, deps)).resolves.toBeDefined();
+    await expect(reviewWithDelivery(target, deps)).resolves.toBeDefined();
 
     expect(indexPassedTo(runReviewPipeline)).toBeUndefined();
     expect(entry(entries, "index.failed")).toMatchObject({
@@ -1099,7 +1115,7 @@ describe("the repository index", () => {
       truncated: true,
     });
 
-    await reviewPullRequest(target, deps);
+    await reviewWithDelivery(target, deps);
 
     expect(indexPassedTo(runReviewPipeline)?.truncated).toBe(true);
     expect(entry(entries, "index.built")).toMatchObject({ truncated: true });
@@ -1115,9 +1131,9 @@ describe("cancellation", () => {
     const controller = new AbortController();
     const { deps, runReviewPipeline } = makeDeps();
 
-    await reviewPullRequest(target, { ...deps, signal: controller.signal });
+    await reviewWithDelivery(target, { ...deps, signal: controller.signal });
 
-    expect(runReviewPipeline.mock.calls[0]?.[1]).toMatchObject({
+    expect(runReviewPipeline.mock.calls[0]?.[0]?.context).toMatchObject({
       signal: controller.signal,
     });
   });
@@ -1128,7 +1144,7 @@ describe("cancellation", () => {
     const { deps, client, runReviewPipeline, entries } = makeDeps();
 
     await expect(
-      reviewPullRequest(target, { ...deps, signal: controller.signal }),
+      reviewWithDelivery(target, { ...deps, signal: controller.signal }),
     ).rejects.toThrow(ReviewCancelledError);
 
     expect(client.getPullRequest).not.toHaveBeenCalled();
@@ -1147,7 +1163,7 @@ describe("cancellation", () => {
     });
 
     await expect(
-      reviewPullRequest(target, { ...deps, signal: controller.signal }),
+      reviewWithDelivery(target, { ...deps, signal: controller.signal }),
     ).rejects.toThrow(ReviewCancelledError);
 
     expect(client.createCheckRun).not.toHaveBeenCalled();
@@ -1168,7 +1184,7 @@ describe("cancellation", () => {
     });
 
     await expect(
-      reviewPullRequest(target, { ...deps, signal: controller.signal }),
+      reviewWithDelivery(target, { ...deps, signal: controller.signal }),
     ).rejects.toThrow(ReviewCancelledError);
 
     expect(client.createCheckRun).not.toHaveBeenCalled();

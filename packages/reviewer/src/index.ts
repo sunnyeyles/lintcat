@@ -9,6 +9,8 @@ export {
 export {
   createPipelineRunner,
   type PipelineRunnerDeps,
+  type ReviewClient,
+  type ReviewPipelineRun,
   type RunReviewPipeline,
 } from "#src/pipeline-runner";
 export { readAtCommit } from "#src/read-at-commit";
@@ -38,9 +40,32 @@ export {
   type PatchedFile,
 } from "#src/validate-patches";
 export {
-  reviewPullRequest,
+  reviewWithDelivery,
   type ReviewOutcome,
+  type ReviewWithDeliveryDeps,
 } from "#src/review-pull-request";
+export {
+  dashboardDelivery,
+  dashboardReview,
+  githubDelivery,
+  recordingDelivery,
+  type FinishedReviewRun,
+  type GithubDeliveryConfig,
+  type PublishReviewRun,
+  type RecordedDelivery,
+  type RecordingDelivery,
+  type ReviewDelivery,
+} from "#src/review-delivery";
+export {
+  runReview,
+  type CreateReviewAgents,
+  type ReviewAgentRequest,
+  type ReviewAgentSource,
+  type ReviewEngine,
+  type ReviewMemory,
+  type ReviewPolicy,
+  type ReviewRunSpec,
+} from "#src/review-run";
 export { buildReviewIndex, type ReviewIndexRequest } from "#src/build-index";
 export {
   learnFromMergedPullRequest,

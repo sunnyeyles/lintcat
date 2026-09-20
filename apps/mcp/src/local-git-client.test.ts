@@ -4,7 +4,11 @@ import path from "node:path";
 import { httpStatus } from "@pr-review/github";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { openLocalRepository, WORKING_TREE } from "#src/local-git-client";
+import {
+  openLocalRepository,
+  searchWorkingTree,
+  WORKING_TREE,
+} from "#src/local-git-client";
 import { createTestRepo, type TestRepo } from "#src/test-repo";
 
 let repo: TestRepo;
@@ -129,17 +133,68 @@ describe("the local client", () => {
     ]);
   });
 
-  it("never writes", async () => {
-    const { client, owner, repo: name } = await openLocalRepository(repo.root, "main");
+  it("declares nothing a checkout cannot honour, so a write cannot be called", async () => {
+    const { client } = await openLocalRepository(repo.root, "main");
 
-    await expect(
-      client.createCheckRun({
-        owner,
-        repo: name,
-        headSha: WORKING_TREE,
-        conclusion: "neutral",
-        output: { title: "", summary: "" },
-      }),
-    ).rejects.toThrow("not available on a local checkout");
+    for (const method of [
+      "compareCommits",
+      "createCheckRun",
+      "createReview",
+      "createCommitOnBranch",
+      "writeFileOnBranch",
+    ]) {
+      expect(method in client, method).toBe(false);
+    }
+  });
+});
+
+describe("searchWorkingTree", () => {
+  beforeEach(() => {
+    repo.write(
+      "src/search.ts",
+      [
+        "const alpha = 1;",
+        "const beta = 2;",
+        "const sum = alpha + beta;",
+        'const phrase = "alpha beta";',
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("reports one entry per matching line, with its path and line number", async () => {
+    const hits = await searchWorkingTree(repo.root, "sum");
+
+    expect(hits).toEqual([
+      { path: "src/search.ts", line: 3, text: "const sum = alpha + beta;" },
+    ]);
+  });
+
+  it("keeps only the lines holding every term, not every line of a file that does", async () => {
+    const hits = await searchWorkingTree(repo.root, "alpha beta");
+
+    expect(hits.map((hit) => hit.line)).toEqual([3, 4]);
+  });
+
+  it("reads a quoted phrase as one term, as the shared query grammar does", async () => {
+    const hits = await searchWorkingTree(repo.root, '"alpha beta"');
+
+    expect(hits.map((hit) => hit.line)).toEqual([4]);
+  });
+
+  it("matches without regard to case, and never as a regular expression", async () => {
+    await expect(searchWorkingTree(repo.root, "CONST ALPHA")).resolves.toHaveLength(3);
+    await expect(searchWorkingTree(repo.root, "alph.")).resolves.toEqual([]);
+  });
+
+  it("limits the search to the given path", async () => {
+    const hits = await searchWorkingTree(repo.root, "sessions", "src/api.ts");
+
+    expect(hits.every((hit) => hit.path === "src/api.ts")).toBe(true);
+    expect(hits.length).toBeGreaterThan(0);
+  });
+
+  it("returns nothing for a query with no terms", async () => {
+    await expect(searchWorkingTree(repo.root, "   ")).resolves.toEqual([]);
   });
 });
