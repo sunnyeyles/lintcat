@@ -47,8 +47,10 @@ import {
   reviewCorrelation,
   runReview,
   type DashboardPublisherConfig,
+  type FinishedReviewRun,
   type PublishToDashboard,
   type ReviewDelivery,
+  type ReviewRunSpec,
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
@@ -75,6 +77,8 @@ export interface ActionEnvironment {
   createDashboardPublisher: (
     config: DashboardPublisherConfig,
   ) => PublishToDashboard;
+  /** Runs the review the inputs assembled. */
+  runReview: (spec: ReviewRunSpec) => Promise<FinishedReviewRun>;
   logger: StructuredLogger;
   /** Marks the process as failed without exiting it. */
   setExitCode: (code: number) => void;
@@ -90,6 +94,7 @@ export function actionEnvironment(): ActionEnvironment {
     createPromptClient: createLangfusePromptClient,
     createLangfuseRuntime,
     createDashboardPublisher,
+    runReview,
     logger: createConsoleLogger(),
     setExitCode: (code) => {
       process.exitCode = code;
@@ -429,7 +434,7 @@ export async function runAction(
       applyFixes,
     });
 
-    await runReview({
+    await environment.runReview({
       client,
       target,
       delivery: actionDelivery(environment, {
