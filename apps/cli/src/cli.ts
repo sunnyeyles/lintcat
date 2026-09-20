@@ -2,6 +2,8 @@
  * `pr-review`: the reviewer as a plain command, for a git hook, a pre-commit
  * framework or a CI step. Findings come back validated or not at all.
  */
+import path from "node:path";
+
 import { errorMessage } from "@pr-review/logging";
 
 import { BYPASS_ENV, installPrePushHook } from "#src/hook";
@@ -74,7 +76,7 @@ async function dispatch(command: Command, deps: CliEnvironment): Promise<number>
     return runReviewCommand({ ...command, color: useColor(deps, command.color) }, deps);
   }
   const installed = await installPrePushHook({
-    repoPath: command.repoPath ?? deps.environment.cwd,
+    repoPath: path.resolve(deps.environment.cwd, command.repoPath ?? "."),
     command: command.command ?? deps.commandLine,
     failOn: command.failOn,
     force: command.force,
