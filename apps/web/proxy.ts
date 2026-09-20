@@ -4,7 +4,7 @@ import { appDomain, organizationSlugFromHost, subdomainRewritePath } from "@/lib
 import { apexUrl, isApexOnly, REQUEST_PATH_HEADER } from "@/lib/paths";
 
 // Server components cannot read the URL, so the sign-in redirect gets it from here.
-export function middleware(request: NextRequest): NextResponse {
+export function proxy(request: NextRequest): NextResponse {
   const { pathname, search, protocol } = request.nextUrl;
   const host = request.headers.get("host");
   const slug = organizationSlugFromHost(host, appDomain());

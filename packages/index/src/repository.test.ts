@@ -16,6 +16,7 @@ const SKIPPED = new Set([
   ".turbo",
   ".vercel",
   "dist",
+  "next-env.d.ts",
   "node_modules",
 ]);
 
