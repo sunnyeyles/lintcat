@@ -1,4 +1,12 @@
-import { Button, EmptyState } from "@pr-review/design";
+import {
+  Button,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@pr-review/design";
 import { LogIn } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -20,7 +28,10 @@ export default async function SignInPage({
 }) {
   const domain = appDomain();
   const requested = safeCallbackUrl((await searchParams).callbackUrl, domain);
-  const callbackUrl = returnUrl(requested === "/" ? DASHBOARD_PATH : requested, domain);
+  const callbackUrl = returnUrl(
+    requested === "/" ? DASHBOARD_PATH : requested,
+    domain,
+  );
   if (await currentSession()) redirect(callbackUrl);
 
   return (
@@ -30,17 +41,24 @@ export default async function SignInPage({
         title="Sign in"
         description="Every review the action publishes for your organization, read from the dashboard's database."
       />
-      <EmptyState
-        icon={<LogIn />}
-        title="Reviews your agents wrote"
-        description="Sign in with GitHub to see your organizations' repositories, reviews and findings."
-        action={
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <LogIn />
+          </EmptyMedia>
+          <EmptyTitle>Reviews your agents wrote</EmptyTitle>
+          <EmptyDescription>
+            Sign in with GitHub to see your organizations' repositories, reviews and
+            findings.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
           <form action={signInWithGithub}>
             <input type="hidden" name="callbackUrl" value={callbackUrl} />
             <Button type="submit">Sign in with GitHub</Button>
           </form>
-        }
-      />
+        </EmptyContent>
+      </Empty>
     </div>
   );
 }

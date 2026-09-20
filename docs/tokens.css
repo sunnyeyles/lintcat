@@ -1,4 +1,4 @@
-/* Generated from tokens.ts by `pnpm --filter @pr-review/design generate`. Do not edit. */
+/* Standalone palette for docs/index.html; the app uses shadcn tokens instead. */
 
 :root {
   --measure: 67ch;

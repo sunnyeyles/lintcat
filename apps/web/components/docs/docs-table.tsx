@@ -18,7 +18,7 @@ export type DocsTableProps = {
 
 export function DocsTable({ caption, columns, rows }: DocsTableProps) {
   return (
-    <Card padding="table">
+    <Card className="py-0">
       <Table>
         <TableCaption className="sr-only">{caption}</TableCaption>
         <TableHeader>

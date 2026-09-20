@@ -21,13 +21,13 @@ export function FilePath({ file, line, className }: FilePathProps) {
       <span className="sr-only">{full}</span>
       {dir ? (
         // RTL clips the head of the path, so the file name survives the squeeze.
-        <span dir="rtl" aria-hidden className="min-w-0 truncate text-slate">
+        <span dir="rtl" aria-hidden className="min-w-0 truncate text-muted-foreground">
           {dir}
         </span>
       ) : null}
-      <span aria-hidden className="shrink-0 text-ink">
+      <span aria-hidden className="shrink-0 text-foreground">
         {base}
-        {suffix ? <span className="text-slate">{suffix}</span> : null}
+        {suffix ? <span className="text-muted-foreground">{suffix}</span> : null}
       </span>
     </span>
   );

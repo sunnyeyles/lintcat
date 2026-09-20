@@ -14,7 +14,7 @@ export function SeverityMix({ bySeverity, className }: SeverityMixProps) {
   const present = ORDER.filter((severity) => bySeverity[severity] > 0);
 
   if (present.length === 0) {
-    return <span className="font-mono text-caption text-slate">no findings</span>;
+    return <span className="font-mono text-xs text-muted-foreground">no findings</span>;
   }
 
   return (

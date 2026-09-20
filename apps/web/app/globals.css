@@ -1,29 +1,8 @@
 @import "tailwindcss";
-@import "@pr-review/design/tokens.css";
+@import "tw-animate-css";
 @import "@pr-review/design/theme.css";
 
 @source "../../../packages/design/src";
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-* {
-  border-color: var(--rule-soft);
-}
-
-body {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: --theme(--font-mono);
-  -webkit-font-smoothing: antialiased;
-}
-
-h1,
-h2,
-h3 {
-  font-family: --theme(--font-display);
-  text-wrap: balance;
-  line-height: 1.15;
-  font-weight: 600;
-}
 
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -4,7 +4,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  EmptyState,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+  Progress,
   Table,
   TableBody,
   TableCaption,
@@ -14,8 +18,8 @@ import {
   TableRow,
 } from "@pr-review/design";
 
-import type { Usage } from "@pr-review/db/dashboard";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
+import type { Usage } from "@pr-review/db/dashboard";
 
 import { sumTokens } from "./series";
 
@@ -31,7 +35,7 @@ export function CostByRepoTable({
 
   return (
     <Card className="flex min-w-0 flex-col">
-      <CardHeader className="block">
+      <CardHeader>
         <CardTitle>Cost by repository</CardTitle>
         <CardDescription>
           Repository names are long and the list is open-ended, so this one stays a table.
@@ -39,10 +43,12 @@ export function CostByRepoTable({
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <EmptyState
-            title="No repository spend"
-            description={`Nothing was reviewed in ${rangePhrase}.`}
-          />
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No repository spend</EmptyTitle>
+              <EmptyDescription>Nothing was reviewed in {rangePhrase}.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <Table>
             <TableCaption>
@@ -86,15 +92,7 @@ export function CostByRepoTable({
                     <TableCell className="text-right">
                       <span className="flex items-center justify-end gap-2">
                         <span className="tabular-nums">{share.toFixed(1)}%</span>
-                        <span
-                          aria-hidden
-                          className="h-1.5 w-12 shrink-0 rounded-xs bg-accent/15"
-                        >
-                          <span
-                            className="block h-full rounded-xs bg-accent"
-                            style={{ width: `${share}%` }}
-                          />
-                        </span>
+                        <Progress value={share} className="h-1.5 w-12 shrink-0" />
                       </span>
                     </TableCell>
                   </TableRow>

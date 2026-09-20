@@ -50,7 +50,7 @@ export default function AgentsPage() {
           specialists ship alongside it, one file each in{" "}
           <code>packages/ai/src/agents/specialists/</code>.
         </P>
-        <Card padding="table">
+        <Card className="py-0">
           <Table>
             <TableCaption className="sr-only">
               The agents that ship, and what each reviews for.

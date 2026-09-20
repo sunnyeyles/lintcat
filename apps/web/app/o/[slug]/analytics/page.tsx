@@ -1,4 +1,9 @@
-import { EmptyState, Stat, StatGrid } from "@pr-review/design";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@pr-review/design";
 import type { Metadata } from "next";
 
 import {
@@ -11,6 +16,7 @@ import {
   SeverityTrendChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber } from "@/lib/format";
 
@@ -70,10 +76,12 @@ export default async function AnalyticsPage({
           </StatGrid>
 
           {totals.reviews === 0 ? (
-            <EmptyState
-              title="Nothing to plot yet"
-              description={`No reviews landed in ${phrase}. Try a wider range.`}
-            />
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>Nothing to plot yet</EmptyTitle>
+                <EmptyDescription>{`No reviews landed in ${phrase}. Try a wider range.`}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2">
               <div className="min-w-0 xl:col-span-2">

@@ -60,7 +60,7 @@ export default function ConfigurationPage() {
       headings={HEADINGS}
     >
       <Section id="inputs" title="Action inputs">
-        <Card padding="table">
+        <Card className="py-0">
           <Table>
             <TableCaption className="sr-only">
               Action inputs, their defaults and what each one does.
@@ -123,7 +123,7 @@ export default function ConfigurationPage() {
           Every permission degrades rather than fails, except the first. Write access to file
           contents is requested only for <code>fix: true</code>; merges and approvals never.
         </P>
-        <Card padding="table">
+        <Card className="py-0">
           <Table>
             <TableCaption className="sr-only">
               What each workflow token permission buys, and what happens without it.

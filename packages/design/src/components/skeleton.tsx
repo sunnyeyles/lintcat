@@ -1,13 +1,13 @@
-import type { ComponentProps } from "react";
+import { cn } from "#src/cn"
 
-import { cn } from "#src/cn";
-
-export function Skeleton({ className, ...props }: ComponentProps<"div">) {
+function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      aria-hidden
-      className={cn("animate-pulse rounded-xs bg-surface-2", className)}
+      data-slot="skeleton"
+      className={cn("animate-pulse rounded-md bg-accent", className)}
       {...props}
     />
-  );
+  )
 }
+
+export { Skeleton }

@@ -4,10 +4,15 @@ import type { Finding } from "@pr-review/db";
 import {
   Button,
   Card,
-  EmptyState,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
   Label,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -69,7 +74,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
   return (
     <section aria-labelledby="findings-heading">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-        <h2 id="findings-heading" className="eyebrow font-mono">
+        <h2 id="findings-heading" className="text-muted-foreground font-mono text-xs tracking-wide uppercase">
           Findings
         </h2>
         <div className="flex flex-wrap items-end gap-3">
@@ -83,12 +88,14 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All severities</SelectItem>
-                {SEVERITIES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value={ALL}>All severities</SelectItem>
+                  {SEVERITIES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -102,12 +109,14 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL}>All agents</SelectItem>
-                {agents.map((a) => (
-                  <SelectItem key={a} value={a}>
-                    {agentLabel(a)}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value={ALL}>All agents</SelectItem>
+                  {agents.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {agentLabel(a)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -119,22 +128,26 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
         </div>
       </div>
 
-      <p aria-live="polite" className="mb-3 font-mono text-caption text-slate">
+      <p aria-live="polite" className="text-muted-foreground mb-3 font-mono text-xs">
         {rows.length} of {sorted.length} shown · sorted by severity, then confidence
       </p>
 
       {rows.length === 0 ? (
-        <EmptyState
-          title="No findings match these filters"
-          description="Widen the severity or agent filter to see the rest of this review."
-          action={
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No findings match these filters</EmptyTitle>
+            <EmptyDescription>
+              Widen the severity or agent filter to see the rest of this review.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
             <Button variant="outline" size="sm" onClick={reset}>
               Clear filters
             </Button>
-          }
-        />
+          </EmptyContent>
+        </Empty>
       ) : (
-        <Card padding="table">
+        <Card className="py-0">
           <Table className="min-w-[52rem] table-fixed">
             <TableHeader>
               <TableRow>
@@ -150,7 +163,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
                 <TableRow
                   key={finding.id}
                   onClick={() => setSelected(finding)}
-                  className="cursor-pointer has-[:focus-visible]:bg-surface-2"
+                  className="cursor-pointer has-[:focus-visible]:bg-muted"
                 >
                   <TableCell>
                     <SeverityBadge severity={finding.severity} />
@@ -159,10 +172,10 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
                     <FilePath
                       file={finding.file}
                       line={finding.line}
-                      className="text-body"
+                      className="text-sm"
                     />
                   </TableCell>
-                  <TableCell className="text-slate">{finding.category}</TableCell>
+                  <TableCell className="text-muted-foreground">{finding.category}</TableCell>
                   <TableCell>
                     <button
                       type="button"
@@ -174,7 +187,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
                         e.stopPropagation();
                         setSelected(finding);
                       }}
-                      className="text-left leading-snug text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                      className="text-left leading-snug text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       {finding.title}
                     </button>

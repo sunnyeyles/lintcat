@@ -1,4 +1,10 @@
-import { Card, EmptyState } from "@pr-review/design";
+import {
+  Card,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@pr-review/design";
 
 import { RepoTable } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
@@ -28,7 +34,7 @@ export default async function ReposPage({
 
       <div className="mt-8">
         {repos.length > 0 ? (
-          <Card padding="table">
+          <Card className="py-0">
             <RepoTable
               slug={slug}
               repos={repos}
@@ -36,10 +42,15 @@ export default async function ReposPage({
             />
           </Card>
         ) : (
-          <EmptyState
-            title="No repositories yet"
-            description="Install the review workflow on a repository and its first review will appear here."
-          />
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>No repositories yet</EmptyTitle>
+              <EmptyDescription>
+                Install the review workflow on a repository and its first review will
+                appear here.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </div>
     </>

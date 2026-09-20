@@ -1,16 +1,15 @@
 "use client";
 
-import { Bar, BarChart, Cell, LabelList, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartTooltip, ChartTooltipContent } from "@pr-review/design";
+import type { ReactNode } from "react";
+import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts";
 
 import { formatDuration, formatNumber } from "@/lib/format";
 import type { AgentBreakdown } from "@pr-review/db/dashboard";
 
-import { axisLineProps, barCursorProps, TICK_FONT_SIZE, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
-import { ChartTooltip } from "./chart-tooltip";
-import { AGENT_COLOR } from "./series";
-import { useChartColors } from "./use-chart-colors";
+import { AGENT_COLOR, AGENT_CONFIG } from "./series";
 
 export function AgentFindingsChart({
   byAgent,
@@ -19,7 +18,6 @@ export function AgentFindingsChart({
   byAgent: AgentBreakdown[];
   rangePhrase: string;
 }) {
-  const colors = useChartColors();
   const rows = [...byAgent].sort((a, b) => b.findingCount - a.findingCount);
   const top = rows[0];
   const total = rows.reduce((sum, row) => sum + row.findingCount, 0);
@@ -34,6 +32,7 @@ export function AgentFindingsChart({
       title="Findings by agent"
       description="Which reviewer is finding the work."
       summary={summary}
+      config={AGENT_CONFIG}
       height={Math.max(180, rows.length * 42)}
       table={
         <ChartDataTable
@@ -61,14 +60,11 @@ export function AgentFindingsChart({
           type="category"
           dataKey="agent"
           width={92}
-          tick={tickProps(colors)}
           tickLine={false}
-          axisLine={axisLineProps(colors)}
+          axisLine={false}
+          tickMargin={8}
         />
-        <Tooltip
-          cursor={barCursorProps(colors)}
-          content={<ChartTooltip formatValue={formatNumber} />}
-        />
+        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
         <Bar
           dataKey="findingCount"
           name="Findings"
@@ -77,14 +73,14 @@ export function AgentFindingsChart({
           isAnimationActive={false}
         >
           {rows.map((row) => (
-            <Cell key={row.agent} fill={colors[AGENT_COLOR[row.agent]]} />
+            <Cell key={row.agent} fill={AGENT_COLOR[row.agent]} />
           ))}
           <LabelList
             dataKey="findingCount"
             position="right"
-            fill={colors.slate}
-            fontSize={TICK_FONT_SIZE}
-            formatter={formatNumber}
+            className="fill-muted-foreground"
+            fontSize={11}
+            formatter={(value: ReactNode) => formatNumber(Number(value))}
           />
         </Bar>
       </BarChart>

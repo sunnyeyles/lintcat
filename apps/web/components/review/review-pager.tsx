@@ -26,14 +26,14 @@ function PagerLink({
     <Link
       href={organizationPath(slug, `/reviews/${review.id}`)}
       className={cn(
-        "group flex min-w-0 flex-1 basis-56 items-center gap-2.5 rounded-sm border border-rule bg-surface px-3.5 py-3 transition-colors outline-none hover:border-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+        "group flex min-w-0 flex-1 basis-56 items-center gap-2.5 rounded-sm border border-border bg-card px-3.5 py-3 transition-colors outline-none hover:border-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         newer ? "" : "flex-row-reverse text-right",
       )}
     >
-      <Icon className="size-3.5 shrink-0 text-slate-dim group-hover:text-accent" />
+      <Icon className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary" />
       <span className="min-w-0">
-        <span className="eyebrow block font-mono">{newer ? "Newer" : "Older"}</span>
-        <span className="block truncate font-mono text-body text-ink">
+        <span className="text-muted-foreground text-xs tracking-wide uppercase block font-mono">{newer ? "Newer" : "Older"}</span>
+        <span className="block truncate font-mono text-sm text-foreground">
           {review.repo.owner}/{review.repo.name} #{review.prNumber}
         </span>
       </span>

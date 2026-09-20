@@ -56,7 +56,7 @@ export default function McpServerPage() {
       </Section>
 
       <Section id="tools" title="Tools">
-        <Card padding="table">
+        <Card className="py-0">
           <Table>
             <TableCaption className="sr-only">
               The tools the MCP server exposes, and what each one does.

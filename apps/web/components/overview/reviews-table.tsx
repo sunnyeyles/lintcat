@@ -44,8 +44,8 @@ export function ReviewsTable({ slug, reviews, caption }: ReviewsTableProps) {
         {reviews.map((review) => (
           <TableRow key={review.id} className="group relative">
             <TableCell className="whitespace-nowrap">
-              <span className="text-slate">{review.repo.owner}/</span>
-              <span className="text-ink">{review.repo.name}</span>
+              <span className="text-muted-foreground">{review.repo.owner}/</span>
+              <span className="text-foreground">{review.repo.name}</span>
             </TableCell>
             <TableCell className="whitespace-nowrap">
               <RowLink

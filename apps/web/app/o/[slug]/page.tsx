@@ -1,13 +1,16 @@
-import { Button, Card, EmptyState, Stat, StatGrid } from "@pr-review/design";
+import {
+  Button,
+  Card,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@pr-review/design";
 import Link from "next/link";
 
-import {
-  RepoTable,
-  ReviewsTable,
-  Section,
-  Sparkline,
-} from "@/components/overview";
+import { RepoTable, ReviewsTable, Section, Sparkline } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
@@ -28,7 +31,9 @@ export default async function OverviewPage({
 
   const { totals } = trends;
   const highShare =
-    totals.findings > 0 ? Math.round((totals.bySeverity.high / totals.findings) * 100) : 0;
+    totals.findings > 0
+      ? Math.round((totals.bySeverity.high / totals.findings) * 100)
+      : 0;
 
   return (
     <>
@@ -44,8 +49,15 @@ export default async function OverviewPage({
       />
 
       <StatGrid className="mt-8">
-        <Stat label="Reviews / 30d" value={formatNumber(totals.reviews)} hint="one per head SHA">
-          <Sparkline points={trends.points} label="Daily review volume over the last 30 days" />
+        <Stat
+          label="Reviews / 30d"
+          value={formatNumber(totals.reviews)}
+          hint="one per head SHA"
+        >
+          <Sparkline
+            points={trends.points}
+            label="Daily review volume over the last 30 days"
+          />
         </Stat>
         <Stat
           label="Findings / 30d"
@@ -73,7 +85,7 @@ export default async function OverviewPage({
       </StatGrid>
 
       <Section title="Recent reviews">
-        <Card padding="table">
+        <Card className="py-0">
           {reviews.length > 0 ? (
             <ReviewsTable
               slug={slug}
@@ -81,10 +93,14 @@ export default async function OverviewPage({
               caption="The eight most recent reviews, newest first."
             />
           ) : (
-            <EmptyState
-              title="No reviews yet"
-              description="Once the action runs on a pull request, the review lands here."
-            />
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No reviews yet</EmptyTitle>
+                <EmptyDescription>
+                  Once the action runs on a pull request, the review lands here.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
         </Card>
       </Section>
@@ -94,13 +110,13 @@ export default async function OverviewPage({
         action={
           <Link
             href={organizationPath(slug, "/repos")}
-            className="font-mono text-caption text-accent no-underline hover:underline"
+            className="text-primary font-mono text-xs no-underline hover:underline"
           >
             View all →
           </Link>
         }
       >
-        <Card padding="table">
+        <Card className="py-0">
           {repos.length > 0 ? (
             <RepoTable
               slug={slug}
@@ -109,10 +125,14 @@ export default async function OverviewPage({
               caption="Repositories connected to this organization, most recently reviewed first."
             />
           ) : (
-            <EmptyState
-              title="No repositories connected"
-              description="Add the review workflow to a repository to see it here."
-            />
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No repositories connected</EmptyTitle>
+                <EmptyDescription>
+                  Add the review workflow to a repository to see it here.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
         </Card>
       </Section>

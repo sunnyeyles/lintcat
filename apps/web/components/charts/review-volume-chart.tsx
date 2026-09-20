@@ -1,16 +1,22 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  type ChartConfig,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@pr-review/design";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatNumber } from "@/lib/format";
 import type { TrendPoint } from "@pr-review/db/dashboard";
 
-import { axisLineProps, cursorProps, gridProps, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
-import { ChartTooltip } from "./chart-tooltip";
 import { formatAxisDate } from "./series";
-import { useChartColors } from "./use-chart-colors";
+
+const CONFIG = {
+  reviews: { label: "Reviews", color: "var(--chart-1)" },
+} satisfies ChartConfig;
 
 export function ReviewVolumeChart({
   points,
@@ -19,8 +25,6 @@ export function ReviewVolumeChart({
   points: TrendPoint[];
   rangePhrase: string;
 }) {
-  const colors = useChartColors();
-
   const total = points.reduce((sum, point) => sum + point.reviews, 0);
   const busiest = points.reduce(
     (best, point) => (point.reviews > best.reviews ? point : best),
@@ -38,6 +42,7 @@ export function ReviewVolumeChart({
       title="Review volume"
       description="Reviews completed per day."
       summary={summary}
+      config={CONFIG}
       table={
         <ChartDataTable
           caption="Reviews by day"
@@ -50,39 +55,35 @@ export function ReviewVolumeChart({
       }
     >
       <AreaChart data={points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid {...gridProps(colors)} />
+        <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={formatAxisDate}
-          tick={tickProps(colors)}
           tickLine={false}
-          axisLine={axisLineProps(colors)}
+          axisLine={false}
+          tickMargin={8}
           minTickGap={28}
           interval="preserveStartEnd"
         />
         <YAxis
           width={38}
           allowDecimals={false}
-          tick={tickProps(colors)}
           tickLine={false}
           axisLine={false}
+          tickMargin={8}
           tickFormatter={formatNumber}
         />
-        <Tooltip
-          cursor={cursorProps(colors)}
-          content={
-            <ChartTooltip formatValue={formatNumber} formatHeading={formatAxisDate} />
-          }
+        <ChartTooltip
+          content={<ChartTooltipContent labelFormatter={(l) => formatAxisDate(String(l))} />}
         />
         <Area
           type="monotone"
           dataKey="reviews"
           name="Reviews"
-          stroke={colors.accent}
+          stroke="var(--color-reviews)"
           strokeWidth={2}
-          fill={colors.accent}
+          fill="var(--color-reviews)"
           fillOpacity={0.1}
-          activeDot={{ r: 4, stroke: colors.surface, strokeWidth: 2 }}
           isAnimationActive={false}
         />
       </AreaChart>
