@@ -78,7 +78,6 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         baseSha: local.baseSha,
         agents,
         index,
-        publish: false,
       });
       return reviewResult(
         result,
@@ -117,7 +116,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
         target: { ...ref, headSha: pullRequest.headSha },
         baseSha: pullRequest.baseSha,
         agents,
-        publish,
+        ...(publish ? { publishTo: client } : {}),
       });
       const where = `${owner}/${repo}#${number} at ${pullRequest.headSha.slice(0, 7)}`;
       return reviewResult(
