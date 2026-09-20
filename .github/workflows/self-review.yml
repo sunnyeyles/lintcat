@@ -93,3 +93,6 @@ jobs:
           langfuse-secret-key: ${{ secrets.LANGFUSE_SECRET_KEY }}
           # Keys are region-scoped: the wrong host 401s and drops every trace.
           langfuse-base-url: ${{ secrets.LANGFUSE_BASE_URL }}
+          # Optional: without both, the review is published to GitHub only.
+          dashboard-url: ${{ secrets.DASHBOARD_URL }}
+          dashboard-token: ${{ secrets.DASHBOARD_TOKEN }}
