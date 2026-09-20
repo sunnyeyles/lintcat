@@ -42,7 +42,7 @@ export interface ReviewPolicy {
  */
 export type ReviewAgentSource =
   | {
-      /** The commit the `agents/` configuration is read at. */
+      /** The commit the agent configuration is read at. */
       readAt: string;
       /** Comma-separated categories; empty runs the configured set. */
       select?: string | undefined;
