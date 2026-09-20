@@ -1,16 +1,19 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@pr-review/design";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatNumber } from "@/lib/format";
 import type { TrendPoint } from "@pr-review/db/dashboard";
 
-import { axisLineProps, cursorProps, gridProps, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
-import { ChartTooltip } from "./chart-tooltip";
-import { formatAxisDate, SEVERITY_SERIES } from "./series";
-import { useChartColors } from "./use-chart-colors";
+import { formatAxisDate, SEVERITY_CONFIG, SEVERITY_SERIES } from "./series";
 
 export function SeverityTrendChart({
   points,
@@ -19,8 +22,6 @@ export function SeverityTrendChart({
   points: TrendPoint[];
   rangePhrase: string;
 }) {
-  const colors = useChartColors();
-
   const totals = { low: 0, medium: 0, high: 0 };
   let peak = { date: "", count: 0 };
   for (const point of points) {
@@ -42,10 +43,7 @@ export function SeverityTrendChart({
       title="Findings over time"
       description="Daily findings, stacked by severity."
       summary={summary}
-      legend={SEVERITY_SERIES.map((series) => ({
-        label: series.label,
-        color: colors[series.color],
-      }))}
+      config={SEVERITY_CONFIG}
       table={
         <ChartDataTable
           caption="Findings by day"
@@ -63,34 +61,30 @@ export function SeverityTrendChart({
       }
     >
       <AreaChart data={points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid {...gridProps(colors)} />
+        <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={formatAxisDate}
-          tick={tickProps(colors)}
           tickLine={false}
-          axisLine={axisLineProps(colors)}
+          axisLine={false}
+          tickMargin={8}
           minTickGap={28}
           interval="preserveStartEnd"
         />
         <YAxis
           width={38}
           allowDecimals={false}
-          tick={tickProps(colors)}
           tickLine={false}
           axisLine={false}
+          tickMargin={8}
           tickFormatter={formatNumber}
         />
-        <Tooltip
-          cursor={cursorProps(colors)}
+        <ChartTooltip
           content={
-            <ChartTooltip
-              formatValue={formatNumber}
-              formatHeading={formatAxisDate}
-              totalLabel="All severities"
-            />
+            <ChartTooltipContent labelFormatter={(l) => formatAxisDate(String(l))} />
           }
         />
+        <ChartLegend content={<ChartLegendContent />} />
         {SEVERITY_SERIES.map((series) => (
           <Area
             key={series.key}
@@ -98,9 +92,9 @@ export function SeverityTrendChart({
             dataKey={series.key}
             name={series.label}
             stackId="severity"
-            fill={colors[series.color]}
+            fill={`var(--color-${series.key})`}
             fillOpacity={0.9}
-            stroke={colors.surface}
+            stroke="var(--color-card)"
             strokeWidth={2}
             isAnimationActive={false}
           />

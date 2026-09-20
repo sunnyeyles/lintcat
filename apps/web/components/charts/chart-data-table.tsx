@@ -21,8 +21,8 @@ export type ChartDataTableProps = {
 // The text alternative every chart carries: no value is reachable only by hovering.
 export function ChartDataTable({ caption, columns, rows }: ChartDataTableProps) {
   return (
-    <details className="mt-3 border-t border-rule-soft pt-2">
-      <summary className="cursor-pointer font-mono text-caption tracking-caps text-slate uppercase outline-none hover:text-ink focus-visible:ring-2 focus-visible:ring-accent">
+    <details className="mt-3 border-t pt-2">
+      <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer text-xs tracking-wide uppercase outline-none focus-visible:ring-2">
         {caption}
       </summary>
       <div className="mt-2">

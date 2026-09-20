@@ -13,7 +13,7 @@ import {
 } from "@pr-review/ai";
 import type {
   ExistingReviewComment,
-  GithubInstallationClient,
+  PullRequestReadClient,
 } from "@pr-review/github";
 import {
   createConsoleLogger,
@@ -23,18 +23,11 @@ import {
 import type { ReviewFinding } from "@pr-review/schemas";
 
 import { buildReviewIndex } from "#src/build-index";
-import type { RunReviewPipeline } from "#src/pipeline-runner";
+import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
 import { countLabel } from "#src/finding-format";
-import {
-  createCheckRunPublisher,
-  createFixPublisher,
-  createReviewCommentPublisher,
-  deliverReview,
-  type PublishFixes,
-  type PublishReview,
-  type PublishReviewComments,
-} from "#src/publish-review";
+import { deliverReview, type PublishReview } from "#src/publish-review";
+import type { ReviewDelivery } from "#src/review-delivery";
 import {
   computeHints,
   computeSynthesisHints,
@@ -57,21 +50,16 @@ import {
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 
-interface ReviewPullRequestDeps {
-  /** Authenticated GitHub client for this repository. */
-  client: GithubInstallationClient;
+/** What one review needs once its delivery has already been chosen. */
+export interface ReviewWithDeliveryDeps {
+  /** Reads only; every write this review makes goes through `delivery`. */
+  client: ReviewClient;
   /** The run's agent set, already narrowed by the `agents` input. */
   agents: readonly AgentDefinition[];
   /** Throws only when every agent failed; a synthesis failure is reported on the result. */
   runReviewPipeline: RunReviewPipeline;
-  /** Defaults to publishing a check run through `client`. */
-  publishReview?: PublishReview | undefined;
-  /** Defaults to publishing a review through `client`. */
-  publishReviewComments?: PublishReviewComments | undefined;
-  /** Whether verified patches may be committed to the head branch. */
-  applyFixes?: boolean | undefined;
-  /** Defaults to committing through `client`, when applyFixes is on. */
-  publishFixes?: PublishFixes | undefined;
+  /** The only route to a publisher: there is no default, and no live fallback. */
+  delivery: ReviewDelivery;
   /** Every event carries repository, PR number, and head SHA. */
   logger?: StructuredLogger | undefined;
   /** Where this repository's review memory lives; undefined means no hints. */
@@ -87,7 +75,7 @@ interface ReviewPullRequestDeps {
 
 /** The comments already on the pull request; none if they cannot be read. */
 async function listPostedComments(
-  client: GithubInstallationClient,
+  client: PullRequestReadClient,
   target: ReviewTarget,
   logger: StructuredLogger,
 ): Promise<ExistingReviewComment[]> {
@@ -104,7 +92,7 @@ async function listPostedComments(
 }
 
 async function openEarlierFindings(
-  client: GithubInstallationClient,
+  client: PullRequestReadClient,
   target: ReviewTarget,
   logger: StructuredLogger,
 ): Promise<PostedFinding[]> {
@@ -247,24 +235,24 @@ function unreviewed(): ReviewOutcome {
   };
 }
 
-/** Throws when the pipeline or the publish step fails; retries are the caller's. */
-export async function reviewPullRequest(
+/**
+ * One review against a delivery that was already chosen. Throws when the
+ * pipeline or the publish step fails; retries are the caller's.
+ */
+export async function reviewWithDelivery(
   target: ReviewTarget,
   {
     client,
     agents,
     runReviewPipeline,
-    publishReview,
-    publishReviewComments,
-    applyFixes = false,
-    publishFixes,
+    delivery,
     logger = createConsoleLogger(),
     memoryStore,
     now = () => new Date(),
     incremental = false,
     index = true,
     signal,
-  }: ReviewPullRequestDeps,
+  }: ReviewWithDeliveryDeps,
 ): Promise<ReviewOutcome> {
   const fields = reviewCorrelation(target);
   const cancelled = (stage: string): never => {
@@ -293,13 +281,12 @@ export async function reviewPullRequest(
     logger,
   });
   const whole = wholePullRequest(scope);
-  const publisher = publishReview ?? createCheckRunPublisher(client);
   // The early returns below publish too, so the guard sits on the publisher.
   const publish: PublishReview = async (reviewed, rendered) => {
     if (signal?.aborted === true) {
       cancelled("before publish");
     }
-    await publisher(reviewed, rendered);
+    await delivery.publishCheckRun(reviewed, rendered);
   };
   // Agents see the scope; publishing sees the whole PR, so comments anchor anywhere.
   const filenames = scope.changedFiles.map((file) => file.filename);
@@ -367,9 +354,9 @@ export async function reviewPullRequest(
   });
 
   // The AI boundary: only the validate step's output reaches GitHub.
-  const review = await runReviewPipeline(
+  const review = await runReviewPipeline({
     client,
-    {
+    context: {
       owner: target.owner,
       repo: target.repo,
       pullRequest,
@@ -381,10 +368,10 @@ export async function reviewPullRequest(
           : undefined,
       signal,
     },
-    active,
-    synthesisHints,
-    repositoryIndex,
-  ).catch((error: unknown) => {
+    agents: active,
+    hints: synthesisHints,
+    index: repositoryIndex,
+  }).catch((error: unknown) => {
     if (isCancellation(error, signal)) {
       cancelled("agents");
     }
@@ -440,11 +427,10 @@ export async function reviewPullRequest(
     },
     {
       publishCheckRun: publish,
-      publishComments:
-        publishReviewComments ?? createReviewCommentPublisher(client, logger),
-      ...(applyFixes
-        ? { publishFixes: publishFixes ?? createFixPublisher(client, logger) }
-        : {}),
+      publishComments: delivery.publishComments,
+      ...(delivery.publishFixes === undefined
+        ? {}
+        : { publishFixes: delivery.publishFixes }),
       logger,
     },
   );

@@ -1,16 +1,26 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@pr-review/design";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatTokens, formatUsd } from "@/lib/format";
 import type { TokenCounts, UsagePoint } from "@pr-review/db/dashboard";
 
-import { axisLineProps, cursorProps, gridProps, tickProps } from "./axis";
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
-import { ChartTooltip } from "./chart-tooltip";
-import { formatAxisDate, sumTokens, type TokenKey, TOKEN_SERIES } from "./series";
-import { useChartColors } from "./use-chart-colors";
+import {
+  formatAxisDate,
+  sumTokens,
+  TOKEN_CONFIG,
+  type TokenKey,
+  TOKEN_SERIES,
+} from "./series";
+import { formatWith } from "./tooltip-format";
 
 function pct(part: number, whole: number): number {
   return whole === 0 ? 0 : (part / whole) * 100;
@@ -27,10 +37,11 @@ export function TokenCompositionChart({
   costByClass: Record<TokenKey, number>;
   rangePhrase: string;
 }) {
-  const colors = useChartColors();
-
   const tokenTotal = sumTokens(totals);
-  const costTotal = TOKEN_SERIES.reduce((sum, series) => sum + costByClass[series.key], 0);
+  const costTotal = TOKEN_SERIES.reduce(
+    (sum, series) => sum + costByClass[series.key],
+    0,
+  );
   const cacheReadVolume = pct(totals.cacheReadInputTokens, tokenTotal);
   const cacheReadCost = pct(costByClass.cacheReadInputTokens, costTotal);
 
@@ -44,23 +55,20 @@ export function TokenCompositionChart({
       title="Token composition"
       description="Daily tokens by class, ordered cheapest to dearest."
       summary={summary}
+      config={TOKEN_CONFIG}
       height={280}
-      legend={TOKEN_SERIES.map((series) => ({
-        label: series.label,
-        color: colors[series.color],
-      }))}
       footer={
         <div>
-          <p className="mb-1.5 tracking-caps uppercase">Share of spend</p>
-          <div className="flex h-2.5 w-full gap-[2px] rounded-xs">
+          <p className="mb-1.5 tracking-wide uppercase">Share of spend</p>
+          <div className="flex h-2.5 w-full gap-[2px]">
             {TOKEN_SERIES.map((series) => (
               <span
                 key={series.key}
                 aria-hidden
-                className="h-full min-w-0 grow-0 rounded-xs"
+                className="h-full min-w-0 grow-0 rounded-sm"
                 style={{
                   flexBasis: `${pct(costByClass[series.key], costTotal)}%`,
-                  backgroundColor: colors[series.color],
+                  backgroundColor: `var(--color-${series.key})`,
                 }}
               />
             ))}
@@ -93,34 +101,32 @@ export function TokenCompositionChart({
       }
     >
       <AreaChart data={points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid {...gridProps(colors)} />
+        <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={formatAxisDate}
-          tick={tickProps(colors)}
           tickLine={false}
-          axisLine={axisLineProps(colors)}
+          axisLine={false}
+          tickMargin={8}
           minTickGap={28}
           interval="preserveStartEnd"
         />
         <YAxis
           width={46}
-          tick={tickProps(colors)}
           tickLine={false}
           axisLine={false}
+          tickMargin={8}
           tickFormatter={formatTokens}
         />
-        <Tooltip
-          cursor={cursorProps(colors)}
+        <ChartTooltip
           content={
-            <ChartTooltip
-              formatValue={formatTokens}
-              formatHeading={formatAxisDate}
-              totalLabel="All tokens"
-              note="Cache reads bill at a tenth of input; output at five times it."
+            <ChartTooltipContent
+              labelFormatter={(l) => formatAxisDate(String(l))}
+              formatter={formatWith(formatTokens)}
             />
           }
         />
+        <ChartLegend content={<ChartLegendContent />} />
         {TOKEN_SERIES.map((series) => (
           <Area
             key={series.key}
@@ -128,9 +134,9 @@ export function TokenCompositionChart({
             dataKey={series.key}
             name={series.label}
             stackId="tokens"
-            fill={colors[series.color]}
+            fill={`var(--color-${series.key})`}
             fillOpacity={0.9}
-            stroke={colors.surface}
+            stroke="var(--color-card)"
             strokeWidth={2}
             isAnimationActive={false}
           />

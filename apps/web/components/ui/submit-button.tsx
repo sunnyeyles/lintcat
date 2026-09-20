@@ -1,10 +1,13 @@
 "use client";
 
-import { Button, type ButtonProps } from "@pr-review/design";
+import { Button } from "@pr-review/design";
 import { Loader2 } from "lucide-react";
+import type { ComponentProps } from "react";
 import { useFormStatus } from "react-dom";
 
-export type SubmitButtonProps = Omit<ButtonProps, "type"> & { pendingLabel?: string };
+export type SubmitButtonProps = Omit<ComponentProps<typeof Button>, "type"> & {
+  pendingLabel?: string;
+};
 
 export function SubmitButton({ pendingLabel, children, disabled, ...props }: SubmitButtonProps) {
   const { pending } = useFormStatus();

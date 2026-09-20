@@ -1,9 +1,14 @@
 import { db } from "@pr-review/db";
 import {
+  Badge,
   Button,
   Card,
-  Chip,
-  EmptyState,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
   Table,
   TableBody,
   TableCaption,
@@ -42,28 +47,30 @@ export default async function OrganizationsPage() {
         description="Every organization you belong to on the dashboard. Pick one to see its repositories and reviews."
       />
       {memberships.length === 0 ? (
-        <EmptyState
-          icon={<Users />}
-          title="You are not in an organization yet"
-          description={
-            <>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Users />
+            </EmptyMedia>
+            <EmptyTitle>You are not in an organization yet</EmptyTitle>
+            <EmptyDescription>
               <code>{session.login}</code> is signed in but belongs to no organization, so
               there is nothing to show.{" "}
               {install
                 ? "Install the GitHub App on your organization, or ask an owner to add you."
                 : "Ask an organization owner to add you."}
-            </>
-          }
-          action={
-            install ? (
+            </EmptyDescription>
+          </EmptyHeader>
+          {install ? (
+            <EmptyContent>
               <Button asChild>
                 <a href={install}>Install the GitHub App</a>
               </Button>
-            ) : undefined
-          }
-        />
+            </EmptyContent>
+          ) : null}
+        </Empty>
       ) : (
-        <Card padding="table">
+        <Card className="py-0">
           <Table>
             <TableCaption className="sr-only">
               Organizations you belong to, with your role in each.
@@ -85,11 +92,11 @@ export default async function OrganizationsPage() {
                       {organization.name}
                     </RowLink>
                   </TableCell>
-                  <TableCell className="font-mono text-slate">
+                  <TableCell className="text-muted-foreground font-mono">
                     {organizationPath(organization.slug)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Chip variant="soft">{role}</Chip>
+                    <Badge variant="secondary">{role}</Badge>
                   </TableCell>
                 </TableRow>
               ))}

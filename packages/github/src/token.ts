@@ -5,7 +5,11 @@
 import { Octokit } from "@octokit/rest";
 
 import { createInstallationClient, type OctokitLike } from "#src/app";
-import type { GithubInstallationClient } from "#src/client";
+import type {
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
+} from "#src/client";
 
 export interface GithubTokenConfig {
   /** A GitHub token — in Actions, `${{ github.token }}`. */
@@ -17,7 +21,7 @@ export interface GithubTokenConfig {
 /** Nothing downstream depends on how the Octokit behind this was authenticated. */
 export function createTokenClient(
   config: GithubTokenConfig,
-): GithubInstallationClient {
+): PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient {
   const createOctokit =
     config.createOctokit ?? ((token: string) => new Octokit({ auth: token }));
   return createInstallationClient(createOctokit(config.token));

@@ -4,13 +4,16 @@ import path from "node:path";
 import {
   collectRepositoryFiles,
   DEFAULT_ARCHIVE_LIMITS,
+  matchesTerms,
+  parseSearchQuery,
   readRepositoryTarball,
+  searchMatchedPaths,
   type ChangedFile,
-  type CodeSearchMatch,
-  type GithubInstallationClient,
   type PullRequestDetails,
+  type PullRequestReadClient,
   type RepositoryArchive,
   type RepositoryFileEntry,
+  type RepositoryHistoryClient,
 } from "@pr-review/github";
 import type { ReviewTarget } from "@pr-review/reviewer";
 
@@ -20,8 +23,9 @@ import { addedFileDiff, parseUnifiedDiff } from "#src/unified-diff";
 /** The head "commit" of a local review: files as they are on disk now. */
 export const WORKING_TREE = "WORKING_TREE";
 
-const MAX_SEARCH_FILES = 30;
-const MAX_SNIPPETS_PER_FILE = 3;
+/** No publishing, and no second commit to compare the working tree against. */
+export type LocalGitClient = PullRequestReadClient &
+  Omit<RepositoryHistoryClient, "compareCommits">;
 
 /** One local checkout, reviewed as if its uncommitted state were a pull request. */
 export interface LocalRepository {
@@ -32,14 +36,7 @@ export interface LocalRepository {
   baseSha: string;
   branch: string;
   target: ReviewTarget;
-  client: GithubInstallationClient;
-}
-
-class LocalClientUnsupported extends Error {
-  constructor(operation: string) {
-    super(`${operation} is not available on a local checkout`);
-    this.name = "LocalClientUnsupported";
-  }
+  client: LocalGitClient;
 }
 
 async function tryGit(root: string, args: readonly string[]): Promise<string | undefined> {
@@ -100,41 +97,11 @@ function resolveInside(root: string, file: string): string {
   return real;
 }
 
-function searchTerms(query: string): string[] {
-  return query
-    .split(/\s+/)
-    .map((term) => term.replace(/^"|"$/g, ""))
-    .filter((term) => term !== "");
-}
-
 /** One matching line, as `git grep -n` reports it. */
 export interface SearchHit {
   path: string;
   line: number;
   text: string;
-}
-
-function parseGrepLines(output: string): SearchHit[] {
-  const hits: SearchHit[] = [];
-  for (const line of output.split("\n")) {
-    const match = /^(.+?):(\d+):(.*)$/.exec(line);
-    if (match) hits.push({ path: match[1]!, line: Number(match[2]), text: match[3]!.trim() });
-  }
-  return hits;
-}
-
-function groupMatches(hits: readonly SearchHit[]): CodeSearchMatch[] {
-  const byPath = new Map<string, string[]>();
-  for (const hit of hits) {
-    const snippets = byPath.get(hit.path) ?? [];
-    if (snippets.length < MAX_SNIPPETS_PER_FILE) snippets.push(hit.text);
-    byPath.set(hit.path, snippets);
-  }
-  return [...byPath].map(([file, snippets]) => ({
-    path: file,
-    name: path.posix.basename(file),
-    snippets,
-  }));
 }
 
 /** The checkout-relative form of a path, or a 404 if it escapes the checkout. */
@@ -143,17 +110,21 @@ function relativeInside(root: string, file: string): string {
   return real === root ? "." : path.relative(root, real);
 }
 
-/** Case-insensitive fixed-string search of the working tree, one entry per matching line. */
+/**
+ * The shared search semantics, line-oriented: `parseSearchQuery` reads the
+ * query and `matchesTerms` judges each line rather than each file.
+ */
 export async function searchWorkingTree(
   root: string,
   query: string,
   scope?: string | undefined,
 ): Promise<SearchHit[]> {
-  const terms = searchTerms(query);
+  const terms = parseSearchQuery(query);
   if (terms.length === 0) {
     return [];
   }
   const pathspec = scope === undefined ? [] : ["--", relativeInside(root, scope)];
+  // git narrows to files holding every term; matchesTerms then keeps the lines that do.
   const output = await git(
     root,
     [
@@ -169,7 +140,14 @@ export async function searchWorkingTree(
     ],
     { okExitCodes: [1] },
   );
-  return parseGrepLines(output);
+  const hits: SearchHit[] = [];
+  for (const line of output.split("\n")) {
+    const match = /^(.+?):(\d+):(.*)$/.exec(line);
+    if (match && matchesTerms(match[3]!, terms)) {
+      hits.push({ path: match[1]!, line: Number(match[2]), text: match[3]!.trim() });
+    }
+  }
+  return hits;
 }
 
 function* workingTreeFiles(root: string, paths: readonly string[]): Generator<RepositoryFileEntry> {
@@ -197,7 +175,7 @@ function untrackedContent(root: string, file: string): Uint8Array {
 
 function createLocalGitClient(
   repository: Omit<LocalRepository, "client">,
-): GithubInstallationClient {
+): LocalGitClient {
   const { root, baseSha, baseRef, branch } = repository;
 
   let snapshot: Promise<{ diff: string; files: ChangedFile[] }> | undefined;
@@ -258,12 +236,20 @@ function createLocalGitClient(
     },
     getFileContents: ({ path: file, ref }) => readAt(ref, file),
     async searchCode({ query }) {
-      const matches = groupMatches(await searchWorkingTree(root, query));
-      return {
-        matches: matches.slice(0, MAX_SEARCH_FILES),
-        totalCount: matches.length,
-        incompleteResults: false,
-      };
+      const terms = parseSearchQuery(query);
+      if (terms.length === 0) {
+        return { matches: [], totalCount: 0, incompleteResults: false };
+      }
+      // -l -i -F --all-match is git's spelling of matchesTerms: contents only, every term.
+      const output = await git(
+        root,
+        ["grep", "-I", "-l", "-i", "-F", "--untracked", "--all-match", ...terms.flatMap((term) => ["-e", term])],
+        { okExitCodes: [1] },
+      );
+      const paths = output.split("\n").filter((file) => file !== "");
+      return searchMatchedPaths(query, paths, (file) =>
+        Buffer.from(untrackedContent(root, file)).toString("utf8"),
+      );
     },
     async getRepositoryArchive({ ref, limits }): Promise<RepositoryArchive> {
       if (ref === WORKING_TREE) {
@@ -299,10 +285,5 @@ function createLocalGitClient(
     async getCommitMessage({ sha }) {
       return git(root, ["log", "-1", "--format=%B", assertRef(sha)]);
     },
-    compareCommits: () => Promise.reject(new LocalClientUnsupported("compareCommits")),
-    createCheckRun: () => Promise.reject(new LocalClientUnsupported("createCheckRun")),
-    createReview: () => Promise.reject(new LocalClientUnsupported("createReview")),
-    createCommitOnBranch: () => Promise.reject(new LocalClientUnsupported("createCommitOnBranch")),
-    writeFileOnBranch: () => Promise.reject(new LocalClientUnsupported("writeFileOnBranch")),
   };
 }

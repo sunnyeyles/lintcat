@@ -1,4 +1,4 @@
-import { Chip, cn } from "@pr-review/design";
+import { Badge, cn } from "@pr-review/design";
 
 import { AgentChip } from "@/components/ui";
 import { AGENTS, type AgentName } from "@pr-review/db/dashboard";
@@ -17,7 +17,7 @@ export function AgentChips({ agents, max = 3, className }: AgentChipsProps) {
   const hidden = named.slice(max);
 
   if (named.length === 0) {
-    return <span className="font-mono text-caption text-slate">—</span>;
+    return <span className="text-muted-foreground font-mono text-xs">—</span>;
   }
 
   return (
@@ -26,10 +26,10 @@ export function AgentChips({ agents, max = 3, className }: AgentChipsProps) {
         <AgentChip key={agent} agent={agent} />
       ))}
       {hidden.length > 0 ? (
-        <Chip variant="soft" title={hidden.join(", ")}>
+        <Badge variant="secondary" title={hidden.join(", ")}>
           +{hidden.length}
           <span className="sr-only"> more: {hidden.join(", ")}</span>
-        </Chip>
+        </Badge>
       ) : null}
     </span>
   );

@@ -79,15 +79,15 @@ export interface CodeSearchMatch {
   path: string;
   /** Base name of the matching file. */
   name: string;
-  /** Verbatim fragments from the default branch's index; no line numbers. */
+  /** Trimmed, deduplicated fragments; no line numbers. See #src/search. */
   snippets: readonly string[];
 }
 
-/** A code search result set, with the totals GitHub reports alongside it. */
+/** A code search result set; #src/search defines the caps every adapter applies. */
 export interface CodeSearchResult {
-  /** Matches GitHub returned; never more than one page. */
+  /** Matches returned, capped at SEARCH_LIMITS.maxMatches. */
   matches: CodeSearchMatch[];
-  /** Total matches in the repository, which may exceed `matches.length`. */
+  /** Total matches in the repository, uncapped, so it may exceed `matches.length`. */
   totalCount: number;
   /** True when GitHub timed out the query and returned a partial answer. */
   incompleteResults: boolean;
@@ -265,10 +265,10 @@ export interface WriteFileRequest {
 }
 
 /**
- * One installation's client. Read-only except createCheckRun, createReview,
- * createCommitOnBranch and writeFileOnBranch; all repository-scoped.
+ * One pull request and the code it touches, at a commit. Every adapter
+ * serves all of it, however the repository is backed.
  */
-export interface GithubInstallationClient {
+export interface PullRequestReadClient {
   getPullRequest(ref: PullRequestRef): Promise<PullRequestDetails>;
   listChangedFiles(ref: PullRequestRef): Promise<ChangedFile[]>;
   getDiff(ref: PullRequestRef): Promise<string>;
@@ -280,23 +280,37 @@ export interface GithubInstallationClient {
   getRepositoryArchive(
     request: RepositoryArchiveRequest,
   ): Promise<RepositoryArchive>;
+  /** From every app, not only ours. */
+  listCheckRuns(request: CheckRunsRequest): Promise<CheckRunSummary[]>;
+  /** Every inline review comment already on the pull request. */
+  listReviewComments(ref: PullRequestRef): Promise<ExistingReviewComment[]>;
+  /** Every review thread on the pull request, with its resolution state. */
+  listReviewThreads(ref: PullRequestRef): Promise<ReviewThread[]>;
+}
+
+/**
+ * Reads that walk commits rather than one tree. An adapter without a commit
+ * graph behind it rejects part of this; ADAPTER_PROFILES says which part.
+ */
+export interface RepositoryHistoryClient {
   /** Default-branch commits touching one path, newest first; an unmerged addition has none. */
   listCommitShas(request: CommitHistoryRequest): Promise<string[]>;
   /** Paths one commit changed; GitHub caps this at 300, so a sweep comes back short. */
   listCommitFiles(request: CommitFilesRequest): Promise<string[]>;
   /** Oldest first. */
   listPullRequestCommitShas(ref: PullRequestRef): Promise<string[]>;
-  /** From every app, not only ours. */
-  listCheckRuns(request: CheckRunsRequest): Promise<CheckRunSummary[]>;
   compareCommits(request: CompareCommitsRequest): Promise<CommitComparison>;
-  /** Every inline review comment already on the pull request. */
-  listReviewComments(ref: PullRequestRef): Promise<ExistingReviewComment[]>;
   /** The commit one branch currently points at. */
   getBranchTip(request: BranchTipRequest): Promise<string>;
   /** One commit's message, used to recognise this system's own commits. */
   getCommitMessage(request: CommitMessageRequest): Promise<string>;
-  /** Every review thread on the pull request, with its resolution state. */
-  listReviewThreads(ref: PullRequestRef): Promise<ReviewThread[]>;
+}
+
+/**
+ * Everything a review run writes back. Only the GitHub-backed adapter has
+ * anywhere to put it; the others reject all four.
+ */
+export interface ReviewPublishClient {
   createCheckRun(input: CreateCheckRunInput): Promise<CheckRun>;
   /** Publishes one advisory review with inline comments. */
   createReview(input: CreateReviewInput): Promise<PullRequestReview>;

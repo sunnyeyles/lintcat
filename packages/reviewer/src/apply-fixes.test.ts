@@ -1,6 +1,7 @@
 import type {
   CreateCommitInput,
-  GithubInstallationClient,
+  RepositoryHistoryClient,
+  ReviewPublishClient,
 } from "@pr-review/github";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it, vi } from "vitest";
@@ -33,7 +34,10 @@ function makeDeps(
     (input: CreateCommitInput) => Promise<{ sha: string }>
   >(overrides.createCommitOnBranch ?? (async () => ({ sha: "newsha99" })));
   const { logger, entries } = createCapturingLogger();
-  const client = { getBranchTip, createCommitOnBranch } as unknown as GithubInstallationClient;
+  const client = {
+    getBranchTip,
+    createCommitOnBranch,
+  } as unknown as RepositoryHistoryClient & ReviewPublishClient;
   return { deps: { client, logger }, getBranchTip, createCommitOnBranch, entries };
 }
 

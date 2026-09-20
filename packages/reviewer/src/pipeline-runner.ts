@@ -7,7 +7,10 @@ import {
   type Synthesiser,
   type SynthesisHints,
 } from "@pr-review/ai";
-import type { GithubInstallationClient } from "@pr-review/github";
+import type {
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+} from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 
 import {
@@ -15,13 +18,24 @@ import {
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
 
-/** Runs one review's agents; `agents` is the subset the path gate woke. */
+/** What one review reads. The two optional methods are absent on an adapter with no commit graph. */
+export type ReviewClient = PullRequestReadClient &
+  Pick<RepositoryHistoryClient, "listCommitShas" | "listPullRequestCommitShas"> &
+  Partial<Pick<RepositoryHistoryClient, "listCommitFiles" | "compareCommits">>;
+
+/** One pipeline run's inputs, named rather than positional. */
+export interface ReviewPipelineRun {
+  client: ReviewClient;
+  context: ReviewContext;
+  /** The subset of the run's agents the path gate woke. */
+  agents: readonly AgentDefinition[];
+  hints: SynthesisHints;
+  index: RepositoryIndex | undefined;
+}
+
+/** Runs one review's agents, then synthesise and validate. */
 export type RunReviewPipeline = (
-  client: GithubInstallationClient,
-  context: ReviewContext,
-  agents: readonly AgentDefinition[],
-  hints: SynthesisHints,
-  index: RepositoryIndex | undefined,
+  run: ReviewPipelineRun,
 ) => Promise<ReviewPipelineResult>;
 
 export interface PipelineRunnerDeps
@@ -37,7 +51,7 @@ export function createPipelineRunner({
   onAgentEvent,
   ...agentDeps
 }: PipelineRunnerDeps): RunReviewPipeline {
-  return (client, context, agents, hints, index) =>
+  return ({ client, context, agents, hints, index }) =>
     runReviewPipeline(
       createReviewAgents(
         { ...agentDeps, github: client, ...(index === undefined ? {} : { index }) },

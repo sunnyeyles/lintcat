@@ -7,7 +7,8 @@ import { z } from "zod";
 import type { McpEnvironment } from "#src/environment";
 import { openLocalRepository, searchWorkingTree } from "#src/local-git-client";
 
-const MAX_MATCHES = 200;
+/** Lines, not files, so `SEARCH_LIMITS.maxMatches` is a cap on a different thing. */
+const MAX_LINES = 200;
 
 function json(value: unknown): CallToolResult {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
@@ -20,10 +21,10 @@ export function registerSearchTools(server: McpServer, environment: McpEnvironme
       title: "Search code",
       description:
         "Text-search a local checkout, returning one entry per matching line with its path and line " +
-        "number. Matching is case-insensitive and literal, never a regular expression; several " +
-        "whitespace-separated terms keep only the lines containing all of them. Binary files are " +
-        "skipped, git-ignored ones are not searched, and the working tree is read as it is on disk. " +
-        `At most ${MAX_MATCHES} lines are returned; \`total\` is the true count.`,
+        "number, where the repository search tools return a file with snippets. Query grammar and " +
+        "matching are the repository search's. Binary files are skipped, git-ignored ones are not " +
+        "searched, and the working tree is read as it is on disk. " +
+        `At most ${MAX_LINES} lines are returned; \`total\` is the true count.`,
       inputSchema: {
         query: z.string().min(1).describe('Literal text to find, e.g. "createSession".'),
         path: z
@@ -46,8 +47,8 @@ export function registerSearchTools(server: McpServer, environment: McpEnvironme
         query,
         ...(scope === undefined ? {} : { path: scope }),
         total: hits.length,
-        truncated: hits.length > MAX_MATCHES,
-        matches: hits.slice(0, MAX_MATCHES),
+        truncated: hits.length > MAX_LINES,
+        matches: hits.slice(0, MAX_LINES),
       });
     },
   );

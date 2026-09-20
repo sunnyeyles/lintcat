@@ -1,4 +1,3 @@
-import { Stat, StatGrid } from "@pr-review/design";
 import type { Metadata } from "next";
 
 import {
@@ -12,6 +11,7 @@ import {
   Section,
   Subheading,
 } from "@/components/docs";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import type { Heading } from "@/lib/docs";
 
 export const metadata: Metadata = {
@@ -43,7 +43,7 @@ inspectEvent          reviewable? otherwise a clean no-op
 runAction             client · agents · model · tracing · prompts
    │
    ▼
-reviewPullRequest     load PR + changed files + diff
+runReview             delivery adapter + policy in · load PR, changed files, diff
    │
    ▼
 gateAgentsByPaths     who wakes · none => neutral check, no review

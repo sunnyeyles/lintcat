@@ -2,7 +2,8 @@
 import {
   CHECK_RUN_NAME,
   type ChangedFile,
-  type GithubInstallationClient,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
 } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
@@ -38,10 +39,10 @@ export function wholePullRequest(scope: ReviewScope): {
     : { diff: scope.diff, changedFiles: scope.changedFiles };
 }
 
-type ScopeClient = Pick<
-  GithubInstallationClient,
-  "listPullRequestCommitShas" | "listCheckRuns" | "compareCommits"
->;
+/** `compareCommits` is optional: an adapter without it can only review the whole pull request. */
+type ScopeClient = Pick<RepositoryHistoryClient, "listPullRequestCommitShas"> &
+  Partial<Pick<RepositoryHistoryClient, "compareCommits">> &
+  Pick<PullRequestReadClient, "listCheckRuns">;
 
 export interface ResolveReviewScopeDeps {
   client: ScopeClient;
@@ -122,6 +123,9 @@ async function narrow(
   deps: ResolveReviewScopeDeps,
 ): Promise<ReviewScope> {
   const { client, diff, changedFiles } = deps;
+  if (client.compareCommits === undefined) {
+    return full("no_commit_comparison", deps);
+  }
   const sinceSha = await findBaseline(client, target);
   if (sinceSha === undefined) {
     return full("no_baseline", deps);

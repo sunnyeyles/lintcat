@@ -2,7 +2,7 @@
  * What a merged pull request taught us: every thread our review opened, and
  * whether the repository resolved it, outran it, or left it alone.
  */
-import type { GithubInstallationClient, ReviewThread } from "@pr-review/github";
+import type { PullRequestReadClient, ReviewThread } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import {
@@ -17,7 +17,7 @@ import { parsePostedFinding } from "#src/render-review";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
 export interface LearnFromMergeDeps {
-  client: Pick<GithubInstallationClient, "listReviewThreads">;
+  client: Pick<PullRequestReadClient, "listReviewThreads">;
   store: MemoryStore;
   logger: StructuredLogger;
   /** Injectable clock, so a test can pin the recorded signal time. */

@@ -19,17 +19,17 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b border-rule pb-5",
+        "flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b pb-5",
         className,
       )}
     >
       <div className="min-w-0 flex-1 basis-[18rem]">
-        <p className="eyebrow">{eyebrow}</p>
-        <h1 className="mt-1.5 font-display text-h1 font-medium tracking-display text-ink">
-          {title}
-        </h1>
+        <p className="text-muted-foreground text-xs tracking-wide uppercase">
+          {eyebrow}
+        </p>
+        <h1 className="mt-1.5 text-3xl font-semibold tracking-tight">{title}</h1>
         {description ? (
-          <p className="mt-2 max-w-measure font-mono text-body leading-relaxed text-slate">
+          <p className="text-muted-foreground mt-2 max-w-prose text-sm leading-relaxed">
             {description}
           </p>
         ) : null}

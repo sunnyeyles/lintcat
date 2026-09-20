@@ -1,53 +1,43 @@
 "use client";
 
-import { cn, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
-import { Monitor, Moon, Sun } from "lucide-react";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@pr-review/design";
+import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
 
-const ORDER = ["system", "light", "dark"] as const;
-
-const META = {
-  system: { Icon: Monitor, label: "System theme" },
-  light: { Icon: Sun, label: "Light theme" },
-  dark: { Icon: Moon, label: "Dark theme" },
-} as const;
-
-const TRIGGER_CLASS =
-  "inline-flex size-8 items-center justify-center rounded-sm border border-rule bg-surface text-slate transition-colors outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+const OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+] as const;
 
 export function ThemeToggle({ className }: { className?: string }) {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  if (!mounted) {
-    return (
-      <span
-        aria-hidden
-        className={cn(TRIGGER_CLASS, "pointer-events-none", className)}
-      />
-    );
-  }
-
-  const current = ORDER.includes(theme as (typeof ORDER)[number])
-    ? (theme as (typeof ORDER)[number])
-    : "system";
-  const { Icon, label } = META[current];
-  const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
+  const { setTheme } = useTheme();
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        type="button"
-        aria-label={`${label}. Switch to ${META[next].label.toLowerCase()}`}
-        onClick={() => setTheme(next)}
-        className={cn(TRIGGER_CLASS, className)}
-      >
-        <Icon className="size-4" />
-      </TooltipTrigger>
-      <TooltipContent>{label} — click for {META[next].label.toLowerCase()}</TooltipContent>
-    </Tooltip>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon" className={className}>
+          <Sun className="scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+          <Moon className="absolute scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuGroup>
+          {OPTIONS.map((option) => (
+            <DropdownMenuItem key={option.value} onClick={() => setTheme(option.value)}>
+              {option.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

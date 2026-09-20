@@ -9,7 +9,7 @@ export function ThemeProvider({
 }: ComponentProps<typeof NextThemesProvider>) {
   return (
     <NextThemesProvider
-      attribute="data-theme"
+      attribute="class"
       defaultTheme="system"
       enableSystem
       disableTransitionOnChange

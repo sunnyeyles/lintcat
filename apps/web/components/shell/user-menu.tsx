@@ -1,4 +1,4 @@
-import { Button } from "@pr-review/design";
+import { Avatar, AvatarFallback, AvatarImage, Button } from "@pr-review/design";
 import Link from "next/link";
 
 import { signOutOfDashboard } from "@/app/auth-actions";
@@ -15,18 +15,14 @@ export async function UserMenu({ signInHref }: { signInHref?: string }) {
       </Button>
     );
   }
+
   return (
     <div className="flex items-center gap-2">
-      {session.avatarUrl ? (
-        <img
-          src={session.avatarUrl}
-          alt=""
-          width={24}
-          height={24}
-          className="size-6 rounded-full border border-rule"
-        />
-      ) : null}
-      <span className="hidden font-mono text-label text-slate sm:inline">
+      <Avatar className="size-6">
+        <AvatarImage src={session.avatarUrl ?? undefined} alt="" />
+        <AvatarFallback>{session.login.slice(0, 2).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <span className="text-muted-foreground hidden font-mono text-sm sm:inline">
         {session.login}
       </span>
       <form action={signOutOfDashboard}>

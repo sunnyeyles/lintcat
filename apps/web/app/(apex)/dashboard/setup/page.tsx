@@ -1,10 +1,19 @@
 import { withWriteDatabase } from "@pr-review/db";
-import { Button, EmptyState } from "@pr-review/design";
+import {
+  Button,
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@pr-review/design";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
 import { Clock, Link2Off, MailCheck, ShieldOff } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/shell";
 import { githubApp, installAppUrl } from "@/lib/github-app";
@@ -33,36 +42,32 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
 
   if (request.kind === "request") {
     return (
-      <Page>
-        <EmptyState
-          icon={<MailCheck />}
-          title="Your request was sent"
-          description="An owner of the organization has to approve the installation. Once they do, sign in again and the organization will be here."
-          action={dashboard}
-        />
-      </Page>
+      <State
+        icon={<MailCheck />}
+        title="Your request was sent"
+        description="An owner of the organization has to approve the installation. Once they do, sign in again and the organization will be here."
+      >
+        {dashboard}
+      </State>
     );
   }
 
   if (request.kind === "invalid") {
     const install = installAppUrl();
     return (
-      <Page>
-        <EmptyState
-          icon={<Link2Off />}
-          title="This link is missing its installation"
-          description="GitHub sends you here after installing the App. Start the installation from GitHub, or go back to your organizations."
-          action={
-            install ? (
-              <Button asChild>
-                <a href={install}>Install the GitHub App</a>
-              </Button>
-            ) : (
-              dashboard
-            )
-          }
-        />
-      </Page>
+      <State
+        icon={<Link2Off />}
+        title="This link is missing its installation"
+        description="GitHub sends you here after installing the App. Start the installation from GitHub, or go back to your organizations."
+      >
+        {install ? (
+          <Button asChild>
+            <a href={install}>Install the GitHub App</a>
+          </Button>
+        ) : (
+          dashboard
+        )}
+      </State>
     );
   }
 
@@ -85,37 +90,43 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
 
   if (result?.status === "unsupported") {
     return (
-      <Page>
-        <EmptyState
-          icon={<ShieldOff />}
-          title="That account type is not supported"
-          description="The dashboard serves organizations and personal accounts. Install the App on one of those instead."
-          action={dashboard}
-        />
-      </Page>
+      <State
+        icon={<ShieldOff />}
+        title="That account type is not supported"
+        description="The dashboard serves organizations and personal accounts. Install the App on one of those instead."
+      >
+        {dashboard}
+      </State>
     );
   }
 
   return (
-    <Page>
-      <EmptyState
-        icon={<Clock />}
-        title="Waiting for GitHub"
-        description="The installation has not reached the dashboard yet. Reload in a moment, or check your organizations."
-        action={
-          <div className="flex gap-2">
-            <Button asChild>
-              <a href={selfUrl(request, params)}>Reload</a>
-            </Button>
-            {dashboard}
-          </div>
-        }
-      />
-    </Page>
+    <State
+      icon={<Clock />}
+      title="Waiting for GitHub"
+      description="The installation has not reached the dashboard yet. Reload in a moment, or check your organizations."
+    >
+      <div className="flex gap-2">
+        <Button asChild>
+          <a href={selfUrl(request, params)}>Reload</a>
+        </Button>
+        {dashboard}
+      </div>
+    </State>
   );
 }
 
-function Page({ children }: { children: React.ReactNode }) {
+function State({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
@@ -123,7 +134,14 @@ function Page({ children }: { children: React.ReactNode }) {
         title="Setting up"
         description="Connecting the GitHub App installation to your organization."
       />
-      {children}
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">{icon}</EmptyMedia>
+          <EmptyTitle>{title}</EmptyTitle>
+          <EmptyDescription>{description}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>{children}</EmptyContent>
+      </Empty>
     </div>
   );
 }

@@ -2,10 +2,12 @@
  * The read-only, repository-scoped tools a review agent gets; there is no write
  * tool here. Repository scope comes from the job, not the model.
  */
+import { SEARCH_LIMITS, boundSnippets } from "@pr-review/github";
 import type {
   ChangedFile,
   CodeSearchResult,
-  GithubInstallationClient,
+  PullRequestReadClient,
+  RepositoryHistoryClient,
 } from "@pr-review/github";
 import {
   findReferences,
@@ -20,28 +22,21 @@ import type { ReviewContext } from "#src/agent-contract";
 import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import { truncateWithMarker } from "#src/agents/truncate";
 
+/** `listCommitFiles` is optional: without it, nothing co-changed, which is what a client with no commit graph means. */
+export type ReviewToolsClient = PullRequestReadClient &
+  Pick<RepositoryHistoryClient, "listCommitShas"> &
+  Partial<Pick<RepositoryHistoryClient, "listCommitFiles">>;
+
 /** Tool results larger than this are truncated to bound token usage. */
 const MAX_TOOL_RESULT_CHARS = 50_000;
 
-// Bounded by these, not by truncate(): truncation would cut the JSON mid-string.
-const MAX_SEARCH_MATCHES = 20;
-
-const MAX_SNIPPETS_PER_MATCH = 2;
-
-const MAX_SNIPPET_CHARS = 400;
+// Bounded by the search module's caps, not by truncate(): truncation would cut the JSON mid-string.
+export const MAX_SEARCH_MATCHES = SEARCH_LIMITS.maxMatches;
 
 const TRUNCATION_MARKER = "\n[... truncated: result exceeded the size limit]";
 
 function truncate(content: string): string {
   return truncateWithMarker(content, MAX_TOOL_RESULT_CHARS, TRUNCATION_MARKER);
-}
-
-/** Trimmed, deduplicated, and capped — the snippets the model actually sees. */
-function boundSnippets(snippets: readonly string[]): string[] {
-  return [...new Set(snippets.map((snippet) => snippet.trim()))]
-    .filter((snippet) => snippet !== "")
-    .slice(0, MAX_SNIPPETS_PER_MATCH)
-    .map((snippet) => truncateWithMarker(snippet, MAX_SNIPPET_CHARS, "…"));
 }
 
 function renderSearchResult(result: CodeSearchResult): string {
@@ -157,7 +152,7 @@ function addedReason(
 
 /** Exactly the eight read-only tools, bound to one pull request. */
 export function createReviewTools(
-  github: GithubInstallationClient,
+  github: ReviewToolsClient,
   context: ReviewContext,
   index?: RepositoryIndex | undefined,
 ): ToolSet {
@@ -169,7 +164,7 @@ export function createReviewTools(
   const filesOf = (sha: string): Promise<string[]> => {
     let files = commitFiles.get(sha);
     if (files === undefined) {
-      files = github.listCommitFiles({ owner, repo, sha });
+      files = github.listCommitFiles?.({ owner, repo, sha }) ?? Promise.resolve([]);
       commitFiles.set(sha, files);
     }
     return files;

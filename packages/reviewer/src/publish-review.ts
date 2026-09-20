@@ -5,7 +5,8 @@
 import {
   httpStatus,
   isPermissionError,
-  type GithubInstallationClient,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
 } from "@pr-review/github";
 import type { StructuredLogger } from "@pr-review/logging";
 import type { ReviewFinding } from "@pr-review/schemas";
@@ -76,7 +77,7 @@ interface ReviewDeliveryDeps {
 
 /** The default delivery: an "AI PR Review" check run on the head SHA. */
 export function createCheckRunPublisher(
-  client: GithubInstallationClient,
+  client: ReviewPublishClient,
 ): PublishReview {
   return async (target, rendered) => {
     await client.createCheckRun({
@@ -94,7 +95,7 @@ export function createCheckRunPublisher(
  * `pull-requests: write`, so a permission failure must not stop the check run.
  */
 export function createReviewCommentPublisher(
-  client: GithubInstallationClient,
+  client: ReviewPublishClient,
   logger: StructuredLogger,
 ): PublishReviewComments {
   return async (target, rendered) => {
@@ -125,7 +126,7 @@ export function createReviewCommentPublisher(
 
 /** Commits the verified patches; the default writes to the head branch. */
 export function createFixPublisher(
-  client: GithubInstallationClient,
+  client: RepositoryHistoryClient & ReviewPublishClient,
   logger: StructuredLogger,
 ): PublishFixes {
   return (target, input) => applyFixes(target, input, { client, logger });

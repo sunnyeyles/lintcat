@@ -1,9 +1,9 @@
 "use client";
 
 import {
+  Button,
   cn,
   Sheet,
-  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -35,7 +35,7 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 const LINK_CLASS =
-  "group flex items-center gap-2.5 rounded-sm border border-transparent px-2.5 py-1.5 font-mono text-label tracking-ui transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+  "focus-visible:ring-ring group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors outline-none focus-visible:ring-2";
 
 function NavLinks({ slug, onNavigate }: { slug: string; onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -53,11 +53,11 @@ function NavLinks({ slug, onNavigate }: { slug: string; onNavigate?: () => void 
             className={cn(
               LINK_CLASS,
               active
-                ? "border-rule-soft bg-accent-wash font-semibold text-accent"
-                : "text-slate hover:border-rule-soft hover:bg-surface-2 hover:text-ink",
+                ? "bg-accent text-accent-foreground font-medium"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
             )}
           >
-            <Icon className="size-3.5 shrink-0" />
+            <Icon className="size-4 shrink-0" />
             <span className="truncate">{label}</span>
           </Link>
         );
@@ -76,12 +76,12 @@ export function Sidebar({ slug, organizationName, className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "hidden w-[13rem] shrink-0 border-r border-rule bg-paper md:block",
+        "bg-sidebar hidden w-[13rem] shrink-0 border-r md:block",
         className,
       )}
     >
       <div className="sticky top-14 px-3 py-5">
-        <p className="eyebrow truncate px-2.5 pb-2.5 border-b border-rule">
+        <p className="text-muted-foreground truncate border-b px-2.5 pb-2.5 text-xs tracking-wide uppercase">
           {organizationName}
         </p>
         <div className="pt-3">
@@ -98,14 +98,15 @@ export function SidebarDrawer({ className }: { className?: string }) {
   if (slug === undefined) return null;
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger
-        aria-label="Open navigation"
-        className={cn(
-          "inline-flex size-8 items-center justify-center rounded-sm border border-rule bg-surface text-slate transition-colors outline-none hover:border-accent hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper md:hidden",
-          className,
-        )}
-      >
-        <Menu className="size-4" />
+      <SheetTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Open navigation"
+          className={cn("md:hidden", className)}
+        >
+          <Menu />
+        </Button>
       </SheetTrigger>
       <SheetContent side="left" className="max-w-[16rem]">
         <SheetHeader>
@@ -115,7 +116,6 @@ export function SidebarDrawer({ className }: { className?: string }) {
         <div className="px-3 py-4">
           <NavLinks slug={slug} onNavigate={() => setOpen(false)} />
         </div>
-        <SheetClose className="sr-only">Close navigation</SheetClose>
       </SheetContent>
     </Sheet>
   );

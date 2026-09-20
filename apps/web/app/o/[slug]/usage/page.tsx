@@ -1,5 +1,10 @@
 import { costOf, type TokenCounts } from "@pr-review/db/dashboard";
-import { EmptyState, Stat, StatGrid } from "@pr-review/design";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@pr-review/design";
 import type { Metadata } from "next";
 
 import {
@@ -14,6 +19,7 @@ import {
   TokenCompositionChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
 
@@ -105,10 +111,12 @@ export default async function UsagePage({
           </StatGrid>
 
           {totals.reviewCount === 0 ? (
-            <EmptyState
-              title="No usage to report"
-              description={`No reviews were billed in ${phrase}. Try a wider range.`}
-            />
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No usage to report</EmptyTitle>
+                <EmptyDescription>{`No reviews were billed in ${phrase}. Try a wider range.`}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2">
               <div className="min-w-0 xl:col-span-2">
