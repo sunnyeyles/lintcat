@@ -10,6 +10,20 @@ export {
   type RepositoryIndexInput,
 } from "#src/build";
 export {
+  findReferences,
+  findReferencesDescription,
+  indexHeader,
+  MAX_REFERENCE_FILES,
+  renderFindReferences,
+  UNINDEXED_PATH_REASON,
+  unknownPath,
+  type FindReferencesQuery,
+  type FindReferencesResult,
+  type IndexHeader,
+  type KnownReferences,
+  type UnknownReferences,
+} from "#src/find-references";
+export {
   parseImports,
   type ImportedName,
   type ImportKind,
