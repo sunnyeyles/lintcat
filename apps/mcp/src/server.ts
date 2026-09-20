@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
 import { registerWorkflowPrompts } from "#src/prompts/workflow-prompts";
+import { registerConfigTools } from "#src/tools/config-tools";
 import { registerHistoryTools } from "#src/tools/history-tools";
 import { registerIndexTools } from "#src/tools/index-tools";
 import { registerReviewTools } from "#src/tools/review-tools";
@@ -14,6 +15,7 @@ const INSTRUCTIONS = `Tools for the pr-review-agents code reviewer.
 - review_pull_request: dry-run review of a GitHub PR; publish: true posts to GitHub, so only set it when the user asks.
 - repository_overview / find_references / describe_file: import-graph navigation of a local checkout; no network.
 - search_code: literal text search of a local checkout, with path and line number; no network.
+- validate_agent_config: check a checkout's .github/pr-review-agents.yml and see what it resolves to; no model calls.
 - list_reviews / get_review / review_trends: stored review history, scoped to the user's GitHub account.
 
 Prompts for the workflows these tools serve: review_branch (review this branch before pushing),
@@ -53,6 +55,7 @@ export function createServer(environment: McpEnvironment, options: ServerOptions
   registerReviewTools(server, environment);
   registerIndexTools(server, environment, options.loadIndex ?? createLocalIndexCache());
   registerSearchTools(server, environment);
+  registerConfigTools(server, environment);
   registerHistoryTools(server, environment, options.githubId ?? githubUserId(environment));
   registerWorkflowPrompts(server);
   return server;
