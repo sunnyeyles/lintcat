@@ -1,31 +1,20 @@
-/**
- * Serves a fixture repository through the real GithubInstallationClient
- * interface. Nothing talks to GitHub, and every write method throws.
- */
+/** Serves a fixture repository through the read interfaces a planted repository can honour. */
 import process from "node:process";
 
 import type {
   ChangedFile,
-  CheckRun,
   CheckRunSummary,
   CodeSearchMatch,
   CodeSearchResult,
-  CommitComparison,
-  CommitMessageRequest,
-  CommitRef,
-  CreateCheckRunInput,
-  CreateCommitInput,
-  CreateReviewInput,
   ExistingReviewComment,
   FileContentsRequest,
-  GithubInstallationClient,
   PullRequestDetails,
+  PullRequestReadClient,
   PullRequestRef,
-  PullRequestReview,
   RepositoryArchive,
   RepositoryArchiveRequest,
+  RepositoryHistoryClient,
   ReviewThread,
-  WriteFileRequest,
 } from "@pr-review/github";
 
 import type { LoadedFixture } from "#src/fixture";
@@ -77,8 +66,15 @@ export interface FixtureCall {
   detail: string;
 }
 
+/** No publishing, and no commit objects to read files, messages or comparisons out of. */
+export type FixtureGithubClient = PullRequestReadClient &
+  Omit<
+    RepositoryHistoryClient,
+    "listCommitFiles" | "compareCommits" | "getCommitMessage"
+  >;
+
 interface FixtureClient {
-  client: GithubInstallationClient;
+  client: FixtureGithubClient;
   /** Every read the agents performed, in order. */
   calls: FixtureCall[];
 }
@@ -111,7 +107,7 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
     }
   };
 
-  const client: GithubInstallationClient = {
+  const client: FixtureGithubClient = {
     async getPullRequest(ref): Promise<PullRequestDetails> {
       checkRef(ref);
       record("getPullRequest", `#${ref.pullRequestNumber}`);
@@ -208,12 +204,6 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
       return [];
     },
 
-    async listCommitFiles(request): Promise<string[]> {
-      throw new FixtureNotFoundError(
-        `fixture ${fixture.name} has no commit history, so ${request.sha} does not exist`,
-      );
-    },
-
     async listReviewComments(ref): Promise<ExistingReviewComment[]> {
       checkRef(ref);
       // A fixture pull request carries no prior review, so every
@@ -236,49 +226,9 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
       return [];
     },
 
-    async compareCommits(): Promise<CommitComparison> {
-      throw new FixtureNotFoundError(
-        `fixture ${fixture.name} has a single commit, so there is nothing to compare`,
-      );
-    },
-
-    async createCheckRun(input: CreateCheckRunInput): Promise<CheckRun> {
-      throw new Error(
-        `the evaluation harness must never publish: createCheckRun called for ` +
-          `${input.owner}/${input.repo}@${input.headSha}`,
-      );
-    },
-
-    async createReview(input: CreateReviewInput): Promise<PullRequestReview> {
-      throw new Error(
-        `the evaluation harness must never publish: createReview called for ` +
-          `${input.owner}/${input.repo}#${input.pullRequestNumber}`,
-      );
-    },
-
     // The branch never moves, so patch verification sees the head it proved against.
     async getBranchTip(): Promise<string> {
       return fixture.pullRequest.headSha;
-    },
-
-    async getCommitMessage(request: CommitMessageRequest): Promise<string> {
-      throw new FixtureNotFoundError(
-        `fixture ${fixture.name} has no commit history, so ${request.sha} does not exist`,
-      );
-    },
-
-    async createCommitOnBranch(input: CreateCommitInput): Promise<CommitRef> {
-      throw new Error(
-        `the evaluation harness must never publish: createCommitOnBranch called for ` +
-          `${input.owner}/${input.repo}@${input.branch}`,
-      );
-    },
-
-    async writeFileOnBranch(request: WriteFileRequest): Promise<void> {
-      throw new Error(
-        `the evaluation harness must never publish: writeFileOnBranch called for ` +
-          `${request.owner}/${request.repo}@${request.branch}:${request.path}`,
-      );
     },
   };
 

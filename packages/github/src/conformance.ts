@@ -1,4 +1,4 @@
-/** One suite every GithubInstallationClient adapter runs; ADAPTER_PROFILES records each divergence. */
+/** One suite every client adapter runs; ADAPTER_PROFILES records each divergence. */
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -66,10 +66,16 @@ export interface SearchProfile {
   honoursQuery: boolean;
 }
 
+/** Every adapter honours all of `PullRequestReadClient`; the rest it declares only if it honours it. */
+export type ConformanceClient = PullRequestReadClient &
+  Partial<RepositoryHistoryClient & ReviewPublishClient>;
+
 export interface AdapterProfile {
   /** What this adapter reads the repository out of. */
   backing: string;
   search: SearchProfile;
+  /** Methods the adapter's type does not declare: calling one is a compile error, not a throw. */
+  absent: readonly ClientMethod[];
   /** Methods that always reject, by the `name` of the error they reject with. */
   unsupported: Partial<Record<ClientMethod, string>>;
   /** The error `name` a read of an absent path rejects with; null when it never rejects. */
@@ -86,6 +92,7 @@ export const ADAPTER_PROFILES = {
       matching: "GitHub code search over the default branch index",
       honoursQuery: true,
     },
+    absent: [],
     unsupported: {},
     missingFileError: "HttpError",
   },
@@ -97,13 +104,14 @@ export const ADAPTER_PROFILES = {
       matching: "git grep -F -i, every term required, contents only",
       honoursQuery: true,
     },
-    unsupported: {
-      compareCommits: "LocalClientUnsupported",
-      createCheckRun: "LocalClientUnsupported",
-      createReview: "LocalClientUnsupported",
-      createCommitOnBranch: "LocalClientUnsupported",
-      writeFileOnBranch: "LocalClientUnsupported",
-    },
+    absent: [
+      "compareCommits",
+      "createCheckRun",
+      "createReview",
+      "createCommitOnBranch",
+      "writeFileOnBranch",
+    ],
+    unsupported: {},
     missingFileError: "GitError",
   },
   "eval-fixture": {
@@ -114,15 +122,16 @@ export const ADAPTER_PROFILES = {
       matching: "case-insensitive substring AND over path and contents, one window per term",
       honoursQuery: true,
     },
-    unsupported: {
-      listCommitFiles: "FixtureNotFoundError",
-      compareCommits: "FixtureNotFoundError",
-      getCommitMessage: "FixtureNotFoundError",
-      createCheckRun: "Error",
-      createReview: "Error",
-      createCommitOnBranch: "Error",
-      writeFileOnBranch: "Error",
-    },
+    absent: [
+      "listCommitFiles",
+      "compareCommits",
+      "getCommitMessage",
+      "createCheckRun",
+      "createReview",
+      "createCommitOnBranch",
+      "writeFileOnBranch",
+    ],
+    unsupported: {},
     missingFileError: "FixtureNotFoundError",
   },
   "agent-test-fake": {
@@ -133,6 +142,7 @@ export const ADAPTER_PROFILES = {
       matching: "nothing is matched; one canned result answers every query",
       honoursQuery: false,
     },
+    absent: [],
     unsupported: { writeFileOnBranch: "Error" },
     missingFileError: null,
   },
@@ -153,7 +163,7 @@ export interface ConformanceSearch {
 
 /** One adapter's repository, described in the terms the suite addresses it by. */
 export interface ConformanceCase {
-  client: GithubInstallationClient;
+  client: ConformanceClient;
   ref: PullRequestRef;
   /** Filenames listChangedFiles must report, in order. */
   changedFilenames: readonly string[];
@@ -171,53 +181,58 @@ function baseName(path: string): string {
 }
 
 function callUnsupported(
-  client: GithubInstallationClient,
+  client: ConformanceClient,
   method: ClientMethod,
   ref: PullRequestRef,
 ): Promise<unknown> {
   const { owner, repo } = ref;
+  const undeclared = (): Promise<never> =>
+    Promise.reject(new Error(`${method} is absent from this adapter`));
   switch (method) {
     case "listCommitFiles":
-      return client.listCommitFiles({ owner, repo, sha: SAMPLE_SHA });
+      return client.listCommitFiles?.({ owner, repo, sha: SAMPLE_SHA }) ?? undeclared();
     case "getCommitMessage":
-      return client.getCommitMessage({ owner, repo, sha: SAMPLE_SHA });
+      return client.getCommitMessage?.({ owner, repo, sha: SAMPLE_SHA }) ?? undeclared();
     case "compareCommits":
-      return client.compareCommits({ owner, repo, base: SAMPLE_SHA, head: SAMPLE_SHA });
+      return (
+        client.compareCommits?.({ owner, repo, base: SAMPLE_SHA, head: SAMPLE_SHA }) ??
+        undeclared()
+      );
     case "createCheckRun":
-      return client.createCheckRun({
+      return client.createCheckRun?.({
         owner,
         repo,
         headSha: SAMPLE_SHA,
         conclusion: "neutral",
         output: { title: "conformance", summary: "conformance" },
-      });
+      }) ?? undeclared();
     case "createReview":
-      return client.createReview({
+      return client.createReview?.({
         owner,
         repo,
         pullRequestNumber: ref.pullRequestNumber,
         commitSha: SAMPLE_SHA,
         body: "conformance",
         comments: [],
-      });
+      }) ?? undeclared();
     case "createCommitOnBranch":
-      return client.createCommitOnBranch({
+      return client.createCommitOnBranch?.({
         owner,
         repo,
         branch: "conformance",
         baseSha: SAMPLE_SHA,
         message: "conformance",
         files: [],
-      });
+      }) ?? undeclared();
     case "writeFileOnBranch":
-      return client.writeFileOnBranch({
+      return client.writeFileOnBranch?.({
         owner,
         repo,
         branch: "conformance",
         path: "conformance.txt",
         content: "conformance",
         message: "conformance",
-      });
+      }) ?? undeclared();
     default:
       return Promise.reject(
         new Error(`the conformance suite has no sample call for ${method}`),
@@ -233,14 +248,18 @@ export function runClientConformance(
   const profile: AdapterProfile = ADAPTER_PROFILES[adapter];
 
   describe(`${adapter} conformance (${profile.backing})`, () => {
-    it("implements every method the interface declares", async () => {
+    it("implements every method it declares, and nothing it does not", async () => {
       const { client } = await open();
+      const absent = new Set<ClientMethod>(profile.absent);
 
       for (const method of CLIENT_METHODS) {
-        expect(typeof client[method], method).toBe("function");
+        expect(typeof client[method], method).toBe(
+          absent.has(method) ? "undefined" : "function",
+        );
       }
       for (const method of Object.keys(profile.unsupported)) {
         expect(CLIENT_METHODS).toContain(method);
+        expect(absent, method).not.toContain(method);
       }
     });
 

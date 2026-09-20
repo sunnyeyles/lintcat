@@ -129,17 +129,17 @@ describe("the local client", () => {
     ]);
   });
 
-  it("never writes", async () => {
-    const { client, owner, repo: name } = await openLocalRepository(repo.root, "main");
+  it("declares nothing a checkout cannot honour, so a write cannot be called", async () => {
+    const { client } = await openLocalRepository(repo.root, "main");
 
-    await expect(
-      client.createCheckRun({
-        owner,
-        repo: name,
-        headSha: WORKING_TREE,
-        conclusion: "neutral",
-        output: { title: "", summary: "" },
-      }),
-    ).rejects.toThrow("not available on a local checkout");
+    for (const method of [
+      "compareCommits",
+      "createCheckRun",
+      "createReview",
+      "createCommitOnBranch",
+      "writeFileOnBranch",
+    ]) {
+      expect(method in client, method).toBe(false);
+    }
   });
 });

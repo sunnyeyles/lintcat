@@ -290,93 +290,28 @@ describe("history the fixture does not have", () => {
     expect(calls).toEqual([{ method: "listCommitShas", detail: "src/a.ts" }]);
   });
 
-  it.each([
-    [
-      "listCommitFiles",
-      (client: ReturnType<typeof createFixtureClient>["client"]) =>
-        client.listCommitFiles({ owner: OWNER, repo: REPO, sha: "deadbee" }),
-      /no commit history, so deadbee does not exist/,
-    ],
-    [
-      "getCommitMessage",
-      (client: ReturnType<typeof createFixtureClient>["client"]) =>
-        client.getCommitMessage({ owner: OWNER, repo: REPO, sha: "deadbee" }),
-      /no commit history, so deadbee does not exist/,
-    ],
-    [
-      "compareCommits",
-      (client: ReturnType<typeof createFixtureClient>["client"]) =>
-        client.compareCommits({ owner: OWNER, repo: REPO, base: "a", head: "b" }),
-      /a single commit, so there is nothing to compare/,
-    ],
-  ])("refuses %s", async (_label, call, message) => {
-    await expect(call(createFixtureClient(fixture).client)).rejects.toThrow(message);
+  it("declares no read that needs a commit object", () => {
+    const { client } = createFixtureClient(fixture);
+
+    for (const method of ["listCommitFiles", "getCommitMessage", "compareCommits"]) {
+      expect(method in client, method).toBe(false);
+    }
   });
 });
 
 describe("writes", () => {
   const fixture = makeFixture(SIMPLE);
 
-  it("refuses to create a check run", async () => {
+  it("declares no publish method, so the harness cannot publish", () => {
     const { client } = createFixtureClient(fixture);
 
-    await expect(
-      client.createCheckRun({
-        owner: OWNER,
-        repo: REPO,
-        headSha: HEAD_SHA,
-        conclusion: "success",
-        output: { title: "Review", summary: "" },
-      }),
-    ).rejects.toThrow(
-      `the evaluation harness must never publish: createCheckRun called for ${OWNER}/${REPO}@${HEAD_SHA}`,
-    );
-  });
-
-  it("refuses to create a review", async () => {
-    const { client } = createFixtureClient(fixture);
-
-    await expect(
-      client.createReview({
-        owner: OWNER,
-        repo: REPO,
-        pullRequestNumber: 154,
-        commitSha: HEAD_SHA,
-        body: "hi",
-        comments: [],
-      }),
-    ).rejects.toThrow(
-      `the evaluation harness must never publish: createReview called for ${OWNER}/${REPO}#154`,
-    );
-  });
-
-  it("refuses to commit", async () => {
-    const { client } = createFixtureClient(fixture);
-
-    await expect(
-      client.createCommitOnBranch({
-        owner: OWNER,
-        repo: REPO,
-        branch: "main",
-        baseSha: BASE_SHA,
-        message: "x",
-        files: [],
-      }),
-    ).rejects.toThrow(/must never publish: createCommitOnBranch called for/);
-  });
-
-  it("refuses to write a file", async () => {
-    const { client } = createFixtureClient(fixture);
-
-    await expect(
-      client.writeFileOnBranch({
-        owner: OWNER,
-        repo: REPO,
-        branch: "main",
-        path: "src/a.ts",
-        content: "x",
-        message: "x",
-      }),
-    ).rejects.toThrow(/must never publish: writeFileOnBranch called for/);
+    for (const method of [
+      "createCheckRun",
+      "createReview",
+      "createCommitOnBranch",
+      "writeFileOnBranch",
+    ]) {
+      expect(method in client, method).toBe(false);
+    }
   });
 });

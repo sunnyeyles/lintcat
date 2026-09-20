@@ -54,8 +54,11 @@ async function publishResult(publishes: ReviewPublishClient): Promise<number> {
   return run.id;
 }
 
-const unsupportedOf = (adapter: keyof typeof ADAPTER_PROFILES): ClientMethod[] =>
-  Object.keys(ADAPTER_PROFILES[adapter].unsupported) as ClientMethod[];
+/** Everything an adapter will not do, whether it rejects the call or never declares it. */
+const declinedOf = (adapter: keyof typeof ADAPTER_PROFILES): ClientMethod[] => [
+  ...(Object.keys(ADAPTER_PROFILES[adapter].unsupported) as ClientMethod[]),
+  ...ADAPTER_PROFILES[adapter].absent,
+];
 
 describe("client method groups", () => {
   it("assigns every method to exactly one group", () => {
@@ -86,15 +89,15 @@ describe("groups against the adapter profiles", () => {
 
   it.each(adapters)("%s honours every pull-request read", (adapter) => {
     const reads = new Set<ClientMethod>(METHOD_GROUPS["pull-request-read"]);
-    expect(unsupportedOf(adapter).filter((method) => reads.has(method))).toEqual([]);
+    expect(declinedOf(adapter).filter((method) => reads.has(method))).toEqual([]);
   });
 
   it.each(["local-checkout", "eval-fixture"] as const)(
-    "%s rejects publishing outright",
+    "%s declares no publish method at all",
     (adapter) => {
-      const unsupported = new Set(unsupportedOf(adapter));
+      const absent = new Set<ClientMethod>(ADAPTER_PROFILES[adapter].absent);
       for (const method of METHOD_GROUPS["review-publish"]) {
-        expect(unsupported.has(method), method).toBe(true);
+        expect(absent.has(method), method).toBe(true);
       }
     },
   );

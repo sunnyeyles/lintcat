@@ -7,10 +7,11 @@ import {
   readRepositoryTarball,
   type ChangedFile,
   type CodeSearchMatch,
-  type GithubInstallationClient,
   type PullRequestDetails,
+  type PullRequestReadClient,
   type RepositoryArchive,
   type RepositoryFileEntry,
+  type RepositoryHistoryClient,
 } from "@pr-review/github";
 import type { ReviewTarget } from "@pr-review/reviewer";
 
@@ -19,6 +20,10 @@ import { addedFileDiff, parseUnifiedDiff } from "#src/unified-diff";
 
 /** The head "commit" of a local review: files as they are on disk now. */
 export const WORKING_TREE = "WORKING_TREE";
+
+/** No publishing, and no second commit to compare the working tree against. */
+export type LocalGitClient = PullRequestReadClient &
+  Omit<RepositoryHistoryClient, "compareCommits">;
 
 const MAX_SEARCH_FILES = 30;
 const MAX_SNIPPETS_PER_FILE = 3;
@@ -32,14 +37,7 @@ export interface LocalRepository {
   baseSha: string;
   branch: string;
   target: ReviewTarget;
-  client: GithubInstallationClient;
-}
-
-class LocalClientUnsupported extends Error {
-  constructor(operation: string) {
-    super(`${operation} is not available on a local checkout`);
-    this.name = "LocalClientUnsupported";
-  }
+  client: LocalGitClient;
 }
 
 async function tryGit(root: string, args: readonly string[]): Promise<string | undefined> {
@@ -148,7 +146,7 @@ function untrackedContent(root: string, file: string): Uint8Array {
 
 function createLocalGitClient(
   repository: Omit<LocalRepository, "client">,
-): GithubInstallationClient {
+): LocalGitClient {
   const { root, baseSha, baseRef, branch } = repository;
 
   let snapshot: Promise<{ diff: string; files: ChangedFile[] }> | undefined;
@@ -259,10 +257,5 @@ function createLocalGitClient(
     async getCommitMessage({ sha }) {
       return git(root, ["log", "-1", "--format=%B", assertRef(sha)]);
     },
-    compareCommits: () => Promise.reject(new LocalClientUnsupported("compareCommits")),
-    createCheckRun: () => Promise.reject(new LocalClientUnsupported("createCheckRun")),
-    createReview: () => Promise.reject(new LocalClientUnsupported("createReview")),
-    createCommitOnBranch: () => Promise.reject(new LocalClientUnsupported("createCommitOnBranch")),
-    writeFileOnBranch: () => Promise.reject(new LocalClientUnsupported("writeFileOnBranch")),
   };
 }
