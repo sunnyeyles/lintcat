@@ -15,11 +15,17 @@ const UNIQUE_CONTENTS = "export const uniqueToken = 1;\n";
 const CHANGED_PATH = "src/api.ts";
 const FLOOD_FILES = 30;
 
+/** Wider than the snippet padding, so each hit earns its own window. */
+const PADDING = "-".repeat(300);
+
 const HEAD_FILES = new Map<string, string>([
   [UNIQUE_PATH, UNIQUE_CONTENTS],
   [
     "src/repeated.ts",
-    Array.from({ length: 5 }, (_, i) => `export const repeatedToken${i} = ${i};\n`).join(""),
+    Array.from(
+      { length: 5 },
+      (_, i) => `export const repeatedToken${i} = ${i}; //${PADDING}\n`,
+    ).join(""),
   ],
   [CHANGED_PATH, "export const api = 2;\n"],
   ...Array.from({ length: FLOOD_FILES }, (_, i) => {
@@ -89,8 +95,9 @@ function openCase(): ConformanceCase {
     search: {
       unique: "uniqueToken",
       absent: "nothingMatchesThis",
+      pathOnly: "flood-00",
       flood: { query: "floodToken", totalMatches: FLOOD_FILES },
-      repeated: { query: "repeatedToken", snippets: 1 },
+      repeated: { query: "repeatedToken", snippets: 2 },
     },
   };
 }

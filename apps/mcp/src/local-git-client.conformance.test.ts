@@ -10,9 +10,12 @@ const UNIQUE_PATH = "src/unique.ts";
 const UNIQUE_CONTENTS = "export const uniqueToken = 1;\n";
 const FLOOD_FILES = 35;
 
+/** Wider than the snippet padding, so each hit earns its own window. */
+const PADDING = "-".repeat(300);
+
 const REPEATED_CONTENTS = Array.from(
   { length: 5 },
-  (_, i) => `export const repeatedToken${i} = ${i};\n`,
+  (_, i) => `export const repeatedToken${i} = ${i}; //${PADDING}\n`,
 ).join("");
 
 const FILES: Record<string, string> = {
@@ -49,8 +52,9 @@ function openCase(): ConformanceCase {
     search: {
       unique: "uniqueToken",
       absent: "nothingMatchesThis",
+      pathOnly: "flood-00",
       flood: { query: "floodToken", totalMatches: FLOOD_FILES },
-      repeated: { query: "repeatedToken", snippets: 3 },
+      repeated: { query: "repeatedToken", snippets: 2 },
     },
   };
 }

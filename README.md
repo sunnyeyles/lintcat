@@ -722,12 +722,21 @@ Four adapters implement `GithubInstallationClient`: Octokit
 (`packages/ai/src/agent-test-support.ts`). One shared suite,
 `@pr-review/github/conformance`, runs against all four in `pnpm test`.
 
+Search semantics are not among the differences. `packages/github/src/search.ts`
+owns the query grammar, what counts as a match (every term, case-insensitively,
+in the contents and never the path), the snippet windows and the caps
+(`SEARCH_LIMITS`: 20 matches, 2 snippets of 400 characters each), and all four
+adapters call it. `totalCount` stays uncapped, so it is what tells the model a
+query was not selective enough.
+
 `ADAPTER_PROFILES` in `packages/github/src/conformance.ts` is the single place
-they are allowed to differ, and every entry is asserted rather than skipped:
-the search match cap (20 / 30 / 25 / none), snippets per match (none / 3 /
-none / none), whether the query is honoured at all, the operations each adapter
-declares unsupported and the error name each rejects with, and how a file the
-repository does not have is reported. Moving a cap in an adapter fails a test.
+they are still allowed to differ, and every entry is asserted rather than
+skipped: how a file is decided to match (`shared` for the local checkout and
+the eval fixture; `github-code-index` for Octokit, whose index is GitHub's to
+define; `canned` for the test fake), what fills a match's snippets before the
+shared cap trims them, the operations each adapter declares unsupported and the
+error name each rejects with, and how a file the repository does not have is
+reported. Moving a cap in `SEARCH_LIMITS` fails a test in every adapter at once.
 
 ---
 
