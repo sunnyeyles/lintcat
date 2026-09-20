@@ -39,8 +39,9 @@ export {
   type PatchedFile,
 } from "#src/validate-patches";
 export {
-  reviewPullRequest,
+  reviewWithDelivery,
   type ReviewOutcome,
+  type ReviewWithDeliveryDeps,
 } from "#src/review-pull-request";
 export {
   dashboardDelivery,

@@ -13,7 +13,6 @@ import type {
   ExistingReviewComment,
   PullRequestReadClient,
   RepositoryHistoryClient,
-  ReviewPublishClient,
 } from "@pr-review/github";
 import {
   createConsoleLogger,
@@ -26,15 +25,7 @@ import { buildReviewIndex } from "#src/build-index";
 import type { RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
 import { countLabel } from "#src/finding-format";
-import {
-  createCheckRunPublisher,
-  createFixPublisher,
-  createReviewCommentPublisher,
-  deliverReview,
-  type PublishFixes,
-  type PublishReview,
-  type PublishReviewComments,
-} from "#src/publish-review";
+import { deliverReview } from "#src/publish-review";
 import type { ReviewDelivery } from "#src/review-delivery";
 import {
   computeHints,
@@ -57,34 +48,6 @@ import {
 } from "#src/review-pipeline";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
-
-interface ReviewPullRequestDeps {
-  /** Authenticated GitHub client for this repository. */
-  client: PullRequestReadClient &
-    RepositoryHistoryClient &
-    ReviewPublishClient;
-  /** The run's agent set, already narrowed by the `agents` input. */
-  agents: readonly AgentDefinition[];
-  /** Throws only when every agent failed; a synthesis failure is reported on the result. */
-  runReviewPipeline: RunReviewPipeline;
-  /** Defaults to publishing a check run through `client`. */
-  publishReview?: PublishReview | undefined;
-  /** Defaults to publishing a review through `client`. */
-  publishReviewComments?: PublishReviewComments | undefined;
-  /** Whether verified patches may be committed to the head branch. */
-  applyFixes?: boolean | undefined;
-  /** Defaults to committing through `client`, when applyFixes is on. */
-  publishFixes?: PublishFixes | undefined;
-  /** Every event carries repository, PR number, and head SHA. */
-  logger?: StructuredLogger | undefined;
-  /** Where this repository's review memory lives; undefined means no hints. */
-  memoryStore?: MemoryStore | undefined;
-  /** Injectable clock, so a test can pin what counts as a fresh signal. */
-  now?: (() => Date) | undefined;
-  incremental?: boolean | undefined;
-  /** Whether the repository index is built for this review; on by default. */
-  index?: boolean | undefined;
-}
 
 /** What one review needs once its delivery has already been chosen. */
 export interface ReviewWithDeliveryDeps {
@@ -446,33 +409,4 @@ export async function reviewWithDelivery(
   );
 
   return { ...review, findings: verified.findings, patches: verified.summary };
-}
-
-/** Throws when the pipeline or the publish step fails; retries are the caller's. */
-export async function reviewPullRequest(
-  target: ReviewTarget,
-  deps: ReviewPullRequestDeps,
-): Promise<ReviewOutcome> {
-  const {
-    client,
-    publishReview,
-    publishReviewComments,
-    applyFixes = false,
-    publishFixes,
-    logger = createConsoleLogger(),
-    ...rest
-  } = deps;
-  return reviewWithDelivery(target, {
-    ...rest,
-    client,
-    logger,
-    delivery: {
-      publishCheckRun: publishReview ?? createCheckRunPublisher(client),
-      publishComments:
-        publishReviewComments ?? createReviewCommentPublisher(client, logger),
-      ...(applyFixes
-        ? { publishFixes: publishFixes ?? createFixPublisher(client, logger) }
-        : {}),
-    },
-  });
 }
