@@ -2,6 +2,7 @@ import {
   createSynthesiser,
   loadAgentDefinitions,
   resolveAgentDefinitions,
+  type AgentLifecycleListener,
 } from "@pr-review/ai";
 import type { GithubInstallationClient } from "@pr-review/github";
 import {
@@ -28,6 +29,8 @@ export interface ReviewRequest {
   publish: boolean;
   /** The caller's cancellation, as the MCP request handler receives it. */
   signal?: AbortSignal | undefined;
+  /** Reports each agent's start and finish while the review runs. */
+  onAgentEvent?: AgentLifecycleListener | undefined;
 }
 
 export interface ReviewResult {
@@ -47,6 +50,7 @@ export async function runReview(
     index = true,
     publish,
     signal,
+    onAgentEvent,
   }: ReviewRequest,
 ): Promise<ReviewResult> {
   const { logger } = environment;
@@ -74,6 +78,7 @@ export async function runReview(
       createModel,
       synthesiser: createSynthesiser({ model, agents }),
       logger,
+      onAgentEvent,
     }),
     publishReview,
     signal,

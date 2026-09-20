@@ -1,6 +1,7 @@
 import {
   emptyTokenUsage,
   ReviewCancelledError,
+  type AgentLifecycleEvent,
   type ReviewAgent,
   type ReviewContext,
   type Synthesiser,
@@ -378,6 +379,79 @@ describe("runReviewPipeline: deterministic validation (spec §17)", () => {
     expect(seenByAgent).toEqual([[otherFile]]);
     expect(result.candidates).toEqual([inThisPr, notInThisPr]);
     expect(result.findings).toEqual([inThisPr]);
+  });
+});
+
+describe("runReviewPipeline: agent lifecycle events", () => {
+  it("reports every agent starting and finishing, counted against the run's total", async () => {
+    const events: AgentLifecycleEvent[] = [];
+
+    await runReviewPipeline(
+      [
+        agent("correctness", async () => [makeFinding()]),
+        agent("security", async () => [makeFinding({ title: "B" })]),
+      ],
+      passthroughSynthesiser(),
+      context,
+      undefined,
+      (event) => events.push(event),
+    );
+
+    expect(events).toEqual([
+      { agent: "correctness", phase: "started", finished: 0, total: 2 },
+      { agent: "security", phase: "started", finished: 0, total: 2 },
+      { agent: "correctness", phase: "completed", finished: 1, total: 2 },
+      { agent: "security", phase: "completed", finished: 2, total: 2 },
+    ]);
+  });
+
+  it("reports a failed agent as finished, so progress still reaches the total", async () => {
+    const events: AgentLifecycleEvent[] = [];
+
+    await runReviewPipeline(
+      [
+        agent("correctness", async () => {
+          throw new Error("model unavailable");
+        }),
+        agent("security", async () => [makeFinding()]),
+      ],
+      passthroughSynthesiser(),
+      context,
+      undefined,
+      (event) => events.push(event),
+    );
+
+    expect(events.filter((event) => event.phase !== "started")).toEqual([
+      { agent: "correctness", phase: "failed", finished: 1, total: 2 },
+      { agent: "security", phase: "completed", finished: 2, total: 2 },
+    ]);
+  });
+
+  it("runs unchanged without a listener", async () => {
+    const finding = makeFinding();
+    const result = await runReviewPipeline(
+      [agent("correctness", async () => [finding])],
+      passthroughSynthesiser(),
+      context,
+    );
+
+    expect(result.findings).toEqual([finding]);
+  });
+
+  it("finishes the review when the listener throws", async () => {
+    const finding = makeFinding();
+    const result = await runReviewPipeline(
+      [agent("correctness", async () => [finding])],
+      passthroughSynthesiser(),
+      context,
+      undefined,
+      () => {
+        throw new Error("transport closed");
+      },
+    );
+
+    expect(result.findings).toEqual([finding]);
+    expect(result.agentFailures).toEqual([]);
   });
 });
 

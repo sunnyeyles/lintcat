@@ -5,6 +5,8 @@
 import {
   isCancellation,
   throwIfCancelled,
+  type AgentLifecycleEvent,
+  type AgentLifecycleListener,
   type ReviewAgent,
   type ReviewContext,
   type Synthesiser,
@@ -54,14 +56,43 @@ export function skippedSynthesis(
   return { outcome: "skipped", candidates, reason };
 }
 
+/** Reports one agent's phase, counting the run's finished agents. */
+type ReportPhase = (agent: string, phase: AgentLifecycleEvent["phase"]) => void;
+
+/** A reporter over `listener`; a no-op when the caller wants no events. */
+function lifecycleReporter(
+  total: number,
+  listener: AgentLifecycleListener | undefined,
+): ReportPhase {
+  if (listener === undefined) {
+    return () => {};
+  }
+  let finished = 0;
+  return (agent, phase) => {
+    if (phase !== "started") {
+      finished += 1;
+    }
+    try {
+      listener({ agent, phase, finished, total });
+    } catch {
+      // Progress reporting must never fail a review.
+    }
+  };
+}
+
 /** Runs one agent, recording success or failure; never throws. */
 async function runAgent(
   agent: ReviewAgent,
   context: ReviewContext,
+  report: ReportPhase,
 ): Promise<AgentOutcome> {
+  report(agent.name, "started");
   try {
-    return { name: agent.name, candidates: await agent.run(context) };
+    const candidates = await agent.run(context);
+    report(agent.name, "completed");
+    return { name: agent.name, candidates };
   } catch (error) {
+    report(agent.name, "failed");
     return { name: agent.name, error: errorMessage(error) };
   }
 }
@@ -146,14 +177,16 @@ export async function runReviewPipeline(
   synthesiser: Synthesiser,
   context: ReviewContext,
   hints?: SynthesisHints,
+  onAgentEvent?: AgentLifecycleListener,
 ): Promise<ReviewPipelineResult> {
   if (agents.length === 0) {
     throw new Error("runReviewPipeline requires at least one review agent");
   }
 
   throwIfCancelled(context.signal);
+  const report = lifecycleReporter(agents.length, onAgentEvent);
   const outcomes = await Promise.all(
-    agents.map((agent) => runAgent(agent, context)),
+    agents.map((agent) => runAgent(agent, context, report)),
   );
   // Before join: agents aborted mid-run report failures nobody should act on.
   throwIfCancelled(context.signal);

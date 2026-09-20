@@ -1,6 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  ProgressNotificationSchema,
+  type CallToolResult,
+  type Progress,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   finalFindingsJson,
   makeFinding,
@@ -186,6 +190,39 @@ describe("review_local_changes", () => {
     const { isError, texts } = await call(client, "review_local_changes", { base: "main" });
     expect(isError).toBe(true);
     expect(texts[0]).toContain("No model API key is set");
+  });
+});
+
+describe("review progress", () => {
+  function reported(progress: Progress[]) {
+    return progress.map(({ progress: done, total, message }) => ({ done, total, message }));
+  }
+
+  it("reports each agent starting and finishing to a caller that sent a progress token", async () => {
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+    const progress: Progress[] = [];
+
+    await client.callTool(
+      { name: "review_local_changes", arguments: { base: "main", index: false } },
+      undefined,
+      { onprogress: (update) => progress.push(update) },
+    );
+
+    expect(reported(progress)).toEqual([
+      { done: 0, total: 1, message: "general started" },
+      { done: 1, total: 1, message: "general completed" },
+    ]);
+  });
+
+  it("sends nothing to a caller that sent no progress token", async () => {
+    const notified = vi.fn();
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+    client.setNotificationHandler(ProgressNotificationSchema, notified);
+
+    const { isError } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(false);
+    expect(notified).not.toHaveBeenCalled();
   });
 });
 

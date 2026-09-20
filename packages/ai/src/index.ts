@@ -15,6 +15,8 @@ export {
   type ReviewModel,
 } from "#src/model";
 export type {
+  AgentLifecycleEvent,
+  AgentLifecycleListener,
   ReviewAgent,
   ReviewContext,
 } from "#src/agent-contract";
