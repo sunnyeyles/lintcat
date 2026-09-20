@@ -5,11 +5,13 @@ import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
 import { registerHistoryTools } from "#src/tools/history-tools";
 import { registerIndexTools } from "#src/tools/index-tools";
 import { registerReviewTools } from "#src/tools/review-tools";
+import { registerSearchTools } from "#src/tools/search-tools";
 
 const INSTRUCTIONS = `Tools for the pr-review-agents code reviewer.
 - review_local_changes: review the working tree before pushing. Slow (model calls); read-only.
 - review_pull_request: dry-run review of a GitHub PR; publish: true posts to GitHub, so only set it when the user asks.
 - repository_overview / find_references / describe_file: import-graph navigation of a local checkout; no network.
+- search_code: literal text search of a local checkout, with path and line number; no network.
 - list_reviews / get_review / review_trends: stored review history, scoped to the user's GitHub account.`;
 
 export interface ServerOptions {
@@ -45,6 +47,7 @@ export function createServer(environment: McpEnvironment, options: ServerOptions
   );
   registerReviewTools(server, environment);
   registerIndexTools(server, environment, options.loadIndex ?? createLocalIndexCache());
+  registerSearchTools(server, environment);
   registerHistoryTools(server, environment, options.githubId ?? githubUserId(environment));
   return server;
 }
