@@ -1,4 +1,4 @@
-import { buildRepositoryIndex } from "@pr-review/index";
+import { buildRepositoryIndex, UNINDEXED_PATH_REASON } from "@pr-review/index";
 import type { Tool, ToolSet } from "ai";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
@@ -352,6 +352,7 @@ describe("review tool execution", () => {
 
     expect(JSON.parse(result).index).toEqual({
       sha: baseSha,
+      files: 7,
       truncated: false,
       languages: expect.arrayContaining([
         {
@@ -441,7 +442,7 @@ describe("review tool execution", () => {
       )) as string,
     );
     expect(payload.known).toBe(false);
-    expect(payload.reason).toBe("not in the index at this commit");
+    expect(payload.reason).toBe(UNINDEXED_PATH_REASON);
     expect(JSON.stringify(payload)).not.toMatch(/does not exist/);
   });
 

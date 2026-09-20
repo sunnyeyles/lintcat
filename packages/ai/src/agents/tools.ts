@@ -7,7 +7,12 @@ import type {
   CodeSearchResult,
   GithubInstallationClient,
 } from "@pr-review/github";
-import { referencesTo, type RepositoryIndex } from "@pr-review/index";
+import {
+  findReferences,
+  findReferencesDescription,
+  renderFindReferences,
+  type RepositoryIndex,
+} from "@pr-review/index";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
@@ -88,9 +93,6 @@ const searchQuerySchema = z
     'Search terms, e.g. "createSession". Do not include repo:/org:/user: qualifiers.',
   );
 
-/** Files reported per find_references call; `total` carries the true count. */
-const MAX_REFERENCE_FILES = 50;
-
 /** An exported name, as the target file spells it. */
 const exportedNameSchema = z
   .string()
@@ -99,15 +101,6 @@ const exportedNameSchema = z
   .regex(/^[A-Za-z_$][\w$]*$/, {
     message: "name must be a single exported identifier",
   });
-
-/** What the agent needs to judge an empty result: commit, completeness, languages. */
-function indexHeader(index: RepositoryIndex) {
-  return {
-    sha: index.sha,
-    truncated: index.truncated,
-    languages: index.coverage,
-  };
-}
 
 // Each sampled commit costs its own API call, so this is the request budget.
 const MAX_HISTORY_COMMITS = 10;
@@ -149,21 +142,17 @@ function patchFor(changedFiles: readonly ChangedFile[], path: string): string {
 }
 
 /** Why the index has no node for a path, or undefined when it has one. */
-function unknownReason(
+/** The one reason the index alone cannot give: the base commit predates the file. */
+function addedReason(
   changedFiles: readonly ChangedFile[],
-  index: RepositoryIndex,
   path: string,
 ): string | undefined {
   const added = changedFiles.some(
     (file) => file.filename === path && file.status === "added",
   );
-  if (added) {
-    return "added by this pull request, so the base commit has no node for it";
-  }
-  if (!index.files.has(path)) {
-    return "not in the index at this commit";
-  }
-  return undefined;
+  return added
+    ? "added by this pull request, so the base commit has no node for it"
+    : undefined;
 }
 
 /** Exactly the eight read-only tools, bound to one pull request. */
@@ -272,17 +261,9 @@ export function createReviewTools(
       },
     }),
     find_references: tool({
-      description:
-        "Find the files that import one file, read from the repository index built at the pull " +
-        "request's BASE commit — the import statements themselves, not a text search. With " +
-        "`name`, only the files importing that exported name; default and namespace (`*`) " +
-        "imports are included and marked as such, since a namespace import reaches every name. " +
-        `At most ${MAX_REFERENCE_FILES} files are returned and \`total\` is the true count. ` +
-        "Every result carries an `index` header: an empty list means nothing imports the path " +
-        "ONLY when that header shows the path's language indexed and truncated false. Each " +
-        "indexed language also carries a `resolution` rate — the share of the repository's own " +
-        "imports the index could place — so a rate below 1 means some importers are missing. A " +
-        "path this pull request added, or one the index does not hold, comes back as known: false.",
+      description: findReferencesDescription(
+        "the repository index built at the pull request's BASE commit",
+      ),
       inputSchema: z.strictObject({
         path: repositoryPathSchema,
         name: exportedNameSchema
@@ -295,27 +276,13 @@ export function createReviewTools(
         if (index === undefined) {
           return INDEX_ABSENT_LINE;
         }
-        const unknown = unknownReason(whole.changedFiles, index, path);
-        if (unknown !== undefined) {
-          return JSON.stringify(
-            { index: indexHeader(index), path, known: false, reason: unknown },
-            null,
-            2,
-          );
-        }
-        const references = referencesTo(index.importers, path, name);
         return truncate(
-          JSON.stringify(
-            {
-              index: indexHeader(index),
+          renderFindReferences(
+            findReferences(index, {
               path,
-              ...(name === undefined ? {} : { name }),
-              known: true,
-              total: references.length,
-              references: references.slice(0, MAX_REFERENCE_FILES),
-            },
-            null,
-            2,
+              name,
+              absentReason: addedReason(whole.changedFiles, path),
+            }),
           ),
         );
       },
