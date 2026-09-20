@@ -713,6 +713,22 @@ suite makes no network calls and runs in under two seconds.
 pnpm test
 ```
 
+### Client conformance
+
+Four adapters implement `GithubInstallationClient`: Octokit
+(`packages/github/src/app.ts`), the local checkout
+(`apps/mcp/src/local-git-client.ts`), the eval fixture
+(`evals/src/fixture-client.ts`), and the agent test fake
+(`packages/ai/src/agent-test-support.ts`). One shared suite,
+`@pr-review/github/conformance`, runs against all four in `pnpm test`.
+
+`ADAPTER_PROFILES` in `packages/github/src/conformance.ts` is the single place
+they are allowed to differ, and every entry is asserted rather than skipped:
+the search match cap (20 / 30 / 25 / none), snippets per match (none / 3 /
+none / none), whether the query is honoured at all, the operations each adapter
+declares unsupported and the error name each rejects with, and how a file the
+repository does not have is reported. Moving a cap in an adapter fails a test.
+
 ---
 
 ## Publishing the Action

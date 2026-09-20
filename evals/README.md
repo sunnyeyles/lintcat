@@ -119,6 +119,7 @@ expectations.ts        the judge: category + anchored location
 fixture.ts             loads repo/ (head) and base/ into the pipeline's inputs
 fixture-client.ts      GithubInstallationClient over a fixture; writes throw,
                        and EVAL_INDEX=off withholds the archive
+*.conformance.test.ts  the shared adapter suite, @pr-review/github/conformance
 unified-diff.ts        synthesises patches from the two trees
 run-fixture-review.ts  drives the real pipeline; only client and publish differ
 model-access.ts        credentials, and the fail-fast before any spend
