@@ -34,7 +34,7 @@
       for (const p of this.parts) {
         if (!p.steps.includes(step)) continue;
         const own = Number(p.el.dataset.hold);
-        const dflt = p.el.matches(".link, .fan, .edge-g") ? 240 : 640;
+        const dflt = p.el.matches(".edge-g") ? 240 : 640;
         hold = Math.max(hold, Number.isFinite(own) && own > 0 ? own : dflt);
       }
       return hold || 240;
