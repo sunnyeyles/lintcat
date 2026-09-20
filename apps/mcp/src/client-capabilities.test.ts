@@ -1,10 +1,13 @@
+import { pathToFileURL } from "node:url";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
+import { ListRootsRequestSchema, type ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
 import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  connectedClient,
   NO_CLIENT_FEATURES,
   readClientFeatures,
   staticClient,
@@ -90,6 +93,13 @@ describe("the fake", () => {
   it("names only the features it was given", () => {
     expect(staticClient({ sampling: true }).features()).toMatchObject({ sampling: true, roots: false });
   });
+
+  it("serves the roots it was given, and reports roots because of them", async () => {
+    const client = staticClient({}, ["/workspace"]);
+
+    expect(client.features()).toMatchObject({ roots: true });
+    await expect(client.roots()).resolves.toEqual(["/workspace"]);
+  });
 });
 
 describe("the live connection", () => {
@@ -103,6 +113,28 @@ describe("the live connection", () => {
     const seen = await negotiated({});
 
     expect(seen).toMatchObject(NO_CLIENT_FEATURES);
+  });
+
+  it("reads the roots a serving client lists as filesystem paths", async () => {
+    const server = createServer(environment(createCapturingLogger().logger));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: "test", version: "0.0.0" }, { capabilities: { roots: {} } });
+    client.setRequestHandler(ListRootsRequestSchema, () => ({
+      roots: [{ uri: pathToFileURL(repo.root).href }],
+    }));
+    await client.connect(clientTransport);
+
+    await expect(connectedClient(server).roots()).resolves.toEqual([repo.root]);
+  });
+
+  it("asks a client that serves no roots for none", async () => {
+    const server = createServer(environment(createCapturingLogger().logger));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await new Client({ name: "test", version: "0.0.0" }, { capabilities: {} }).connect(clientTransport);
+
+    await expect(connectedClient(server).roots()).resolves.toEqual([]);
   });
 
   it("takes an injected client over the live one", async () => {
