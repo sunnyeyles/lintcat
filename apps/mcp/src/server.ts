@@ -1,4 +1,5 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
 import { connectedClient, type ConnectedClient } from "#src/client-capabilities";
 import { createClientLogger } from "#src/client-logger";
@@ -37,6 +38,23 @@ export interface ServerOptions {
   githubId?: () => Promise<number>;
   /** What the connected client can do; defaults to asking the live connection. */
   client?: ConnectedClient;
+  /** Hides and refuses every tool not annotated read-only; defaults to PR_REVIEW_MCP_READ_ONLY. */
+  readOnly?: boolean;
+}
+
+function readOnlyFromEnv(env: McpEnvironment["env"]): boolean {
+  return ["1", "true"].includes(env["PR_REVIEW_MCP_READ_ONLY"]?.trim().toLowerCase() ?? "");
+}
+
+/** Disables each write tool as it registers, so later tools are covered without per-tool code. */
+function hideWriteTools(server: McpServer): void {
+  const register = server.registerTool.bind(server) as (...args: unknown[]) => RegisteredTool;
+  (server as { registerTool: unknown }).registerTool = (...args: unknown[]) => {
+    const tool = register(...args);
+    const config = args[1] as { annotations?: ToolAnnotations };
+    if (config.annotations?.readOnlyHint !== true) tool.disable();
+    return tool;
+  };
 }
 
 /** The signed-in user's numeric GitHub id, read once per server. */
@@ -65,6 +83,7 @@ export function createServer(base: McpEnvironment, options: ServerOptions = {}):
     { name: "pr-review-agents", version: "0.1.0" },
     { instructions: INSTRUCTIONS, capabilities: { logging: {} } },
   );
+  if (options.readOnly ?? readOnlyFromEnv(base.env)) hideWriteTools(server);
   const client = options.client ?? connectedClient(server);
   const environment: McpEnvironment = {
     ...base,

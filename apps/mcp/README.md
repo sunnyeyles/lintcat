@@ -79,6 +79,7 @@ variable that is already set takes precedence.
 | `PR_REVIEW_MODEL_BASE_URL` | Unset |
 | `GITHUB_TOKEN` / `GH_TOKEN` | Falls back to `gh auth token` |
 | `DATABASE_URL` | From `.env.local` |
+| `PR_REVIEW_MCP_READ_ONLY` | Off. Set to `1` or `true` to hide every tool that is not read-only (`apply_fix`, `suppress_finding`, `review_pull_request`) and refuse direct calls to them |
 
 Logs go to stderr, because stdout carries the protocol.
 
