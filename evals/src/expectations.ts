@@ -95,6 +95,17 @@ function inAnchor(finding: ReviewFinding, anchor: ResolvedAnchor): boolean {
   );
 }
 
+/** A standalone agent stamps its own name on every finding, so location alone judges it. */
+function expectedCategory(
+  review: FixtureReview,
+  declared: FindingCategory,
+): FindingCategory {
+  const [only] = review.agents;
+  return review.agents.length === 1 && only?.standalone === true
+    ? only.category
+    : declared;
+}
+
 /** One finding rendered for a failure message. */
 function describeFinding(finding: ReviewFinding): string {
   const at = finding.line === undefined ? finding.file : `${finding.file}:${finding.line}`;
@@ -160,9 +171,10 @@ export function evaluateExpectation(
   const anchors = expectation.anchors.map((anchor) =>
     resolveAnchor(review.fixture, anchor),
   );
+  const category = expectedCategory(review, expectation.category);
   const matched = findings.filter(
     (finding) =>
-      finding.category === expectation.category &&
+      finding.category === category &&
       anchors.some((anchor) => inAnchor(finding, anchor)),
   );
   if (matched.length > 0) {
@@ -178,7 +190,7 @@ export function evaluateExpectation(
   return {
     passed: false,
     detail:
-      `No ${expectation.category} finding landed on the planted problem.\n` +
-      `Expected a ${expectation.category} finding within:\n${where}\n\n${rendered}`,
+      `No ${category} finding landed on the planted problem.\n` +
+      `Expected a ${category} finding within:\n${where}\n\n${rendered}`,
   };
 }
