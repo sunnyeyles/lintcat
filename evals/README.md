@@ -117,7 +117,7 @@ proves nothing on its own: the gate needs both halves.
 cases.ts               the spec: fixtures and their expectations
 expectations.ts        the judge: category + anchored location
 fixture.ts             loads repo/ (head) and base/ into the pipeline's inputs
-fixture-client.ts      GithubInstallationClient over a fixture; writes throw,
+fixture-client.ts      the reads a fixture can serve; publishing is undeclared,
                        and EVAL_INDEX=off withholds the archive
 *.conformance.test.ts  the shared adapter suite, @pr-review/github/conformance
 unified-diff.ts        synthesises patches from the two trees

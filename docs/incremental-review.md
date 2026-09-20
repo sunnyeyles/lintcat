@@ -145,9 +145,9 @@ Four events, alongside the existing set:
 
 ## Client additions
 
-Three read-only methods on `GithubInstallationClient`:
-`listPullRequestCommitShas`, `listCheckRuns`, `compareCommits`. Nothing gains a
-write. The narrowed diff is rebuilt from the comparison's file patches rather
+Three read-only methods: `listPullRequestCommitShas` and `compareCommits` on
+`RepositoryHistoryClient`, `listCheckRuns` on `PullRequestReadClient`. Nothing
+gains a write. The narrowed diff is rebuilt from the comparison's file patches rather
 than fetched: the intersection has to happen anyway, and a raw compare diff
 would carry the base-branch files back in.
 

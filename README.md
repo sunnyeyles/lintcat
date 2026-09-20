@@ -742,9 +742,9 @@ test in every adapter at once.
 
 ### The three client interfaces
 
-`GithubInstallationClient` is the union of three narrower interfaces declared
-beside it in `packages/github/src/client.ts`, and they are what the profiles
-table divides along:
+`packages/github/src/client.ts` declares three interfaces and no wider one;
+they are what the profiles table divides along. A caller that needs more than
+one names the intersection it needs, so no type says "everything" any more:
 
 | Interface | What it covers | Who declines part of it |
 | --- | --- | --- |
@@ -759,6 +759,12 @@ they decline is a compile error at the call, not a throw. A review run takes
 that narrow `ReviewClient` and writes only through its `ReviewDelivery`, so
 publishing is unreachable from a checkout or a fixture twice over: the client
 has no publish method, and the delivery closes over no client.
+
+Only the Octokit-backed adapters — `createInstallationClient` and
+`createTokenClient` — return all three intersected, because an installation
+token really can do all of it; the Action and the MCP server take that
+intersection through their environment seams and hand each half to the
+narrower consumer that wants it.
 
 `METHOD_GROUPS` in `conformance.ts` carries the same split at runtime, and
 `client-groups.test.ts` asserts it against `ADAPTER_PROFILES`: no adapter may
