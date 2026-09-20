@@ -4,9 +4,10 @@ import path from "node:path";
 import {
   collectRepositoryFiles,
   DEFAULT_ARCHIVE_LIMITS,
+  parseSearchQuery,
   readRepositoryTarball,
+  searchMatchedPaths,
   type ChangedFile,
-  type CodeSearchMatch,
   type PullRequestDetails,
   type PullRequestReadClient,
   type RepositoryArchive,
@@ -24,9 +25,6 @@ export const WORKING_TREE = "WORKING_TREE";
 /** No publishing, and no second commit to compare the working tree against. */
 export type LocalGitClient = PullRequestReadClient &
   Omit<RepositoryHistoryClient, "compareCommits">;
-
-const MAX_SEARCH_FILES = 30;
-const MAX_SNIPPETS_PER_FILE = 3;
 
 /** One local checkout, reviewed as if its uncommitted state were a pull request. */
 export interface LocalRepository {
@@ -96,29 +94,6 @@ function resolveInside(root: string, file: string): string {
     throw new GitError(`${file} is outside the repository`, 404);
   }
   return real;
-}
-
-function searchTerms(query: string): string[] {
-  return query
-    .split(/\s+/)
-    .map((term) => term.replace(/^"|"$/g, ""))
-    .filter((term) => term !== "");
-}
-
-function groupMatches(output: string): CodeSearchMatch[] {
-  const byPath = new Map<string, string[]>();
-  for (const line of output.split("\n")) {
-    const match = /^(.+?):(\d+):(.*)$/.exec(line);
-    if (!match) continue;
-    const snippets = byPath.get(match[1]!) ?? [];
-    if (snippets.length < MAX_SNIPPETS_PER_FILE) snippets.push(match[3]!.trim());
-    byPath.set(match[1]!, snippets);
-  }
-  return [...byPath].map(([file, snippets]) => ({
-    path: file,
-    name: path.posix.basename(file),
-    snippets,
-  }));
 }
 
 function* workingTreeFiles(root: string, paths: readonly string[]): Generator<RepositoryFileEntry> {
@@ -207,21 +182,20 @@ function createLocalGitClient(
     },
     getFileContents: ({ path: file, ref }) => readAt(ref, file),
     async searchCode({ query }) {
-      const terms = searchTerms(query);
+      const terms = parseSearchQuery(query);
       if (terms.length === 0) {
         return { matches: [], totalCount: 0, incompleteResults: false };
       }
+      // -l -i -F --all-match is git's spelling of matchesTerms: contents only, every term.
       const output = await git(
         root,
-        ["grep", "-I", "-n", "-i", "-F", "--untracked", "--all-match", ...terms.flatMap((term) => ["-e", term])],
+        ["grep", "-I", "-l", "-i", "-F", "--untracked", "--all-match", ...terms.flatMap((term) => ["-e", term])],
         { okExitCodes: [1] },
       );
-      const matches = groupMatches(output);
-      return {
-        matches: matches.slice(0, MAX_SEARCH_FILES),
-        totalCount: matches.length,
-        incompleteResults: false,
-      };
+      const paths = output.split("\n").filter((file) => file !== "");
+      return searchMatchedPaths(query, paths, (file) =>
+        Buffer.from(untrackedContent(root, file)).toString("utf8"),
+      );
     },
     async getRepositoryArchive({ ref, limits }): Promise<RepositoryArchive> {
       if (ref === WORKING_TREE) {

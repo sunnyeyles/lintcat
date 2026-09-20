@@ -17,6 +17,17 @@ export {
   type RepositoryPermission,
 } from "#src/app-client";
 export { httpStatus, isPermissionError } from "#src/errors";
+export {
+  SEARCH_LIMITS,
+  boundSnippets,
+  buildMatch,
+  formatSearchQuery,
+  matchesTerms,
+  parseSearchQuery,
+  searchFiles,
+  searchMatchedPaths,
+  snippetWindows,
+} from "#src/search";
 export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
   CHECK_RUN_NAME,

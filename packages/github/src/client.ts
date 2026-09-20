@@ -79,15 +79,15 @@ export interface CodeSearchMatch {
   path: string;
   /** Base name of the matching file. */
   name: string;
-  /** Verbatim fragments from the default branch's index; no line numbers. */
+  /** Trimmed, deduplicated fragments; no line numbers. See #src/search. */
   snippets: readonly string[];
 }
 
-/** A code search result set, with the totals GitHub reports alongside it. */
+/** A code search result set; #src/search defines the caps every adapter applies. */
 export interface CodeSearchResult {
-  /** Matches GitHub returned; never more than one page. */
+  /** Matches returned, capped at SEARCH_LIMITS.maxMatches. */
   matches: CodeSearchMatch[];
-  /** Total matches in the repository, which may exceed `matches.length`. */
+  /** Total matches in the repository, uncapped, so it may exceed `matches.length`. */
   totalCount: number;
   /** True when GitHub timed out the query and returned a partial answer. */
   incompleteResults: boolean;

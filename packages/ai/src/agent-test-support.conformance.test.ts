@@ -25,6 +25,7 @@ function openCase(): ConformanceCase {
     search: {
       unique: "createSession",
       absent: "nothingMatchesThis",
+      pathOnly: "sessions.ts",
       flood: { query: "createSession", totalMatches: 1 },
       repeated: { query: "createSession", snippets: 1 },
     },

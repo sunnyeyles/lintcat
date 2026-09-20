@@ -8,6 +8,7 @@ import type {
   RepositoryHistoryClient,
   ReviewPublishClient,
 } from "#src/client";
+import { SEARCH_LIMITS } from "#src/search";
 
 export type ClientMethod = keyof GithubInstallationClient;
 
@@ -54,16 +55,17 @@ export const CLIENT_METHODS = Object.values(METHOD_GROUPS).flat();
 /** Matches packages/ai keeps from any adapter; capping below it silently narrows what the agent sees. */
 export const AGENT_TOOL_SEARCH_MATCHES = 20;
 
-/** Where adapters differ most: none of these three numbers agree. */
+/** All that is left to an adapter: SEARCH_LIMITS owns the grammar and the caps. */
 export interface SearchProfile {
-  /** Matches one query returns at most; null when the adapter never truncates. */
-  maxMatches: number | null;
-  /** Snippets per match at most; null when the adapter never truncates them. */
-  maxSnippetsPerMatch: number | null;
-  /** How a file is decided to match, in words. */
-  matching: string;
-  /** False when every query gets the same fixed answer. */
-  honoursQuery: boolean;
+  /** What decides a file matches; only "shared" runs #src/search's own rule. */
+  matching: "shared" | "github-code-index" | "canned";
+  /** What fills a match before the shared snippet cap trims it. */
+  snippets: "shared-windows" | "github-fragments" | "canned";
+}
+
+/** A canned adapter answers every query the same way, so no query test can bind it. */
+function honoursQuery(profile: AdapterProfile): boolean {
+  return profile.search.matching !== "canned";
 }
 
 /** Every adapter honours all of `PullRequestReadClient`; the rest it declares only if it honours it. */
@@ -82,28 +84,18 @@ export interface AdapterProfile {
   missingFileError: string | null;
 }
 
-/** Every adapter side by side. A number that moves here has to move in the adapter too. */
+/** Every adapter side by side; anything absent here is shared and asserted identically. */
 export const ADAPTER_PROFILES = {
   octokit: {
     backing: "the GitHub REST and GraphQL APIs",
-    search: {
-      maxMatches: 20,
-      maxSnippetsPerMatch: null,
-      matching: "GitHub code search over the default branch index",
-      honoursQuery: true,
-    },
+    search: { matching: "github-code-index", snippets: "github-fragments" },
     absent: [],
     unsupported: {},
     missingFileError: "HttpError",
   },
   "local-checkout": {
     backing: "a git checkout on disk, head being the working tree",
-    search: {
-      maxMatches: 30,
-      maxSnippetsPerMatch: 3,
-      matching: "git grep -F -i, every term required, contents only",
-      honoursQuery: true,
-    },
+    search: { matching: "shared", snippets: "shared-windows" },
     absent: [
       "compareCommits",
       "createCheckRun",
@@ -116,12 +108,7 @@ export const ADAPTER_PROFILES = {
   },
   "eval-fixture": {
     backing: "a planted fixture repository held in memory",
-    search: {
-      maxMatches: 25,
-      maxSnippetsPerMatch: null,
-      matching: "case-insensitive substring AND over path and contents, one window per term",
-      honoursQuery: true,
-    },
+    search: { matching: "shared", snippets: "shared-windows" },
     absent: [
       "listCommitFiles",
       "compareCommits",
@@ -136,12 +123,7 @@ export const ADAPTER_PROFILES = {
   },
   "agent-test-fake": {
     backing: "hard-coded literals in packages/ai/src/agent-test-support.ts",
-    search: {
-      maxMatches: null,
-      maxSnippetsPerMatch: null,
-      matching: "nothing is matched; one canned result answers every query",
-      honoursQuery: false,
-    },
+    search: { matching: "canned", snippets: "canned" },
     absent: [],
     unsupported: { writeFileOnBranch: "Error" },
     missingFileError: null,
@@ -155,9 +137,11 @@ export interface ConformanceSearch {
   unique: string;
   /** A query the repository has no match for. */
   absent: string;
-  /** A query matching more files than the adapter is willing to return. */
+  /** A query appearing in some file's path but in no file's contents. */
+  pathOnly: string;
+  /** A query matching more files than SEARCH_LIMITS.maxMatches. */
   flood: { query: string; totalMatches: number };
-  /** A query whose single matching file comes back with this many snippets. */
+  /** A query whose first matching file comes back with this many snippets. */
   repeated: { query: string; snippets: number };
 }
 
@@ -178,6 +162,18 @@ const SAMPLE_SHA = "9f2c1a4b7e5d3c8a6f0b2d4e6a8c0e2f4a6b8d0c";
 
 function baseName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
+}
+
+/** The one snippet shape: trimmed, non-empty, unique, and within both caps. */
+function expectBoundedSnippets(snippets: readonly string[]): void {
+  expect(snippets.length).toBeLessThanOrEqual(SEARCH_LIMITS.maxSnippetsPerMatch);
+  expect(new Set(snippets).size).toBe(snippets.length);
+  for (const snippet of snippets) {
+    expect(typeof snippet).toBe("string");
+    expect(snippet).toBe(snippet.trim());
+    expect(snippet).not.toBe("");
+    expect(snippet.length).toBeLessThanOrEqual(SEARCH_LIMITS.maxSnippetChars + 1);
+  }
 }
 
 function callUnsupported(
@@ -332,16 +328,15 @@ export function runClientConformance(
       expect(result.totalCount).toBeGreaterThanOrEqual(result.matches.length);
       for (const match of result.matches) {
         expect(match.name).toBe(baseName(match.path));
-        expect(Array.isArray(match.snippets)).toBe(true);
-        for (const snippet of match.snippets) expect(typeof snippet).toBe("string");
+        expectBoundedSnippets(match.snippets);
       }
-      if (profile.search.honoursQuery) {
+      if (honoursQuery(profile)) {
         expect(result.matches.map((match) => match.path)).toEqual([file.path]);
       }
     });
 
     it(
-      profile.search.honoursQuery
+      honoursQuery(profile)
         ? "returns nothing for a query the repository has no match for"
         : "answers a query it cannot match with the same canned result",
       async () => {
@@ -349,7 +344,7 @@ export function runClientConformance(
         const scope = { owner: ref.owner, repo: ref.repo };
 
         const absent = await client.searchCode({ ...scope, query: search.absent });
-        if (profile.search.honoursQuery) {
+        if (honoursQuery(profile)) {
           expect(absent.matches).toEqual([]);
           expect(absent.totalCount).toBe(0);
         } else {
@@ -361,53 +356,55 @@ export function runClientConformance(
     );
 
     it(
-      profile.search.maxMatches === null
-        ? "never truncates its matches"
-        : `caps its matches at ${profile.search.maxMatches} and still reports the true total`,
+      honoursQuery(profile)
+        ? "matches on contents alone, never on the path"
+        : "answers a path-only query with the same canned result",
       async () => {
         const { client, ref, search } = await open();
+        const scope = { owner: ref.owner, repo: ref.repo };
 
-        const result = await client.searchCode({
-          owner: ref.owner,
-          repo: ref.repo,
-          query: search.flood.query,
-        });
-        expect(result.totalCount).toBe(search.flood.totalMatches);
-        if (profile.search.maxMatches === null) {
-          expect(result.matches).toHaveLength(result.totalCount);
+        const result = await client.searchCode({ ...scope, query: search.pathOnly });
+        if (honoursQuery(profile)) {
+          expect(result.matches).toEqual([]);
+          expect(result.totalCount).toBe(0);
         } else {
-          expect(result.matches).toHaveLength(profile.search.maxMatches);
-          expect(result.totalCount).toBeGreaterThan(result.matches.length);
-        }
-      },
-    );
-
-    it(
-      profile.search.maxSnippetsPerMatch === null
-        ? "returns every snippet it found for one match"
-        : `caps one match at ${profile.search.maxSnippetsPerMatch} snippets`,
-      async () => {
-        const { client, ref, search } = await open();
-
-        const result = await client.searchCode({
-          owner: ref.owner,
-          repo: ref.repo,
-          query: search.repeated.query,
-        });
-        const match = result.matches[0];
-        expect(match).toBeDefined();
-        expect(match?.snippets).toHaveLength(search.repeated.snippets);
-        if (profile.search.maxSnippetsPerMatch !== null) {
-          expect(search.repeated.snippets).toBeLessThanOrEqual(
-            profile.search.maxSnippetsPerMatch,
+          expect(result).toEqual(
+            await client.searchCode({ ...scope, query: search.unique }),
           );
         }
       },
     );
 
-    it("returns at least as many matches as the agent tool keeps", () => {
-      const cap = profile.search.maxMatches;
-      expect(cap === null || cap >= AGENT_TOOL_SEARCH_MATCHES).toBe(true);
+    it(`caps its matches at ${SEARCH_LIMITS.maxMatches} and still reports the true total`, async () => {
+      const { client, ref, search } = await open();
+
+      const result = await client.searchCode({
+        owner: ref.owner,
+        repo: ref.repo,
+        query: search.flood.query,
+      });
+      expect(result.totalCount).toBe(search.flood.totalMatches);
+      expect(result.matches).toHaveLength(
+        Math.min(result.totalCount, SEARCH_LIMITS.maxMatches),
+      );
+    });
+
+    it(`caps one match at ${SEARCH_LIMITS.maxSnippetsPerMatch} snippets`, async () => {
+      const { client, ref, search } = await open();
+
+      const result = await client.searchCode({
+        owner: ref.owner,
+        repo: ref.repo,
+        query: search.repeated.query,
+      });
+      const match = result.matches[0];
+      expect(match).toBeDefined();
+      expectBoundedSnippets(match?.snippets ?? []);
+      expect(match?.snippets).toHaveLength(search.repeated.snippets);
+    });
+
+    it("keeps as many matches as the agent tool does", () => {
+      expect(SEARCH_LIMITS.maxMatches).toBe(AGENT_TOOL_SEARCH_MATCHES);
     });
 
     const unsupported = Object.entries(profile.unsupported) as [
