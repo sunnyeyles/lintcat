@@ -1,8 +1,13 @@
+import { chmodSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
+  CreateMessageRequestSchema,
   ProgressNotificationSchema,
   type CallToolResult,
+  type CreateMessageRequest,
   type Progress,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
@@ -80,7 +85,12 @@ async function connect(env: McpEnvironment, githubId?: () => Promise<number>): P
 async function call(client: Client, name: string, args: Record<string, unknown>) {
   const result = (await client.callTool({ name, arguments: args })) as CallToolResult;
   const texts = result.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
-  return { isError: result.isError === true, texts };
+  return { isError: result.isError === true, texts, content: result.content };
+}
+
+async function readResource(client: Client, uri: string) {
+  const { contents } = await client.readResource({ uri });
+  return contents[0] as { uri: string; mimeType?: string; text: string };
 }
 
 /** Replaces the fixture repository, so `afterEach` still removes exactly one. */
@@ -100,6 +110,7 @@ describe("the tool list", () => {
     const { tools } = await client.listTools();
 
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "apply_fix",
       "describe_file",
       "find_references",
       "get_review",
@@ -110,10 +121,13 @@ describe("the tool list", () => {
       "review_pull_request",
       "review_trends",
       "search_code",
+      "suppress_finding",
       "validate_agent_config",
     ]);
     const writes = tools.filter((tool) => tool.annotations?.readOnlyHint !== true);
-    expect(writes.map((tool) => tool.name)).toEqual(["review_pull_request"]);
+    expect(writes.map((tool) => tool.name).sort()).toEqual(["apply_fix", "review_pull_request", "suppress_finding"]);
+    const applyFix = tools.find((tool) => tool.name === "apply_fix");
+    expect(applyFix?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
   });
 });
 
@@ -314,6 +328,85 @@ describe("review_local_changes", () => {
   });
 });
 
+describe("review scopes", () => {
+  const admin = makeFinding("general", { file: "src/sessions.ts", line: 3, title: "Admin is always on" });
+
+  it("reviews only the index, leaving unstaged work out", async () => {
+    repo.git("add", "src/sessions.ts");
+    repo.write("src/api.ts", 'import { createSession } from "./sessions";\nexport const unstaged = 1;\n');
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([admin]) }));
+
+    const { isError, texts } = await call(client, "review_local_changes", {
+      scope: "staged",
+      index: false,
+    });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reviewed 1 changed file(s)");
+    expect(texts[0]).toContain("the staged changes");
+    expect(JSON.parse(texts[1]!).findings).toMatchObject([{ title: "Admin is always on" }]);
+  });
+
+  it("reviews an explicit commit range, leaving the working tree out", async () => {
+    repo.commit("admin");
+    repo.write("src/api.ts", "export const notReviewed = 1;\n");
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([admin]) }));
+
+    const { isError, texts } = await call(client, "review_local_changes", {
+      range: "main..feature",
+      index: false,
+    });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reviewed 1 changed file(s)");
+    expect(JSON.parse(texts[1]!).findings).toMatchObject([{ title: "Admin is always on" }]);
+  });
+
+  it("names an unknown ref before calling the model", async () => {
+    const createLanguageModel = vi.fn(() => scriptedModel([]));
+    const client = await connect(environment({ createLanguageModel }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { range: "main..nope" });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain('unknown commit "nope"');
+    expect(createLanguageModel).not.toHaveBeenCalled();
+  });
+
+  it("refuses a range handed to a scope that cannot take one", async () => {
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "review_local_changes", {
+      scope: "staged",
+      range: "main..feature",
+    });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("drop one of them");
+  });
+
+  it("makes no model call when the range is empty", async () => {
+    const createLanguageModel = vi.fn(() => scriptedModel([]));
+    const client = await connect(environment({ createLanguageModel }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { range: "HEAD..HEAD" });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("No changes between");
+    expect(createLanguageModel).not.toHaveBeenCalled();
+  });
+
+  it("gates the agents on the scope's changed files, not the working tree's", async () => {
+    repo.git("add", "src/sessions.ts");
+    repo.write("src/api.ts", "export const unstaged = 1;\n");
+    const client = await connect(environment({ env: {} }));
+
+    const { texts } = await call(client, "list_review_agents", { scope: "staged" });
+
+    expect(JSON.parse(texts[1]!).changedFiles).toEqual(["src/sessions.ts"]);
+  });
+});
+
 describe("review progress", () => {
   function reported(progress: Progress[]) {
     return progress.map(({ progress: done, total, message }) => ({ done, total, message }));
@@ -426,6 +519,84 @@ describe("review_pull_request", () => {
   });
 });
 
+describe("apply_fix", () => {
+  const adminLine = "export const admin = true;";
+  const patch = {
+    file: "src/sessions.ts",
+    startLine: 3,
+    endLine: 3,
+    expected: adminLine,
+    replacement: "export const admin = false;",
+  };
+
+  function read(file: string): string {
+    return readFileSync(path.join(repo.root, file), "utf8");
+  }
+
+  it("writes the patch into the working tree without committing", async () => {
+    const client = await connect(environment());
+    const head = repo.git("rev-parse", "HEAD");
+
+    const { isError, texts } = await call(client, "apply_fix", { patches: [patch] });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("No commit was made and nothing was pushed");
+    expect(read("src/sessions.ts")).toContain("export const admin = false;");
+    expect(repo.git("rev-parse", "HEAD")).toBe(head);
+    expect(repo.git("status", "--porcelain")).toContain("src/sessions.ts");
+    expect(repo.git("diff", "--cached", "--name-only")).toBe("");
+  });
+
+  it("refuses when the file changed since the review that produced the patch", async () => {
+    const client = await connect(environment());
+    repo.write("src/sessions.ts", "export const sessions = [];\nexport function createSession() {}\n");
+
+    const { isError, texts } = await call(client, "apply_fix", { patches: [patch] });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("no longer holds the text the review proved the patch against");
+    expect(read("src/sessions.ts")).not.toContain("admin");
+  });
+
+  it("refuses a patch whose file is not in the working tree", async () => {
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "apply_fix", {
+      patches: [{ ...patch, file: "src/gone.ts" }],
+    });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("does not exist in the working tree");
+  });
+
+  it("leaves every file as it was when one of the writes fails", async () => {
+    repo.write("src/api.ts", 'import { createSession } from "./sessions";\nexport const port = 80;\n');
+    const locked = path.join(repo.root, "src/api.ts");
+    const before = { sessions: read("src/sessions.ts"), api: read("src/api.ts") };
+    chmodSync(locked, 0o444);
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "apply_fix", {
+      patches: [
+        patch,
+        {
+          file: "src/api.ts",
+          startLine: 2,
+          endLine: 2,
+          expected: "export const port = 80;",
+          replacement: "export const port = 443;",
+        },
+      ],
+    });
+    chmodSync(locked, 0o644);
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("put back as it was");
+    expect(read("src/sessions.ts")).toBe(before.sessions);
+    expect(read("src/api.ts")).toBe(before.api);
+  });
+});
+
 describe("history tools", () => {
   let database: Database;
   const member = 101;
@@ -476,11 +647,44 @@ describe("history tools", () => {
   it("lists and opens reviews for a member", async () => {
     const client = await connect(environment({ database: () => database }), async () => member);
 
-    const listed = JSON.parse((await call(client, "list_reviews", { org: "acme" })).texts[0]!);
+    const listing = await call(client, "list_reviews", { org: "acme" });
+    const listed = JSON.parse(listing.texts[0]!);
     expect(listed).toMatchObject([{ repo: "acme/widgets", prNumber: 7, findingCount: 1 }]);
 
     const review = JSON.parse((await call(client, "get_review", { org: "acme", id: listed[0].id })).texts[0]!);
     expect(review.findings).toMatchObject([{ title: "Token compared with ==", severity: "high" }]);
+  });
+
+  it("links each listed review as a resource instead of inlining its findings", async () => {
+    const client = await connect(environment({ database: () => database }), async () => member);
+
+    const listing = await call(client, "list_reviews", { org: "acme" });
+    const [id] = JSON.parse(listing.texts[0]!).map((review: { id: number }) => review.id);
+    const links = listing.content.filter((part) => part.type === "resource_link");
+
+    expect(links).toMatchObject([
+      { uri: `pr-review://review/acme/${id}`, name: `acme/widgets#7 review ${id}`, mimeType: "application/json" },
+    ]);
+    expect(listing.texts.join("")).not.toContain("Token compared with ==");
+  });
+
+  it("resolves a stored review through its resource URI", async () => {
+    const client = await connect(environment({ database: () => database }), async () => member);
+    const [{ id }] = JSON.parse((await call(client, "list_reviews", { org: "acme" })).texts[0]!);
+
+    const contents = await readResource(client, `pr-review://review/acme/${id}`);
+
+    expect(contents.mimeType).toBe("application/json");
+    expect(JSON.parse(contents.text)).toMatchObject({
+      repo: "acme/widgets",
+      findings: [{ title: "Token compared with ==", severity: "high" }],
+    });
+  });
+
+  it("refuses a review resource for someone who is not a member", async () => {
+    const client = await connect(environment({ database: () => database }), async () => 999);
+
+    await expect(readResource(client, "pr-review://review/acme/1")).rejects.toThrow(/No organization "acme"/);
   });
 
   it("aggregates trends for a member", async () => {
@@ -496,6 +700,75 @@ describe("history tools", () => {
     const { isError, texts } = await call(client, "list_reviews", { org: "acme" });
     expect(isError).toBe(true);
     expect(texts[0]).toContain('No organization "acme"');
+  });
+});
+
+describe("resources", () => {
+  it("offers the configuration resource and a template per addressable kind", async () => {
+    const client = await connect(environment());
+
+    const { resources } = await client.listResources();
+    const { resourceTemplates } = await client.listResourceTemplates();
+
+    expect(resources.map((resource) => resource.uri)).toEqual(["pr-review://config"]);
+    expect(resourceTemplates.map((template) => template.uriTemplate).sort()).toEqual([
+      "pr-review://file/{+path}",
+      "pr-review://review/{org}/{id}",
+    ]);
+  });
+
+  it("resolves the checkout's agent configuration", async () => {
+    const client = await connect(environment());
+
+    const contents = await readResource(client, "pr-review://config");
+
+    expect(contents.mimeType).toBe("application/json");
+    expect(JSON.parse(contents.text)).toMatchObject({
+      checkout: repo.root,
+      present: false,
+      valid: true,
+      usingDefaults: true,
+      agents: [{ agent: "general" }],
+    });
+  });
+
+  it("reads a file from the working tree, not the commit", async () => {
+    const client = await connect(environment());
+
+    const contents = await readResource(client, "pr-review://file/src/sessions.ts");
+
+    expect(contents.mimeType).toBe("text/plain");
+    expect(contents.text).toContain("export const admin = true;");
+  });
+
+  it("refuses a file path that escapes the checkout", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://file//etc/hosts")).rejects.toThrow(
+      /outside the repository/,
+    );
+  });
+
+  it("says which file is missing", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://file/src/missing.ts")).rejects.toThrow(
+      /does not exist in the working tree/,
+    );
+  });
+
+  it("rejects a review URI whose id is not a number", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://review/acme/latest")).rejects.toThrow(
+      /non-numeric review id "latest"/,
+    );
+  });
+
+  it("rejects a URI no scheme covers", async () => {
+    const client = await connect(environment());
+
+    await expect(readResource(client, "pr-review://nonsense/1")).rejects.toThrow(/not found/);
   });
 });
 
@@ -540,5 +813,151 @@ describe("the prompt list", () => {
     const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
     expect(text).toContain("the most severe finding");
     expect(text).toContain('`get_review` with org "acme" and id 12');
+  });
+});
+
+describe("a review through client sampling", () => {
+  /** A client that answers sampling/createMessage with `reply`, recording what it was asked. */
+  async function samplingClient(env: McpEnvironment, reply: string) {
+    const asked: CreateMessageRequest["params"][] = [];
+    const server = createServer(env);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: "test", version: "0.0.0" }, { capabilities: { sampling: {} } });
+    client.setRequestHandler(CreateMessageRequestSchema, (request) => {
+      asked.push(request.params);
+      return { model: "client-model", role: "assistant" as const, content: { type: "text" as const, text: reply } };
+    });
+    await client.connect(clientTransport);
+    return { client, asked };
+  }
+
+  it("reviews with no provider key at all, and says the review was reduced", async () => {
+    const { client, asked } = await samplingClient(
+      environment({ env: {} }),
+      finalFindingsJson([makeFinding("general", { file: "src/sessions.ts", line: 3, title: "Admin is always on" })]),
+    );
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reduced single-shot review");
+    expect(texts[1]).toContain("Reviewed 1 changed file(s)");
+    const details = JSON.parse(texts[2]!);
+    expect(details).toMatchObject({ singleShot: true, agents: ["general"], synthesis: "skipped" });
+    expect(details.findings.map((finding: { title: string }) => finding.title)).toEqual(["Admin is always on"]);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.messages[0]!.content).toMatchObject({ type: "text" });
+  });
+
+  it("validates a sampled finding exactly as it validates any other agent's", async () => {
+    const { client } = await samplingClient(
+      environment({ env: {} }),
+      finalFindingsJson([
+        makeFinding("general", { file: "src/sessions.ts", line: 1, title: "On an untouched line" }),
+        makeFinding("general", { file: "src/nowhere.ts", line: 3, title: "In an unchanged file" }),
+      ]),
+    );
+
+    const { texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(JSON.parse(texts[2]!).findings).toEqual([]);
+  });
+
+  it("leaves the sampling client alone whenever a provider key is present", async () => {
+    const { client, asked } = await samplingClient(
+      environment({ createLanguageModel: () => scriptedModel([]) }),
+      finalFindingsJson([]),
+    );
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).not.toContain("Reduced single-shot review");
+    expect(asked).toEqual([]);
+  });
+
+  it("names both ways out when there is neither a key nor sampling", async () => {
+    const client = await connect(environment({ env: {} }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main", index: false });
+
+    expect(isError).toBe(true);
+    expect(texts[0]).toContain("No model API key is set and this client does not offer sampling");
+    expect(texts[0]).toContain("sampling/createMessage");
+  });
+});
+
+describe("suppress_finding", () => {
+  const TITLE = "Admin is always on";
+
+  function reviewing(title: string) {
+    return environment({
+      createLanguageModel: () =>
+        scriptedModel([makeFinding("general", { file: "src/sessions.ts", line: 3, title })]),
+    });
+  }
+
+  async function review(client: Client) {
+    const { texts } = await call(client, "review_local_changes", { base: "main", index: false });
+    return { heading: texts[0]!, details: JSON.parse(texts[1]!) };
+  }
+
+  it("records the suppression under .git, where no review reads it as a change", async () => {
+    const client = await connect(environment());
+
+    const { isError, texts } = await call(client, "suppress_finding", {
+      category: "general",
+      title: TITLE,
+      reason: "the flag is deliberate here",
+    });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("1 suppression(s) now live in");
+    expect(texts[0]).toContain(path.join(repo.root, ".git", "pr-review-agents", "memory.json"));
+    expect(JSON.parse(texts[1]!)).toEqual([
+      {
+        category: "general",
+        shape: "admin is always on",
+        title: TITLE,
+        reason: "the flag is deliberate here",
+        createdAt: expect.any(String),
+      },
+    ]);
+  });
+
+  it("excludes the finding from a later review and says how many it hid", async () => {
+    await call(await connect(environment()), "suppress_finding", { category: "general", title: TITLE });
+
+    const { heading, details } = await review(await connect(reviewing(TITLE)));
+
+    expect(details.findings).toEqual([]);
+    expect(details.suppressed).toBe(1);
+    expect(heading).toContain("1 finding(s) were hidden by suppressions");
+  });
+
+  it("suppresses the same problem under another identifier", async () => {
+    await call(await connect(environment()), "suppress_finding", {
+      category: "general",
+      title: "Admin is always on in adminFlag",
+    });
+
+    const { details } = await review(await connect(reviewing("Admin is always on in isAdmin")));
+
+    expect(details.findings).toEqual([]);
+    expect(details.suppressed).toBe(1);
+  });
+
+  it("leaves a finding the suppression no longer matches alone", async () => {
+    await call(await connect(environment()), "suppress_finding", {
+      category: "general",
+      title: "Unbounded query in the session list",
+    });
+
+    const { heading, details } = await review(await connect(reviewing(TITLE)));
+
+    expect(details.findings.map((found: { title: string }) => found.title)).toEqual([TITLE]);
+    expect(details.suppressed).toBe(0);
+    expect(heading).not.toContain("hidden by suppressions");
   });
 });

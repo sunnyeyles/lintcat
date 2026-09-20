@@ -23,11 +23,32 @@ import { addedFileDiff, parseUnifiedDiff } from "#src/unified-diff";
 /** The head "commit" of a local review: files as they are on disk now. */
 export const WORKING_TREE = "WORKING_TREE";
 
+/** git's own empty tree, the base of a range whose head is the root commit. */
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+/** Which slice of a checkout to review. */
+export type LocalScope =
+  | { kind: "working-tree" }
+  | { kind: "staged" }
+  | { kind: "range"; range: string };
+
+export interface ResolvedScope {
+  kind: LocalScope["kind"];
+  baseRef: string;
+  baseSha: string;
+  /** The head to diff against: a commit, a tree, or the WORKING_TREE sentinel. */
+  headRef: string;
+  /** The commits under review, or undefined when the scope holds none. */
+  commitRange: string | undefined;
+  /** Names the head in a message, e.g. "the staged changes". */
+  headLabel: string;
+}
+
 /** No publishing, and no second commit to compare the working tree against. */
 type LocalGitClient = PullRequestReadClient &
   Omit<RepositoryHistoryClient, "compareCommits">;
 
-/** One local checkout, reviewed as if its uncommitted state were a pull request. */
+/** One local checkout, reviewed as if one slice of its state were a pull request. */
 export interface LocalRepository {
   root: string;
   owner: string;
@@ -35,6 +56,7 @@ export interface LocalRepository {
   baseRef: string;
   baseSha: string;
   branch: string;
+  scope: ResolvedScope;
   target: ReviewTarget;
   client: LocalGitClient;
 }
@@ -65,25 +87,132 @@ function ownerAndRepo(remoteUrl: string | undefined, root: string): { owner: str
   return match ? { owner: match[1]!, repo: match[2]! } : { owner: "local", repo: path.basename(root) };
 }
 
-/** Resolves `repoPath` to its checkout and the base the working tree is compared against. */
+async function resolveCommit(root: string, ref: string): Promise<string> {
+  const sha = await tryGit(root, ["rev-parse", "--verify", "--quiet", `${assertRef(ref)}^{commit}`]);
+  if (sha === undefined) {
+    throw new GitError(`unknown commit ${JSON.stringify(ref)} in this checkout`, 404);
+  }
+  return sha;
+}
+
+interface RangeEndpoints {
+  from: string | undefined;
+  to: string;
+  /** `a...b`, which starts the range at the merge-base rather than at `a`. */
+  mergeBase: boolean;
+}
+
+function malformedRange(range: string): GitError {
+  return new GitError(
+    `malformed commit range ${JSON.stringify(range)}; use "<from>..<to>", "<from>...<to>" or a single commit`,
+  );
+}
+
+/** Reads `a..b`, `a...b` or a bare commit; anything else is malformed. */
+function parseCommitRange(range: string): RangeEndpoints {
+  const trimmed = range.trim();
+  if (trimmed === "") {
+    throw malformedRange(range);
+  }
+  if (!trimmed.includes("..")) {
+    return { from: undefined, to: trimmed, mergeBase: false };
+  }
+  const match = /^(.+?)(\.\.\.?)(.+)$/.exec(trimmed);
+  if (!match || match[1]!.includes("..") || match[3]!.includes("..")) {
+    throw malformedRange(range);
+  }
+  return { from: match[1]!, to: match[3]!, mergeBase: match[2] === "..." };
+}
+
+async function resolveRange(root: string, range: string): Promise<ResolvedScope> {
+  const { from, to, mergeBase } = parseCommitRange(range);
+  const headSha = await resolveCommit(root, to);
+  let baseRef: string;
+  let baseSha: string;
+  if (from === undefined) {
+    baseRef = `${to}^`;
+    baseSha = (await tryGit(root, ["rev-parse", "--verify", "--quiet", `${headSha}^`])) ?? EMPTY_TREE;
+  } else {
+    const fromSha = await resolveCommit(root, from);
+    baseRef = from;
+    baseSha = mergeBase ? (await git(root, ["merge-base", fromSha, headSha])).trim() : fromSha;
+  }
+  return {
+    kind: "range",
+    baseRef,
+    baseSha,
+    headRef: headSha,
+    commitRange: baseSha === EMPTY_TREE ? headSha : `${baseSha}..${headSha}`,
+    headLabel: `${to} (${headSha.slice(0, 7)})`,
+  };
+}
+
+async function resolveScope(
+  root: string,
+  scope: LocalScope,
+  base: string | undefined,
+): Promise<ResolvedScope> {
+  if (scope.kind === "range") {
+    if (base !== undefined) {
+      throw new GitError("a commit range already names its base, so `base` cannot be given with it");
+    }
+    return resolveRange(root, scope.range);
+  }
+  if (scope.kind === "staged") {
+    const baseRef = base ?? "HEAD";
+    // write-tree turns the index into a tree, so the staged state reads like any commit.
+    return {
+      kind: "staged",
+      baseRef,
+      baseSha: await resolveCommit(root, baseRef),
+      headRef: (await git(root, ["write-tree"])).trim(),
+      commitRange: undefined,
+      headLabel: "the staged changes",
+    };
+  }
+  const baseRef = assertRef(base ?? (await defaultBaseRef(root)));
+  const baseSha = (await git(root, ["merge-base", baseRef, "HEAD"])).trim();
+  return {
+    kind: "working-tree",
+    baseRef,
+    baseSha,
+    headRef: WORKING_TREE,
+    commitRange: `${baseSha}..HEAD`,
+    headLabel: "the working tree",
+  };
+}
+
+/** The checkout holding `repoPath`, with symlinks resolved. */
+export async function repositoryRoot(repoPath: string): Promise<string> {
+  return realpathSync((await git(repoPath, ["rev-parse", "--show-toplevel"])).trim());
+}
+
+/** Resolves `repoPath` to its checkout and the two ends of the reviewed slice. */
 export async function openLocalRepository(
   repoPath: string,
   base?: string | undefined,
+  scope: LocalScope = { kind: "working-tree" },
 ): Promise<LocalRepository> {
-  const root = realpathSync(
-    (await git(repoPath, ["rev-parse", "--show-toplevel"])).trim(),
-  );
-  const baseRef = assertRef(base ?? (await defaultBaseRef(root)));
-  const baseSha = (await git(root, ["merge-base", baseRef, "HEAD"])).trim();
+  const root = await repositoryRoot(repoPath);
+  const resolved = await resolveScope(root, scope, base);
   const branch = (await tryGit(root, ["branch", "--show-current"])) ?? "HEAD";
   const { owner, repo } = ownerAndRepo(await tryGit(root, ["remote", "get-url", "origin"]), root);
-  const target: ReviewTarget = { owner, repo, pullRequestNumber: 0, headSha: WORKING_TREE };
-  const repository = { root, owner, repo, baseRef, baseSha, branch, target };
+  const target: ReviewTarget = { owner, repo, pullRequestNumber: 0, headSha: resolved.headRef };
+  const repository = {
+    root,
+    owner,
+    repo,
+    baseRef: resolved.baseRef,
+    baseSha: resolved.baseSha,
+    branch,
+    scope: resolved,
+    target,
+  };
   return { ...repository, client: createLocalGitClient(repository) };
 }
 
 /** A path inside the checkout, with symlinks resolved; anything else is a 404. */
-function resolveInside(root: string, file: string): string {
+export function resolveInside(root: string, file: string): string {
   const resolved = path.resolve(root, file);
   let real: string;
   try {
@@ -108,6 +237,22 @@ export interface SearchHit {
 function relativeInside(root: string, file: string): string {
   const real = resolveInside(root, file);
   return real === root ? "." : path.relative(root, real);
+}
+
+export interface WorkingTreeFile {
+  root: string;
+  path: string;
+  text: string;
+}
+
+/** One file's text as it is on disk now; a directory or an escape is a 404. */
+export async function readWorkingTreeFile(repoPath: string, file: string): Promise<WorkingTreeFile> {
+  const root = realpathSync((await git(repoPath, ["rev-parse", "--show-toplevel"])).trim());
+  const absolute = resolveInside(root, file);
+  if (!statSync(absolute).isFile()) {
+    throw new GitError(`${file} is not a file in the working tree`, 404);
+  }
+  return { root, path: path.relative(root, absolute), text: readFileSync(absolute, "utf8") };
 }
 
 /**
@@ -173,10 +318,30 @@ function untrackedContent(root: string, file: string): Uint8Array {
     : readFileSync(absolute);
 }
 
+/** A commit if the ref names one, else the bare object: the staged tree is not a commit. */
+async function resolveTreeish(root: string, ref: string): Promise<string> {
+  const commit = await tryGit(root, ["rev-parse", "--verify", "--quiet", `${assertRef(ref)}^{commit}`]);
+  if (commit !== undefined) {
+    return commit;
+  }
+  const object = await tryGit(root, ["rev-parse", "--verify", "--quiet", `${ref}^{tree}`]);
+  if (object === undefined) {
+    throw new GitError(`unknown commit ${JSON.stringify(ref)} in this checkout`, 404);
+  }
+  return object;
+}
+
+function scopeTitle(scope: ResolvedScope, branch: string): string {
+  if (scope.kind === "staged") return `Staged changes on ${branch}`;
+  if (scope.kind === "range") return `Commits ${scope.baseRef}..${scope.headRef.slice(0, 7)}`;
+  return `Local changes on ${branch}`;
+}
+
 function createLocalGitClient(
   repository: Omit<LocalRepository, "client">,
 ): LocalGitClient {
-  const { root, baseSha, baseRef, branch } = repository;
+  const { root, baseSha, baseRef, branch, scope } = repository;
+  const headRef = scope.headRef;
 
   let snapshot: Promise<{ diff: string; files: ChangedFile[] }> | undefined;
   // Taken once, so every reader of one review sees the same working tree.
@@ -191,7 +356,11 @@ function createLocalGitClient(
         "--src-prefix=a/",
         "--dst-prefix=b/",
         baseSha,
+        ...(headRef === WORKING_TREE ? [] : [headRef]),
       ]);
+      if (headRef !== WORKING_TREE) {
+        return { diff: tracked, files: parseUnifiedDiff(tracked) };
+      }
       // A trailing slash is a nested repository, which has no content of its own to diff.
       const untracked = (await git(root, ["ls-files", "-z", "--others", "--exclude-standard"]))
         .split("\0")
@@ -216,16 +385,19 @@ function createLocalGitClient(
 
   return {
     async getPullRequest(): Promise<PullRequestDetails> {
-      const subjects = await git(root, ["log", "--format=- %s", `${baseSha}..HEAD`]);
+      const subjects =
+        scope.commitRange === undefined
+          ? ""
+          : (await git(root, ["log", "--format=- %s", scope.commitRange])).trim();
       return {
         number: 0,
-        title: `Local changes on ${branch}`,
-        body: subjects.trim() === "" ? null : `Commits since ${baseRef}:\n${subjects.trim()}`,
+        title: scopeTitle(scope, branch),
+        body: subjects === "" ? null : `Commits since ${baseRef}:\n${subjects}`,
         author: (await tryGit(root, ["config", "user.name"])) ?? null,
         baseRef,
         baseSha,
-        headRef: branch,
-        headSha: WORKING_TREE,
+        headRef: scope.kind === "range" ? headRef : branch,
+        headSha: headRef,
       };
     },
     async listChangedFiles() {
@@ -258,14 +430,15 @@ function createLocalGitClient(
           .filter((file) => file !== "");
         return { sha: WORKING_TREE, ...collectRepositoryFiles(workingTreeFiles(root, listed), limits) };
       }
-      const sha = (await git(root, ["rev-parse", `${assertRef(ref)}^{commit}`])).trim();
+      const sha = await resolveTreeish(root, ref);
       const tarball = await gitBuffer(root, ["archive", "--format=tar", "--prefix=repository/", sha], {
         maxBuffer: limits?.maxInflatedBytes ?? DEFAULT_ARCHIVE_LIMITS.maxInflatedBytes,
       });
       return { sha, ...readRepositoryTarball(new Uint8Array(tarball), limits) };
     },
     async listCommitShas({ path: file, limit }) {
-      const output = await git(root, ["log", "--format=%H", "-n", String(limit), "HEAD", "--", file]);
+      const tip = scope.kind === "range" ? headRef : "HEAD";
+      const output = await git(root, ["log", "--format=%H", "-n", String(limit), tip, "--", file]);
       return output.split("\n").filter((sha) => sha !== "");
     },
     async listCommitFiles({ sha }) {
@@ -273,7 +446,10 @@ function createLocalGitClient(
       return output.split("\n").filter((file) => file !== "");
     },
     async listPullRequestCommitShas() {
-      const output = await git(root, ["rev-list", "--reverse", `${baseSha}..HEAD`]);
+      if (scope.commitRange === undefined) {
+        return [];
+      }
+      const output = await git(root, ["rev-list", "--reverse", scope.commitRange]);
       return output.split("\n").filter((sha) => sha !== "");
     },
     listCheckRuns: async () => [],

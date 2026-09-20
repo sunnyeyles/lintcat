@@ -49,6 +49,9 @@ const github: GithubAppClient = {
   async listRepositoryCollaborators() {
     throw new Error("sign-in never lists collaborators");
   },
+  async getInstallation() {
+    throw new Error("sign-in never reads the installation");
+  },
 };
 
 let nextAccountId = 100;

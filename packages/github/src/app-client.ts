@@ -28,8 +28,16 @@ export interface RepositoryCollaborator {
   permission: RepositoryPermission;
 }
 
+export interface AppInstallation {
+  id: number;
+  account: { id: number; login: string; type: string };
+  suspendedAt: Date | null;
+}
+
 /** What the dashboard asks GitHub as the App; tests pass a fake. */
 export interface GithubAppClient {
+  /** The installation as GitHub records it; read with the App's JWT, not an installation token. */
+  getInstallation(installationId: number): Promise<AppInstallation>;
   listInstallationRepositories(
     installationId: number,
   ): Promise<InstallationRepository[]>;
@@ -68,6 +76,7 @@ export interface AppOctokitLike {
   rest: {
     apps: {
       listReposAccessibleToInstallation: unknown;
+      getInstallation(params: { installation_id: number }): Promise<{ data: unknown }>;
     };
     orgs: {
       listMembers: unknown;
@@ -167,9 +176,27 @@ const membershipSchema = z.object({
   user: memberSchema.nullable(),
 });
 
+const installationSchema = z.object({
+  id: z.number(),
+  account: z.object({ id: z.number(), login: z.string(), type: z.string() }),
+  suspended_at: z.string().nullish(),
+});
+
 /** Wraps per-installation Octokits in the App client; authentication is the caller's only job. */
 export function createAppClient(installation: InstallationOctokit): GithubAppClient {
   return {
+    async getInstallation(installationId) {
+      const { data } = await installation(installationId).rest.apps.getInstallation({
+        installation_id: installationId,
+      });
+      const parsed = installationSchema.parse(data);
+      return {
+        id: parsed.id,
+        account: parsed.account,
+        suspendedAt: parsed.suspended_at ? new Date(parsed.suspended_at) : null,
+      };
+    },
+
     async listInstallationRepositories(installationId) {
       const octokit = installation(installationId);
       const data = await octokit.paginate(

@@ -89,6 +89,7 @@ function review(result: Partial<ReviewOutcome> = {}): FixtureReview {
       synthesis: { outcome: "skipped", candidates: [], reason: "no candidate findings" },
       findings: [],
       patches: { proposed: 0, verified: 0 },
+      suppressed: 0,
       ...result,
     },
     rendered: { conclusion: "success", output: { title: "Review", summary: "" } },

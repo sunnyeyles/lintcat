@@ -88,8 +88,9 @@ export default function IntroductionPage() {
       <Section id="delivery" title="Delivery path">
         <P>
           A GitHub Action, run in your repository&rsquo;s own Actions runner. There is no
-          infrastructure to stand up and no GitHub App to register — the workflow&rsquo;s own
-          token authenticates the reads and publishes the check run.
+          infrastructure to stand up and no GitHub App to register for the review itself —
+          the workflow&rsquo;s own token authenticates the reads and publishes the check run.
+          The dashboard is the one part that installs an App, to read your organization.
         </P>
         <Code caption=".github/workflows/ai-review.yml">{`- uses: sunnyeyles/pr-review-action@v2
   with:

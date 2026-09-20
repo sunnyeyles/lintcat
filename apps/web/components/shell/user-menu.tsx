@@ -1,17 +1,18 @@
 import { Avatar, AvatarFallback, AvatarImage, Button } from "@pr-review/design";
+import Link from "next/link";
 
-import { signInWithGithub, signOutOfDashboard } from "@/app/auth-actions";
+import { signOutOfDashboard } from "@/app/auth-actions";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { currentSession } from "@/lib/session";
 
-export async function UserMenu() {
+export async function UserMenu({ signInHref }: { signInHref?: string }) {
   const session = await currentSession();
   if (!session) {
+    if (!signInHref) return null;
     return (
-      <form action={signInWithGithub}>
-        <Button type="submit" size="sm">
-          Sign in
-        </Button>
-      </form>
+      <Button asChild size="sm">
+        <Link href={signInHref}>Sign in</Link>
+      </Button>
     );
   }
 
@@ -25,9 +26,9 @@ export async function UserMenu() {
         {session.login}
       </span>
       <form action={signOutOfDashboard}>
-        <Button type="submit" variant="outline" size="sm">
+        <SubmitButton variant="outline" size="sm" pendingLabel="Signing out">
           Sign out
-        </Button>
+        </SubmitButton>
       </form>
     </div>
   );

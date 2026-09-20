@@ -25,6 +25,7 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `GITHUB_APP_ID`             | The GitHub App's id                                              |
 | `GITHUB_APP_PRIVATE_KEY`    | The App's PEM key; newlines may be written as `\n`               |
 | `GITHUB_APP_WEBHOOK_SECRET` | Verifies `X-Hub-Signature-256` on each delivery                  |
+| `GITHUB_APP_SLUG`           | The App's URL slug; shows the Install button (optional)          |
 | `APP_DOMAIN`                | Apex domain organizations are subdomains of; default `localhost` |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
@@ -135,6 +136,10 @@ holds the lookups the webhook and sign-in share.
 - User authorization: callback URL as under Environment; its client id and
   secret are `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`. There is no separate
   OAuth app.
+- Setup URL `https://<app-domain>/dashboard/setup`, with **Redirect on update**
+  ticked, so GitHub returns the installer to the dashboard (locally
+  `http://lvh.me:3000/dashboard/setup`). The App's URL slug, from
+  `github.com/apps/<slug>`, goes in `GITHUB_APP_SLUG`.
 - Locally, forward deliveries to the dev server with a service such as smee.io.
 
 ## Sign-in
@@ -144,7 +149,27 @@ sessions and no auth tables; the GitHub provider works unchanged with an App's
 client id and secret. The sign-in pass (`lib/sign-in.ts`) upserts the `users`
 row by GitHub id, then refreshes the user's membership in every installed
 organization. A user can have memberships in several organizations, each with
-its own role; `/dashboard` lists them (`lib/organization.ts`).
+its own role; `/dashboard` lists them (`lib/organization.ts`), and forwards a
+user with exactly one straight to it.
+
+OAuth starts in one place: the topbar's **Sign in** links to
+`/sign-in?callbackUrl=<the page>` on the apex, and only that page posts to
+Auth.js. Auth.js sends its errors to the same page (`pages.error`), which
+renders them through `lib/auth-errors.ts`. Sign-out returns to the apex
+`/sign-in` from any host.
+
+### Onboarding
+
+A signed-in user with no organization sees **Install the GitHub App**, which
+opens GitHub's install page. GitHub returns to
+`/dashboard/setup?installation_id=…&setup_action=install`. That page fetches
+the installation with the App's JWT and runs the same install path as the
+webhook (`installOrganization` in `lib/installation.ts`), so it works before
+the delivery arrives, and both paths converge whichever runs first. The user is
+then forwarded to the organization, or to the picker if GitHub does not list
+them as a member. `setup_action=request` (a non-admin asking an owner to
+install) renders a note; a missing or malformed `installation_id` renders the
+Install button again.
 
 The refresh costs one `GET /orgs/{org}/memberships/{username}` per installed
 organization, up to eight at a time, before one transaction writes the results.
@@ -178,8 +203,8 @@ rewrites `acme.example.com/repos` onto `/o/acme/repos`; the mapping is
 `organizationSlugFromHost` in `lib/host.ts`. The apex, the reserved names
 `www app api auth admin docs status mail`, and every other host (Vercel preview
 URLs included) pass through, so previews keep using `/o/` paths. `/api/*` and
-`/_next/*` are never rewritten, and `/docs/*` and `/dashboard` are redirected to
-the apex, since those pages exist only there (`isApexOnly` in `lib/paths.ts`;
+`/_next/*` are never rewritten, and `/docs/*`, `/dashboard` and `/sign-in` are
+redirected to the apex, since those pages exist only there (`isApexOnly` in `lib/paths.ts`;
 the topbar links to them with `apexUrl`). Links inside an organization still use
 `/o/<slug>/...`, and on a subdomain that form is served as is, so both work;
 `acme.example.com/o/globex/...` is a 404.
@@ -243,7 +268,8 @@ app/
   (docs)/page.tsx       the docs home, and the site's own homepage
   (docs)/docs/          one page per section; /docs redirects to the home
   (apex)/dashboard/     the signed-in user's organizations
-  (apex)/sign-in/       sign-in, returning to callbackUrl
+  (apex)/dashboard/setup/  where GitHub returns after installing the App
+  (apex)/sign-in/       sign-in and its errors, returning to callbackUrl
   o/[slug]/             one organization, guarded by requireOrganization
     page.tsx            overview
     repos/              repo list, and per-repo review history

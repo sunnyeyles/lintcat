@@ -11,7 +11,6 @@ export function proxy(request: NextRequest): NextResponse {
   const headers = new Headers(request.headers);
 
   if (slug === undefined) {
-    if (!pathname.startsWith("/o/")) return NextResponse.next();
     headers.set(REQUEST_PATH_HEADER, pathname + search);
     return NextResponse.next({ request: { headers } });
   }

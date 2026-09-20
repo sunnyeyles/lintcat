@@ -32,6 +32,13 @@ export {
   type ReviewAgentDeps,
 } from "#src/agents/runtime";
 export {
+  createSamplingAgent,
+  type SamplingAgentDeps,
+  type SamplingRequest,
+  type SampleText,
+} from "#src/agents/sampling-agent";
+export { GENERAL_AGENT } from "#src/agents/general-agent";
+export {
   renderRepository,
   renderRepositoryIndex,
   INDEX_ABSENT_LINE,

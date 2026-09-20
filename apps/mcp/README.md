@@ -17,13 +17,25 @@ Then pass that repository's checkout as `repoPath`, or start Claude Code in it.
 | Tool | What it does | Needs |
 |---|---|---|
 | `list_review_agents` | Lists the checkout's configured agents with their categories and path gates, and marks which the working tree's changes would wake. | Nothing |
-| `review_local_changes` | Runs the configured agents on commits since the merge-base with the base branch, plus uncommitted and untracked files. Returns only validated findings. | A model key |
-| `review_pull_request` | Reviews a GitHub PR at its head. It is a dry run unless `publish: true`, which posts the check run and review comments. It never commits fixes. | A model key and a GitHub token |
+| `review_local_changes` | Runs the configured agents on commits since the merge-base with the base branch, plus uncommitted and untracked files. Returns only validated findings. | A model key, or a sampling client |
+| `review_pull_request` | Reviews a GitHub PR at its head. It is a dry run unless `publish: true`, which posts the check run and review comments. It never commits fixes. | A model key or a sampling client, and a GitHub token |
+| `apply_fix` | Writes verified patches from a review into the working tree, all or nothing. Refuses any patch whose range no longer holds its `expected` text. Never stages, commits or pushes. | Nothing |
+| `suppress_finding` | Marks a finding as a false positive, so later reviews of the same checkout exclude it. Matched by category and title shape. | Nothing |
 | `repository_overview` | Lists the workspace's packages and the per-language index coverage. | Nothing |
 | `find_references` | Lists the files that import a file, or one of its exported names. Same query, cap and result shape as the review agents' tool. | Nothing |
 | `describe_file` | Shows a file's role, package, importers, covering test, and imports. | Nothing |
 | `validate_agent_config` | Parses `.github/pr-review-agents.yml` and reports the agents it resolves to, or the error with its location. No file means the default agent. | Nothing |
-| `list_reviews`, `get_review`, `review_trends` | Stored reviews, findings, trends and cost. | `DATABASE_URL` and a GitHub token |
+| `list_reviews`, `get_review`, `review_trends` | Stored reviews, findings, trends and cost. `list_reviews` also returns a resource link per review. | `DATABASE_URL` and a GitHub token |
+
+## Resources
+
+Things an agent can attach to its context instead of calling a tool for.
+
+| URI | What it is |
+|---|---|
+| `pr-review://config` | The resolved agent configuration of the checkout the server runs in, or the parse error and its location. |
+| `pr-review://review/{org}/{id}` | One stored review with every finding and agent run, as `get_review` returns it. `list_reviews` links each review here. |
+| `pr-review://file/{path}` | One repository-relative file of that checkout, read from the working tree. A path that escapes the checkout is refused. |
 
 A local review reads the agent configuration (`.github/pr-review-agents.yml`)
 at the base commit, the same way the Action does. It then assembles the same
@@ -33,9 +45,26 @@ has nothing to write through — and the git-backed client declares no publish
 method to write through either. The index tools read the working tree and cache
 the index until it changes.
 
+`apply_fix` is the one tool that writes. It takes the `patch` a review already
+verified and replays it onto the file with `applyVerifiedPatches`, the same
+deterministic replacement the Action commits — but onto the working tree, so
+the change lands where `git diff` shows it and you decide what to do with it.
+Because the patch is proved against the file a second time, a file edited
+between the review and the call is refused rather than mangled.
+
 History uses the dashboard's own access rules (`authorize` in `packages/db`).
 Your GitHub account must be a member of the organization, and private repos
 need a `repo_access` row.
+
+## Reviewing without a model key
+
+With no provider key set, a client that advertises MCP sampling runs the model
+instead. Sampling is one text completion with no tool calling, so this is not
+the tool loop: the diff, the changed files and the index render go into a
+single prompt, one general agent answers it, and nothing reads further. The
+findings pass the same validation, and the tool result opens by saying the
+review was the reduced one. A provider key always wins, and with neither a key
+nor sampling the tool fails naming both ways out.
 
 ## Configuration
 
@@ -44,7 +73,7 @@ variable that is already set takes precedence.
 
 | Variable | Default |
 |---|---|
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | One is required for reviews |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | One is required for a tool-calling review; without either, a sampling client runs the reduced review |
 | `PR_REVIEW_MODEL_PROVIDER` | `openai` when its key is set, otherwise whichever provider has a key |
 | `PR_REVIEW_MODEL` | The provider's default. Haiku is weak here, so prefer `claude-sonnet-5` |
 | `PR_REVIEW_MODEL_BASE_URL` | Unset |
