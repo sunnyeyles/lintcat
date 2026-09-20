@@ -688,6 +688,7 @@ runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
 | `review_local_changes` | Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed |
 | `review_pull_request` | Reviews a GitHub pull request; a dry run unless `publish: true`, which posts the check run and comments as the Action would |
 | `repository_overview`, `find_references`, `describe_file` | The [repository index](#repository-index), built from the working tree, with no network |
+| `validate_agent_config` | Checks a checkout's `.github/pr-review-agents.yml` and reports what it resolves to, or where it is wrong; no model calls |
 | `list_reviews`, `get_review`, `review_trends` | Stored review history, scoped by the dashboard's own access rules to your GitHub account |
 
 A local review takes the same path as the Action, with a git-backed client in

@@ -21,6 +21,7 @@ Then pass that repository's checkout as `repoPath`, or start Claude Code in it.
 | `repository_overview` | Lists the workspace's packages and the per-language index coverage. | Nothing |
 | `find_references` | Lists the files that import a file, or one of its exported names. | Nothing |
 | `describe_file` | Shows a file's role, package, importers, covering test, and imports. | Nothing |
+| `validate_agent_config` | Parses `.github/pr-review-agents.yml` and reports the agents it resolves to, or the error with its location. No file means the default agent. | Nothing |
 | `list_reviews`, `get_review`, `review_trends` | Stored reviews, findings, trends and cost. | `DATABASE_URL` and a GitHub token |
 
 A local review reads the agent configuration (`.github/pr-review-agents.yml`)

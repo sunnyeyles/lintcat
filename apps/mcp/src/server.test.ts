@@ -95,6 +95,7 @@ describe("the tool list", () => {
       "review_local_changes",
       "review_pull_request",
       "review_trends",
+      "validate_agent_config",
     ]);
     const writes = tools.filter((tool) => tool.annotations?.readOnlyHint !== true);
     expect(writes.map((tool) => tool.name)).toEqual(["review_pull_request"]);
