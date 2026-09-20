@@ -80,3 +80,20 @@ pnpm typecheck     # pnpm -r typecheck
 pnpm build         # pnpm -r build
 pnpm eval          # vitest run --config evals/vitest.eval.config.ts
 ```
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `sunnyeyles/pr-review-agents`, via the `gh` CLI. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, each label string equal to its name. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root, neither of which
+exists yet. See `docs/agents/domain.md`.

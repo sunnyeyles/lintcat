@@ -5,6 +5,8 @@
 import {
   emptySynthesisHints,
   gateAgentsByPaths,
+  isCancellation,
+  ReviewCancelledError,
   withRepositoryHints,
   type AgentDefinition,
   type SynthesisHints,
@@ -79,6 +81,8 @@ interface ReviewPullRequestDeps {
   incremental?: boolean | undefined;
   /** Whether the repository index is built for this review; on by default. */
   index?: boolean | undefined;
+  /** Aborting it stops the agents and publishes nothing. */
+  signal?: AbortSignal | undefined;
 }
 
 /** The comments already on the pull request; none if they cannot be read. */
@@ -259,9 +263,17 @@ export async function reviewPullRequest(
     now = () => new Date(),
     incremental = false,
     index = true,
+    signal,
   }: ReviewPullRequestDeps,
 ): Promise<ReviewOutcome> {
   const fields = reviewCorrelation(target);
+  const cancelled = (stage: string): never => {
+    logger.info("review.cancelled", { ...fields, stage });
+    throw new ReviewCancelledError();
+  };
+  if (signal?.aborted === true) {
+    cancelled("before start");
+  }
   const [pullRequest, changedFiles, diff] = await Promise.all([
     client.getPullRequest(target),
     client.listChangedFiles(target),
@@ -281,7 +293,14 @@ export async function reviewPullRequest(
     logger,
   });
   const whole = wholePullRequest(scope);
-  const publish = publishReview ?? createCheckRunPublisher(client);
+  const publisher = publishReview ?? createCheckRunPublisher(client);
+  // The early returns below publish too, so the guard sits on the publisher.
+  const publish: PublishReview = async (reviewed, rendered) => {
+    if (signal?.aborted === true) {
+      cancelled("before publish");
+    }
+    await publisher(reviewed, rendered);
+  };
   // Agents see the scope; publishing sees the whole PR, so comments anchor anywhere.
   const filenames = scope.changedFiles.map((file) => file.filename);
   const carriedForward =
@@ -360,11 +379,17 @@ export async function reviewPullRequest(
         scope.kind === "incremental"
           ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
           : undefined,
+      signal,
     },
     active,
     synthesisHints,
     repositoryIndex,
-  );
+  ).catch((error: unknown) => {
+    if (isCancellation(error, signal)) {
+      cancelled("agents");
+    }
+    throw error;
+  });
   logSynthesisOutcome(logger, target, review);
 
   logger.info("findings.validated", {
@@ -387,6 +412,10 @@ export async function reviewPullRequest(
     verifiedCount: verified.summary.verified,
     files: verified.files.map((file) => file.path),
   });
+
+  if (signal?.aborted === true) {
+    cancelled("before publish");
+  }
 
   await deliverReview(
     target,

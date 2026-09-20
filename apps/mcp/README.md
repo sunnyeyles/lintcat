@@ -16,11 +16,13 @@ Then pass that repository's checkout as `repoPath`, or start Claude Code in it.
 
 | Tool | What it does | Needs |
 |---|---|---|
+| `list_review_agents` | Lists the checkout's configured agents with their categories and path gates, and marks which the working tree's changes would wake. | Nothing |
 | `review_local_changes` | Runs the configured agents on commits since the merge-base with the base branch, plus uncommitted and untracked files. Returns only validated findings. | A model key |
 | `review_pull_request` | Reviews a GitHub PR at its head. It is a dry run unless `publish: true`, which posts the check run and review comments. It never commits fixes. | A model key and a GitHub token |
 | `repository_overview` | Lists the workspace's packages and the per-language index coverage. | Nothing |
 | `find_references` | Lists the files that import a file, or one of its exported names. | Nothing |
 | `describe_file` | Shows a file's role, package, importers, covering test, and imports. | Nothing |
+| `validate_agent_config` | Parses `.github/pr-review-agents.yml` and reports the agents it resolves to, or the error with its location. No file means the default agent. | Nothing |
 | `list_reviews`, `get_review`, `review_trends` | Stored reviews, findings, trends and cost. | `DATABASE_URL` and a GitHub token |
 
 A local review reads the agent configuration (`.github/pr-review-agents.yml`)

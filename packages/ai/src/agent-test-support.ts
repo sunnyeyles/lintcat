@@ -197,6 +197,28 @@ export function makeModel(
   return { model, doGenerate, calls: model.doGenerateCalls };
 }
 
+/** A model that answers only by rejecting when the run is aborted. */
+export function makeHangingModel(provider = "test-provider", modelId = "test-model") {
+  let started = (): void => {};
+  const firstCall = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const doGenerate = async ({ abortSignal }: { abortSignal?: AbortSignal }) => {
+    started();
+    return new Promise<never>((_resolve, reject) => {
+      abortSignal?.addEventListener("abort", () => {
+        reject(new DOMException("The operation was aborted", "AbortError"));
+      });
+    });
+  };
+  const model = new MockLanguageModelV4({
+    provider,
+    modelId,
+    doGenerate: doGenerate as unknown as MockLanguageModelV4["doGenerate"],
+  });
+  return { model, firstCall };
+}
+
 /** The base commit's tree the fake archive serves. */
 export const archiveFiles = new Map<string, string>([
   [

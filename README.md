@@ -685,10 +685,15 @@ runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
 
 | Tool | What it does |
 | --- | --- |
+| `list_review_agents` | Lists the agents a checkout configures, each one's category and path gate, and which the working tree's changes would wake; no model key needed |
 | `review_local_changes` | Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed |
 | `review_pull_request` | Reviews a GitHub pull request; a dry run unless `publish: true`, which posts the check run and comments as the Action would |
 | `repository_overview`, `find_references`, `describe_file` | The [repository index](#repository-index), built from the working tree, with no network |
+| `validate_agent_config` | Checks a checkout's `.github/pr-review-agents.yml` and reports what it resolves to, or where it is wrong; no model calls |
 | `list_reviews`, `get_review`, `review_trends` | Stored review history, scoped by the dashboard's own access rules to your GitHub account |
+
+Cancelling a review — Ctrl-C in the client, or any `notifications/cancelled` —
+aborts the agents' model calls, and a cancelled run publishes nothing.
 
 A local review takes the same path as the Action, with a git-backed client in
 place of GitHub's, so the [trust boundary](#the-trust-boundary) is unchanged:
@@ -746,10 +751,10 @@ under event names, grouped by what they trace:
 
 | Stage | Events |
 | --- | --- |
-| Review | `review.skipped`, `review.started`, `review.model_selected`, `review.agents_selected`, `review.loaded`, `review.no_agents_matched`, `review.failed` |
+| Review | `review.skipped`, `review.started`, `review.model_selected`, `review.agents_selected`, `review.loaded`, `review.no_agents_matched`, `review.cancelled`, `review.failed` |
 | Scope | `review.scope_resolved`, `review.scope_unreadable`, `review.incremental.no_changes`, `review.carried_forward.unreadable` |
 | Index | `index.built`, `index.skipped`, `index.failed` |
-| Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.skipped` |
+| Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled`, `agent.skipped` |
 | Synthesis | `synthesis.started`, `synthesis.skipped`, `synthesis.completed`, `synthesis.failed` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
 | Langfuse | `langfuse.disabled_incomplete_credentials`, `langfuse.prompts.loaded`, `langfuse.prompts.unavailable`, `langfuse.prompts.fallback_used`, `tracing.flush_failed` |
