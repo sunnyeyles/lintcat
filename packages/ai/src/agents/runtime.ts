@@ -3,7 +3,10 @@
  * AgentDefinition supplies role, focus and category; the rest is identical.
  */
 import { startActiveObservation } from "@langfuse/tracing";
-import type { GithubInstallationClient } from "@pr-review/github";
+import type {
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+} from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 import {
   createConsoleLogger,
@@ -136,7 +139,7 @@ export interface ReviewAgentDeps {
   model: ReviewModel;
   /** Builds a model by id. Without it, an agent's `model` is ignored. */
   createModel?: ((modelId: string) => ReviewModel) | undefined;
-  github: GithubInstallationClient;
+  github: PullRequestReadClient & RepositoryHistoryClient;
   maxTurns?: number | undefined;
   /** Receives agent.started / agent.completed / agent.failed. */
   logger?: StructuredLogger | undefined;

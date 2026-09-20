@@ -5,7 +5,8 @@
 import type {
   ChangedFile,
   CodeSearchResult,
-  GithubInstallationClient,
+  PullRequestReadClient,
+  RepositoryHistoryClient,
 } from "@pr-review/github";
 import { referencesTo, type RepositoryIndex } from "@pr-review/index";
 import { tool, type ToolSet } from "ai";
@@ -168,7 +169,7 @@ function unknownReason(
 
 /** Exactly the eight read-only tools, bound to one pull request. */
 export function createReviewTools(
-  github: GithubInstallationClient,
+  github: PullRequestReadClient & RepositoryHistoryClient,
   context: ReviewContext,
   index?: RepositoryIndex | undefined,
 ): ToolSet {

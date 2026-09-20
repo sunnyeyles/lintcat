@@ -10,7 +10,10 @@ import {
   type AgentDefinition,
   type Synthesiser,
 } from "@pr-review/ai";
-import type { GithubInstallationClient } from "@pr-review/github";
+import type {
+  PullRequestReadClient,
+  RepositoryHistoryClient,
+} from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
 import {
@@ -30,7 +33,7 @@ export interface FixtureReviewDeps {
   agents: readonly AgentDefinition[];
   /** Built over the review's own logger, so every event of one fixture lands together. */
   createAgents: (
-    github: GithubInstallationClient,
+    github: PullRequestReadClient & RepositoryHistoryClient,
     logger: StructuredLogger,
     agents: readonly AgentDefinition[],
     index: RepositoryIndex | undefined,
