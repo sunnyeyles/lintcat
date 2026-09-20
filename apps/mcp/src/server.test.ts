@@ -82,6 +82,13 @@ async function call(client: Client, name: string, args: Record<string, unknown>)
   return { isError: result.isError === true, texts };
 }
 
+/** Replaces the fixture repository, so `afterEach` still removes exactly one. */
+function useRepo(files: Record<string, string>): TestRepo {
+  repo.remove();
+  repo = createTestRepo(files);
+  return repo;
+}
+
 function scriptedModel(findings: ReturnType<typeof makeFinding>[]) {
   return makeModel([message([textBlock(finalFindingsJson(findings))], "end_turn")]).model;
 }
@@ -95,6 +102,7 @@ describe("the tool list", () => {
       "describe_file",
       "find_references",
       "get_review",
+      "list_review_agents",
       "list_reviews",
       "repository_overview",
       "review_local_changes",
@@ -185,6 +193,62 @@ describe("search_code", () => {
 
     expect(isError).toBe(true);
     expect(texts[0]).toContain("outside the repository");
+  });
+});
+
+describe("list_review_agents", () => {
+  function configuredRepo(config: string): void {
+    useRepo({
+      ".github/pr-review-agents.yml": config,
+      "src/sessions.ts": "export const sessions = [];\n",
+      "packages/api/server.ts": "export const server = {};\n",
+    });
+    repo.git("checkout", "-q", "-b", "feature");
+    repo.write("src/sessions.ts", "export const sessions = [1];\n");
+  }
+
+  it("reports each agent's category and gate, and which the changes wake", async () => {
+    configuredRepo(
+      ["agents:", "  - agent: security", "    paths:", "      - packages/**", "  - correctness", ""].join("\n"),
+    );
+    const client = await connect(environment({ env: {} }));
+
+    const { isError, texts } = await call(client, "list_review_agents", { base: "main" });
+
+    expect(isError).toBe(false);
+    const listing = JSON.parse(texts[1]!);
+    expect(listing.configured).toBe(true);
+    expect(listing.changedFiles).toEqual(["src/sessions.ts"]);
+    expect(listing.agents).toMatchObject([
+      { category: "security", paths: ["packages/**"], wakes: false },
+      { category: "correctness", paths: null, wakes: true },
+    ]);
+    expect(texts[0]).toContain("correctness would run on the current changes");
+  });
+
+  it("says nothing would run when every gate misses the changes", async () => {
+    configuredRepo(["agents:", "  - agent: security", "    paths:", "      - packages/**", ""].join("\n"));
+    const client = await connect(environment({ env: {} }));
+
+    const { texts } = await call(client, "list_review_agents", { base: "main" });
+
+    const listing = JSON.parse(texts[1]!);
+    expect(listing.agents).toMatchObject([
+      { category: "security", wakes: false, reason: "no changed file matches its paths" },
+    ]);
+    expect(texts[0]).toContain("none would run on the current changes");
+  });
+
+  it("reports the defaults for a repository that configures nothing", async () => {
+    const client = await connect(environment({ env: {} }));
+
+    const { isError, texts } = await call(client, "list_review_agents", { base: "main" });
+
+    expect(isError).toBe(false);
+    const listing = JSON.parse(texts[1]!);
+    expect(listing.configured).toBe(false);
+    expect(listing.agents).toMatchObject([{ category: "general", paths: null, wakes: true }]);
+    expect(texts[0]).toContain("no .github/pr-review-agents.yml, so these are the defaults");
   });
 });
 
