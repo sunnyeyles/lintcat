@@ -164,10 +164,13 @@ export async function runReview({
   logger = createConsoleLogger(),
 }: ReviewRunSpec): Promise<FinishedReviewRun> {
   const agents = await resolveAgents(client, target, source);
-  logger.info("review.agents_selected", {
-    ...reviewCorrelation(target),
-    agents: agents.map((agent) => agent.category),
-  });
+  // A supplied set was selected by the caller, which logs what it knows of it.
+  if (!("use" in source)) {
+    logger.info("review.agents_selected", {
+      ...reviewCorrelation(target),
+      agents: agents.map((agent) => agent.category),
+    });
+  }
 
   const usage: AgentUsageReport[] = [];
   const startedAt = Date.now();
