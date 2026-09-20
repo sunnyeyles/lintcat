@@ -38,6 +38,8 @@ export interface FixtureReviewDeps {
 /** Everything one fixture review produced, for expectations to judge. */
 export interface FixtureReview {
   fixture: LoadedFixture;
+  /** The agent set that produced it, which decides how a finding's category reads. */
+  agents: readonly AgentDefinition[];
   /** The pipeline's own result: candidates, failures, final findings, patches. */
   result: ReviewOutcome;
   /** The check run a real review would have published. */
@@ -101,5 +103,10 @@ export async function runFixtureReview(
     );
   }
 
-  return { fixture, result: run.outcome, rendered: recorded.checkRun };
+  return {
+    fixture,
+    agents: deps.agents,
+    result: run.outcome,
+    rendered: recorded.checkRun,
+  };
 }

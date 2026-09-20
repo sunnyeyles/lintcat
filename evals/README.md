@@ -11,7 +11,7 @@ quality regression in the paid run. `vitest.config.ts` is that project;
 
 ## What is evaluated
 
-Six fixtures, fourteen assertions. Eight of them are quality signals; six
+Seven fixtures, sixteen assertions. Nine of them are quality signals; seven
 are health checks that stop a crashed agent from reading as a quality result.
 
 | Fixture | Assertion | Signal |
@@ -27,6 +27,8 @@ are health checks that stop a crashed agent from reading as a quality result.
 | `test-coverage-untested-branch` | a `test-coverage` finding lands on `BULK_PARCEL_RATE` or `applyDiscount` | recall |
 | `performance-n-plus-one` | every agent completes | health |
 | `performance-n-plus-one` | a `performance` finding lands on `buildOrderSummary` | recall |
+| `docs-drift-retry-budget` | every agent completes | health |
+| `docs-drift-retry-budget` | a `docs-drift` finding lands on `RETRY_BUDGET_ENV` or `withRetryBudget` | recall |
 | `clean-pagination` | every agent completes | health |
 | `clean-pagination` | zero findings | precision |
 | `clean-pagination` | every proposed patch matches the file at head | precision |
@@ -46,7 +48,8 @@ once.
 Assertions match on category and location, never wording — see
 `expectations.ts`. Anchors must match exactly one line of a changed file, so a
 fixture edit that moves the planted bug fails loudly instead of silently
-passing.
+passing. One agent covering every category stamps its own name on every
+finding, so a lone standalone agent is judged on location alone.
 
 ## The repository-index gate
 
@@ -92,12 +95,32 @@ tokens on the cross-file fixture alone.
 Until the control arm runs to completion, the on arm's pass is one sample and
 proves nothing on its own: the gate needs both halves.
 
+## The agent-set arms
+
+The second question the suite answers: do the five specialists find more than
+the one general agent, and is the difference worth roughly five times the
+spend? `EVAL_AGENTS` is the switch, in the same shape as `EVAL_INDEX`.
+
+```bash
+MODEL_PROVIDER=anthropic MODEL_ID=claude-sonnet-5 pnpm eval                   # five specialists
+MODEL_PROVIDER=anthropic MODEL_ID=claude-sonnet-5 EVAL_AGENTS=general pnpm eval  # one general agent
+```
+
+Unset, the suite runs the agents `.github/pr-review-agents.yml` configures.
+`EVAL_AGENTS=general` swaps in `GENERAL_AGENT` — what reviews a repository
+that configures nothing — and nothing else changes. `REVIEW_AGENTS` still
+narrows whichever set the arm chose.
+
+Two asymmetries are inherent to the arms and cannot be switched off. The
+general agent is `standalone`, so its arm skips synthesis, and it owns every
+category, so its findings are all `category: "general"` and are judged on
+location alone. Read the recall numbers as "did a reviewer point at the
+planted problem", not as "did a reviewer classify it".
+
+**The verdict lives in `docs/adr/0001-general-agent-versus-five-specialists.md`.**
+
 ## Known gaps
 
-- **`docs-drift` has no quality assertion.** Four of the five agents
-  `.github/pr-review-agents.yml` ships have a recall fixture; `docs-drift` is
-  the one that does not, and is exercised only as "did not crash, stayed quiet
-  on clean code".
 - **No fixture requires a patch.** `patches-verify` catches a wrong patch but
   cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
 - **The Anthropic default model does not clear the suite.** On
@@ -110,10 +133,18 @@ proves nothing on its own: the gate needs both halves.
 - **One sample per arm.** A fixture is one non-deterministic review, so a
   single on-versus-off pair is a signal, not a measurement. Read the gate with
   that in mind, and repeat the pair before concluding the index does nothing.
+- **`docs-drift-retry-budget` has never reached a model.** It loads, diffs and
+  runs the pipeline, but on 2026-09-21 the Anthropic account was over its usage
+  limit, so no review of it has been judged. Its anchors are unproven.
+- **Drift is reported on the code, not on the stale page.** A finding must name
+  a changed file, and the documents this fixture makes wrong are untouched — so
+  the recall assertion anchors the changed source, and a reviewer that names
+  `README.md` instead is dropped by validation before the judge sees it.
 
 ## Layout
 
 ```
+agent-set.ts           the arm: the configured specialists, or the general agent
 cases.ts               the spec: fixtures and their expectations
 expectations.ts        the judge: category + anchored location
 fixture.ts             loads repo/ (head) and base/ into the pipeline's inputs

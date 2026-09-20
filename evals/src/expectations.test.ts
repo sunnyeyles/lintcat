@@ -1,6 +1,8 @@
 /** Anchor resolution and expectation judgement, over scripted reviews. */
 import { describe, expect, it } from "vitest";
 
+import { GENERAL_AGENT, type AgentDefinition } from "@pr-review/ai";
+import { repositoryAgents } from "@pr-review/ai/agent-test-support";
 import type { ChangedFile, PullRequestDetails } from "@pr-review/github";
 import type { ReviewOutcome } from "@pr-review/reviewer";
 import type { ReviewFinding } from "@pr-review/schemas";
@@ -80,9 +82,13 @@ function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   };
 }
 
-function review(result: Partial<ReviewOutcome> = {}): FixtureReview {
+function review(
+  result: Partial<ReviewOutcome> = {},
+  agents: readonly AgentDefinition[] = repositoryAgents(),
+): FixtureReview {
   return {
     fixture,
+    agents,
     result: {
       candidates: [],
       agentFailures: [],
@@ -179,6 +185,21 @@ describe("evaluateExpectation", () => {
     expect(
       evaluateExpectation(review({ findings: [finding({ category: "security" })] }), expectation)
         .passed,
+    ).toBe(false);
+  });
+
+  it("judges a lone standalone agent's findings by location, whatever it calls them", () => {
+    const general = finding({ category: GENERAL_AGENT.category });
+
+    expect(evaluateExpectation(review({ findings: [general] }, [GENERAL_AGENT]), expectation).passed).toBe(
+      true,
+    );
+    expect(
+      evaluateExpectation(review({ findings: [general] }, [GENERAL_AGENT, GENERAL_AGENT]), expectation)
+        .passed,
+    ).toBe(false);
+    expect(
+      evaluateExpectation(review({ findings: [finding()] }, [GENERAL_AGENT]), expectation).passed,
     ).toBe(false);
   });
 

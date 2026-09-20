@@ -8,7 +8,7 @@ import { resolveAgentDefinitions } from "@pr-review/ai";
 import { createConsoleLogger } from "@pr-review/logging";
 import { beforeAll, describe, expect, test } from "vitest";
 
-import { repositoryAgents } from "@pr-review/ai/agent-test-support";
+import { evalAgentSet } from "#src/agent-set";
 import { evalCases } from "#src/cases";
 import { evaluateExpectation } from "#src/expectations";
 import { loadFixture } from "#src/fixture";
@@ -23,7 +23,7 @@ import {
 const deps = modelBackedDeps(
   requireModelAccess(process.env),
   createConsoleLogger(),
-  resolveAgentDefinitions(process.env[AGENTS_ENV] ?? "", repositoryAgents()),
+  resolveAgentDefinitions(process.env[AGENTS_ENV] ?? "", evalAgentSet(process.env)),
 );
 
 for (const evalCase of evalCases) {

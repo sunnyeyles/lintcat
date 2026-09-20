@@ -132,6 +132,28 @@ export const evalCases: EvalCase[] = [
     ],
   },
   {
+    fixture: "docs-drift-retry-budget",
+    expectations: [
+      agentsCompleted,
+      {
+        kind: "finding",
+        description:
+          "reports a docs-drift finding on the retry budget that replaced the attempt count the README and the runbook still document",
+        category: "docs-drift",
+        anchors: [
+          {
+            file: "src/config.ts",
+            startMarker: "export const RETRY_BUDGET_ENV",
+          },
+          {
+            file: "src/delivery/retry.ts",
+            startMarker: "export async function withRetryBudget",
+          },
+        ],
+      },
+    ],
+  },
+  {
     fixture: "clean-pagination",
     expectations: [
       agentsCompleted,
