@@ -83,6 +83,113 @@ describe("openLocalRepository", () => {
   });
 });
 
+describe("the staged scope", () => {
+  const staged = { kind: "staged" } as const;
+
+  it("reviews the index against HEAD, ignoring unstaged and untracked work", async () => {
+    repo.git("add", "src/sessions.ts");
+    const local = await openLocalRepository(repo.root, undefined, staged);
+
+    expect(local.baseSha).toBe(repo.git("rev-parse", "HEAD").trim());
+    expect(local.target.headSha).not.toBe(WORKING_TREE);
+    const files = await local.client.listChangedFiles(local.target);
+    expect(files.map((file) => file.filename)).toEqual(["src/sessions.ts"]);
+  });
+
+  it("reads a staged file at the head, not as the working tree has it since", async () => {
+    repo.git("add", "src/sessions.ts");
+    const { client, owner, repo: name, target } = await openLocalRepository(repo.root, undefined, staged);
+    repo.write("src/sessions.ts", "export const sessions: never[] = [];\n");
+
+    const contents = await client.getFileContents({
+      owner,
+      repo: name,
+      path: "src/sessions.ts",
+      ref: target.headSha,
+    });
+    expect(contents).toBe("export const sessions: string[] = [];\n");
+  });
+
+  it("reports nothing staged as an empty change list", async () => {
+    const local = await openLocalRepository(repo.root, undefined, staged);
+
+    await expect(local.client.listChangedFiles(local.target)).resolves.toEqual([]);
+    await expect(local.client.listPullRequestCommitShas(local.target)).resolves.toEqual([]);
+  });
+
+  it("archives the staged tree even though it is not a commit", async () => {
+    repo.git("add", "src/draft.ts");
+    const { client, owner, repo: name, target } = await openLocalRepository(repo.root, undefined, staged);
+
+    const archive = await client.getRepositoryArchive({ owner, repo: name, ref: target.headSha });
+    expect([...archive.files.keys()]).toContain("src/draft.ts");
+  });
+});
+
+describe("the range scope", () => {
+  const range = (spec: string) => openLocalRepository(repo.root, undefined, { kind: "range", range: spec });
+
+  it("diffs the two ends of an explicit range, ignoring the working tree", async () => {
+    const local = await range("main..feature");
+
+    expect(local.baseSha).toBe(repo.git("rev-parse", "main").trim());
+    expect(local.target.headSha).toBe(repo.git("rev-parse", "feature").trim());
+    const files = await local.client.listChangedFiles(local.target);
+    expect(files.map((file) => file.filename)).toEqual(["src/api.ts"]);
+  });
+
+  it("lists the commits in the range and names them in the pull request body", async () => {
+    const local = await range("main..feature");
+
+    const shas = await local.client.listPullRequestCommitShas(local.target);
+    expect(shas).toEqual([repo.git("rev-parse", "feature").trim()]);
+    const pullRequest = await local.client.getPullRequest(local.target);
+    expect(pullRequest.body).toContain("- count sessions");
+    expect(pullRequest.title).toContain("Commits main..");
+  });
+
+  it("starts a three-dot range at the merge-base", async () => {
+    repo.git("checkout", "-q", "main");
+    repo.write("src/unrelated.ts", "export const unrelated = true;\n");
+    repo.commit("unrelated");
+    repo.git("checkout", "-q", "feature");
+    const local = await range("main...feature");
+
+    const files = await local.client.listChangedFiles(local.target);
+    expect(files.map((file) => file.filename)).toEqual(["src/api.ts"]);
+  });
+
+  it("reads a bare commit as that commit against its parent", async () => {
+    const local = await range("feature");
+
+    const files = await local.client.listChangedFiles(local.target);
+    expect(files.map((file) => file.filename)).toEqual(["src/api.ts"]);
+  });
+
+  it("reports an empty range as no changes at all", async () => {
+    const local = await range("feature..feature");
+
+    await expect(local.client.listChangedFiles(local.target)).resolves.toEqual([]);
+    await expect(local.client.getDiff(local.target)).resolves.toBe("");
+  });
+
+  it("names an unknown ref rather than guessing", async () => {
+    await expect(range("main..nope")).rejects.toThrow('unknown commit "nope" in this checkout');
+  });
+
+  it("rejects a malformed range", async () => {
+    for (const spec of ["main..", "..main", "   "]) {
+      await expect(range(spec), spec).rejects.toThrow(/malformed commit range|unknown commit/);
+    }
+  });
+
+  it("refuses a base alongside a range, which already names one", async () => {
+    await expect(
+      openLocalRepository(repo.root, "main", { kind: "range", range: "main..feature" }),
+    ).rejects.toThrow("already names its base");
+  });
+});
+
 describe("the local client", () => {
   it("reads a file at the base commit and from the working tree", async () => {
     const { client, owner, repo: name, baseSha } = await openLocalRepository(repo.root, "main");
