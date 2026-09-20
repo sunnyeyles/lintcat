@@ -6,6 +6,8 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { DEFAULT_AGENT_CONFIG_PATH, loadAgentDefinitions, type AgentDefinition } from "@pr-review/ai";
 import { z } from "zod";
 
+import { resolveCheckoutPath } from "#src/checkout-path";
+import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
 
 interface Location {
@@ -41,7 +43,11 @@ function result(heading: string, body: unknown): CallToolResult {
   };
 }
 
-export function registerConfigTools(server: McpServer, environment: McpEnvironment): void {
+export function registerConfigTools(
+  server: McpServer,
+  environment: McpEnvironment,
+  client: ConnectedClient,
+): void {
   server.registerTool(
     "validate_agent_config",
     {
@@ -64,7 +70,7 @@ export function registerConfigTools(server: McpServer, environment: McpEnvironme
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ repoPath, configPath }) => {
-      const root = path.resolve(environment.cwd, repoPath ?? ".");
+      const root = await resolveCheckoutPath(environment, client, repoPath);
       const relative = configPath ?? DEFAULT_AGENT_CONFIG_PATH;
       let present = false;
 

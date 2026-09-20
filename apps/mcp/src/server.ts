@@ -57,10 +57,10 @@ export function createServer(environment: McpEnvironment, options: ServerOptions
   );
   const client = options.client ?? connectedClient(server);
   server.server.oninitialized = () => environment.logger.info("mcp.client", { ...client.features() });
-  registerReviewTools(server, environment);
-  registerIndexTools(server, environment, options.loadIndex ?? createLocalIndexCache());
-  registerSearchTools(server, environment);
-  registerConfigTools(server, environment);
+  registerReviewTools(server, environment, client);
+  registerIndexTools(server, environment, client, options.loadIndex ?? createLocalIndexCache());
+  registerSearchTools(server, environment, client);
+  registerConfigTools(server, environment, client);
   registerHistoryTools(server, environment, options.githubId ?? githubUserId(environment));
   registerWorkflowPrompts(server);
   return server;

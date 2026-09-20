@@ -1,5 +1,3 @@
-import path from "node:path";
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { renderRepository } from "@pr-review/ai";
@@ -13,6 +11,8 @@ import {
 } from "@pr-review/index";
 import { z } from "zod";
 
+import { resolveCheckoutPath } from "#src/checkout-path";
+import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
 import type { LocalIndex } from "#src/local-index";
 
@@ -37,10 +37,11 @@ function unknown(index: RepositoryIndex, file: string): CallToolResult {
 export function registerIndexTools(
   server: McpServer,
   environment: McpEnvironment,
+  client: ConnectedClient,
   loadIndex: (repoPath: string) => Promise<LocalIndex>,
 ): void {
-  const load = (repoPath: string | undefined) =>
-    loadIndex(path.resolve(environment.cwd, repoPath ?? "."));
+  const load = async (repoPath: string | undefined) =>
+    loadIndex(await resolveCheckoutPath(environment, client, repoPath));
 
   server.registerTool(
     "repository_overview",

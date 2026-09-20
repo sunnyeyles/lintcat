@@ -1,5 +1,3 @@
-import path from "node:path";
-
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
@@ -11,6 +9,8 @@ import type { AgentLifecycleListener } from "@pr-review/ai";
 import { z } from "zod";
 
 import { listAgents, type AgentListing } from "#src/agent-listing";
+import { resolveCheckoutPath } from "#src/checkout-path";
+import type { ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { openLocalRepository } from "#src/local-git-client";
 import { runReview, type ReviewResult } from "#src/review";
@@ -71,7 +71,11 @@ function agentHeadline(listing: AgentListing): string {
   return `${listing.agents.length} agent(s) from ${source}; ${wakes}.`;
 }
 
-export function registerReviewTools(server: McpServer, environment: McpEnvironment): void {
+export function registerReviewTools(
+  server: McpServer,
+  environment: McpEnvironment,
+  client: ConnectedClient,
+): void {
   server.registerTool(
     "list_review_agents",
     {
@@ -94,7 +98,10 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ repoPath, base }) => {
-      const local = await openLocalRepository(path.resolve(environment.cwd, repoPath ?? "."), base);
+      const local = await openLocalRepository(
+        await resolveCheckoutPath(environment, client, repoPath),
+        base,
+      );
       const listing = await listAgents(local);
       return {
         content: [
@@ -133,7 +140,7 @@ export function registerReviewTools(server: McpServer, environment: McpEnvironme
     },
     async ({ repoPath, base, agents, index }, extra) => {
       const local = await openLocalRepository(
-        path.resolve(environment.cwd, repoPath ?? "."),
+        await resolveCheckoutPath(environment, client, repoPath),
         base,
       );
       const files = await local.client.listChangedFiles(local.target);
