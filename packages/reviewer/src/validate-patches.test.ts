@@ -3,6 +3,7 @@ import type { FindingPatch, ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  applyVerifiedPatches,
   MAX_PATCHED_FILES,
   MAX_PATCHED_LINES,
   verifyPatches,
@@ -305,5 +306,44 @@ describe("verifyPatches", () => {
     );
 
     expect(result.patchCount).toBe(0);
+  });
+});
+
+describe("applyVerifiedPatches", () => {
+  const content = ["alpha", "beta", "gamma", ""].join("\n");
+
+  it("replays every patch and keeps the trailing newline", () => {
+    const applied = applyVerifiedPatches(content, [
+      { startLine: 1, endLine: 1, expected: "alpha", replacement: "ALPHA" },
+      { startLine: 3, endLine: 3, expected: "gamma", replacement: "GAMMA" },
+    ]);
+
+    expect(applied).toEqual({ status: "applied", content: "ALPHA\nbeta\nGAMMA\n" });
+  });
+
+  it("reports the patch whose range no longer holds its expected text", () => {
+    const stale = { startLine: 2, endLine: 2, expected: "beta", replacement: "BETA" };
+
+    expect(applyVerifiedPatches("alpha\nmoved\ngamma\n", [stale])).toEqual({
+      status: "stale",
+      patch: stale,
+    });
+  });
+
+  it("reports a range that runs past the end of the file", () => {
+    const beyond = { startLine: 3, endLine: 9, expected: "gamma", replacement: "" };
+
+    expect(applyVerifiedPatches(content, [beyond])).toMatchObject({ status: "stale" });
+  });
+
+  it("refuses two patches that overlap rather than splicing one into the other", () => {
+    const second = { startLine: 2, endLine: 3, expected: "beta\ngamma", replacement: "x" };
+
+    expect(
+      applyVerifiedPatches(content, [
+        { startLine: 1, endLine: 2, expected: "alpha\nbeta", replacement: "y" },
+        second,
+      ]),
+    ).toEqual({ status: "overlapping", patch: second });
   });
 });

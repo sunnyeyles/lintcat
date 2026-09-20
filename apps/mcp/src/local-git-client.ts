@@ -182,15 +182,18 @@ async function resolveScope(
   };
 }
 
+/** The checkout holding `repoPath`, with symlinks resolved. */
+export async function repositoryRoot(repoPath: string): Promise<string> {
+  return realpathSync((await git(repoPath, ["rev-parse", "--show-toplevel"])).trim());
+}
+
 /** Resolves `repoPath` to its checkout and the two ends of the reviewed slice. */
 export async function openLocalRepository(
   repoPath: string,
   base?: string | undefined,
   scope: LocalScope = { kind: "working-tree" },
 ): Promise<LocalRepository> {
-  const root = realpathSync(
-    (await git(repoPath, ["rev-parse", "--show-toplevel"])).trim(),
-  );
+  const root = await repositoryRoot(repoPath);
   const resolved = await resolveScope(root, scope, base);
   const branch = (await tryGit(root, ["branch", "--show-current"])) ?? "HEAD";
   const { owner, repo } = ownerAndRepo(await tryGit(root, ["remote", "get-url", "origin"]), root);
@@ -209,7 +212,7 @@ export async function openLocalRepository(
 }
 
 /** A path inside the checkout, with symlinks resolved; anything else is a 404. */
-function resolveInside(root: string, file: string): string {
+export function resolveInside(root: string, file: string): string {
   const resolved = path.resolve(root, file);
   let real: string;
   try {
