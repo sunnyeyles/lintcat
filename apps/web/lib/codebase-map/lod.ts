@@ -229,6 +229,20 @@ export function groupSlice(
   };
 }
 
+/** Every path in the named groups — what a caller holding those groups has. */
+export function pathsInGroups(
+  graph: NormalisedGraph,
+  groupIds: readonly string[],
+): ReadonlySet<string> {
+  const wanted = new Set(groupIds);
+  const paths = new Set<string>();
+  if (wanted.size === 0) return paths;
+  for (const file of graph.files) {
+    if (wanted.has(groupIdFor(file))) paths.add(file.path);
+  }
+  return paths;
+}
+
 export interface LodSearchResult extends SearchResult {
   groupId: string;
 }

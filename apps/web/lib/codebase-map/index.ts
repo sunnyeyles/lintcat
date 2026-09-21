@@ -16,6 +16,7 @@ export {
   groupSlice,
   lodGraph,
   mapPayload,
+  pathsInGroups,
   resolveLodThreshold,
   searchGroups,
 } from "@/lib/codebase-map/lod";
