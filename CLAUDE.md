@@ -105,7 +105,11 @@ script before paint. No `.dark` class, no theme library; Tailwind's `dark:`
 variant is a custom one keyed on that attribute. Fonts are the system stacks.
 
 `src/tokens-guard.test.ts` fails the build on Tailwind palette classes
-(`bg-gray-100`) or raw hex in app code. `docs/tokens.css` is a separate,
+(`bg-gray-100`) or raw hex in app code.
+
+Brand assets (the LintCat mark and lockup, colour and mono) live in
+`apps/web/public/brand/`; `apps/web/components/shell/logo-mark.tsx` draws the
+same mark from the `--brand-*` tokens for inline use. `docs/tokens.css` is a separate,
 unrelated palette for the standalone `docs/index.html` explainer page.
 
 ## Commands

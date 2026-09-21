@@ -93,7 +93,8 @@
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji";
-  --font-display: var(--font-sans);
+  /* The lockup is set in Space Grotesk; nothing loads it, so it applies only where installed. */
+  --font-display: "Space Grotesk", var(--font-sans);
   --font-mono: var(--fontStack-monospace);
 
   --text-caption: 0.75rem;

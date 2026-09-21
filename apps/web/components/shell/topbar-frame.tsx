@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ColorModeToggle } from "@/components/shell/color-mode-toggle";
-import { LogoMark } from "@/components/shell/logo-mark";
+import { Wordmark } from "@/components/shell/logo-mark";
 
 /** The topbar's chrome, with no request-bound data, so a static page can render it. */
 export function TopbarFrame({
@@ -30,10 +30,7 @@ export function TopbarFrame({
           href={docsHref}
           className="flex min-w-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <LogoMark />
-          <span className="truncate font-mono text-sm font-semibold tracking-wide text-foreground">
-            pr-review-agents
-          </span>
+          <Wordmark />
         </Link>
         <nav aria-label="Site" className="ml-4 hidden items-center gap-1 sm:flex">
           <Link
