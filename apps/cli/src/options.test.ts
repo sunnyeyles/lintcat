@@ -39,6 +39,11 @@ describe("the command line", () => {
     expect(() => parseArguments(["review", "--publish"])).toThrow(/unknown option --publish/);
   });
 
+  it("names --agents as removed rather than unknown", () => {
+    expect(() => parseArguments(["--agents=security"])).toThrow(/--agents was removed in v3/);
+    expect(() => parseArguments(["install-hook", "--agents", "x"])).toThrow(/removed in v3/);
+  });
+
   it("refuses an option the other command owns", () => {
     expect(() => parseArguments(["install-hook", "--no-index"])).toThrow(
       /unknown option --no-index/,

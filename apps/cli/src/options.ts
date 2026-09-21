@@ -1,5 +1,5 @@
 /** The command line: what `pr-review` was asked to do, before anything is read. */
-import type { LocalScope } from "@pr-review/mcp/local-review";
+import { REMOVED_AGENTS_FLAG, type LocalScope } from "@pr-review/mcp/local-review";
 
 /** The severity that makes a review fail; "off" never fails. */
 export type FailOn = "low" | "medium" | "high" | "off";
@@ -92,6 +92,9 @@ function readFlags(argv: readonly string[]): Flags {
 /** An unknown name is reported before a missing value, so a typo reads as one. */
 function known(flags: Flags, allowed: readonly string[]): void {
   for (const name of [...flags.values.keys(), ...flags.switches, ...flags.missing]) {
+    if (name === "agents") {
+      throw new UsageError(REMOVED_AGENTS_FLAG);
+    }
     if (!allowed.includes(name)) {
       throw new UsageError(`unknown option --${name}`);
     }
