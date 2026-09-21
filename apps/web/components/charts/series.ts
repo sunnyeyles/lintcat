@@ -9,11 +9,11 @@ export const SEVERITY_SERIES: readonly SeriesDef<Severity>[] = [
   { key: "high", label: "High" },
 ];
 
-// High severity takes destructive rather than a chart slot: it means danger, not category.
+// Severity has its own tokens rather than chart slots: it means urgency, not category.
 export const SEVERITY_CONFIG = {
-  low: { label: "Low", color: "var(--chart-2)" },
-  medium: { label: "Medium", color: "var(--chart-4)" },
-  high: { label: "High", color: "var(--destructive)" },
+  low: { label: "Low", color: "var(--severity-low)" },
+  medium: { label: "Medium", color: "var(--severity-medium)" },
+  high: { label: "High", color: "var(--severity-high)" },
 } satisfies ChartConfig;
 
 const AGENT_SERIES: readonly SeriesDef<AgentName>[] = [

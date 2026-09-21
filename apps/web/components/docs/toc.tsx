@@ -34,7 +34,7 @@ export function Toc({ headings }: { headings: Heading[] }) {
   return (
     <aside className="hidden w-[13rem] shrink-0 xl:block">
       <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto">
-        <p className="eyebrow border-b border-rule pb-2">On this page</p>
+        <p className="eyebrow border-b border-border pb-2">On this page</p>
         <nav aria-label="On this page" className="flex flex-col gap-1.5 pt-3">
           {headings.map(({ id, title }) => (
             <a
@@ -43,7 +43,7 @@ export function Toc({ headings }: { headings: Heading[] }) {
               aria-current={active === id ? "location" : undefined}
               className={cn(
                 "font-mono text-caption leading-snug no-underline transition-colors",
-                active === id ? "text-accent" : "text-slate hover:text-ink",
+                active === id ? "text-primary" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {title}

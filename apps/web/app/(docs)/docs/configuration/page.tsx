@@ -77,11 +77,11 @@ export default function ConfigurationPage() {
             <TableBody>
               {INPUTS.map(([input, fallback, purpose]) => (
                 <TableRow key={input}>
-                  <TableCell className="font-mono whitespace-nowrap text-ink">{input}</TableCell>
-                  <TableCell className="font-mono whitespace-nowrap text-slate">
+                  <TableCell className="font-mono whitespace-nowrap text-foreground">{input}</TableCell>
+                  <TableCell className="font-mono whitespace-nowrap text-muted-foreground">
                     {fallback}
                   </TableCell>
-                  <TableCell className="text-slate">{purpose}</TableCell>
+                  <TableCell className="text-muted-foreground">{purpose}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -140,11 +140,11 @@ export default function ConfigurationPage() {
             <TableBody>
               {PERMISSIONS.map(([permission, granted, withheld]) => (
                 <TableRow key={permission}>
-                  <TableCell className="font-mono whitespace-nowrap text-ink">
+                  <TableCell className="font-mono whitespace-nowrap text-foreground">
                     {permission}
                   </TableCell>
-                  <TableCell className="text-slate">{granted}</TableCell>
-                  <TableCell className="text-slate">{withheld}</TableCell>
+                  <TableCell className="text-muted-foreground">{granted}</TableCell>
+                  <TableCell className="text-muted-foreground">{withheld}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

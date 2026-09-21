@@ -12,7 +12,7 @@ function Neighbour({ page, direction }: { page: DocsPage; direction: "previous" 
     <Link
       href={page.href}
       className={cn(
-        "group flex flex-1 flex-col gap-1 rounded-sm border border-rule bg-surface px-4 py-3 no-underline transition-colors hover:border-accent",
+        "group flex flex-1 flex-col gap-1 rounded-sm border border-border bg-card px-4 py-3 no-underline transition-colors hover:border-primary",
         next ? "items-end text-right" : "items-start",
       )}
     >
@@ -21,7 +21,7 @@ function Neighbour({ page, direction }: { page: DocsPage; direction: "previous" 
         {next ? "Next" : "Previous"}
         {next ? <ArrowRight className="size-3" /> : null}
       </span>
-      <span className="font-mono text-label text-ink group-hover:text-accent">{page.title}</span>
+      <span className="font-mono text-label text-foreground group-hover:text-primary">{page.title}</span>
     </Link>
   );
 }
@@ -47,10 +47,10 @@ export function DocsArticle({
   return (
     <div className="mx-auto flex w-full max-w-[72rem] gap-10 px-4 py-8 sm:px-8">
       <article className="flex min-w-0 flex-1 flex-col gap-8 [&>section:first-of-type]:border-t-0 [&>section:first-of-type]:pt-0">
-        <header className="flex flex-col gap-3 border-b border-rule pb-6">
+        <header className="flex flex-col gap-3 border-b border-border pb-6">
           <p className="eyebrow">{eyebrow}</p>
-          <h1 className="font-display text-h1 font-medium tracking-display text-ink">{title}</h1>
-          <p className="max-w-measure font-mono text-lede leading-relaxed text-slate">
+          <h1 className="font-display text-h1 font-medium tracking-display text-foreground">{title}</h1>
+          <p className="max-w-measure font-mono text-lede leading-relaxed text-muted-foreground">
             {description}
           </p>
         </header>
@@ -58,7 +58,7 @@ export function DocsArticle({
         {previous || next ? (
           <nav
             aria-label="Pagination"
-            className="flex flex-wrap gap-3 border-t border-rule pt-6"
+            className="flex flex-wrap gap-3 border-t border-border pt-6"
           >
             {previous ? <Neighbour page={previous} direction="previous" /> : null}
             {next ? <Neighbour page={next} direction="next" /> : null}

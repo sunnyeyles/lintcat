@@ -1,14 +1,11 @@
-import { Badge } from "@pr-review/design";
-import type { ComponentProps } from "react";
+import { Badge, cn } from "@pr-review/design";
 
 import type { Severity } from "@pr-review/db/dashboard";
 
-type BadgeVariant = ComponentProps<typeof Badge>["variant"];
-
-const SEVERITY_VARIANT: Record<Severity, BadgeVariant> = {
-  low: "outline",
-  medium: "secondary",
-  high: "destructive",
+const SEVERITY_TONE: Record<Severity, string> = {
+  low: "border-severity-low/40 bg-severity-low/10 text-severity-low",
+  medium: "border-severity-medium/40 bg-severity-medium/10 text-severity-medium",
+  high: "border-severity-high/40 bg-severity-high/15 text-severity-high",
 };
 
 export type SeverityBadgeProps = {
@@ -19,7 +16,7 @@ export type SeverityBadgeProps = {
 
 export function SeverityBadge({ severity, count, className }: SeverityBadgeProps) {
   return (
-    <Badge variant={SEVERITY_VARIANT[severity]} className={className}>
+    <Badge variant="outline" className={cn(SEVERITY_TONE[severity], className)}>
       {severity}
       {count === undefined ? null : (
         <span className="tabular-nums opacity-80">{count}</span>

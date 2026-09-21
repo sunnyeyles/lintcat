@@ -62,8 +62,8 @@ export default function AgentsPage() {
             <TableBody>
               {AGENTS.map(([name, reviews]) => (
                 <TableRow key={name}>
-                  <TableCell className="font-mono text-ink">{name}</TableCell>
-                  <TableCell className="text-slate">{reviews}</TableCell>
+                  <TableCell className="font-mono text-foreground">{name}</TableCell>
+                  <TableCell className="text-muted-foreground">{reviews}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -57,7 +57,7 @@ function NavLinks({ slug, onNavigate }: { slug: string; onNavigate?: () => void 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
             )}
           >
-            <Icon className="size-4 shrink-0" />
+            <Icon className={cn("size-4 shrink-0", active && "text-attention")} />
             <span className="truncate">{label}</span>
           </Link>
         );
