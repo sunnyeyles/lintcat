@@ -87,7 +87,7 @@ export function MapExplorer() {
     if (!scene || focusedPath === null) return;
     const node = scene.byId.get(focusedPath);
     const handle = handleRef.current;
-    if (node && handle) handle.centreOn(node.x, node.y, Math.max(handle.getView().scale, 0.6));
+    if (node && handle) handle.centreOn(node.x, node.y);
   }, [focusedPath, scene]);
 
   const toggleGroup = useCallback(

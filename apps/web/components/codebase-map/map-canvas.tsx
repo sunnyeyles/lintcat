@@ -137,6 +137,7 @@ export function MapCanvas({
     const batches = new Map<string, Batch>();
     const labels: SceneNode[] = [];
     const move = new DOMMatrix();
+    const minRadius = Math.round((2.4 / view.scale) * 4) / 4;
     for (const node of current.nodes) {
       if (
         node.x + node.radius < left - margin ||
@@ -148,8 +149,10 @@ export function MapCanvas({
       }
       const fill = nodeColour(node, colours);
       const stroke = node.kind === "group" ? colours["--map-structure-border"] : fill;
-      const shapeKey = `${node.marker}|${node.direction ?? "-"}|${node.radius}`;
-      const parts = markerParts(node.marker, node.radius, node.direction);
+      // Zoomed out, a marker at its world radius is sub-pixel and the map turns to mush.
+      const radius = Math.max(node.radius, minRadius);
+      const shapeKey = `${node.marker}|${node.direction ?? "-"}|${radius}`;
+      const parts = markerParts(node.marker, radius, node.direction);
       for (let i = 0; i < parts.length; i += 1) {
         const part = parts[i]!;
         const colour = part.mode === "fill" ? fill : stroke;
