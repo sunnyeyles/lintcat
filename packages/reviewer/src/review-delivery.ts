@@ -8,6 +8,7 @@ import type {
   ReviewPublishClient,
 } from "@pr-review/github";
 import type { StructuredLogger } from "@pr-review/logging";
+import type { ReviewFinding, ReviewRecordFinding } from "@pr-review/schemas";
 
 import type { DashboardReview, PublishToDashboard } from "#src/publish-dashboard";
 import {
@@ -133,10 +134,25 @@ export function dashboardReview({
       ).length,
       ...report.usage,
     })),
-    findings: outcome.findings.map((finding) => ({
-      ...finding,
-      agent: finding.category,
-    })),
+    findings: outcome.findings.map(dashboardFinding),
+  };
+}
+
+// An allowlist, so a field added to the finding reaches the dashboard only by choice.
+function dashboardFinding(finding: ReviewFinding): ReviewRecordFinding {
+  return {
+    file: finding.file,
+    ...(finding.line === undefined ? {} : { line: finding.line }),
+    category: finding.category,
+    severity: finding.severity,
+    title: finding.title,
+    explanation: finding.explanation,
+    ...(finding.suggestedFix === undefined
+      ? {}
+      : { suggestedFix: finding.suggestedFix }),
+    confidence: finding.confidence,
+    agent: finding.category,
+    hasPatch: finding.patch !== undefined,
   };
 }
 
