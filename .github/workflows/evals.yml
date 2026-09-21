@@ -37,17 +37,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup workspace
+        uses: ./.github/actions/setup
 
       # Reports pass/fail per fixture and per expectation, and exits non-zero
       # if any expectation failed. The harness itself refuses to start without

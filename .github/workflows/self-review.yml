@@ -1,5 +1,5 @@
 # Reviews this repository's own pull requests with the action built from the branch.
-# Opt-in via the `ai-review` label; a missing provider key skips the job, not fails it.
+# Opt-in via the `ai-review` label; with no key for the provider the action skips with a notice.
 
 name: Self review
 
@@ -28,53 +28,18 @@ jobs:
       && (github.event.action != 'labeled' || github.event.label.name == 'ai-review')
     runs-on: ubuntu-latest
     steps:
-      - name: Check for a model provider key
-        id: key
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          MODEL_PROVIDER: ${{ vars.MODEL_PROVIDER }}
-        # Normalised as the action reads it; unknown names run so it fails loudly.
-        run: |
-          case "$(printf '%s' "$MODEL_PROVIDER" | tr '[:upper:]' '[:lower:]' | xargs)" in
-            "" | openai) API_KEY="$OPENAI_API_KEY" ;;
-            anthropic) API_KEY="$ANTHROPIC_API_KEY" ;;
-            *) API_KEY="unknown provider" ;;
-          esac
-          if [ -n "$API_KEY" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::No model provider API key is set — skipping the self review"
-            echo "present=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout
-        if: steps.key.outputs.present == 'true'
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        if: steps.key.outputs.present == 'true'
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        if: steps.key.outputs.present == 'true'
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        if: steps.key.outputs.present == 'true'
-        run: pnpm install --frozen-lockfile
+      - name: Setup workspace
+        uses: ./.github/actions/setup
 
       # A local action must have its dist/ built before `uses: ./` runs it;
       # dist/ is gitignored, so it is always built here rather than committed.
       - name: Build the action
-        if: steps.key.outputs.present == 'true'
         run: pnpm --filter @pr-review/action build
 
       - name: Review this pull request
-        if: steps.key.outputs.present == 'true'
         uses: ./apps/action
         # The action reads the selected provider's key from these, so the
         # workflow never has to pick one.
@@ -89,7 +54,7 @@ jobs:
           langfuse-public-key: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
           langfuse-secret-key: ${{ secrets.LANGFUSE_SECRET_KEY }}
           # Keys are region-scoped: the wrong host 401s and drops every trace.
-          langfuse-base-url: ${{ secrets.LANGFUSE_BASE_URL }}
+          langfuse-base-url: ${{ vars.LANGFUSE_BASE_URL }}
           # Optional: without both, the review is published to GitHub only.
-          dashboard-url: ${{ secrets.DASHBOARD_URL }}
+          dashboard-url: ${{ vars.DASHBOARD_URL }}
           dashboard-token: ${{ secrets.DASHBOARD_TOKEN }}

@@ -106,7 +106,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: sunnyeyles/pr-review-action@v2
+      - uses: sunnyeyles/pr-review-action@v3
         with:
           api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
@@ -116,14 +116,15 @@ The `closed` trigger and `contents: write` are needed only for
 `types: [opened, synchronize, reopened]` and `contents: read`.
 
 Source lives in [`apps/action`](apps/action); `release-action.yml` publishes the
-bundle to the public action repository. `v2` made the provider configurable and
-renamed the `anthropic-api-key` input to `api-key`; a `v1` workflow needs that
-one rename to move.
+bundle to the public action repository. `v3` removed the `agents` and
+`agent-config` inputs and skips, rather than fails, when the provider key is
+missing; the [action README](apps/action/README.md#moving-from-v2) has the
+migration.
 
 Three names for the same thing, deliberately: this source repo is
 `pr-review-agents`, the published action repo is `pr-review-action` and is
-listed on the Marketplace as **[Review Agent Fleet](https://github.com/marketplace/actions/review-agent-fleet)**
-(the `name:` in `action.yml`), and the check run it writes is `AI PR Review`
+listed on the Marketplace as **LintCat PR Review** (the `name:` in
+`action.yml`), and the check run it writes is `AI PR Review`
 (`CHECK_RUN_NAME` in `packages/github/src/client.ts`).
 
 On a fork PR, `GITHUB_TOKEN` is read-only and can't create a check run — the
@@ -270,7 +271,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 
 | Input | Required | Purpose |
 | --- | --- | --- |
-| `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agent authenticates with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. |
+| `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agent authenticates with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. With neither set, the step skips the review with a notice and succeeds. |
 | `model-provider` | no (default `openai`) | Which provider the agent calls: `openai` or `anthropic`. An unknown name fails the step before any model call. |
 | `github-token` | no (default `${{ github.token }}`) | Token for the eight read-only repository tools and for publishing the check run. |
 | `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-haiku-4-5`) | Model id, as the provider spells it. |
@@ -683,17 +684,25 @@ publish method at all.
 ## Publishing the Action
 
 `.github/workflows/release-action.yml` runs on a `v*` tag (or manual dispatch):
-install → typecheck → test → build the bundle → push only `action.yml`,
+it calls `ci.yml` (typecheck → test → build and smoke-test the bundles), then
+takes the smoke-tested action bundle from that run and pushes only `action.yml`,
 `dist/index.mjs`, `LICENSE`, and a usage `README.md` to a separate public repo,
-moving that repo's major-version alias (`v2`) to the new tag and cutting a
-GitHub Release there. Listing the Action on the Marketplace is a manual tick on
+moving that repo's major-version alias (`v3`) to the new tag and cutting a
+GitHub Release there. Before anything is committed there, the job refuses to
+move an alias that already exists if the new `action.yml` drops or renames an
+input the alias still publishes (`scripts/check-action-inputs.mjs`): a breaking
+input change needs the next major. Listing the Action on the Marketplace is a manual tick on
 that release, once, and the listing is keyed on the `name:` in `action.yml` —
 change it and the Marketplace URL moves with it. The engine, the tests, the
 spec, and this README stay in this repo, and are not published downstream.
-`.github/workflows/ci.yml` runs typecheck and tests on every push;
+`.github/workflows/ci.yml` runs typecheck, tests, and the action, cli and mcp
+bundle smoke checks on every branch push (tags go through the release instead,
+and `main` through `.github/workflows/production.yml`, which then migrates the
+database and deploys the dashboard — see [`apps/web`](apps/web/README.md#deploys));
 `.github/workflows/self-review.yml` dogfoods the Action on this repo's own
 PRs, but only on a pull request labelled `ai-review` — reviews cost tokens, so
-they are opt-in. Add the label to review, remove it to stop.
+they are opt-in. Add the label to review, remove it to stop. Without a key for
+`vars.MODEL_PROVIDER` the Action skips with a notice.
 
 Required repository configuration for the release workflow:
 
@@ -701,6 +710,11 @@ Required repository configuration for the release workflow:
 | --- | --- |
 | `vars.ACTION_RELEASE_REPO` | Target public repo, e.g. `sunnyeyles/pr-review-action` |
 | `secrets.ACTION_RELEASE_TOKEN` | Token with `contents: write` on that repo |
+
+The self review reads `secrets.OPENAI_API_KEY` / `secrets.ANTHROPIC_API_KEY`,
+`secrets.LANGFUSE_PUBLIC_KEY`, `secrets.LANGFUSE_SECRET_KEY` and
+`secrets.DASHBOARD_TOKEN`, plus the non-secret `vars.MODEL_PROVIDER`,
+`vars.REVIEW_MODEL`, `vars.LANGFUSE_BASE_URL` and `vars.DASHBOARD_URL`.
 
 ---
 

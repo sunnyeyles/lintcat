@@ -1,11 +1,12 @@
-name: Review Agent Fleet
+name: LintCat PR Review
 description: >-
-  Reviews a pull request with an AI reviewer.
+  LintCat reviews pull requests with AI on your own model key, as inline
+  review comments and a check run.
 author: sunnyeyles
 
 branding:
   icon: check-circle
-  color: purple
+  color: green
 
 inputs:
   model-provider:
@@ -19,6 +20,7 @@ inputs:
       organisation secret; never inline it. Defaults to the provider's
       conventional environment variable (OPENAI_API_KEY, ANTHROPIC_API_KEY)
       when left empty, so a workflow can pass the key through `env` instead.
+      With no key at all the step skips the review with a notice and succeeds.
     required: false
     default: ""
   github-token:

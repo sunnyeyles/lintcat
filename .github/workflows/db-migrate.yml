@@ -1,29 +1,26 @@
-# Applies pending Drizzle migrations to secrets.DATABASE_URL when a merge to
-# main touches packages/db/drizzle.
+# Applies pending Drizzle migrations to secrets.DATABASE_URL. production.yml
+# calls it on every push to main, after CI and before the Vercel deploy.
 
 name: Migrate database
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "packages/db/drizzle/**"
-      - "packages/db/drizzle.config.ts"
-      - ".github/workflows/db-migrate.yml"
+  workflow_call:
+    secrets:
+      DATABASE_URL:
+        required: false
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Two runs against one database must never overlap, and a queued one must not be dropped.
-concurrency:
-  group: db-migrate
-  cancel-in-progress: false
-
 jobs:
   migrate:
     name: Apply pending migrations
     runs-on: ubuntu-latest
+    # Two runs against one database must never overlap, and a queued one must not be dropped.
+    concurrency:
+      group: db-migrate
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -40,17 +37,8 @@ jobs:
           fi
           echo "Connection string is configured."
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup workspace
+        uses: ./.github/actions/setup
 
       # drizzle-kit compares the journal against the database, so no pending migration is a no-op.
       - name: Apply pending migrations

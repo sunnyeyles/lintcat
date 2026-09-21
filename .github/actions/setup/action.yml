@@ -1,0 +1,19 @@
+# Local actions resolve from the workspace, so actions/checkout must run first.
+name: Setup workspace
+description: Installs pnpm, Node.js 24 and the workspace dependencies from the lockfile.
+
+runs:
+  using: composite
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

@@ -1,0 +1,86 @@
+# The only path to production: CI, then migrations, then the Vercel deploy.
+# apps/web/vercel.json turns off Vercel's own git deploys for main.
+
+name: Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One pipeline at a time, so an older commit can never deploy over a newer one.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check deploy configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the Vercel token and project link
+        env:
+          # Only tested for emptiness, never printed.
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          ok=true
+          if [ "${REF}" != refs/heads/main ]; then
+            echo "::error::Production deploys only from main (got ${REF})."
+            ok=false
+          fi
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Secret ${name} is not set. Add it under Settings > Secrets and variables > Actions > Secrets; apps/web/README.md says where each value comes from."
+              ok=false
+            fi
+          done
+          if [ "${ok}" != true ]; then
+            echo "::error::Stopped before CI and migrations: nothing could be deployed afterwards."
+            exit 1
+          fi
+          echo "Vercel token and project link are configured."
+
+  ci:
+    name: CI
+    needs: preflight
+    uses: ./.github/workflows/ci.yml
+
+  migrate:
+    name: Migrate
+    needs: ci
+    uses: ./.github/workflows/db-migrate.yml
+    secrets:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  deploy:
+    name: Deploy to Vercel production
+    needs: migrate
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # Run from the repo root: Vercel applies the project's apps/web root directory and builds remotely.
+      # Domains move only once the build succeeds, so a failure leaves the previous deployment live.
+      - name: Deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          url="$(npx --yes vercel@59 deploy --prod --yes --token "$VERCEL_TOKEN")"
+          echo "Production deployment: ${url}" >> "$GITHUB_STEP_SUMMARY"

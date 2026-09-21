@@ -82,6 +82,8 @@ export interface ActionEnvironment {
   logger: StructuredLogger;
   /** Marks the process as failed without exiting it. */
   setExitCode: (code: number) => void;
+  /** Surfaces a message as a workflow annotation. */
+  notice: (message: string) => void;
 }
 
 /** The real environment: the live process, filesystem, and SDK clients. */
@@ -98,6 +100,9 @@ export function actionEnvironment(): ActionEnvironment {
     logger: createConsoleLogger(),
     setExitCode: (code) => {
       process.exitCode = code;
+    },
+    notice: (message) => {
+      process.stdout.write(`::notice::${message}\n`);
     },
   };
 }
@@ -256,36 +261,36 @@ async function resolveManagedPrompts(
   }
 }
 
-interface ModelInputs {
-  model: ReviewModel;
+interface ModelCredentials {
   provider: ModelProvider;
+  /** Empty when neither the input nor the provider's variable is set. */
+  apiKey: string;
+  keyEnv: string;
 }
 
-/** Builds the run's model. */
-function resolveModelInputs(
+function resolveModelCredentials(
   env: Record<string, string | undefined>,
-  environment: Pick<ActionEnvironment, "createLanguageModel">,
-): ModelInputs {
+): ModelCredentials {
   const provider = resolveModelProvider(getInput(env, "model-provider"));
   const keyEnv = apiKeyEnvFor(provider);
   // The provider's own variable is the fallback, so a workflow can pass each
   // provider's secret through `env` rather than picking one in YAML.
   const apiKey = getInput(env, "api-key") || (env[keyEnv] ?? "").trim();
-  if (apiKey === "") {
-    throw new Error(
-      `Missing required action input: api-key (or the ${keyEnv} environment variable)`,
-    );
-  }
+  return { provider, apiKey, keyEnv };
+}
+
+function createModel(
+  env: Record<string, string | undefined>,
+  environment: Pick<ActionEnvironment, "createLanguageModel">,
+  { provider, apiKey }: ModelCredentials,
+): ReviewModel {
   const baseUrl = getInput(env, "model-base-url");
-  return {
+  return environment.createLanguageModel({
     provider,
-    model: environment.createLanguageModel({
-      provider,
-      apiKey,
-      ...(baseUrl === "" ? {} : { baseUrl }),
-      modelId: getInput(env, "model") || defaultModelFor(provider),
-    }),
-  };
+    apiKey,
+    ...(baseUrl === "" ? {} : { baseUrl }),
+    modelId: getInput(env, "model") || defaultModelFor(provider),
+  });
 }
 
 /**
@@ -367,12 +372,24 @@ export async function runAction(
   }
   const { target, isFork } = inspection;
 
+  // An unknown provider still throws here; only a missing key is a clean skip.
+  const credentials = resolveModelCredentials(env);
+  if (credentials.apiKey === "") {
+    const reason = `no API key for ${credentials.provider}: set the api-key input or ${credentials.keyEnv}`;
+    logger.info("review.skipped", { ...reviewCorrelation(target), reason });
+    environment.notice(`Skipping the AI review: ${reason}`);
+    return;
+  }
+
   const client = environment.createTokenClient({
     token: requireInput(env, "github-token"),
   });
 
-  const { model, provider } = resolveModelInputs(env, environment);
-  logger.info("review.model_selected", { provider, model: model.modelId });
+  const model = createModel(env, environment, credentials);
+  logger.info("review.model_selected", {
+    provider: credentials.provider,
+    model: model.modelId,
+  });
 
   const langfuse = resolveLangfuseInputs(env, logger);
   const dashboard = resolveDashboardInputs(env, logger);
