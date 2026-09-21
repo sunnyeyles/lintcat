@@ -72,12 +72,11 @@ export function LogoMark({ variant = "colour", className }: LogoMarkProps) {
   );
 }
 
-// The lockup: colour mark on light canvases, cream mono on dark, wordmark in the display face.
+// The lockup: the full-colour mark in both modes, wordmark in the display face.
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <LogoMark variant="colour" className="dark:hidden" />
-      <LogoMark variant="mono" className="hidden dark:block" />
+      <LogoMark variant="colour" />
       <span className="font-display text-base leading-none font-bold tracking-tight text-foreground">
         Lint<span className="text-link">Cat</span>
       </span>
