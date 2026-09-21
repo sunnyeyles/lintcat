@@ -11,6 +11,7 @@ erDiagram
   users ||--o{ repo_access : "holds"
   repos ||--o{ repo_access : "grants"
   repos ||--o{ reviews : "collects"
+  repos ||--o{ repository_graphs : "snapshots"
   reviews ||--o{ findings : "holds"
   reviews ||--o{ agent_runs : "times"
 
@@ -61,9 +62,20 @@ erDiagram
     int repo_id FK
     int pr_number
     text head_sha
+    text base_sha "the graph this review reads"
+    jsonb changed_files "path status additions deletions"
     text[] agents
     text summary
     int duration_ms
+  }
+  repository_graphs {
+    serial id PK
+    int repo_id FK
+    text base_sha
+    bytea snapshot "gzipped JSON of the index"
+    int file_count
+    int edge_count
+    timestamptz created_at
   }
   agent_runs {
     serial id PK
@@ -103,6 +115,13 @@ erDiagram
   conflict target, so a rerun of one commit replaces its runs and findings.
 - `findings.agent` records which review agent produced the finding; `category`
   stays the finding's own classification.
+- `repository_graphs` is the repository index serialised by `@pr-review/index`,
+  gzipped by the reviewer and stored as those exact bytes: ingest only base64
+  decodes them, and the web data layer gunzips on read. It is unique on
+  `(repo_id, base_sha)`, so every review of one base shares a row, and ingest
+  keeps the newest `REPOSITORY_GRAPH_RETENTION` (20) per repo, deleting the
+  rest (`src/repository-graphs.ts`). A review whose index was off or failed
+  records `base_sha` and `changed_files` and no snapshot.
 - `memberships` is unique on `(user_id, organization_id)`: one role per user
   per organization, and a user may belong to any number of organizations.
 - `repo_access` is a user's GitHub permission on one repo, unique on
