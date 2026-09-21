@@ -136,3 +136,37 @@ describe("initialBounds", () => {
     expect(initialBounds(scene, graph, ["ghost.ts"])).toEqual(scene.bounds);
   });
 });
+
+describe("buildScene with summaries", () => {
+  const summarised = normaliseGraph({
+    ...GRAPH,
+    summaries: [
+      { id: "far::far/away", fileCount: 30, changedCount: 0, heat: { total: 9, high: 2, medium: 3, low: 4 } },
+    ],
+    groupImports: [{ from: "pkg::pkg/b", to: "far::far/away", count: 12 }],
+    totalFileCount: 34,
+  });
+
+  it("draws a summary as a node sized and heated by its counts", () => {
+    const node = buildScene(summarised, view()).byId.get("far::far/away")!;
+
+    expect(node.kind).toBe("group");
+    expect(node.fileCount).toBe(30);
+    expect(node.heat.counts.total).toBe(9);
+    expect(Number.isFinite(node.x) && Number.isFinite(node.y)).toBe(true);
+    expect(node.label).toBe("away");
+  });
+
+  it("draws the group counts as edges, since the summary has no file edges", () => {
+    const scene = buildScene(summarised, view());
+
+    expect(scene.edges.some((e) => e.a === "pkg::pkg/b" && e.b === "far::far/away")).toBe(true);
+  });
+
+  it("adds no edge for a group whose files are on screen", () => {
+    const before = buildScene(graph, view({ expandedGroups: new Set(["pkg::pkg/a"]) }));
+    const ids = before.edges.map((e) => `${e.a}->${e.b}`);
+
+    expect(ids).not.toContain("pkg::pkg/a->pkg::pkg/b");
+  });
+});

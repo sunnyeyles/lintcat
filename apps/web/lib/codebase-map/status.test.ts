@@ -103,5 +103,24 @@ describe("mapStatus", () => {
 
     expect(result.flagCoverage).toEqual({ changed: 2, dead: 1, inCycle: 1 });
     expect(result.fileCount).toBe(2);
+    expect(result.totalFileCount).toBe(2);
+  });
+
+  it("says so when summaries stand in for most of the repo", () => {
+    const result = status({
+      files: [known("a.ts")],
+      imports: [],
+      summaries: [{ id: "-::lib", fileCount: 900, changedCount: 4 }],
+      totalFileCount: 901,
+    });
+
+    expect(result.reasons[0]).toEqual({
+      code: "level-of-detail",
+      count: 901,
+      message: "Large repo: showing packages, expand to see files.",
+    });
+    expect(result.fileCount).toBe(1);
+    expect(result.totalFileCount).toBe(901);
+    expect(result.changedCount).toBe(4);
   });
 });

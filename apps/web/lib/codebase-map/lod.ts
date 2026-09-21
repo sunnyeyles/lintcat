@@ -15,7 +15,7 @@ import type {
 export const DEFAULT_LOD_THRESHOLD = 5000;
 
 /** What the first level-of-detail payload may carry, so its size is capped. */
-export const DEFAULT_LOD_BUDGET = { openFiles: 3000, groupImports: 1200 } as const;
+export const DEFAULT_LOD_BUDGET = { openFiles: 2500, groupImports: 800 } as const;
 
 export interface LodOptions {
   threshold?: number;
@@ -125,13 +125,12 @@ export function lodGraph(
       for (const path of group.files) kept.add(path);
       continue;
     }
+    const counts = sumHeat(heat, group.files);
     summaries.push({
       id: group.id,
-      package: group.package,
-      directory: group.directory,
       fileCount: group.fileCount,
       changedCount: group.changedCount,
-      heat: sumHeat(heat, group.files),
+      ...(counts.total > 0 ? { heat: counts } : {}),
     });
   }
 

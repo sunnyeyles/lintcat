@@ -36,8 +36,18 @@ export function directoryOf(path: string): string {
   return cut === -1 ? "." : path.slice(0, cut);
 }
 
+const NO_PACKAGE = "-";
+
 export function groupIdFor(file: MapFile): string {
-  return `${file.package ?? "-"}::${directoryOf(file.path)}`;
+  return `${file.package ?? NO_PACKAGE}::${directoryOf(file.path)}`;
+}
+
+/** Reads back what `groupIdFor` wrote, so a summary need not repeat it. */
+export function groupIdParts(id: string): { package: string | null; directory: string } {
+  const cut = id.indexOf("::");
+  if (cut === -1) return { package: null, directory: id };
+  const name = id.slice(0, cut);
+  return { package: name === NO_PACKAGE ? null : name, directory: id.slice(cut + 2) };
 }
 
 interface Draft {
@@ -108,7 +118,7 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
       fileCount,
       changedCount: Math.max(draft.changedCount, summary?.changedCount ?? 0),
       loaded: draft.files.length >= fileCount,
-      ...(summary ? { heatCounts: summary.heat } : {}),
+      ...(summary?.heat ? { heatCounts: summary.heat } : {}),
       collapsed: false,
     };
   });
@@ -117,15 +127,14 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
     .filter((summary) => !drafts.has(summary.id))
     .map((summary) => ({
       id: summary.id,
-      package: summary.package,
-      directory: summary.directory,
+      ...groupIdParts(summary.id),
       files: [],
       fileCount: summary.fileCount,
       changedCount: summary.changedCount,
       containsFocus: false,
       internalImports: 0,
       loaded: false,
-      heatCounts: summary.heat,
+      ...(summary.heat ? { heatCounts: summary.heat } : {}),
       collapsed: true,
     }));
 

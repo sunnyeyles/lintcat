@@ -28,12 +28,11 @@ export interface GroupImport {
 
 /** A group whose files were not sent: counts stand in for them. */
 export interface GroupSummary {
+  /** The group id, which already spells out the package and the directory. */
   id: string;
-  package: string | null;
-  directory: string;
   fileCount: number;
   changedCount: number;
-  heat: FindingCounts;
+  heat?: FindingCounts;
 }
 
 export interface MapGraph {

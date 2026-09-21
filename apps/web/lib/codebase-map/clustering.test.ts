@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clusterGraph, directoryOf, groupIdFor } from "./clustering";
+import { clusterGraph, directoryOf, groupIdFor, groupIdParts } from "./clustering";
 import { normaliseGraph } from "./normalise";
 import type { MapViewState } from "./types";
 
@@ -101,5 +101,66 @@ describe("clusterGraph", () => {
 
     expect(groupOfFile.get("apps/web/lib/b.ts")).toBe("web::apps/web/lib");
     expect(groupOfFile.size).toBe(4);
+  });
+});
+
+describe("clusterGraph with summaries", () => {
+  const summarised = normaliseGraph({
+    files: [{ path: "apps/web/lib/a.ts", package: "web", changed: true }],
+    imports: [],
+    summaries: [
+      {
+        id: "db::packages/db/src",
+        fileCount: 40,
+        changedCount: 2,
+        heat: { total: 4, high: 1, medium: 1, low: 2 },
+      },
+    ],
+    groupImports: [{ from: "web::apps/web/lib", to: "db::packages/db/src", count: 9 }],
+    totalFileCount: 41,
+  });
+
+  it("stands a summary in for the group whose files did not arrive", () => {
+    const group = clusterGraph(summarised, view()).groups.find(
+      (g) => g.id === "db::packages/db/src",
+    )!;
+
+    expect(group.loaded).toBe(false);
+    expect(group.files).toEqual([]);
+    expect(group.fileCount).toBe(40);
+    expect(group.changedCount).toBe(2);
+    expect(group.heatCounts?.total).toBe(4);
+  });
+
+  it("reads the package and directory back out of the id", () => {
+    expect(groupIdParts("db::packages/db/src")).toEqual({
+      package: "db",
+      directory: "packages/db/src",
+    });
+    expect(groupIdParts("-::src")).toEqual({ package: null, directory: "src" });
+  });
+
+  it("keeps a summary collapsed even when the viewer asked for it", () => {
+    const group = clusterGraph(
+      summarised,
+      view({ expandedGroups: new Set(["db::packages/db/src"]) }),
+    ).groups.find((g) => g.id === "db::packages/db/src")!;
+
+    expect(group.collapsed).toBe(true);
+  });
+
+  it("takes the counts between groups from the summary, not the edges it has", () => {
+    expect(clusterGraph(summarised, view()).imports).toEqual([
+      { from: "web::apps/web/lib", to: "db::packages/db/src", count: 9 },
+    ]);
+  });
+
+  it("marks a group with all its files loaded", () => {
+    const group = clusterGraph(summarised, view()).groups.find(
+      (g) => g.id === "web::apps/web/lib",
+    )!;
+
+    expect(group.loaded).toBe(true);
+    expect(group.fileCount).toBe(1);
   });
 });
