@@ -235,6 +235,9 @@ importers:
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
       '@pr-review/schemas':
         specifier: workspace:*
         version: link:../schemas

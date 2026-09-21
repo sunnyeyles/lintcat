@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
+    "@pr-review/index": "workspace:*",
     "@pr-review/schemas": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },

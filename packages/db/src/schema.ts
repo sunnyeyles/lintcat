@@ -1,7 +1,10 @@
+import type { ReviewRecordChangedFile } from "@pr-review/schemas";
 import {
   bigint,
   boolean,
+  customType,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   real,
@@ -10,6 +13,11 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
+  dataType: () => "bytea",
+  toDriver: (value) => Buffer.from(value),
+});
 
 export const severityEnum = pgEnum("severity", ["low", "medium", "high"]);
 export const accountTypeEnum = pgEnum("account_type", ["organization", "user"]);
@@ -137,6 +145,12 @@ export const reviews = pgTable(
       .references(() => repos.id, { onDelete: "cascade" }),
     prNumber: integer("pr_number").notNull(),
     headSha: text("head_sha").notNull(),
+    // The pull request's base: which repository_graphs row this review reads.
+    baseSha: text("base_sha"),
+    changedFiles: jsonb("changed_files")
+      .$type<ReviewRecordChangedFile[]>()
+      .notNull()
+      .default([]),
     agents: text("agents").array().notNull(),
     summary: text("summary").notNull(),
     durationMs: integer("duration_ms").notNull().default(0),
@@ -166,6 +180,25 @@ export const agentRuns = pgTable(
     outputTokens: integer("output_tokens").notNull().default(0),
   },
   (t) => [uniqueIndex("agent_runs_review_agent_idx").on(t.reviewId, t.agent)],
+);
+
+// The repository index at one commit, gzipped JSON; reviews sharing a base share a row.
+export const repositoryGraphs = pgTable(
+  "repository_graphs",
+  {
+    id: serial("id").primaryKey(),
+    repoId: integer("repo_id")
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+    baseSha: text("base_sha").notNull(),
+    snapshot: bytea("snapshot").notNull(),
+    fileCount: integer("file_count").notNull(),
+    edgeCount: integer("edge_count").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("repository_graphs_repo_base_sha_idx").on(t.repoId, t.baseSha),
+  ],
 );
 
 // Mirrors reviewFindingSchema in @pr-review/schemas; keep the two in step.
@@ -201,5 +234,7 @@ export type Review = typeof reviews.$inferSelect;
 export type NewReview = typeof reviews.$inferInsert;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type NewAgentRun = typeof agentRuns.$inferInsert;
+export type RepositoryGraph = typeof repositoryGraphs.$inferSelect;
+export type NewRepositoryGraph = typeof repositoryGraphs.$inferInsert;
 export type Finding = typeof findings.$inferSelect;
 export type NewFinding = typeof findings.$inferInsert;
