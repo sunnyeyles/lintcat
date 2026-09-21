@@ -1,4 +1,11 @@
-import type { MapFile, MapGraph, MapImport } from "@/lib/codebase-map/types";
+import { groupIdFor } from "@/lib/codebase-map/clustering";
+import type {
+  GroupImport,
+  GroupSummary,
+  MapFile,
+  MapGraph,
+  MapImport,
+} from "@/lib/codebase-map/types";
 
 export interface DroppedCounts {
   invalidFiles: number;
@@ -16,6 +23,11 @@ export interface NormalisedGraph {
   incoming: ReadonlyMap<string, readonly string[]>;
   truncated: boolean;
   dropped: DroppedCounts;
+  /** Empty unless the payload was level-of-detail. */
+  summaries: readonly GroupSummary[];
+  groupImports: readonly GroupImport[];
+  /** The repo's size, which is `files.length` unless summaries stand in. */
+  totalFileCount: number;
 }
 
 const FLAG_KEYS = ["role", "package", "changed", "dead", "inCycle"] as const;
@@ -109,6 +121,13 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
 
   const files = [...byPath.values()].sort((a, b) => byPathAscending(a.path, b.path));
 
+  // A summary whose files all arrived has nothing left to stand in for.
+  const held = graph.summaries?.length ? filesPerGroup(files) : undefined;
+  const summaries = (graph.summaries ?? []).filter(
+    (summary) => summary.fileCount > (held?.get(summary.id) ?? 0),
+  );
+  const summarised = summaries.reduce((sum, summary) => sum + summary.fileCount, 0);
+
   return {
     files,
     imports,
@@ -117,5 +136,17 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
     incoming,
     truncated: graph.truncated === true,
     dropped,
+    summaries,
+    groupImports: graph.groupImports ?? [],
+    totalFileCount: graph.totalFileCount ?? files.length + summarised,
   };
+}
+
+function filesPerGroup(files: readonly MapFile[]): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const file of files) {
+    const id = groupIdFor(file);
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }

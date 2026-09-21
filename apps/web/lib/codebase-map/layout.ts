@@ -39,6 +39,12 @@ function onDisc(key: string, radius: number): LayoutPoint {
   return { x: distance * Math.cos(angle), y: distance * Math.sin(angle) };
 }
 
+/** Where a group sits, with no file needed — a summary is drawn here. */
+export function groupCentre(groupId: string, options: LayoutOptions = {}): LayoutPoint {
+  const { x, y } = onDisc(groupId, options.mapRadius ?? DEFAULTS.mapRadius);
+  return { x: round(x), y: round(y) };
+}
+
 export function seedPosition(
   path: string,
   groupId: string,

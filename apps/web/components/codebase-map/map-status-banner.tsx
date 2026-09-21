@@ -30,7 +30,10 @@ export function MapStatusBanner({ status }: { status: MapStatus }) {
       </AlertTitle>
       <AlertDescription>
         <p>
-          {status.fileCount} file{status.fileCount === 1 ? "" : "s"} · {status.changedCount} changed
+          {status.totalFileCount > status.fileCount
+            ? `${status.fileCount} of ${status.totalFileCount} files loaded`
+            : `${status.fileCount} file${status.fileCount === 1 ? "" : "s"}`}{" "}
+          · {status.changedCount} changed
           · change data on {status.flagCoverage.changed}, dead on {status.flagCoverage.dead}, cycle
           on {status.flagCoverage.inCycle}
         </p>

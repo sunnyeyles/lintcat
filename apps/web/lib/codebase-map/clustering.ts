@@ -1,21 +1,28 @@
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
-import type { MapFile, MapViewState } from "@/lib/codebase-map/types";
+import type {
+  FindingCounts,
+  GroupImport,
+  MapFile,
+  MapViewState,
+} from "@/lib/codebase-map/types";
+
+export type { GroupImport };
 
 export interface MapGroup {
   id: string;
   package: string | null;
   directory: string;
   files: readonly string[];
+  /** The group's real size, which exceeds `files.length` while it is a summary. */
+  fileCount: number;
   changedCount: number;
   containsFocus: boolean;
   internalImports: number;
   collapsed: boolean;
-}
-
-export interface GroupImport {
-  from: string;
-  to: string;
-  count: number;
+  /** False while the group is a summary: its files have not been fetched. */
+  loaded: boolean;
+  /** A summary's finding counts, since its files are not here to sum. */
+  heatCounts?: FindingCounts;
 }
 
 export interface Clustering {
@@ -41,6 +48,10 @@ interface Draft {
   changedCount: number;
   containsFocus: boolean;
   internalImports: number;
+}
+
+function byId(a: { id: string }, b: { id: string }): number {
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
 export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Clustering {
@@ -83,17 +94,54 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
     if (existing) existing.count += 1;
     else merged.set(key, { from, to, count: 1 });
   }
+  for (const edge of graph.groupImports) {
+    merged.set(`${edge.from}\u0000${edge.to}`, edge);
+  }
 
-  const groups: MapGroup[] = [...drafts.values()]
-    .map((draft) => ({
+  const summaries = new Map(graph.summaries.map((summary) => [summary.id, summary]));
+
+  const loaded: MapGroup[] = [...drafts.values()].map((draft) => {
+    const summary = summaries.get(draft.id);
+    const fileCount = Math.max(draft.files.length, summary?.fileCount ?? 0);
+    return {
       ...draft,
-      collapsed: !(
-        draft.changedCount > 0 ||
-        draft.containsFocus ||
-        view.expandedGroups.has(draft.id)
-      ),
+      fileCount,
+      changedCount: Math.max(draft.changedCount, summary?.changedCount ?? 0),
+      loaded: draft.files.length >= fileCount,
+      ...(summary ? { heatCounts: summary.heat } : {}),
+      collapsed: false,
+    };
+  });
+
+  const standIns: MapGroup[] = graph.summaries
+    .filter((summary) => !drafts.has(summary.id))
+    .map((summary) => ({
+      id: summary.id,
+      package: summary.package,
+      directory: summary.directory,
+      files: [],
+      fileCount: summary.fileCount,
+      changedCount: summary.changedCount,
+      containsFocus: false,
+      internalImports: 0,
+      loaded: false,
+      heatCounts: summary.heat,
+      collapsed: true,
+    }));
+
+  const groups = [...loaded, ...standIns]
+    .map((group) => ({
+      ...group,
+      // A group whose files are still on the server can only be drawn collapsed.
+      collapsed:
+        !group.loaded ||
+        !(
+          group.changedCount > 0 ||
+          group.containsFocus ||
+          view.expandedGroups.has(group.id)
+        ),
     }))
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    .sort(byId);
 
   const imports = [...merged.values()].sort(
     (a, b) =>

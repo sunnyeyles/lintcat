@@ -4,6 +4,7 @@ import {
   EMPHASIS_RANK,
   heatOf,
   heatOfPaths,
+  groupCentre,
   neighbourhood,
   seedLayout,
 } from "@/lib/codebase-map";
@@ -132,21 +133,27 @@ export function buildScene(
       level = lowerRank(level, emphasis.get(path)!.level);
       representativeOf.set(path, group.id);
     }
+    // A summary has no files to average, so it sits on its group's own seed.
+    const empty = group.files.length === 0;
+    const centre = empty
+      ? groupCentre(group.id, LAYOUT)
+      : { x: x / group.files.length, y: y / group.files.length };
+    if (empty) level = group.changedCount > 0 ? "changed" : "context";
     const node: SceneNode = {
       id: group.id,
       kind: "group",
       label: lastSegment(group.directory),
       sublabel: `${group.package ?? "no package"} · ${group.directory}`,
-      x: x / group.files.length,
-      y: y / group.files.length,
-      radius: 7 + Math.sqrt(group.files.length) * 1.6,
+      x: centre.x,
+      y: centre.y,
+      radius: 7 + Math.sqrt(Math.max(1, group.fileCount)) * 1.6,
       level,
       // A collapsed group is structure, so it never borrows a file's marker.
       marker: "group",
       direction: null,
-      fileCount: group.files.length,
+      fileCount: group.fileCount,
       changedCount: group.changedCount,
-      heat: heatOfPaths(heat, group.files),
+      heat: group.heatCounts ? heatOf(group.heatCounts) : heatOfPaths(heat, group.files),
     };
     nodes.push(node);
     byId.set(group.id, node);
@@ -173,6 +180,25 @@ export function buildScene(
     const from = byId.get(a)!;
     const to = byId.get(b)!;
     edges.push({ a, b, ax: from.x, ay: from.y, bx: to.x, by: to.y, relation });
+  }
+
+  // Summaries have no file edges of their own, so the group counts stand in.
+  for (const edge of clustering.imports) {
+    const from = byId.get(edge.from);
+    const to = byId.get(edge.to);
+    if (!from || !to || from === to) continue;
+    const key = `${edge.from}\u0000${edge.to}\u0000base`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    edges.push({
+      a: edge.from,
+      b: edge.to,
+      ax: from.x,
+      ay: from.y,
+      bx: to.x,
+      by: to.y,
+      relation: "base",
+    });
   }
 
   const RELATION_ORDER: Record<EdgeRelation, number> = { base: 0, dependent: 1, dependency: 2 };

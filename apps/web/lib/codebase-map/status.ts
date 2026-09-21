@@ -3,6 +3,7 @@ import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 export type MapStatusKind = "empty" | "no-changes" | "partial" | "ready";
 
 export type StatusReasonCode =
+  | "level-of-detail"
   | "unresolved-imports"
   | "truncated"
   | "unknown-changed-flags"
@@ -25,6 +26,8 @@ export interface MapStatus {
   kind: MapStatusKind;
   reasons: readonly StatusReason[];
   fileCount: number;
+  /** The repo's size, above `fileCount` only while summaries stand in for files. */
+  totalFileCount: number;
   changedCount: number;
   flagCoverage: FlagCoverage;
 }
@@ -40,8 +43,16 @@ export function mapStatus(graph: NormalisedGraph): MapStatus {
     if (file.inCycle !== undefined) coverage.inCycle += 1;
     if (file.changed === true) changedCount += 1;
   }
+  for (const summary of graph.summaries) changedCount += summary.changedCount;
 
   const reasons: StatusReason[] = [];
+  if (graph.summaries.length > 0) {
+    reasons.push({
+      code: "level-of-detail",
+      count: graph.totalFileCount,
+      message: "Large repo: showing packages, expand to see files.",
+    });
+  }
   const unresolved = graph.dropped.unresolvedImports;
   if (unresolved > 0) {
     reasons.push({
@@ -93,5 +104,12 @@ export function mapStatus(graph: NormalisedGraph): MapStatus {
           ? "no-changes"
           : "ready";
 
-  return { kind, reasons, fileCount, changedCount, flagCoverage: coverage };
+  return {
+    kind,
+    reasons,
+    fileCount,
+    totalFileCount: graph.totalFileCount,
+    changedCount,
+    flagCoverage: coverage,
+  };
 }

@@ -13,7 +13,7 @@ export interface GroupListProps {
 
 export function GroupList({ clustering, onToggle }: GroupListProps) {
   const groups = [...clustering.groups]
-    .sort((a, b) => b.files.length - a.files.length)
+    .sort((a, b) => b.fileCount - a.fileCount)
     .slice(0, SHOWN);
 
   return (
@@ -37,7 +37,7 @@ export function GroupList({ clustering, onToggle }: GroupListProps) {
                 </Badge>
               ) : null}
               <Badge variant="outline" className="shrink-0">
-                {group.collapsed ? "collapsed" : "expanded"}
+                {group.loaded ? (group.collapsed ? "collapsed" : "expanded") : "on server"}
               </Badge>
             </button>
           </li>

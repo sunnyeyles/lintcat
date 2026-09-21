@@ -2,16 +2,16 @@ import type { Severity } from "@pr-review/db/dashboard";
 import type { RepositoryGraphSnapshot } from "@pr-review/index";
 import type { ReviewRecordChangedFile } from "@pr-review/schemas";
 
-import type { MapFile, MapGraph, MapImport } from "@/lib/codebase-map/types";
+import type {
+  FindingCounts,
+  MapFile,
+  MapGraph,
+  MapImport,
+} from "@/lib/codebase-map/types";
 
 export const SEVERITIES = ["high", "medium", "low"] as const;
 
-export interface FindingCounts {
-  total: number;
-  high: number;
-  medium: number;
-  low: number;
-}
+export type { FindingCounts };
 
 /** Counts per path, plain so it crosses the server boundary unchanged. */
 export type FindingHeat = Record<string, FindingCounts>;
