@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildScene } from "@/components/codebase-map/scene";
+import { initialBounds } from "@/components/codebase-map/view";
 import { EMPHASIS_MARKERS, groupIdFor, normaliseGraph } from "@/lib/codebase-map";
 import type { MapGraph, MapViewState } from "@/lib/codebase-map";
 
@@ -75,5 +76,63 @@ describe("buildScene", () => {
       const other = second.byId.get(node.id)!;
       expect([other.x, other.y]).toEqual([node.x, node.y]);
     }
+  });
+
+  it("carries finding heat onto files and sums it onto a collapsed group", () => {
+    const heat = {
+      "pkg/a/one.ts": { total: 1, high: 0, medium: 0, low: 1 },
+      "pkg/b/three.ts": { total: 2, high: 1, medium: 1, low: 0 },
+      "pkg/b/four.ts": { total: 1, high: 0, medium: 0, low: 1 },
+    };
+    const scene = buildScene(graph, view(), 1, heat);
+
+    expect(scene.byId.get("pkg/a/one.ts")?.heat.top).toBe("low");
+    expect(scene.byId.get("pkg/a/two.ts")?.heat.top).toBeNull();
+    expect(scene.byId.get("pkg::pkg/b")?.heat.counts).toEqual({
+      total: 3,
+      high: 1,
+      medium: 1,
+      low: 1,
+    });
+  });
+
+  it("leaves every node cool when no heat is given", () => {
+    expect(buildScene(graph, view()).nodes.every((n) => n.heat.band === 0)).toBe(true);
+  });
+});
+
+describe("initialBounds", () => {
+  it("fits the changed files and their neighbours, not the whole map", () => {
+    const expandedGroups = new Set(graph.files.map(groupIdFor));
+    const scene = buildScene(graph, view({ expandedGroups }));
+    const bounds = initialBounds(scene, graph, ["pkg/a/one.ts"]);
+
+    // one.ts plus three.ts and four.ts; two.ts imports nothing and is left out.
+    const inside = (path: string) => {
+      const node = scene.byId.get(path)!;
+      return (
+        node.x >= bounds.minX && node.x <= bounds.maxX && node.y >= bounds.minY && node.y <= bounds.maxY
+      );
+    };
+    expect(inside("pkg/a/one.ts")).toBe(true);
+    expect(inside("pkg/b/three.ts")).toBe(true);
+    expect(inside("pkg/b/four.ts")).toBe(true);
+    expect(bounds).not.toEqual(scene.bounds);
+  });
+
+  it("uses the collapsed group standing in for a changed file", () => {
+    const scene = buildScene(graph, view());
+    const bounds = initialBounds(scene, graph, ["pkg/b/three.ts"]);
+    const group = scene.byId.get("pkg::pkg/b")!;
+
+    expect(bounds.minX).toBeLessThanOrEqual(group.x);
+    expect(bounds.maxX).toBeGreaterThanOrEqual(group.x);
+  });
+
+  it("falls back to the whole scene when nothing changed is in the graph", () => {
+    const scene = buildScene(graph, view());
+
+    expect(initialBounds(scene, graph, [])).toEqual(scene.bounds);
+    expect(initialBounds(scene, graph, ["ghost.ts"])).toEqual(scene.bounds);
   });
 });

@@ -2,12 +2,16 @@ import {
   clusterGraph,
   emphasise,
   EMPHASIS_RANK,
+  heatOf,
+  heatOfPaths,
   neighbourhood,
   seedLayout,
 } from "@/lib/codebase-map";
 import type {
   Clustering,
   EmphasisLevel,
+  FindingHeat,
+  Heat,
   MapViewState,
   NeighbourDirection,
   NormalisedGraph,
@@ -29,6 +33,7 @@ export interface SceneNode {
   direction: NeighbourDirection | null;
   fileCount: number;
   changedCount: number;
+  heat: Heat;
 }
 
 export interface SceneEdge {
@@ -69,7 +74,12 @@ function lowerRank(a: EmphasisLevel, b: EmphasisLevel): EmphasisLevel {
   return EMPHASIS_RANK[a] <= EMPHASIS_RANK[b] ? a : b;
 }
 
-export function buildScene(graph: NormalisedGraph, view: MapViewState, steps = 1): Scene {
+export function buildScene(
+  graph: NormalisedGraph,
+  view: MapViewState,
+  steps = 1,
+  heat: FindingHeat = {},
+): Scene {
   const positions = seedLayout(graph, LAYOUT);
   const clustering = clusterGraph(graph, view);
   const emphasis = emphasise(graph, view, steps);
@@ -103,6 +113,7 @@ export function buildScene(graph: NormalisedGraph, view: MapViewState, steps = 1
               : null,
           fileCount: 1,
           changedCount: graph.byPath.get(path)?.changed === true ? 1 : 0,
+          heat: heatOf(heat[path]),
         };
         nodes.push(node);
         byId.set(path, node);
@@ -135,6 +146,7 @@ export function buildScene(graph: NormalisedGraph, view: MapViewState, steps = 1
       direction: null,
       fileCount: group.files.length,
       changedCount: group.changedCount,
+      heat: heatOfPaths(heat, group.files),
     };
     nodes.push(node);
     byId.set(group.id, node);

@@ -16,6 +16,9 @@ const TOKENS = [
   "--map-edge",
   "--map-kind-1",
   "--map-kind-3",
+  "--severity-low",
+  "--severity-medium",
+  "--severity-high",
 ] as const;
 
 export type MapToken = (typeof TOKENS)[number];

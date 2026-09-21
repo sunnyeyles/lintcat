@@ -9,6 +9,18 @@ import { clampScale, fitView, type MapHandle, type MapView } from "@/components/
 
 const LABEL_SCALE = 0.7;
 const LABEL_BUDGET = 160;
+const COUNT_SCALE = 0.9;
+
+const HEAT_TOKENS = {
+  high: "--severity-high",
+  medium: "--severity-medium",
+  low: "--severity-low",
+} as const;
+
+function heatRing(radius: number, band: number): string {
+  const r = radius * (2.2 + band * 0.25);
+  return `M ${-r} 0 A ${r} ${r} 0 1 0 ${r} 0 A ${r} ${r} 0 1 0 ${-r} 0 Z`;
+}
 
 export interface MapCanvasProps {
   scene: Scene;
@@ -136,6 +148,7 @@ export function MapCanvas({
 
     const batches = new Map<string, Batch>();
     const labels: SceneNode[] = [];
+    const counts: SceneNode[] = [];
     const move = new DOMMatrix();
     const minRadius = Math.round((2.4 / view.scale) * 4) / 4;
     for (const node of current.nodes) {
@@ -166,6 +179,21 @@ export function MapCanvas({
         move.f = node.y;
         batch.path.addPath(shapeFor(`${shapeKey}|${i}`, part.d), move);
       }
+      const heat = node.heat;
+      if (heat.top !== null) {
+        const colour = colours[HEAT_TOKENS[heat.top]];
+        const ringKey = `heat|${radius}|${heat.band}`;
+        const key = `${ringKey}|${colour}`;
+        let batch = batches.get(key);
+        if (!batch) {
+          batch = { path: new Path2D(), mode: "stroke", width: 0.75 + heat.band * 0.75, colour };
+          batches.set(key, batch);
+        }
+        move.e = node.x;
+        move.f = node.y;
+        batch.path.addPath(shapeFor(ringKey, heatRing(radius, heat.band)), move);
+        if (counts.length < LABEL_BUDGET && view.scale >= COUNT_SCALE) counts.push(node);
+      }
       if (
         labels.length < LABEL_BUDGET &&
         (node.level === "focus" ||
@@ -187,7 +215,7 @@ export function MapCanvas({
       }
     }
 
-    if (labels.length > 0) {
+    if (labels.length > 0 || counts.length > 0) {
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
       context.font = "11px ui-monospace, monospace";
       context.textAlign = "center";
@@ -198,6 +226,17 @@ export function MapCanvas({
         const sy = node.y * view.scale + view.y + node.radius * view.scale + 3;
         if (sx < -60 || sx > width + 60 || sy < -20 || sy > height + 20) continue;
         context.fillText(node.label, sx, sy);
+      }
+
+      // The number is the cue a reader without colour gets; the ring only reinforces it.
+      context.font = "bold 10px ui-monospace, monospace";
+      context.textBaseline = "bottom";
+      for (const node of counts) {
+        const sx = node.x * view.scale + view.x + node.radius * view.scale + 5;
+        const sy = node.y * view.scale + view.y - node.radius * view.scale - 2;
+        if (sx < -40 || sx > width + 40 || sy < -20 || sy > height + 20) continue;
+        context.fillStyle = colours[HEAT_TOKENS[node.heat.top ?? "low"]];
+        context.fillText(String(node.heat.counts.total), sx, sy);
       }
     }
   }, []);
@@ -238,6 +277,11 @@ export function MapCanvas({
       fit: () => {
         const { width, height } = sizeRef.current;
         viewRef.current = fitView(sceneRef.current.bounds, width, height);
+        schedule();
+      },
+      fitBounds: (bounds) => {
+        const { width, height } = sizeRef.current;
+        viewRef.current = fitView(bounds, width, height);
         schedule();
       },
       centreOn: (x, y, scale) => {

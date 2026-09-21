@@ -2,8 +2,9 @@
 
 import { Badge, Button, Empty, EmptyDescription, EmptyHeader, EmptyTitle, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
 
-import { neighbourhood } from "@/lib/codebase-map";
-import type { NormalisedGraph } from "@/lib/codebase-map";
+import { heatOf, neighbourhood, SEVERITIES } from "@/lib/codebase-map";
+import type { FindingHeat, NormalisedGraph } from "@/lib/codebase-map";
+import { SeverityBadge } from "@/components/ui";
 
 const SHOWN = 12;
 
@@ -14,6 +15,8 @@ export interface FileDetailsProps {
   groupCollapsed: boolean;
   onSelect: (path: string) => void;
   onToggleGroup: () => void;
+  heat?: FindingHeat;
+  onShowFindings?: (path: string) => void;
 }
 
 function FlagRow({
@@ -88,6 +91,46 @@ function PathList({
   );
 }
 
+function Findings({
+  path,
+  heat,
+  onShow,
+}: {
+  path: string;
+  heat: FindingHeat;
+  onShow: ((path: string) => void) | undefined;
+}) {
+  const { counts, top } = heatOf(heat[path]);
+  return (
+    <div>
+      <h4 className="text-xs font-semibold">
+        Findings <span className="text-muted-foreground font-normal">({counts.total})</span>
+      </h4>
+      {top === null ? (
+        <p className="text-muted-foreground mt-1 text-xs">None on this file in this review.</p>
+      ) : (
+        <>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {SEVERITIES.filter((s) => counts[s] > 0).map((s) => (
+              <SeverityBadge key={s} severity={s} count={counts[s]} />
+            ))}
+          </div>
+          {onShow ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2 w-full"
+              onClick={() => onShow(path)}
+            >
+              Show these findings
+            </Button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function FileDetails({
   graph,
   focusedPath,
@@ -95,6 +138,8 @@ export function FileDetails({
   groupCollapsed,
   onSelect,
   onToggleGroup,
+  heat,
+  onShowFindings,
 }: FileDetailsProps) {
   const file = focusedPath === null ? undefined : graph.byPath.get(focusedPath);
   if (!file) {
@@ -128,6 +173,8 @@ export function FileDetails({
         <FlagRow label="Dead file" value={file.dead} flagged="Dead" clear="Reachable" />
         <FlagRow label="Import cycle" value={file.inCycle} flagged="In a cycle" clear="No cycle" />
       </div>
+
+      {heat ? <Findings path={file.path} heat={heat} onShow={onShowFindings} /> : null}
 
       {groupId ? (
         <Button variant="outline" size="sm" className="w-full" onClick={onToggleGroup}>
