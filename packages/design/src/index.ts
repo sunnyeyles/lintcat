@@ -46,6 +46,7 @@ export {
   EmptyMedia,
   EmptyTitle,
 } from "#src/components/empty";
+export { Input } from "#src/components/input";
 export { Label } from "#src/components/label";
 export { Progress } from "#src/components/progress";
 export {

@@ -21,7 +21,7 @@ function Neighbour({ page, direction }: { page: DocsPage; direction: "previous" 
         {next ? "Next" : "Previous"}
         {next ? <ArrowRight className="size-3" /> : null}
       </span>
-      <span className="font-mono text-label text-foreground group-hover:text-primary">{page.title}</span>
+      <span className="text-label text-foreground group-hover:text-link">{page.title}</span>
     </Link>
   );
 }
@@ -49,8 +49,8 @@ export function DocsArticle({
       <article className="flex min-w-0 flex-1 flex-col gap-8 [&>section:first-of-type]:border-t-0 [&>section:first-of-type]:pt-0">
         <header className="flex flex-col gap-3 border-b border-border pb-6">
           <p className="eyebrow">{eyebrow}</p>
-          <h1 className="font-display text-h1 font-medium tracking-display text-foreground">{title}</h1>
-          <p className="max-w-measure font-mono text-lede leading-relaxed text-muted-foreground">
+          <h1 className="font-display text-h1 font-semibold tracking-display text-foreground">{title}</h1>
+          <p className="max-w-measure text-lede leading-relaxed text-muted-foreground">
             {description}
           </p>
         </header>

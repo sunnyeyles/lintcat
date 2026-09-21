@@ -1,7 +1,6 @@
 import { Button } from "@pr-review/design";
 import Link from "next/link";
 
-import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { TopbarFrame } from "@/components/shell/topbar-frame";
 import { DOCS_HOME } from "@/lib/docs";
 import { appDomain } from "@/lib/host";
@@ -18,7 +17,6 @@ export function DocsTopbar({ className }: { className?: string }) {
           <Button asChild variant="outline" size="sm">
             <Link href={DASHBOARD_PATH}>Dashboard</Link>
           </Button>
-          <ThemeToggle />
           <Button asChild size="sm">
             <Link href={signInUrl(DASHBOARD_PATH, appDomain())}>Sign in</Link>
           </Button>

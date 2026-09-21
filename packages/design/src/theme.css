@@ -1,183 +1,86 @@
-@custom-variant dark (&:is(.dark *));
+@import "@primer/primitives/dist/css/base/typography/typography.css";
+@import "@primer/primitives/dist/css/functional/typography/typography.css";
+@import "@primer/primitives/dist/css/functional/size/radius.css";
+@import "@primer/primitives/dist/css/functional/themes/light.css";
+@import "@primer/primitives/dist/css/functional/themes/dark.css";
+@import "./brand.css";
 
-/* Raw brand palette. Components use the semantic tokens below, never these. */
-:root {
-  --palette-night: #0f1217;
-  --palette-night-1: #151b22;
-  --palette-night-2: #1c242d;
-  --palette-night-3: #25303b;
-  --palette-night-border: #303a45;
-  --palette-night-border-subtle: #242d36;
-  --palette-offwhite: #f3f1ec;
-  --palette-grey-300: #a9b0b7;
-  --palette-grey-500: #727c86;
-  --palette-ink: #19293a;
-  --palette-teal: #3a9387;
-  --palette-teal-light: #49a69a;
-  --palette-teal-dark: #2c7a70;
-  --palette-teal-darker: #256860;
-  --palette-coral: #f97447;
-  --palette-coral-light: #fb865e;
-  --palette-coral-dark: #b84a22;
-  --palette-coral-darker: #a0401d;
-  --palette-cream: #d8d1c4;
-  --palette-paper: #f5f3ee;
-  --palette-paper-1: #fbfaf7;
-  --palette-paper-2: #ece8e0;
-  --palette-paper-3: #e2ddd3;
-  --palette-paper-border: #d3ccbf;
-  --palette-paper-border-subtle: #e4dfd6;
-  --palette-grey-700: #4e5862;
-  --palette-grey-600: #6b747d;
-  --palette-rose: #e35d6a;
-  --palette-rose-dark: #c4404f;
-  --palette-amber: #d9a441;
-  --palette-amber-dark: #8a6010;
-  --palette-sage: #7fb069;
-  --palette-sage-dark: #3f7a3a;
-  --palette-steel: #7d9bc1;
-  --palette-steel-dark: #4f6a88;
-  --palette-mauve: #a98bbf;
-  --palette-mauve-dark: #7a5a94;
+/* `dark:` follows Primer's colour mode: forced dark, or auto plus the OS preference. */
+@custom-variant dark {
+  &:where([data-color-mode="dark"], [data-color-mode="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-color-mode="auto"], [data-color-mode="auto"] *) {
+      @slot;
+    }
+  }
 }
 
+/* shadcn semantic tokens, each aliased to a Primer token so the theme follows the colour mode. */
 :root {
-  --radius: 0.625rem;
+  --radius: var(--borderRadius-default);
 
-  --background: var(--palette-paper);
-  --foreground: var(--palette-night-1);
-  --surface-1: var(--palette-paper-1);
-  --surface-2: var(--palette-paper-2);
-  --surface-3: var(--palette-paper-3);
-  --card: var(--surface-1);
-  --card-foreground: var(--foreground);
-  --popover: #ffffff;
-  --popover-foreground: var(--foreground);
+  --background: var(--bgColor-default);
+  --foreground: var(--fgColor-default);
+  --surface-1: var(--bgColor-default);
+  --surface-2: var(--bgColor-muted);
+  --surface-3: var(--control-bgColor-active);
+  --card: var(--bgColor-default);
+  --card-foreground: var(--fgColor-default);
+  --popover: var(--overlay-bgColor);
+  --popover-foreground: var(--fgColor-default);
 
-  --primary: var(--palette-teal-dark);
-  --primary-foreground: #ffffff;
-  --primary-hover: var(--palette-teal-darker);
-  --secondary: var(--surface-2);
-  --secondary-foreground: var(--foreground);
-  --secondary-hover: var(--surface-3);
-  --attention: var(--palette-coral-dark);
-  --attention-foreground: #ffffff;
-  --attention-hover: var(--palette-coral-darker);
+  --primary: var(--bgColor-accent-emphasis);
+  --primary-foreground: var(--fgColor-onEmphasis);
+  --primary-hover: var(--control-checked-bgColor-hover);
+  --link: var(--fgColor-accent);
+  --secondary: var(--control-bgColor-rest);
+  --secondary-foreground: var(--control-fgColor-rest);
+  --secondary-hover: var(--control-bgColor-hover);
+  --attention: var(--bgColor-severe-emphasis);
+  --attention-foreground: var(--fgColor-onEmphasis);
+  --attention-hover: color-mix(in oklab, var(--bgColor-severe-emphasis) 88%, var(--fgColor-default));
 
-  --muted: var(--surface-2);
-  --muted-foreground: var(--palette-grey-700);
-  --subtle-foreground: var(--palette-grey-600);
-  --accent: var(--surface-3);
-  --accent-foreground: var(--foreground);
+  --muted: var(--bgColor-muted);
+  --muted-foreground: var(--fgColor-muted);
+  --subtle-foreground: var(--fgColor-disabled);
+  --accent: var(--control-transparent-bgColor-selected);
+  --accent-foreground: var(--fgColor-default);
 
-  --border: var(--palette-paper-border);
-  --border-subtle: var(--palette-paper-border-subtle);
-  --input: var(--palette-paper-border);
-  --ring: var(--palette-teal-dark);
+  --border: var(--borderColor-default);
+  --border-subtle: var(--borderColor-muted);
+  --input: var(--control-borderColor-rest);
+  --ring: var(--focus-outline-color);
 
-  --brand-ink: var(--palette-ink);
-  --brand-cream: var(--palette-cream);
+  --destructive: var(--fgColor-danger);
+  --success: var(--fgColor-success);
+  --success-foreground: var(--fgColor-onEmphasis);
+  --warning: var(--fgColor-attention);
+  --warning-foreground: var(--fgColor-onEmphasis);
 
-  --destructive: var(--palette-rose-dark);
-  --success: var(--palette-sage-dark);
-  --success-foreground: #ffffff;
-  --warning: var(--palette-amber-dark);
-  --warning-foreground: #ffffff;
+  --severity-low: var(--fgColor-neutral);
+  --severity-medium: var(--fgColor-attention);
+  --severity-high: var(--fgColor-danger);
 
-  --severity-low: var(--palette-steel-dark);
-  --severity-medium: var(--palette-amber-dark);
-  --severity-high: var(--palette-rose-dark);
+  --chart-1: var(--fgColor-accent);
+  --chart-2: var(--data-orange-color-emphasis);
+  --chart-3: var(--data-blue-color-emphasis);
+  --chart-4: var(--data-yellow-color-emphasis);
+  --chart-5: var(--data-purple-color-emphasis);
 
-  --chart-1: var(--palette-teal-dark);
-  --chart-2: var(--palette-coral-dark);
-  --chart-3: var(--palette-steel-dark);
-  --chart-4: var(--palette-amber-dark);
-  --chart-5: var(--palette-mauve-dark);
+  --map-module: var(--fgColor-accent);
+  --map-module-changed: var(--fgColor-severe);
+  --map-structure: var(--bgColor-muted);
+  --map-structure-border: var(--borderColor-default);
+  --map-label: var(--fgColor-default);
+  --map-edge: var(--borderColor-muted);
+  --map-kind-1: var(--data-blue-color-emphasis);
+  --map-kind-2: var(--data-yellow-color-emphasis);
+  --map-kind-3: var(--data-purple-color-emphasis);
 
-  --map-module: var(--palette-teal-dark);
-  --map-module-changed: var(--palette-coral-dark);
-  --map-structure: #dde2e8;
-  --map-structure-border: #b7c2ce;
-  --map-label: var(--palette-ink);
-  --map-edge: var(--palette-paper-border);
-  --map-kind-1: var(--palette-steel-dark);
-  --map-kind-2: var(--palette-amber-dark);
-  --map-kind-3: var(--palette-mauve-dark);
-
-  --sidebar: var(--surface-1);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--accent);
-  --sidebar-accent-foreground: var(--accent-foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
-}
-
-.dark {
-  color-scheme: dark;
-
-  --background: var(--palette-night);
-  --foreground: var(--palette-offwhite);
-  --surface-1: var(--palette-night-1);
-  --surface-2: var(--palette-night-2);
-  --surface-3: var(--palette-night-3);
-  --card: var(--surface-1);
-  --card-foreground: var(--foreground);
-  --popover: var(--surface-2);
-  --popover-foreground: var(--foreground);
-
-  /* White on brand teal is 3.7:1; the dark ground clears 5:1. */
-  --primary: var(--palette-teal);
-  --primary-foreground: var(--palette-night);
-  --primary-hover: var(--palette-teal-light);
-  --secondary: var(--surface-2);
-  --secondary-foreground: var(--foreground);
-  --secondary-hover: var(--surface-3);
-  --attention: var(--palette-coral);
-  --attention-foreground: var(--palette-night);
-  --attention-hover: var(--palette-coral-light);
-
-  /* Brand muted grey is under 4.5:1 on surfaces, so it only serves as subtle. */
-  --muted: var(--surface-2);
-  --muted-foreground: var(--palette-grey-300);
-  --subtle-foreground: var(--palette-grey-500);
-  --accent: var(--surface-3);
-  --accent-foreground: var(--foreground);
-
-  --border: var(--palette-night-border);
-  --border-subtle: var(--palette-night-border-subtle);
-  --input: var(--palette-night-border);
-  --ring: var(--palette-teal-light);
-
-  --destructive: var(--palette-rose);
-  --success: var(--palette-sage);
-  --success-foreground: var(--palette-night);
-  --warning: var(--palette-amber);
-  --warning-foreground: var(--palette-night);
-
-  --severity-low: var(--palette-steel);
-  --severity-medium: var(--palette-amber);
-  --severity-high: var(--palette-rose);
-
-  --chart-1: var(--palette-teal);
-  --chart-2: var(--palette-coral);
-  --chart-3: var(--palette-steel);
-  --chart-4: var(--palette-amber);
-  --chart-5: var(--palette-mauve);
-
-  --map-module: var(--palette-teal);
-  --map-module-changed: var(--palette-coral);
-  --map-structure: var(--palette-ink);
-  --map-structure-border: #2c4460;
-  --map-label: var(--palette-cream);
-  --map-edge: var(--palette-night-border);
-  --map-kind-1: var(--palette-steel);
-  --map-kind-2: var(--palette-amber);
-  --map-kind-3: var(--palette-mauve);
-
-  --sidebar: var(--surface-1);
-  --sidebar-foreground: var(--foreground);
+  --sidebar: var(--bgColor-muted);
+  --sidebar-foreground: var(--fgColor-default);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--accent);
@@ -187,12 +90,46 @@
 }
 
 @theme inline {
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  /* The lockup is set in Space Grotesk; nothing loads it, so it applies only where installed. */
+  --font-display: "Space Grotesk", var(--font-sans);
+  --font-mono: var(--fontStack-monospace);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.25;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.25;
+  /* Prose sizes follow GitHub's markdown body (16/24), not its UI chrome (14/21). */
+  --text-body: 1rem;
+  --text-body--line-height: 1.5;
+  --text-lede: 1.125rem;
+  --text-lede--line-height: 1.5;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.4;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 1.3334;
+  --text-h1: 2rem;
+  --text-h1--line-height: 1.25;
+  --text-sm--line-height: 1.5;
+
+  --tracking-display: -0.01em;
+  --tracking-ui: 0.02em;
+  --tracking-caps: 0.08em;
+  --container-measure: 67ch;
+
+  --radius-sm: var(--borderRadius-small);
+  --radius-md: var(--borderRadius-medium);
+  --radius-lg: var(--borderRadius-medium);
+  --radius-xl: var(--borderRadius-medium);
+  --radius-2xl: var(--borderRadius-large);
+
+  --shadow-xs: var(--shadow-resting-xsmall);
+  --shadow-sm: var(--shadow-resting-small);
+  --shadow-md: var(--shadow-resting-medium);
+  --shadow-lg: var(--shadow-floating-small);
+  --shadow-xl: var(--shadow-floating-medium);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -206,6 +143,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
+  --color-link: var(--link);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary-hover: var(--secondary-hover);
@@ -229,8 +167,6 @@
   --color-border-subtle: var(--border-subtle);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-brand-ink: var(--brand-ink);
-  --color-brand-cream: var(--brand-cream);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -253,13 +189,38 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-turquoise: var(--brand-turquoise);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-coral: var(--brand-coral);
+  --color-brand-rust: var(--brand-rust);
+  --color-brand-cream: var(--brand-cream);
+}
+
+@utility eyebrow {
+  font-size: --theme(--text-caption);
+  letter-spacing: --theme(--tracking-caps);
+  text-transform: uppercase;
+  color: --theme(--color-muted-foreground);
+  font-weight: 500;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    color-scheme: light;
+  }
+  html[data-color-mode="dark"] {
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    html[data-color-mode="auto"] {
+      color-scheme: dark;
+    }
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-sm text-foreground;
   }
 }

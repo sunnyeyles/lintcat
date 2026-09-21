@@ -160,7 +160,7 @@ export default async function OverviewPage({
         action={
           <Link
             href={organizationPath(slug, "/repos")}
-            className="text-primary font-mono text-xs no-underline hover:underline"
+            className="text-link font-mono text-xs no-underline hover:underline"
           >
             View all →
           </Link>

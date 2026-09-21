@@ -42,8 +42,8 @@ export function Toc({ headings }: { headings: Heading[] }) {
               href={`#${id}`}
               aria-current={active === id ? "location" : undefined}
               className={cn(
-                "font-mono text-caption leading-snug no-underline transition-colors",
-                active === id ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                "text-caption leading-snug no-underline transition-colors",
+                active === id ? "text-link" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {title}
