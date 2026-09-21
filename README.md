@@ -683,17 +683,20 @@ publish method at all.
 ## Publishing the Action
 
 `.github/workflows/release-action.yml` runs on a `v*` tag (or manual dispatch):
-install → typecheck → test → build the bundle → push only `action.yml`,
+it calls `ci.yml` (typecheck → test → build and smoke-test the bundles), then
+takes the smoke-tested action bundle from that run and pushes only `action.yml`,
 `dist/index.mjs`, `LICENSE`, and a usage `README.md` to a separate public repo,
 moving that repo's major-version alias (`v2`) to the new tag and cutting a
 GitHub Release there. Listing the Action on the Marketplace is a manual tick on
 that release, once, and the listing is keyed on the `name:` in `action.yml` —
 change it and the Marketplace URL moves with it. The engine, the tests, the
 spec, and this README stay in this repo, and are not published downstream.
-`.github/workflows/ci.yml` runs typecheck and tests on every push;
+`.github/workflows/ci.yml` runs typecheck, tests, and the action, cli and mcp
+bundle smoke checks on every branch push (tags go through the release instead);
 `.github/workflows/self-review.yml` dogfoods the Action on this repo's own
 PRs, but only on a pull request labelled `ai-review` — reviews cost tokens, so
-they are opt-in. Add the label to review, remove it to stop.
+they are opt-in. Add the label to review, remove it to stop. Without a key for
+`vars.MODEL_PROVIDER` the Action skips with a notice.
 
 Required repository configuration for the release workflow:
 
@@ -701,6 +704,11 @@ Required repository configuration for the release workflow:
 | --- | --- |
 | `vars.ACTION_RELEASE_REPO` | Target public repo, e.g. `sunnyeyles/pr-review-action` |
 | `secrets.ACTION_RELEASE_TOKEN` | Token with `contents: write` on that repo |
+
+The self review reads `secrets.OPENAI_API_KEY` / `secrets.ANTHROPIC_API_KEY`,
+`secrets.LANGFUSE_PUBLIC_KEY`, `secrets.LANGFUSE_SECRET_KEY` and
+`secrets.DASHBOARD_TOKEN`, plus the non-secret `vars.MODEL_PROVIDER`,
+`vars.REVIEW_MODEL`, `vars.LANGFUSE_BASE_URL` and `vars.DASHBOARD_URL`.
 
 ---
 
