@@ -45,6 +45,38 @@ function walk(
   return depths;
 }
 
+/**
+ * The union of several files and everything within `steps` of any of them —
+ * what the map must have in view to show where a change lands.
+ */
+export function neighbourhoodOf(
+  graph: NormalisedGraph,
+  focuses: readonly string[],
+  steps = 1,
+): ReadonlySet<string> {
+  const seen = new Set<string>();
+  let frontier: string[] = [];
+  for (const path of focuses) {
+    if (!graph.byPath.has(path) || seen.has(path)) continue;
+    seen.add(path);
+    frontier.push(path);
+  }
+  for (let depth = 1; depth <= steps && frontier.length > 0; depth += 1) {
+    const next: string[] = [];
+    for (const path of frontier) {
+      for (const edges of [graph.outgoing, graph.incoming]) {
+        for (const other of edges.get(path) ?? []) {
+          if (seen.has(other)) continue;
+          seen.add(other);
+          next.push(other);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return seen;
+}
+
 export function neighbourhood(
   graph: NormalisedGraph,
   focus: string | null,

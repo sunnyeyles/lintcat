@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { neighbourhood } from "./neighbourhood";
+import { neighbourhood, neighbourhoodOf } from "./neighbourhood";
 import { normaliseGraph } from "./normalise";
 
 const chain = normaliseGraph({
@@ -84,5 +84,34 @@ describe("neighbourhood", () => {
     expect(neighbourhood(chain, null).neighbours).toEqual([]);
     expect(neighbourhood(chain, "ghost.ts").neighbours).toEqual([]);
     expect(neighbourhood(chain, "a.ts", 0).neighbours).toEqual([]);
+  });
+});
+
+describe("neighbourhoodOf", () => {
+  it("unions several focuses and their one-step reach, both directions", () => {
+    expect([...neighbourhoodOf(chain, ["a.ts"], 1)].sort()).toEqual(["a.ts", "b.ts"]);
+    expect([...neighbourhoodOf(chain, ["c.ts"], 1)].sort()).toEqual(["b.ts", "c.ts"]);
+    expect([...neighbourhoodOf(chain, ["a.ts", "c.ts"], 1)].sort()).toEqual([
+      "a.ts",
+      "b.ts",
+      "c.ts",
+    ]);
+  });
+
+  it("reaches further with more steps", () => {
+    expect([...neighbourhoodOf(chain, ["a.ts"], 2)].sort()).toEqual([
+      "a.ts",
+      "b.ts",
+      "c.ts",
+      "d.ts",
+    ]);
+  });
+
+  it("drops a focus the graph does not have, and keeps a lone file alone", () => {
+    expect([...neighbourhoodOf(chain, ["missing.ts", "loose.ts"], 1)]).toEqual(["loose.ts"]);
+  });
+
+  it("is empty without focuses", () => {
+    expect(neighbourhoodOf(chain, [], 1).size).toBe(0);
   });
 });
