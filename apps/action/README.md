@@ -47,7 +47,7 @@ review is never executed.
 
 | Input | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `api-key` | yes, as the input or through `env` | — | Key for the selected provider, which the reviewer authenticates with. Store it as a secret. Falls back to that provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty. |
+| `api-key` | yes, as the input or through `env` | — | Key for the selected provider, which the reviewer authenticates with. Store it as a secret. Falls back to that provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty. With neither set, the step skips the review with a notice and succeeds. |
 | `model-provider` | no | `openai` | Which provider to call: `openai` or `anthropic`. An unknown name fails the step before any model call. |
 | `github-token` | no | `${{ github.token }}` | Token for the read-only tools, the review comments, and the check run. |
 | `model` | no | the provider's own | Default model id, as the provider spells it: `gpt-5.6-luna` on `openai`, `claude-haiku-4-5` on `anthropic`. |

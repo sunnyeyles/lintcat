@@ -19,6 +19,7 @@ inputs:
       organisation secret; never inline it. Defaults to the provider's
       conventional environment variable (OPENAI_API_KEY, ANTHROPIC_API_KEY)
       when left empty, so a workflow can pass the key through `env` instead.
+      With no key at all the step skips the review with a notice and succeeds.
     required: false
     default: ""
   github-token:

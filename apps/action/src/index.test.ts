@@ -116,6 +116,7 @@ interface Harness {
   /** Every file written to a branch, in order. */
   writes: { branch: string; path: string; content: string }[];
   exitCodes: number[];
+  notices: string[];
   /** The GitHub client the run was given, so writes can be asserted on. */
   client: ReturnType<typeof makeGithub>;
 }
@@ -150,6 +151,7 @@ function harness(
   const threadListings: number[] = [];
   const writes: Harness["writes"] = [];
   const exitCodes: number[] = [];
+  const notices: string[] = [];
   const specs: ReviewRunSpec[] = [];
 
   const client = {
@@ -191,6 +193,7 @@ function harness(
     modelCalls: () => modelCalls,
     specs,
     exitCodes,
+    notices,
     environment: {
       env,
       readEventFile: (path) => {
@@ -277,6 +280,7 @@ function harness(
       },
       logger,
       setExitCode: (code) => exitCodes.push(code),
+      notice: (text) => notices.push(text),
     },
   };
 }
@@ -396,13 +400,36 @@ describe("runAction", () => {
     );
   });
 
-  it("fails when neither the API key input nor the provider's variable is set", async () => {
+  it("skips with a notice and no model or GitHub call when the selected provider has no key", async () => {
     const env: Record<string, string | undefined> = { ...reviewEnv };
     delete env["INPUT_API-KEY"];
-    const { environment } = harness(env);
-    await expect(runAction(environment)).rejects.toThrow(
-      "Missing required action input: api-key (or the OPENAI_API_KEY environment variable)",
+    const {
+      environment,
+      entries,
+      notices,
+      exitCodes,
+      modelConfigs,
+      tokenConfigs,
+      modelCalls,
+    } = harness({
+      ...env,
+      "INPUT_MODEL-PROVIDER": "anthropic",
+      // Another provider's key must not count for the selected one.
+      OPENAI_API_KEY: "sk-openai-key",
+    });
+
+    await expect(runAction(environment)).resolves.toBeUndefined();
+
+    expect(notices).toEqual([
+      "Skipping the AI review: no API key for anthropic: set the api-key input or ANTHROPIC_API_KEY",
+    ]);
+    expect(entries).toContainEqual(
+      expect.objectContaining({ event: "review.skipped" }),
     );
+    expect(modelConfigs).toEqual([]);
+    expect(modelCalls()).toBe(0);
+    expect(tokenConfigs).toEqual([]);
+    expect(exitCodes).toEqual([]);
   });
 
   it("falls back to the selected provider's own key variable", async () => {
