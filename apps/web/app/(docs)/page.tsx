@@ -84,7 +84,7 @@ export default function IntroductionPage() {
           the workflow&rsquo;s own token authenticates the reads and publishes the check run.
           The dashboard is the one part that installs an App, to read your organization.
         </P>
-        <Code caption=".github/workflows/ai-review.yml">{`- uses: sunnyeyles/pr-review-action@v2
+        <Code caption=".github/workflows/ai-review.yml">{`- uses: sunnyeyles/pr-review-action@v3
   with:
     api-key: \${{ secrets.OPENAI_API_KEY }}`}</Code>
         <Note title="Fork pull requests">

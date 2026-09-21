@@ -1,6 +1,6 @@
-# Review Agent Fleet
+# LintCat PR Review
 
-Reviews pull requests with one AI reviewer. Findings post as inline pull
+LintCat reviews pull requests with one AI reviewer. Findings post as inline pull
 request review comments, alongside a check run named `AI PR Review` carrying
 the full summary. The model provider is configurable.
 
@@ -27,7 +27,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: sunnyeyles/pr-review-action@v2
+      - uses: sunnyeyles/pr-review-action@v3
         with:
           api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
@@ -35,9 +35,6 @@ jobs:
 The `closed` trigger and `contents: write` are needed only for
 [`memory-branch`](#inputs); without it, `types: [opened, synchronize,
 reopened]` and `contents: read` are enough.
-
-Moving from `v1`: the `anthropic-api-key` input is now `api-key`, and
-`model-provider` selects OpenAI (the default) or Anthropic.
 
 No checkout step is needed. Everything — the pull request and the diff — is
 read through the GitHub API, never from a working copy, and the code under
@@ -53,14 +50,40 @@ review is never executed.
 | `model` | no | the provider's own | Default model id, as the provider spells it: `gpt-5.6-luna` on `openai`, `claude-haiku-4-5` on `anthropic`. |
 | `model-base-url` | no | the provider's own host | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `index` | no | `true` | Whether the review builds a repository index from the pull request's base commit before the reviewer starts. One archive request, `contents: read` only, held in memory and discarded. Any failure is logged and the review runs without it. `false` turns it off. |
+| `incremental` | no | `false` | `true` reviews only the commits added since the last completed `AI PR Review` check run on this pull request, falling back to the whole pull request when there is no usable baseline. |
 | `fix` | no | `false` | Whether verified fixes are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. Off, or when the commit cannot be made, the same fixes are offered as suggested changes on the review comments. |
 | `memory-branch` | no | — | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding, so repeatedly ignored shapes are deprioritised in later reviews. Empty turns the feature off. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | — | Langfuse public key. Set this and the secret key to manage prompts and collect traces. |
 | `langfuse-secret-key` | no | — | Langfuse secret key. Store it as a secret. |
 | `langfuse-base-url` | no | `https://cloud.langfuse.com` | Langfuse host, for self-hosted instances. |
 | `langfuse-prompt-label` | no | `production` | Which labelled version of each prompt to fetch. |
+| `langfuse-record-io` | no | `false` | `true` exports each model call's prompts, completions and tool results to Langfuse, including the diff and every file read. Off, traces carry timings, token counts and outcomes only. |
 | `dashboard-token` | no | — | Ingest secret for the review dashboard. Set this and `dashboard-url` to record each review there. Store it as a secret. |
 | `dashboard-url` | no | — | Dashboard base URL, e.g. `https://example.vercel.app`; the action appends `/api/ingest`. |
+
+## Moving from v2
+
+`v3` has one reviewer and no agent configuration, so two inputs are gone.
+Workflows pinned to `@v2` keep working; `v2` is not moved.
+
+| Removed input | What to do |
+| --- | --- |
+| `agents` | Delete it. One general agent reviews the whole pull request. |
+| `agent-config` | Delete it, and `.github/pr-review-agents.yml` with it; nothing reads that file now. |
+
+New inputs, all optional and off or unchanged by default: `fix`,
+`incremental`, `index` (on by default), `memory-branch`, `langfuse-record-io`,
+`dashboard-token` and `dashboard-url`. See [Inputs](#inputs).
+
+One behaviour change: with no key for the selected provider, neither as
+`api-key` nor through its environment variable, `v3` skips the review with a
+notice and the step succeeds. `v2` failed the step instead. A workflow that
+relied on that failure to flag a missing secret should check for it itself.
+
+Then change the `uses:` line to `sunnyeyles/pr-review-action@v3`.
+
+Moving from `v1` as well: the `anthropic-api-key` input became `api-key` in
+`v2`, and `model-provider` selects OpenAI (the default) or Anthropic.
 
 ## Repository index
 
@@ -172,6 +195,7 @@ inline placement is lost.
 
 ## What it does not do
 
-No automatic fixing, no automatic merging or approval, and no review history.
+No automatic merging or approval, no fixes committed unless `fix` is on, and
+no review history.
 Without `memory-branch` it keeps no memory between runs and writes nothing
 beyond the check run and its comments.

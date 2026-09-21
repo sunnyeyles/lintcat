@@ -28,7 +28,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: sunnyeyles/pr-review-action@v2
+      - uses: sunnyeyles/pr-review-action@v3
         with:
           api-key: \${{ secrets.OPENAI_API_KEY }}`;
 
