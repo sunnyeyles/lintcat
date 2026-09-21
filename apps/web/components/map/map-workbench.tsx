@@ -30,6 +30,7 @@ import {
 import {
   CircleDashed,
   GitBranch,
+  LayoutGrid,
   List,
   Map as MapIcon,
   Maximize2,
@@ -42,6 +43,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { CodebaseMap, KIND_COLOR } from "@/components/map/codebase-map";
+import { ArcView, ListView, TreemapView } from "@/components/map/map-views";
 import { FilePath } from "@/components/review/file-path";
 import { Stat, StatGrid } from "@/components/ui/stat";
 import {
@@ -153,8 +155,9 @@ export function MapWorkbench({ graph, pr }: MapWorkbenchProps) {
             <Tabs value={mode} onValueChange={setMode}>
               <TabsList aria-label="View">
                 <TabsTrigger value="map"><MapIcon aria-hidden /> Map</TabsTrigger>
+                <TabsTrigger value="treemap"><LayoutGrid aria-hidden /> Treemap</TabsTrigger>
+                <TabsTrigger value="arcs"><Network aria-hidden /> Arcs</TabsTrigger>
                 <TabsTrigger value="list"><List aria-hidden /> List</TabsTrigger>
-                <TabsTrigger value="tree"><Network aria-hidden /> Tree</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -230,10 +233,12 @@ export function MapWorkbench({ graph, pr }: MapWorkbenchProps) {
                 onFocus={(focus) => update({ focus })}
                 className="absolute inset-0"
               />
+            ) : mode === "treemap" ? (
+              <TreemapView graph={graph} view={view} onFocus={(focus) => update({ focus })} className="absolute inset-0 p-2" />
+            ) : mode === "arcs" ? (
+              <ArcView graph={graph} view={view} onFocus={(focus) => update({ focus })} className="absolute inset-0" />
             ) : (
-              <div className="text-muted-foreground flex h-full min-h-[28rem] items-center justify-center text-sm">
-                {mode === "list" ? "List" : "Tree"} view is a placeholder for review.
-              </div>
+              <ListView graph={graph} view={view} onFocus={(focus) => update({ focus })} className="absolute inset-0" />
             )}
             <div className="text-muted-foreground pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-x-3 gap-y-1 text-xs">
               <LegendSwatch color="var(--map-module-changed)" ring>Changed</LegendSwatch>

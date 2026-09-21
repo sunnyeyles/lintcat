@@ -24,7 +24,7 @@ export default function PreviewLayout({ children }: { children: ReactNode }) {
         }
       />
       <div className="flex">
-        <Sidebar slug="funnelweb" organizationName="Funnelweb" />
+        <Sidebar slug="lintcat" organizationName="LintCat" />
         <MainColumn>{children}</MainColumn>
       </div>
     </div>

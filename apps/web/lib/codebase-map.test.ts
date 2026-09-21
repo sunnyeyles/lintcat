@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  arcLayout,
   classify,
   classifyEdges,
   clusterOf,
@@ -9,6 +10,7 @@ import {
   type MapGraph,
   neighbours,
   stats,
+  treemapLayout,
 } from "./codebase-map";
 
 const graph: MapGraph = {
@@ -123,5 +125,37 @@ describe("layout", () => {
 
   it("is deterministic", () => {
     expect(layout(graph, 800, 600)).toEqual(layout(graph, 800, 600));
+  });
+});
+
+describe("treemapLayout", () => {
+  it("tiles every file inside its cluster with area proportional to size", () => {
+    const groups = treemapLayout(graph, 800, 600, 0);
+    const cells = groups.flatMap((g) => g.cells);
+    expect(cells.map((c) => c.id).sort()).toEqual(graph.nodes.map((n) => n.id).sort());
+    const outerArea = groups.reduce((s, g) => s + g.width * g.height, 0);
+    expect(outerArea).toBeCloseTo(800 * 600, 3);
+    for (const group of groups) {
+      for (const cell of group.cells) {
+        expect(cell.x).toBeGreaterThanOrEqual(group.x - 1e-6);
+        expect(cell.y).toBeGreaterThanOrEqual(group.y - 1e-6);
+        expect(cell.x + cell.width).toBeLessThanOrEqual(group.x + group.width + 1e-6);
+        expect(cell.y + cell.height).toBeLessThanOrEqual(group.y + group.height + 1e-6);
+      }
+    }
+    const ai = groups.find((g) => g.id === "packages/ai")!;
+    const agent = ai.cells.find((c) => c.id === "packages/ai/src/agent.ts")!;
+    const tools = ai.cells.find((c) => c.id === "packages/ai/src/tools.ts")!;
+    expect((agent.width + 2) * (agent.height + 2)).toBeGreaterThan((tools.width + 2) * (tools.height + 2));
+  });
+});
+
+describe("arcLayout", () => {
+  it("orders files by path and keeps each cluster contiguous", () => {
+    const { positions, groups } = arcLayout(graph, 1000);
+    expect(positions.size).toBe(graph.nodes.length);
+    expect(groups.map((g) => g.id)).toEqual(["apps/web", "packages/ai", "packages/design", "packages/index", "README.md"]);
+    for (const g of groups) expect(g.to).toBeGreaterThanOrEqual(g.from);
+    expect(positions.get("apps/web/app/page.tsx")).toBe(16);
   });
 });

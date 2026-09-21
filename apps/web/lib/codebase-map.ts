@@ -141,3 +141,100 @@ export function layout(graph: MapGraph, width: number, height: number): Layout {
   });
   return { positions, clusters };
 }
+
+export type Rect = { x: number; y: number; width: number; height: number };
+export type TreemapCell = Rect & { id: string };
+export type TreemapGroup = Rect & { id: string; cells: TreemapCell[] };
+
+// Squarified treemap: rows of near-square tiles, laid along the shorter side.
+function squarify(items: { id: string; weight: number }[], rect: Rect): TreemapCell[] {
+  const total = items.reduce((s, i) => s + i.weight, 0);
+  if (total <= 0 || items.length === 0) return [];
+  const sorted = [...items].sort((a, b) => b.weight - a.weight);
+  const cells: TreemapCell[] = [];
+  let { x, y, width, height } = rect;
+  let row: { id: string; weight: number }[] = [];
+  const scale = (width * height) / total;
+  const worst = (r: typeof row, side: number) => {
+    const s = r.reduce((sum, i) => sum + i.weight * scale, 0);
+    const max = Math.max(...r.map((i) => i.weight * scale));
+    const min = Math.min(...r.map((i) => i.weight * scale));
+    return Math.max((side * side * max) / (s * s), (s * s) / (side * side * min));
+  };
+  const flush = () => {
+    const side = Math.min(width, height);
+    const area = row.reduce((s, i) => s + i.weight * scale, 0);
+    const thickness = side === 0 ? 0 : area / side;
+    let offset = 0;
+    for (const item of row) {
+      const length = (item.weight * scale) / (thickness || 1);
+      cells.push(
+        width >= height
+          ? { id: item.id, x, y: y + offset, width: thickness, height: length }
+          : { id: item.id, x: x + offset, y, width: length, height: thickness },
+      );
+      offset += length;
+    }
+    if (width >= height) {
+      x += thickness;
+      width -= thickness;
+    } else {
+      y += thickness;
+      height -= thickness;
+    }
+    row = [];
+  };
+  for (const item of sorted) {
+    const side = Math.min(width, height);
+    if (row.length && worst([...row, item], side) > worst(row, side)) flush();
+    row.push(item);
+  }
+  if (row.length) flush();
+  return cells;
+}
+
+export function treemapLayout(graph: MapGraph, width: number, height: number, gutter = 4): TreemapGroup[] {
+  const groups = new Map<string, MapNode[]>();
+  for (const node of graph.nodes) {
+    const key = clusterOf(node.id);
+    groups.set(key, [...(groups.get(key) ?? []), node]);
+  }
+  const outer = squarify(
+    [...groups.entries()].map(([id, nodes]) => ({ id, weight: nodes.reduce((s, n) => s + n.size, 0) })),
+    { x: 0, y: 0, width, height },
+  );
+  return outer.map((group) => {
+    const inner: Rect = {
+      x: group.x + gutter,
+      y: group.y + gutter + 14,
+      width: Math.max(0, group.width - gutter * 2),
+      height: Math.max(0, group.height - gutter * 2 - 14),
+    };
+    const nodes = groups.get(group.id) ?? [];
+    const cells = squarify(nodes.map((n) => ({ id: n.id, weight: n.size })), inner).map((c) => ({
+      ...c,
+      width: Math.max(0, c.width - 2),
+      height: Math.max(0, c.height - 2),
+    }));
+    return { ...group, cells };
+  });
+}
+
+export type ArcLayout = { positions: Map<string, number>; groups: { id: string; from: number; to: number }[] };
+
+// Files on one axis, grouped by cluster, so imports read as arcs between neighbourhoods.
+export function arcLayout(graph: MapGraph, width: number, padding = 16): ArcLayout {
+  const ordered = [...graph.nodes].sort((a, b) => a.id.localeCompare(b.id));
+  const step = ordered.length > 1 ? (width - padding * 2) / (ordered.length - 1) : 0;
+  const positions = new Map<string, number>();
+  const groups: ArcLayout["groups"] = [];
+  ordered.forEach((node, i) => {
+    const x = padding + i * step;
+    positions.set(node.id, x);
+    const cluster = clusterOf(node.id);
+    const last = groups[groups.length - 1];
+    if (last && last.id === cluster) last.to = x;
+    else groups.push({ id: cluster, from: x, to: x });
+  });
+  return { positions, groups };
+}
