@@ -1,4 +1,4 @@
-import type { ReviewRecord, ReviewRecordAgentRun } from "@pr-review/schemas";
+import type { ReviewRecord } from "@pr-review/schemas";
 import { eq, inArray } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -18,19 +18,19 @@ import { createTestDatabase } from "../test-database";
 import { categoryCounts, computeTrends, costOf } from "./aggregate";
 import { createDbSource } from "./source";
 
-function run(
-  agent: string,
-  findingCount: number,
-  durationMs = 10_000,
-): ReviewRecordAgentRun {
+const UNIT = {
+  inputTokens: 1_000,
+  cacheCreationInputTokens: 2_000,
+  cacheReadInputTokens: 3_000,
+  outputTokens: 400,
+};
+
+function tokens(times: number) {
   return {
-    agent,
-    durationMs,
-    findingCount,
-    inputTokens: 1_000,
-    cacheCreationInputTokens: 2_000,
-    cacheReadInputTokens: 3_000,
-    outputTokens: 400,
+    inputTokens: UNIT.inputTokens * times,
+    cacheCreationInputTokens: UNIT.cacheCreationInputTokens * times,
+    cacheReadInputTokens: UNIT.cacheReadInputTokens * times,
+    outputTokens: UNIT.outputTokens * times,
   };
 }
 
@@ -40,13 +40,11 @@ function record(overrides: Partial<ReviewRecord> = {}): ReviewRecord {
     repo: "widgets",
     prNumber: 7,
     headSha: "a".repeat(40),
-    agents: ["security", "performance"],
     summary: "Two findings.",
     durationMs: 12_000,
-    agentRuns: [run("security", 1), run("performance", 1)],
+    ...tokens(2),
     findings: [
       {
-        agent: "security",
         file: "src/auth.ts",
         line: 3,
         category: "security",
@@ -56,7 +54,6 @@ function record(overrides: Partial<ReviewRecord> = {}): ReviewRecord {
         confidence: 0.9,
       },
       {
-        agent: "performance",
         file: "src/list.ts",
         category: "performance",
         severity: "low",
@@ -113,15 +110,15 @@ beforeEach(async () => {
 });
 
 describe("createDbSource", () => {
-  it("lists only the organization's repos, with totals from reviews, findings and runs", async () => {
+  it("lists only the organization's repos, with totals from reviews and findings", async () => {
     await ingest(acme, record());
-    await ingest(acme, record({ headSha: "b".repeat(40), findings: [], agentRuns: [run("security", 0)] }));
+    await ingest(acme, record({ headSha: "b".repeat(40), findings: [], ...tokens(1) }));
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
 
     const repos = await (await sourceFor(acme)).listRepos();
 
     expect(repos).toHaveLength(1);
-    const perRun = costOf(run("security", 0));
+    const perUnit = costOf(tokens(1));
     expect(repos[0]).toMatchObject({
       owner: "acme",
       name: "widgets",
@@ -130,7 +127,7 @@ describe("createDbSource", () => {
       highSeverity: 1,
     });
     expect(repos[0]!.lastReviewedAt).toBeInstanceOf(Date);
-    expect(repos[0]!.costUsd).toBeCloseTo(perRun * 3, 10);
+    expect(repos[0]!.costUsd).toBeCloseTo(perUnit * 3, 10);
   });
 
   it("finds a repo by owner and name only within the organization", async () => {
@@ -152,7 +149,6 @@ describe("createDbSource", () => {
     expect(reviews.map((review) => review.prNumber)).toEqual([8, 7]);
     const [, first] = reviews;
     expect(first).toMatchObject({
-      agents: ["security", "performance"],
       findingCount: 2,
       bySeverity: { high: 1, medium: 0, low: 1 },
       durationMs: 12_000,
@@ -160,33 +156,18 @@ describe("createDbSource", () => {
       outputTokens: 800,
       repo: { owner: "acme", name: "widgets" },
     });
-    expect(first!.costUsd).toBeCloseTo(costOf(run("x", 0)) * 2, 10);
+    expect(first!.costUsd).toBeCloseTo(costOf(tokens(2)), 10);
     expect(await (await sourceFor(acme)).listReviews({ limit: 1 })).toHaveLength(1);
   });
 
-  it("returns a review with its findings and runs, and not another organization's", async () => {
+  it("returns a review with its findings, and not another organization's", async () => {
     const mine = await ingest(acme, record());
     const theirs = await ingest(globex, record({ owner: "globex", repo: "secret" }));
     const source = await sourceFor(acme);
 
     const review = await source.getReview(mine);
     expect(review?.findings.map((f) => f.severity)).toEqual(["high", "low"]);
-    expect(review?.findings[0]).toMatchObject({ agent: "security" });
-    expect(review?.runs.map((r) => r.agent).sort()).toEqual(["performance", "security"]);
     expect(await source.getReview(theirs)).toBeNull();
-  });
-
-  it("drops agents the dashboard cannot render but still counts their spend", async () => {
-    const id = await ingest(
-      acme,
-      record({ agents: ["general"], agentRuns: [run("general", 0)], findings: [] }),
-    );
-
-    const review = await (await sourceFor(acme)).getReview(id);
-
-    expect(review?.agents).toEqual([]);
-    expect(review?.runs).toEqual([]);
-    expect(review?.outputTokens).toBe(400);
   });
 
   it("aggregates trends and usage over the organization's recent reviews", async () => {
@@ -203,11 +184,10 @@ describe("createDbSource", () => {
     });
     expect(trends.points).toHaveLength(30);
     expect(trends.points.at(-1)?.reviews).toBe(1);
-    expect(trends.byAgent.map((a) => a.agent).sort()).toEqual(["performance", "security"]);
 
     const usage = await source.getUsage("30d");
     expect(usage.totals.reviewCount).toBe(1);
-    expect(usage.totals.costUsd).toBeCloseTo(costOf(run("x", 0)) * 2, 10);
+    expect(usage.totals.costUsd).toBeCloseTo(costOf(tokens(2)), 10);
     expect(usage.byRepo.map((row) => row.repo.name)).toEqual(["widgets"]);
   });
 
@@ -373,8 +353,8 @@ describe("createDbSource deduplicates reads within one instance", () => {
       source.getUsage("30d"),
     ]);
 
-    expect(separate.selects()).toBe(8);
-    expect(shared.selects()).toBe(5);
+    expect(separate.selects()).toBe(6);
+    expect(shared.selects()).toBe(4);
     expect(trends).toEqual(apartTrends);
     expect(usage).toEqual(apartUsage);
   });
@@ -388,7 +368,7 @@ describe("createDbSource deduplicates reads within one instance", () => {
       source.listReviews(),
     ]);
 
-    expect(counted.selects()).toBe(3);
+    expect(counted.selects()).toBe(2);
     expect(first).toEqual(second);
   });
 
@@ -425,13 +405,11 @@ describe("createDbSource rolls trends up in Postgres", () => {
   }
 
   function finding(
-    agent: string,
     category: string,
     severity: "low" | "medium" | "high",
     file: string,
   ) {
     return {
-      agent,
       file,
       category,
       severity,
@@ -455,12 +433,11 @@ describe("createDbSource rolls trends up in Postgres", () => {
       record({
         headSha: "b".repeat(40),
         prNumber: 8,
-        agents: ["correctness", "security"],
-        agentRuns: [run("correctness", 2, 8_000), run("security", 1, 4_000)],
+        durationMs: 12_000,
         findings: [
-          finding("correctness", "correctness", "medium", "src/a.ts"),
-          finding("correctness", "correctness", "low", "src/b.ts"),
-          finding("security", "security", "high", "src/c.ts"),
+          finding("correctness", "medium", "src/a.ts"),
+          finding("correctness", "low", "src/b.ts"),
+          finding("security", "high", "src/c.ts"),
         ],
       }),
     );
@@ -469,8 +446,6 @@ describe("createDbSource rolls trends up in Postgres", () => {
       record({
         headSha: "c".repeat(40),
         prNumber: 9,
-        agents: ["security"],
-        agentRuns: [run("security", 0)],
         findings: [],
       }),
     );
@@ -479,9 +454,8 @@ describe("createDbSource rolls trends up in Postgres", () => {
       record({
         headSha: "d".repeat(40),
         prNumber: 10,
-        agents: ["docs-drift"],
-        agentRuns: [run("docs-drift", 1, 20_000)],
-        findings: [finding("docs-drift", "docs", "low", "docs/readme.md")],
+        durationMs: 20_000,
+        findings: [finding("docs", "low", "docs/readme.md")],
       }),
     );
     await ingest(globex, record({ owner: "globex", repo: "secret" }));
@@ -492,7 +466,7 @@ describe("createDbSource rolls trends up in Postgres", () => {
     await backdate(older, 3);
   });
 
-  it("matches the JS rollup over reviews spanning days, agents and severities", async () => {
+  it("matches the JS rollup over reviews spanning days and severities", async () => {
     const source = await sourceFor(acme);
     const scoped = await loadedReviews(source);
 

@@ -1,10 +1,7 @@
 /** What a review agent is. Everything else is derived from an AgentDefinition. */
 import type { FindingCategory } from "@pr-review/schemas";
 
-/** The value selecting every configured agent, and the default when none is given. */
-export const ALL_AGENTS = "all";
-
-/** One review agent's definition. Only these fields differ between agents. */
+/** The review agent's definition. */
 export interface AgentDefinition {
   /** The agent's name AND the one finding category it owns. */
   category: FindingCategory;
@@ -14,15 +11,6 @@ export interface AgentDefinition {
   focus: string;
   /** Optional agent-specific addition to "# Context and tools". */
   contextGuidance?: string;
-  /** Model id for this agent alone; the run's default model otherwise. */
-  model?: string;
-  /**
-   * Optional globs gating whether the agent runs at all. Never narrows what a
-   * running agent reviews, and never reaches a prompt.
-   */
-  paths?: readonly string[];
-  /** Covers every category itself, so running alone it skips synthesis. */
-  standalone?: boolean;
   /** Deprioritisation sentences attached per run; never read from config. */
   repositoryHints?: readonly string[];
 }

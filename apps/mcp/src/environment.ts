@@ -71,7 +71,6 @@ export function processEnvironment(): McpEnvironment {
 /** The run's default model, and the factory an agent's own `model` uses. */
 export interface ModelSelection {
   model: ReviewModel;
-  createModel: (modelId: string) => ReviewModel;
 }
 
 /** Unset, the default provider wins when its key is present, else any provider that has one. */
@@ -101,15 +100,15 @@ export function resolveModel(environment: McpEnvironment): ModelSelection {
     throw new Error(`No model API key is set. Set ${keys} in the MCP server's environment or .env.local.`);
   }
   const baseUrl = env["PR_REVIEW_MODEL_BASE_URL"]?.trim() ?? "";
-  const createModel = (modelId: string): ReviewModel =>
-    environment.createLanguageModel({
+  const modelId = env["PR_REVIEW_MODEL"]?.trim() || defaultModelFor(provider);
+  return {
+    model: environment.createLanguageModel({
       provider,
       apiKey,
       ...(baseUrl === "" ? {} : { baseUrl }),
       modelId,
-    });
-  const modelId = env["PR_REVIEW_MODEL"]?.trim() || defaultModelFor(provider);
-  return { model: createModel(modelId), createModel };
+    }),
+  };
 }
 
 /** GITHUB_TOKEN, then GH_TOKEN, then the `gh` CLI's own login. */

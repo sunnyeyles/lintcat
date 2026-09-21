@@ -139,7 +139,7 @@ export function promptContractProblems(
 }
 
 /** Both the loader's fallback and the seeder's baseline, so the two cannot
- * disagree. The synthesiser is absent: its prompt is always built. */
+ * disagree. */
 export function inCodePrompts(agents: readonly AgentDefinition[]): ManagedPrompts {
   const prompts: ManagedPrompts = {};
   for (const agent of agents) {

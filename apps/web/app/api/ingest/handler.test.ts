@@ -1,5 +1,4 @@
 import {
-  agentRuns,
   findings,
   hashIngestToken,
   repos,
@@ -18,32 +17,14 @@ const record: ReviewRecord = {
   repo: "widgets",
   prNumber: 7,
   headSha: "0f1e2d3c4b5a69788796a5b4c3d2e1f001234567",
-  agents: ["security", "performance"],
   summary: "One finding.",
   durationMs: 1_500,
-  agentRuns: [
-    {
-      agent: "security",
-      durationMs: 1_400,
-      findingCount: 1,
-      inputTokens: 100,
-      cacheCreationInputTokens: 2_000,
-      cacheReadInputTokens: 0,
-      outputTokens: 20,
-    },
-    {
-      agent: "performance",
-      durationMs: 1_100,
-      findingCount: 0,
-      inputTokens: 90,
-      cacheCreationInputTokens: 0,
-      cacheReadInputTokens: 2_000,
-      outputTokens: 15,
-    },
-  ],
+  inputTokens: 190,
+  cacheCreationInputTokens: 2_000,
+  cacheReadInputTokens: 2_000,
+  outputTokens: 35,
   findings: [
     {
-      agent: "security",
       file: "src/auth/session.ts",
       category: "security",
       severity: "high",
@@ -82,12 +63,11 @@ async function rowCounts() {
   return {
     repos: (await database.select().from(repos)).length,
     reviews: (await database.select().from(reviews)).length,
-    agentRuns: (await database.select().from(agentRuns)).length,
     findings: (await database.select().from(findings)).length,
   };
 }
 
-const nothing = { repos: 0, reviews: 0, agentRuns: 0, findings: 0 };
+const nothing = { repos: 0, reviews: 0, findings: 0 };
 
 describe("handleIngest", () => {
   it("401s with no Authorization header and writes nothing", async () => {
@@ -142,7 +122,7 @@ describe("handleIngest", () => {
     expect(await rowCounts()).toEqual(nothing);
   });
 
-  it("200s and stores the review, one agent run per agent, and its findings", async () => {
+  it("200s and stores the review and its findings", async () => {
     const response = await handleIngest(post(record, "secret-token"), database);
     expect(response.status).toBe(200);
     const body = (await response.json()) as { reviewId: number };
@@ -150,7 +130,6 @@ describe("handleIngest", () => {
     expect(await rowCounts()).toEqual({
       repos: 1,
       reviews: 1,
-      agentRuns: 2,
       findings: 1,
     });
   });
@@ -188,7 +167,6 @@ describe("handleIngest", () => {
     expect(await rowCounts()).toEqual({
       repos: 1,
       reviews: 1,
-      agentRuns: 2,
       findings: 1,
     });
     const rows = await database.select().from(reviews);

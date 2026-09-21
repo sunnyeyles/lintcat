@@ -16,6 +16,6 @@ export default function setup(): void {
       throw error;
     }
     console.error(`\n${error instanceof Error ? error.message : String(error)}\n`);
-    throw new Error("Model credentials are not set — the agent evaluations cannot run");
+    throw new Error("Model credentials are not set — the review evaluations cannot run");
   }
 }

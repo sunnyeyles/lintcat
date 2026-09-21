@@ -1,6 +1,4 @@
-export { AgentFindingsChart } from "./agent-findings-chart";
 export { CategorySeverityChart } from "./category-severity-chart";
-export { CostByAgentChart } from "./cost-by-agent-chart";
 export { CostByRepoTable } from "./cost-by-repo-table";
 export { parseRange, RANGE_PHRASE } from "./range";
 export { RangeScope } from "./range-scope";

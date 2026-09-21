@@ -5,10 +5,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import {
   CreateMessageRequestSchema,
-  ProgressNotificationSchema,
   type CallToolResult,
   type CreateMessageRequest,
-  type Progress,
 } from "@modelcontextprotocol/sdk/types.js";
 import {
   finalFindingsJson,
@@ -97,13 +95,6 @@ async function readResource(client: Client, uri: string) {
   return contents[0] as { uri: string; mimeType?: string; text: string };
 }
 
-/** Replaces the fixture repository, so `afterEach` still removes exactly one. */
-function useRepo(files: Record<string, string>): TestRepo {
-  repo.remove();
-  repo = createTestRepo(files);
-  return repo;
-}
-
 function scriptedModel(findings: ReturnType<typeof makeFinding>[]) {
   return makeModel([message([textBlock(finalFindingsJson(findings))], "end_turn")]).model;
 }
@@ -118,7 +109,6 @@ describe("the tool list", () => {
       "describe_file",
       "find_references",
       "get_review",
-      "list_review_agents",
       "list_reviews",
       "repository_overview",
       "review_local_changes",
@@ -126,7 +116,6 @@ describe("the tool list", () => {
       "review_trends",
       "search_code",
       "suppress_finding",
-      "validate_agent_config",
     ]);
     const writes = tools.filter((tool) => tool.annotations?.readOnlyHint !== true);
     expect(writes.map((tool) => tool.name).sort()).toEqual(["apply_fix", "review_pull_request", "suppress_finding"]);
@@ -272,62 +261,6 @@ describe("search_code", () => {
   });
 });
 
-describe("list_review_agents", () => {
-  function configuredRepo(config: string): void {
-    useRepo({
-      ".github/pr-review-agents.yml": config,
-      "src/sessions.ts": "export const sessions = [];\n",
-      "packages/api/server.ts": "export const server = {};\n",
-    });
-    repo.git("checkout", "-q", "-b", "feature");
-    repo.write("src/sessions.ts", "export const sessions = [1];\n");
-  }
-
-  it("reports each agent's category and gate, and which the changes wake", async () => {
-    configuredRepo(
-      ["agents:", "  - agent: security", "    paths:", "      - packages/**", "  - correctness", ""].join("\n"),
-    );
-    const client = await connect(environment({ env: {} }));
-
-    const { isError, texts } = await call(client, "list_review_agents", { base: "main" });
-
-    expect(isError).toBe(false);
-    const listing = JSON.parse(texts[1]!);
-    expect(listing.configured).toBe(true);
-    expect(listing.changedFiles).toEqual(["src/sessions.ts"]);
-    expect(listing.agents).toMatchObject([
-      { category: "security", paths: ["packages/**"], wakes: false },
-      { category: "correctness", paths: null, wakes: true },
-    ]);
-    expect(texts[0]).toContain("correctness would run on the current changes");
-  });
-
-  it("says nothing would run when every gate misses the changes", async () => {
-    configuredRepo(["agents:", "  - agent: security", "    paths:", "      - packages/**", ""].join("\n"));
-    const client = await connect(environment({ env: {} }));
-
-    const { texts } = await call(client, "list_review_agents", { base: "main" });
-
-    const listing = JSON.parse(texts[1]!);
-    expect(listing.agents).toMatchObject([
-      { category: "security", wakes: false, reason: "no changed file matches its paths" },
-    ]);
-    expect(texts[0]).toContain("none would run on the current changes");
-  });
-
-  it("reports the defaults for a repository that configures nothing", async () => {
-    const client = await connect(environment({ env: {} }));
-
-    const { isError, texts } = await call(client, "list_review_agents", { base: "main" });
-
-    expect(isError).toBe(false);
-    const listing = JSON.parse(texts[1]!);
-    expect(listing.configured).toBe(false);
-    expect(listing.agents).toMatchObject([{ category: "general", paths: null, wakes: true }]);
-    expect(texts[0]).toContain("no .github/pr-review-agents.yml, so these are the defaults");
-  });
-});
-
 describe("review_local_changes", () => {
   it("returns only findings on lines the working tree changed", async () => {
     const env = environment({
@@ -344,7 +277,6 @@ describe("review_local_changes", () => {
     expect(isError).toBe(false);
     expect(texts[0]).toContain("Reviewed 1 changed file(s)");
     const details = JSON.parse(texts[1]!);
-    expect(details.agents).toEqual(["general"]);
     expect(details.findings.map((finding: { title: string }) => finding.title)).toEqual(["Admin is always on"]);
   });
 
@@ -440,49 +372,6 @@ describe("review scopes", () => {
     expect(isError).toBe(false);
     expect(texts[0]).toContain("No changes between");
     expect(createLanguageModel).not.toHaveBeenCalled();
-  });
-
-  it("gates the agents on the scope's changed files, not the working tree's", async () => {
-    repo.git("add", "src/sessions.ts");
-    repo.write("src/api.ts", "export const unstaged = 1;\n");
-    const client = await connect(environment({ env: {} }));
-
-    const { texts } = await call(client, "list_review_agents", { scope: "staged" });
-
-    expect(JSON.parse(texts[1]!).changedFiles).toEqual(["src/sessions.ts"]);
-  });
-});
-
-describe("review progress", () => {
-  function reported(progress: Progress[]) {
-    return progress.map(({ progress: done, total, message }) => ({ done, total, message }));
-  }
-
-  it("reports each agent starting and finishing to a caller that sent a progress token", async () => {
-    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
-    const progress: Progress[] = [];
-
-    await client.callTool(
-      { name: "review_local_changes", arguments: { base: "main", index: false } },
-      undefined,
-      { onprogress: (update) => progress.push(update) },
-    );
-
-    expect(reported(progress)).toEqual([
-      { done: 0, total: 1, message: "general started" },
-      { done: 1, total: 1, message: "general completed" },
-    ]);
-  });
-
-  it("sends nothing to a caller that sent no progress token", async () => {
-    const notified = vi.fn();
-    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
-    client.setNotificationHandler(ProgressNotificationSchema, notified);
-
-    const { isError } = await call(client, "review_local_changes", { base: "main", index: false });
-
-    expect(isError).toBe(false);
-    expect(notified).not.toHaveBeenCalled();
   });
 });
 
@@ -660,23 +549,14 @@ describe("history tools", () => {
       repo: "widgets",
       prNumber: 7,
       headSha: "a".repeat(40),
-      agents: ["security"],
       summary: "One finding.",
       durationMs: 1_000,
-      agentRuns: [
-        {
-          agent: "security",
-          durationMs: 1_000,
-          findingCount: 1,
-          inputTokens: 10,
-          cacheCreationInputTokens: 0,
-          cacheReadInputTokens: 0,
-          outputTokens: 5,
-        },
-      ],
+      inputTokens: 10,
+      cacheCreationInputTokens: 0,
+      cacheReadInputTokens: 0,
+      outputTokens: 5,
       findings: [
         {
-          agent: "security",
           file: "src/auth.ts",
           line: 3,
           category: "security",
@@ -750,32 +630,15 @@ describe("history tools", () => {
 });
 
 describe("resources", () => {
-  it("offers the configuration resource and a template per addressable kind", async () => {
+  it("offers a template per addressable kind", async () => {
     const client = await connect(environment());
 
-    const { resources } = await client.listResources();
     const { resourceTemplates } = await client.listResourceTemplates();
 
-    expect(resources.map((resource) => resource.uri)).toEqual(["pr-review://config"]);
     expect(resourceTemplates.map((template) => template.uriTemplate).sort()).toEqual([
       "pr-review://file/{+path}",
       "pr-review://review/{org}/{id}",
     ]);
-  });
-
-  it("resolves the checkout's agent configuration", async () => {
-    const client = await connect(environment());
-
-    const contents = await readResource(client, "pr-review://config");
-
-    expect(contents.mimeType).toBe("application/json");
-    expect(JSON.parse(contents.text)).toMatchObject({
-      checkout: repo.root,
-      present: false,
-      valid: true,
-      usingDefaults: true,
-      agents: [{ agent: "general" }],
-    });
   });
 
   it("reads a file from the working tree, not the commit", async () => {
@@ -841,13 +704,13 @@ describe("the prompt list", () => {
 
     const { messages } = await client.getPrompt({
       name: "review_branch",
-      arguments: { base: "origin/main", agents: "security" },
+      arguments: { base: "origin/main" },
     });
 
     expect(messages).toHaveLength(1);
     expect(messages[0]!.role).toBe("user");
     const text = messages[0]!.content.type === "text" ? messages[0]!.content.text : "";
-    expect(text).toContain('`review_local_changes` with base "origin/main", agents "security"');
+    expect(text).toContain('`review_local_changes` with base "origin/main"');
     expect(text).toContain("find_references");
   });
 
@@ -890,7 +753,7 @@ describe("a review through client sampling", () => {
     expect(texts[0]).toContain("Reduced single-shot review");
     expect(texts[1]).toContain("Reviewed 1 changed file(s)");
     const details = JSON.parse(texts[2]!);
-    expect(details).toMatchObject({ singleShot: true, agents: ["general"], synthesis: "skipped" });
+    expect(details).toMatchObject({ singleShot: true });
     expect(details.findings.map((finding: { title: string }) => finding.title)).toEqual(["Admin is always on"]);
     expect(asked).toHaveLength(1);
     expect(asked[0]!.messages[0]!.content).toMatchObject({ type: "text" });

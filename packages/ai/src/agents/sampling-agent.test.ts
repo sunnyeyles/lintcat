@@ -31,10 +31,9 @@ describe("the single-shot sampling agent", () => {
     expect(findings).toMatchObject([{ title: "Assignment in a condition" }]);
   });
 
-  it("is the standalone general agent, so a run of it skips synthesis", () => {
+  it("is the general agent", () => {
     expect(createSamplingAgent({ sample: async () => "" })).toMatchObject({
       name: "general",
-      standalone: true,
     });
   });
 

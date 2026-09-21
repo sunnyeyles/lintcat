@@ -11,7 +11,7 @@ export const DOCS_NAV: DocsSection[] = [
       {
         href: DOCS_HOME,
         title: "Introduction",
-        summary: "What the agents review, and what they are never allowed to do.",
+        summary: "What the reviewer looks for, and what it is never allowed to do.",
       },
       {
         href: "/docs/quickstart",
@@ -26,17 +26,12 @@ export const DOCS_NAV: DocsSection[] = [
       {
         href: "/docs/how-it-works",
         title: "The review pipeline",
-        summary: "Agents propose, a synthesiser refines, deterministic code decides.",
+        summary: "The reviewer proposes, deterministic code decides.",
       },
       {
         href: "/docs/trust-boundary",
         title: "The trust boundary",
         summary: "Model output is untrusted data until validation has passed it.",
-      },
-      {
-        href: "/docs/agents",
-        title: "Agents",
-        summary: "The general agent, the five specialists, and how a repository picks.",
       },
     ],
   },

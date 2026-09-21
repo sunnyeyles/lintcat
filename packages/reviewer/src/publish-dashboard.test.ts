@@ -16,29 +16,12 @@ const target: ReviewTarget = {
 };
 
 const review: DashboardReview = {
-  agents: ["security", "docs-drift"],
-  summary: "1 finding from security, docs-drift",
+  summary: "1 finding",
   durationMs: 8_400,
-  agentRuns: [
-    {
-      agent: "security",
-      durationMs: 8_000,
-      findingCount: 1,
-      inputTokens: 1_200,
-      cacheCreationInputTokens: 3_000,
-      cacheReadInputTokens: 0,
-      outputTokens: 340,
-    },
-    {
-      agent: "docs-drift",
-      durationMs: 5_000,
-      findingCount: 0,
-      inputTokens: 900,
-      cacheCreationInputTokens: 0,
-      cacheReadInputTokens: 3_000,
-      outputTokens: 120,
-    },
-  ],
+  inputTokens: 2_100,
+  cacheCreationInputTokens: 3_000,
+  cacheReadInputTokens: 3_000,
+  outputTokens: 460,
   findings: [
     {
       file: "src/sessions.ts",
@@ -48,7 +31,6 @@ const review: DashboardReview = {
       title: "Assignment instead of comparison in admin check",
       explanation: "The if condition assigns instead of comparing.",
       confidence: 0.95,
-      agent: "security",
     },
   ],
 };

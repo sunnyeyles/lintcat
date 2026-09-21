@@ -8,7 +8,6 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import {
-  AgentFindingsChart,
   CategorySeverityChart,
   parseRange,
   RANGE_PHRASE,
@@ -72,7 +71,7 @@ async function TrendsBody({ slug, range }: { slug: string; range: Range }) {
         <Stat
           label="Median duration"
           value={formatDuration(totals.medianDurationMs)}
-          hint="slowest agent leg per review"
+          hint="per review"
         />
       </StatGrid>
 
@@ -88,11 +87,8 @@ async function TrendsBody({ slug, range }: { slug: string; range: Range }) {
           <div className="min-w-0 xl:col-span-2">
             <SeverityTrendChart points={trends.points} rangePhrase={phrase} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 xl:col-span-2">
             <ReviewVolumeChart points={trends.points} rangePhrase={phrase} />
-          </div>
-          <div className="min-w-0">
-            <AgentFindingsChart byAgent={trends.byAgent} rangePhrase={phrase} />
           </div>
           <div className="min-w-0 xl:col-span-2">
             <CategorySeverityChart
@@ -122,7 +118,7 @@ export default async function AnalyticsPage({
       <PageHeader
         eyebrow="Analytics"
         title="Trends"
-        description={`What the agents found in ${phrase}, and where it came from.`}
+        description={`What the review found in ${phrase}, and where it came from.`}
       />
 
       <div className="mt-8">

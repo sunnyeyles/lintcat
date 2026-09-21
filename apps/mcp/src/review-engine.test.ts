@@ -1,4 +1,4 @@
-import type { ReviewModel } from "@pr-review/ai";
+import { GENERAL_AGENT, type ReviewModel } from "@pr-review/ai";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it } from "vitest";
 
@@ -24,58 +24,52 @@ function environment(env: Record<string, string | undefined>): McpEnvironment {
   };
 }
 
-const request = { baseSha: "abc1234", select: "" };
-
 describe("choosing how a review runs", () => {
-  it("runs the tool-calling agents when a provider key is set", () => {
+  it("runs the tool-calling agent when a provider key is set", () => {
     const selected = selectReviewEngine(
       environment({ OPENAI_API_KEY: "sk-test" }),
       staticClient({ sampling: true }),
-      request,
     );
 
     expect(selected.singleShot).toBe(false);
     expect(selected.engine).toHaveProperty("model");
-    expect(selected.agents).toEqual({ readAt: "abc1234", select: "" });
   });
 
   it("falls back to one sampling agent when no key is set and the client samples", () => {
     const selected = selectReviewEngine(
       environment({}),
       staticClient({ sampling: true }),
-      request,
     );
 
     expect(selected.singleShot).toBe(true);
-    expect(selected.engine).toHaveProperty("createAgents");
-    expect(selected.agents).toMatchObject({ use: [{ category: "general" }] });
+    expect(selected.engine).toHaveProperty("createAgent");
   });
 
-  it("builds a standalone general agent over the client's sampling", () => {
+  it("builds a general agent over the client's sampling", () => {
     const client = staticClient({ sampling: true }, [], async () => "{}");
-    const engine = selectReviewEngine(environment({}), client, request).engine;
-    if (!("createAgents" in engine)) {
+    const engine = selectReviewEngine(environment({}), client).engine;
+    if (!("createAgent" in engine)) {
       throw new Error("expected the sampling engine");
     }
 
-    const agents = engine.createAgents({
+    const agent = engine.createAgent({
       client: {} as never,
-      agents: [],
+      agent: GENERAL_AGENT,
       index: undefined,
       logger: createCapturingLogger().logger,
     });
 
-    expect(agents).toMatchObject([{ name: "general", standalone: true }]);
+    expect(agent).toMatchObject({ name: "general" });
   });
 
   it("names both ways out when there is no key and no sampling", () => {
-    expect(() => selectReviewEngine(environment({}), staticClient(), request)).toThrow(
+    expect(() => selectReviewEngine(environment({}), staticClient())).toThrow(
       /No model API key is set and this client does not offer sampling/,
     );
   });
 
   it("points at the provider key environment variables and at sampling", () => {
-    expect(() => selectReviewEngine(environment({}), staticClient(), request)).toThrow(
+    expect(() => selectReviewEngine(environment({}), staticClient())).toThrow(
       /ANTHROPIC_API_KEY.*sampling\/createMessage/s,
     );
   });

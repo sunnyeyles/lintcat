@@ -179,7 +179,6 @@ async function seedReview(repo: InstallationRepository): Promise<void> {
     repoId: row!.id,
     prNumber: 1,
     headSha: `sha-${repo.name}`,
-    agents: ["security"],
     summary: "ok",
   });
 }
@@ -369,8 +368,7 @@ describe("handleGithubWebhook installation", () => {
       repoId: repo!.id,
       prNumber: 1,
       headSha: "abc",
-      agents: ["security"],
-      summary: "ok",
+        summary: "ok",
     });
 
     await deliver(created());

@@ -9,7 +9,6 @@ import {
   recordingDelivery,
   type FinishedReviewRun,
 } from "#src/review-delivery";
-import { skippedSynthesis } from "#src/review-pipeline";
 import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
@@ -46,25 +45,16 @@ const unpatched: ReviewFinding = {
 const run: FinishedReviewRun = {
   outcome: {
     candidates: [patched, unpatched],
-    agentFailures: [],
-    synthesis: skippedSynthesis("standalone agent", [patched, unpatched]),
     findings: [patched, unpatched],
     patches: { proposed: 1, verified: 1 },
     suppressed: 0,
   },
-  agents: [],
-  usage: [
-    {
-      agent: "security",
-      durationMs: 8_000,
-      usage: {
-        inputTokens: 1_200,
-        cacheCreationInputTokens: 0,
-        cacheReadInputTokens: 0,
-        outputTokens: 340,
-      },
-    },
-  ],
+  usage: {
+    inputTokens: 1_200,
+    cacheCreationInputTokens: 0,
+    cacheReadInputTokens: 0,
+    outputTokens: 340,
+  },
   durationMs: 8_400,
 };
 

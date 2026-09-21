@@ -4,13 +4,10 @@
  */
 
 import {
+  GENERAL_AGENT,
   inCodePrompts,
   type LangfusePromptWriter,
 } from "@pr-review/ai";
-import {
-  repositoryAgentConfigYaml,
-  repositoryAgents,
-} from "@pr-review/ai/agent-test-support";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it, vi } from "vitest";
 
@@ -26,10 +23,6 @@ const CREDENTIALS = {
   LANGFUSE_PUBLIC_KEY: "pk-test",
   LANGFUSE_SECRET_KEY: "sk-test",
 };
-
-const configuredAgents = repositoryAgents();
-/** The seeder reads the same config the action does. */
-const configYaml = repositoryAgentConfigYaml();
 
 interface Harness {
   environment: Parameters<typeof main>[1] & {};
@@ -49,7 +42,6 @@ function harness(
     lines,
     environment: {
       env,
-      readConfigFile: async () => configYaml,
       createWriter: vi.fn(() => ({
         readLabelled: vi.fn(async () => undefined),
         publish: vi.fn(async ({ name, text, label }) => {
@@ -65,11 +57,10 @@ function harness(
 }
 
 describe("parseSeedArgs", () => {
-  it("defaults to the production label, a real run, and the default config", () => {
+  it("defaults to the production label, and a real run", () => {
     expect(parseSeedArgs([])).toEqual({
       label: "production",
       dryRun: false,
-      config: ".github/pr-review-agents.yml",
     });
   });
 
@@ -78,16 +69,10 @@ describe("parseSeedArgs", () => {
     expect(parseSeedArgs(["--label=staging"]).label).toBe("staging");
   });
 
-  it("accepts --config in both spellings", () => {
-    expect(parseSeedArgs(["--config", "agents.yml"]).config).toBe("agents.yml");
-    expect(parseSeedArgs(["--config=agents.yml"]).config).toBe("agents.yml");
-  });
-
   it("accepts --dry-run alongside a label", () => {
     expect(parseSeedArgs(["--label", "staging", "--dry-run"])).toEqual({
       label: "staging",
       dryRun: true,
-      config: ".github/pr-review-agents.yml",
     });
   });
 
@@ -96,7 +81,6 @@ describe("parseSeedArgs", () => {
     expect(parseSeedArgs(["--", "--dry-run"])).toEqual({
       label: "production",
       dryRun: true,
-      config: ".github/pr-review-agents.yml",
     });
   });
 
@@ -105,13 +89,10 @@ describe("parseSeedArgs", () => {
     expect(() => parseSeedArgs(["--label", "--dry-run"])).toThrow(
       /--label needs a value/,
     );
-    expect(() => parseSeedArgs(["--config"])).toThrow(/--config needs a value/);
   });
 
   it("rejects the `=` spelling with an empty value", () => {
-    // Otherwise the empty path reaches the loader and the failure names no file.
     expect(() => parseSeedArgs(["--label="])).toThrow(/--label needs a value/);
-    expect(() => parseSeedArgs(["--config="])).toThrow(/--config needs a value/);
   });
 
   it("rejects an unknown argument rather than ignoring it", () => {
@@ -147,19 +128,13 @@ describe("requireLangfuseConfig", () => {
 });
 
 describe("main", () => {
-  it("publishes every configured prompt and succeeds", async () => {
+  it("publishes the general prompt and succeeds", async () => {
     const { environment, published, lines } = harness();
 
     await expect(main([], environment)).resolves.toBe(0);
 
-    expect(published.map((entry) => entry.name).sort()).toEqual([
-      "correctness_system",
-      "docs_drift_system",
-      "performance_system",
-      "security_system",
-      "test_coverage_system",
-    ]);
-    expect(lines.join("\n")).toContain("security");
+    expect(published.map((entry) => entry.name)).toEqual(["general_system"]);
+    expect(lines.join("\n")).toContain("general");
   });
 
   it("publishes exactly the prompts a review would fall back to", async () => {
@@ -167,10 +142,8 @@ describe("main", () => {
 
     await main([], environment);
 
-    const expected = inCodePrompts(configuredAgents);
-    const byName = new Map(published.map((e) => [e.name, e.text]));
-    expect(byName.get("security_system")).toBe(expected.security);
-    expect(byName.get("docs_drift_system")).toBe(expected["docs-drift"]);
+    const expected = inCodePrompts([GENERAL_AGENT]);
+    expect(published.map((e) => e.text)).toEqual([expected["general"]]);
   });
 
   it("threads the label through to the publish", async () => {
@@ -212,7 +185,7 @@ describe("main", () => {
   it("exits non-zero when a prompt could not be published", async () => {
     const { environment } = harness(CREDENTIALS, {
       readLabelled: vi.fn(async (name: string) => {
-        if (name === "security_system") {
+        if (name === "general_system") {
           throw new Error("langfuse unavailable");
         }
         return undefined;
