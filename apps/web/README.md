@@ -234,6 +234,17 @@ and use `http://lvh.me:3000` and `http://acme.lvh.me:3000`; register
 4. The OAuth callback URL is registered once, on the apex:
    `https://example.com/api/auth/callback/github`.
 
+The project's root directory is `apps/web`, so `apps/web/vercel.json` is the
+one Vercel reads. Its `ignoreCommand` runs `turbo-ignore`, which skips the
+build when a push changed nothing this app depends on — most pushes here touch
+the reviewer, the CLI or the action, and each one otherwise costs a full
+deployment.
+
+A preview that fails within seconds of the push, with no preview URL, never
+reached the build: look at the account rather than the diff. A pull request
+from a fork fails the same way with "Authorization required to deploy" until
+its author is authorized on the Vercel team.
+
 ## The seam
 
 Pages never touch Drizzle. They ask for a `DataSource` (`packages/db/src/dashboard/types.ts`):
