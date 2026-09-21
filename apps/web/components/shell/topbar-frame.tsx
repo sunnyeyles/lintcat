@@ -28,6 +28,7 @@ export function TopbarFrame({
         {left}
         <Link
           href={docsHref}
+          data-animate-on-hover
           className="flex min-w-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Wordmark />
