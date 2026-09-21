@@ -6,6 +6,7 @@ import {
   seedLayout,
 } from "@/lib/codebase-map";
 import type {
+  Clustering,
   EmphasisLevel,
   MapViewState,
   NeighbourDirection,
@@ -41,6 +42,7 @@ export interface SceneEdge {
 }
 
 export interface Scene {
+  clustering: Clustering;
   nodes: readonly SceneNode[];
   edges: readonly SceneEdge[];
   byId: ReadonlyMap<string, SceneNode>;
@@ -175,5 +177,12 @@ export function buildScene(graph: NormalisedGraph, view: MapViewState, steps = 1
     if (node.y + node.radius > maxY) maxY = node.y + node.radius;
   }
 
-  return { nodes, edges, byId, representativeOf, bounds: { minX, minY, maxX, maxY } };
+  return {
+    clustering,
+    nodes,
+    edges,
+    byId,
+    representativeOf,
+    bounds: { minX, minY, maxX, maxY },
+  };
 }
