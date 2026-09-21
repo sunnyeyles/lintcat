@@ -6,7 +6,7 @@ import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { GitError } from "#src/git";
-import { REMOVED_AGENTS_ARGUMENT, rejectLegacyAgentConfig } from "#src/legacy-agent-config";
+import { REMOVED_AGENTS_ARGUMENT } from "#src/legacy-agent-config";
 import { openLocalRepository, type LocalRepository, type LocalScope } from "#src/local-git-client";
 import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
@@ -141,7 +141,6 @@ export function registerReviewTools(
     },
     async ({ index, ...args }, extra) => {
       const local = await openScoped(environment, connection, args);
-      await rejectLegacyAgentConfig(local.root);
       const files = await local.client.listChangedFiles(local.target);
       if (files.length === 0) {
         return {

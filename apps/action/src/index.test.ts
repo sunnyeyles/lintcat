@@ -40,7 +40,6 @@ const originalGithubActions = vi.hoisted(() => {
 import {
   actionEnvironment,
   getInput,
-  LEGACY_AGENT_CONFIG_PATH,
   MIGRATION_NOTE_URL,
   requireInput,
   runAction,
@@ -132,8 +131,6 @@ interface HarnessOptions {
   reviewThreads?: readonly ReviewThread[] | undefined;
   /** What the dashboard answers; a 200 carrying a review id by default. */
   dashboardResponse?: (() => Promise<Response>) | undefined;
-  /** Paths present in the workflow's checkout; none by default. */
-  checkoutFiles?: readonly string[] | undefined;
 }
 
 function harness(
@@ -206,8 +203,6 @@ function harness(
           ? Promise.reject(eventFile)
           : Promise.resolve(eventFile);
       },
-      fileExists: (path) =>
-        Promise.resolve((options.checkoutFiles ?? []).includes(path)),
       createLanguageModel: (config) => {
         modelConfigs.push({
           provider: config.provider,
@@ -637,21 +632,6 @@ describe("v2 agent configuration", () => {
     },
   );
 
-  it("fails when the legacy config file is in the checkout", async () => {
-    const { environment, modelConfigs, modelCalls, tokenConfigs } = harness(
-      workspaceEnv,
-      pullRequestEvent(),
-      { checkoutFiles: [`/work/repo/${LEGACY_AGENT_CONFIG_PATH}`] },
-    );
-
-    await expect(runAction(environment)).rejects.toThrow(
-      /`\.github\/pr-review-agents\.yml` was removed in v3: .*Delete the file/,
-    );
-    expect(modelConfigs).toEqual([]);
-    expect(modelCalls()).toBe(0);
-    expect(tokenConfigs).toEqual([]);
-  });
-
   it("fails a merge-learning run too, before its GitHub client", async () => {
     const { environment, tokenConfigs } = harness(
       { ...workspaceEnv, "INPUT_MEMORY-BRANCH": "pr-review-memory", INPUT_AGENTS: "security" },
@@ -662,10 +642,8 @@ describe("v2 agent configuration", () => {
     expect(tokenConfigs).toEqual([]);
   });
 
-  it("reviews as usual when neither is present", async () => {
-    const { environment, modelCalls, entries } = harness(workspaceEnv, pullRequestEvent(), {
-      checkoutFiles: ["/work/repo/.github/workflows/review.yml"],
-    });
+  it("reviews as usual when neither input is set", async () => {
+    const { environment, modelCalls, entries } = harness(workspaceEnv, pullRequestEvent());
 
     await expect(runAction(environment)).resolves.toBeUndefined();
 
@@ -1147,7 +1125,6 @@ describe("actionEnvironment", () => {
     const environment = actionEnvironment();
     expect(environment.env).toBe(process.env);
     expect(typeof environment.readEventFile).toBe("function");
-    expect(typeof environment.fileExists).toBe("function");
     expect(typeof environment.createLanguageModel).toBe("function");
     expect(typeof environment.createTokenClient).toBe("function");
     expect(typeof environment.createPromptClient).toBe("function");

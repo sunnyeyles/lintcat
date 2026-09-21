@@ -174,18 +174,6 @@ describe("reviewing a working tree", () => {
     expect(code).toBe(2);
   });
 
-  it("refuses a checkout that still holds the v2 agent config, before any model call", async () => {
-    const createLanguageModel = vi.fn(() => scriptedModel([]));
-    repo.write(".github/pr-review-agents.yml", "agents: [security]\n");
-
-    const { code, err } = await run(["--base", "main"], { createLanguageModel });
-
-    expect(err).toContain("`.github/pr-review-agents.yml` was removed in v3");
-    expect(err).toContain("single general reviewer");
-    expect(createLanguageModel).not.toHaveBeenCalled();
-    expect(code).toBe(2);
-  });
-
   it("refuses the removed --agents flag by name", async () => {
     const { code, err } = await run(["--agents", "security"]);
 
