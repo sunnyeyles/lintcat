@@ -14,7 +14,10 @@ import { Suspense } from "react";
 
 import {
   AgentRunStrip,
+  FindingsFocusProvider,
   FindingsTable,
+  ReviewMapSection,
+  ReviewMapSkeleton,
   ReviewPager,
   ReviewSummaryPanel,
 } from "@/components/review";
@@ -95,22 +98,28 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
       {review.runs.length > 0 ? <AgentRunStrip runs={review.runs} /> : null}
 
-      {review.findings.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ShieldCheck />
-            </EmptyMedia>
-            <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
-            <EmptyDescription>
-              Every agent ran and every candidate finding was dropped before publish.
-              That is the clean outcome, not a failure.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <FindingsTable findings={review.findings} />
-      )}
+      <FindingsFocusProvider>
+        <Suspense fallback={<ReviewMapSkeleton />}>
+          <ReviewMapSection slug={slug} reviewId={review.id} findings={review.findings} />
+        </Suspense>
+
+        {review.findings.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ShieldCheck />
+              </EmptyMedia>
+              <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
+              <EmptyDescription>
+                Every agent ran and every candidate finding was dropped before publish.
+                That is the clean outcome, not a failure.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <FindingsTable findings={review.findings} />
+        )}
+      </FindingsFocusProvider>
 
       <Suspense fallback={null}>
         <AdjacentReviews slug={slug} repoId={review.repoId} reviewId={review.id} />

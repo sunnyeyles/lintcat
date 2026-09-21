@@ -2,6 +2,8 @@
  * The repository index: a pure function over an in-memory file map, so it can
  * be tested with inline fixtures and reused unchanged anywhere the files come from.
  */
+import { nodesInCycles } from "#src/cycles";
+import { collectEntryPoints, isEntryPoint } from "#src/entry-points";
 import { parseImports, type ImportedName } from "#src/imports";
 import {
   INDEXED_LANGUAGES,
@@ -28,6 +30,10 @@ export interface IndexedFile {
   readonly package?: string;
   /** Distinct files importing this one, resolved. */
   readonly importerCount: number;
+  /** In a cycle of two or more files over the resolved edges; a self-import is not. */
+  readonly inCycle: boolean;
+  /** A source file nobody imports and nothing outside the graph runs. */
+  readonly dead: boolean;
   /** The test covering this source file, when one matches a convention. */
   readonly coveredBy?: string;
   /** The source file this test covers, when one matches a convention. */
@@ -154,6 +160,42 @@ function readImports(
   return { edges, importers, tally };
 }
 
+/** The resolved edges as an adjacency list, the graph the cycles run over. */
+function adjacencyOf(
+  edges: readonly ImportEdge[],
+): Map<string, readonly string[]> {
+  const graph = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (edge.to === undefined) {
+      continue;
+    }
+    const targets = graph.get(edge.from);
+    if (targets === undefined) {
+      graph.set(edge.from, [edge.to]);
+    } else {
+      targets.push(edge.to);
+    }
+  }
+  return graph;
+}
+
+/** Sets `inCycle` and `dead`, once the importer counts are known. */
+function flagFiles(
+  files: Map<string, MutableIndexedFile>,
+  edges: readonly ImportEdge[],
+  workspace: WorkspaceModel,
+): void {
+  const cycling = nodesInCycles(adjacencyOf(edges));
+  const entries = collectEntryPoints(workspace, (path) => files.has(path));
+  for (const file of files.values()) {
+    file.inCycle = cycling.has(file.path);
+    file.dead =
+      file.role === "source" &&
+      file.importerCount === 0 &&
+      !isEntryPoint(file.path, file.role, entries);
+  }
+}
+
 /** Builds the index. Paths are sorted, so the same tree always indexes alike. */
 export function buildRepositoryIndex(
   input: RepositoryIndexInput,
@@ -167,6 +209,8 @@ export function buildRepositoryIndex(
       role: classifyFileRole(path),
       language: languageOf(path),
       importerCount: 0,
+      inCycle: false,
+      dead: false,
       ...(owner === undefined ? {} : { package: owner }),
     });
   }
@@ -178,6 +222,7 @@ export function buildRepositoryIndex(
       file.importerCount = new Set(pointing.map((edge) => edge.from)).size;
     }
   }
+  flagFiles(files, edges, workspace);
 
   return {
     sha: input.sha,

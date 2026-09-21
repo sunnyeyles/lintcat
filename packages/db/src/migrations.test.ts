@@ -30,6 +30,8 @@ describe("migrations applied in order to an empty database", () => {
   it("give reviews its duration once and no token columns", async () => {
     expect(await columns("reviews")).toEqual([
       "agents",
+      "base_sha",
+      "changed_files",
       "created_at",
       "duration_ms",
       "head_sha",
@@ -38,6 +40,20 @@ describe("migrations applied in order to an empty database", () => {
       "repo_id",
       "summary",
     ]);
+  });
+
+  it("add repository_graphs and the review's base sha and changed files", async () => {
+    expect(await columns("repository_graphs")).toEqual([
+      "base_sha",
+      "created_at",
+      "edge_count",
+      "file_count",
+      "id",
+      "repo_id",
+      "snapshot",
+    ]);
+    expect(await columns("reviews")).toContain("base_sha");
+    expect(await columns("reviews")).toContain("changed_files");
   });
 
   it("add the ingest token, the finding's agent and agent_runs", async () => {

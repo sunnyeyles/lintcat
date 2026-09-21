@@ -7,7 +7,15 @@ import type {
   RepositoryHistoryClient,
   ReviewPublishClient,
 } from "@pr-review/github";
+import {
+  encodeRepositoryGraph,
+  type RepositoryGraphSnapshot,
+} from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
+import type {
+  ReviewRecordChangedFile,
+  ReviewRecordGraph,
+} from "@pr-review/schemas";
 
 import type { DashboardReview, PublishToDashboard } from "#src/publish-dashboard";
 import {
@@ -113,6 +121,24 @@ export function recordingDelivery(): RecordingDelivery {
   };
 }
 
+const RECORDED_STATUSES = new Set(["added", "modified", "removed", "renamed"]);
+
+// GitHub's copied, changed and unchanged have no status of their own here.
+function recordedStatus(status: string): ReviewRecordChangedFile["status"] {
+  return RECORDED_STATUSES.has(status)
+    ? (status as ReviewRecordChangedFile["status"])
+    : "modified";
+}
+
+/** The snapshot as the ingest payload carries it: base64 of gzipped JSON. */
+function graphPayload(snapshot: RepositoryGraphSnapshot): ReviewRecordGraph {
+  return {
+    gzip: Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64"),
+    fileCount: snapshot.files.length,
+    edgeCount: snapshot.edges.length,
+  };
+}
+
 /** What one finished run contributes to the dashboard. */
 export function dashboardReview({
   outcome,
@@ -122,6 +148,14 @@ export function dashboardReview({
   const names = usage.map((report) => report.agent);
   const count = outcome.findings.length;
   return {
+    baseSha: outcome.baseSha,
+    changedFiles: outcome.changedFiles.map((file) => ({
+      path: file.filename,
+      status: recordedStatus(file.status),
+      additions: file.additions,
+      deletions: file.deletions,
+    })),
+    ...(outcome.graph === undefined ? {} : { graph: graphPayload(outcome.graph) }),
     agents: names,
     summary: `${count === 1 ? "1 finding" : `${count} findings`} from ${names.join(", ") || "no agent"}`,
     durationMs,

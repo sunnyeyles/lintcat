@@ -13,6 +13,7 @@
     "@pr-review/db": "workspace:*",
     "@pr-review/design": "workspace:*",
     "@pr-review/github": "workspace:*",
+    "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",
     "@pr-review/schemas": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
@@ -31,6 +32,8 @@
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "graphology": "^0.26.0",
+    "sigma": "^3.0.3",
     "typescript": "^5.9.3"
   }
 }

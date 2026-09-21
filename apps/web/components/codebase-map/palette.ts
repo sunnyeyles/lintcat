@@ -1,0 +1,67 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+const TOKENS = [
+  "--background",
+  "--foreground",
+  "--muted-foreground",
+  "--border",
+  "--ring",
+  "--map-module",
+  "--map-module-changed",
+  "--map-structure",
+  "--map-structure-border",
+  "--map-label",
+  "--map-edge",
+  "--map-kind-1",
+  "--map-kind-3",
+  "--severity-low",
+  "--severity-medium",
+  "--severity-high",
+] as const;
+
+export type MapToken = (typeof TOKENS)[number];
+export type MapPalette = Record<MapToken, string>;
+
+export function readPalette(element: Element): MapPalette {
+  const style = getComputedStyle(element);
+  const palette = {} as MapPalette;
+  for (const token of TOKENS) {
+    palette[token] = style.getPropertyValue(token).trim() || "#888888";
+  }
+  return palette;
+}
+
+/** Re-read on a theme class change, because canvas cannot inherit CSS variables. */
+export function usePalette(element: Element | null): MapPalette | null {
+  const [palette, setPalette] = useState<MapPalette | null>(null);
+
+  useEffect(() => {
+    if (!element) return;
+    const refresh = () => setPalette(readPalette(element));
+    refresh();
+    const observer = new MutationObserver(refresh);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "style", "data-theme"],
+    });
+    return () => observer.disconnect();
+  }, [element]);
+
+  return palette;
+}
+
+export function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return reduced;
+}

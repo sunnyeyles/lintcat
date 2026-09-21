@@ -9,6 +9,12 @@ export {
   type RepositoryIndex,
   type RepositoryIndexInput,
 } from "#src/build";
+export { nodesInCycles } from "#src/cycles";
+export {
+  collectEntryPoints,
+  isEntryPoint,
+  type EntryPoints,
+} from "#src/entry-points";
 export {
   findReferences,
   findReferencesDescription,
@@ -49,8 +55,16 @@ export {
   type ReferenceImport,
 } from "#src/references";
 export {
+  decodeRepositoryGraph,
+  encodeRepositoryGraph,
+  snapshotRepositoryIndex,
+  type RepositoryGraphSnapshot,
+  type SnapshotEdge,
+} from "#src/snapshot";
+export {
   createImportResolver,
   isRelativeSpecifier,
+  moduleCandidates,
   resolveRelativeImport,
   type ResolvedImport,
 } from "#src/resolve";
