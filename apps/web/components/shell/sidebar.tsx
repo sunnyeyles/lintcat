@@ -35,7 +35,7 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 const LINK_CLASS =
-  "focus-visible:ring-ring group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors outline-none focus-visible:ring-2";
+  "focus-visible:ring-ring group flex h-control items-center gap-2.5 rounded-md px-2 text-sm transition-colors outline-none focus-visible:ring-2";
 
 function NavLinks({ slug, onNavigate }: { slug: string; onNavigate?: () => void }) {
   const pathname = usePathname();

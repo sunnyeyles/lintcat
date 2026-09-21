@@ -134,7 +134,7 @@ export default async function OverviewPage({
         title="Overview"
         description={`${source.organization.name} — every review published in the last 30 days, newest first.`}
         actions={
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline">
             <Link href={organizationPath(slug, "/repos")}>All repositories</Link>
           </Button>
         }

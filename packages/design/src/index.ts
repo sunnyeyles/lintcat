@@ -93,6 +93,7 @@ export {
 } from "#src/components/tabs";
 export { Toggle, toggleVariants } from "#src/components/toggle";
 export { ToggleGroup, ToggleGroupItem } from "#src/components/toggle-group";
+export { Toolbar, ToolbarGroup } from "#src/components/toolbar";
 export {
   Tooltip,
   TooltipContent,

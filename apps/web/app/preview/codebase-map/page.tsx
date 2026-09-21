@@ -16,8 +16,8 @@ export default function CodebaseMapPreviewPage() {
         description="Where this change sits in the repository, what it imports and what depends on it. Sample data; the controls are for UI review and follow the user stories in issue #145."
         actions={
           <>
-            <Button variant="outline" size="sm">Share view</Button>
-            <Button size="sm">Open pull request</Button>
+            <Button variant="outline">Share view</Button>
+            <Button>Open pull request</Button>
           </>
         }
       />

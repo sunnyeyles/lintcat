@@ -70,6 +70,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
     <div className="flex flex-col gap-8">
       <PageHeader
         eyebrow="Review"
+        size="record"
         title={`${review.repo.owner}/${review.repo.name} #${review.prNumber}`}
         description={
           <>
@@ -84,7 +85,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           </>
         }
         actions={
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline">
             <Link href={repoHref}>
               <ArrowLeft />
               {review.repo.owner}/{review.repo.name}

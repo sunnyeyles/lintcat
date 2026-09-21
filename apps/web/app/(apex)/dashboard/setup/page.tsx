@@ -35,7 +35,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
   if (!session) redirect(signInUrl(selfUrl(request, params), appDomain()));
 
   const dashboard = (
-    <Button asChild variant="outline" size="sm">
+    <Button asChild variant="outline">
       <Link href={DASHBOARD_PATH}>Your organizations</Link>
     </Button>
   );

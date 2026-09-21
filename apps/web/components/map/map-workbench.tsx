@@ -23,6 +23,8 @@ import {
   TabsTrigger,
   ToggleGroup,
   ToggleGroupItem,
+  Toolbar,
+  ToolbarGroup,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -163,7 +165,7 @@ export function MapWorkbench({ graph, pr }: MapWorkbenchProps) {
           </div>
         </CardHeader>
 
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b px-4 py-2">
+        <Toolbar>
           <ToggleGroup
             type="multiple"
             variant="outline"
@@ -184,15 +186,15 @@ export function MapWorkbench({ graph, pr }: MapWorkbenchProps) {
             ))}
           </ToggleGroup>
           <Separator orientation="vertical" className="hidden h-5 sm:block" />
-          <div className="flex items-center gap-2">
+          <ToolbarGroup>
             <Switch id="dead" checked={view.showDead} onCheckedChange={(showDead) => update({ showDead })} />
             <Label htmlFor="dead">Unreferenced files</Label>
-          </div>
-          <div className="flex items-center gap-2">
+          </ToolbarGroup>
+          <ToolbarGroup>
             <Switch id="cycles" checked={view.showCycles} onCheckedChange={(showCycles) => update({ showCycles })} />
             <Label htmlFor="cycles">Import cycles</Label>
-          </div>
-          <div className="ml-auto flex items-center gap-1">
+          </ToolbarGroup>
+          <ToolbarGroup className="ml-auto gap-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="outline" size="icon-sm" aria-label="Zoom out" disabled={zoomIndex === 0} onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}>
@@ -220,8 +222,8 @@ export function MapWorkbench({ graph, pr }: MapWorkbenchProps) {
               </TooltipTrigger>
               <TooltipContent>Fit to view</TooltipContent>
             </Tooltip>
-          </div>
-        </div>
+          </ToolbarGroup>
+        </Toolbar>
 
         <CardContent className="grid gap-0 p-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="relative min-h-[28rem] border-b lg:border-r lg:border-b-0">
