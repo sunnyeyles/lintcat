@@ -21,11 +21,4 @@ export {
   type ReviewMemory,
   type Suppression,
 } from "#src/review-memory";
-export {
-  reviewRecordAgentRunSchema,
-  reviewRecordFindingSchema,
-  reviewRecordSchema,
-  type ReviewRecord,
-  type ReviewRecordAgentRun,
-  type ReviewRecordFinding,
-} from "#src/review-record";
+export { reviewRecordSchema, type ReviewRecord } from "#src/review-record";

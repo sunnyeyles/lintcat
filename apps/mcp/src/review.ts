@@ -1,4 +1,3 @@
-import type { AgentLifecycleListener } from "@pr-review/ai";
 import {
   githubDelivery,
   recordingDelivery,
@@ -17,22 +16,19 @@ import type { SelectedEngine } from "#src/review-engine";
 export interface ReviewRequest {
   client: ReviewClient;
   target: ReviewTarget;
-  /** What runs the review, and over which agent set; chosen by the caller. */
+  /** What runs the review; chosen by the caller. */
   selected: SelectedEngine;
   index?: boolean | undefined;
   /** Where the run writes back; absent is a dry run, and a local checkout has nothing to pass. */
   publishTo?: GithubDeliveryConfig["client"] | undefined;
   /** The memory whose hints and suppressions this run consults; absent reads none. */
   memory?: MemoryStore | undefined;
-  /** Aborting it stops the agents, and a cancelled run publishes nothing. */
+  /** Aborting it stops the agent, and a cancelled run publishes nothing. */
   signal?: AbortSignal | undefined;
-  /** Reports each agent's start and finish while the review runs. */
-  onAgentEvent?: AgentLifecycleListener | undefined;
 }
 
 export interface ReviewResult {
   outcome: ReviewOutcome;
-  agents: string[];
   /** The check-run text the Action would have published. */
   summary: string;
   /** The reduced review ran: one sampling request instead of the tool loop. */
@@ -64,7 +60,6 @@ export async function runReview(
     publishTo,
     memory,
     signal,
-    onAgentEvent,
   }: ReviewRequest,
 ): Promise<ReviewResult> {
   const { logger } = environment;
@@ -80,17 +75,14 @@ export async function runReview(
         summary = captured;
       },
     ),
-    agents: selected.agents,
     engine: selected.engine,
     policy: { index },
     ...(memory === undefined ? {} : { memory: { store: memory } }),
     logger,
     signal,
-    onAgentEvent,
   });
   return {
     outcome: run.outcome,
-    agents: run.agents.map((agent) => agent.category),
     summary,
     singleShot: selected.singleShot,
   };

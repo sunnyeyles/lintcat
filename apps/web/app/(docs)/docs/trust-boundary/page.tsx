@@ -15,10 +15,7 @@ const HEADINGS: Heading[] = [
   { id: "rules", title: "Reinforcing rules" },
 ];
 
-const BOUNDARY = `Agents ──► raw candidates (unknown[])
-              │
-              ▼
-        Synthesiser (AI: dedupe, merge, re-rank)
+const BOUNDARY = `Reviewer ──► raw candidates (unknown[])
               │
               ▼
    ┌──────────────────────────────────────┐
@@ -39,7 +36,7 @@ export default function TrustBoundaryPage() {
       href="/docs/trust-boundary"
       eyebrow="How it works"
       title="The trust boundary"
-      description="The core design constraint of the project: model output is untrusted data until deterministic code has validated it. The agents never touch GitHub."
+      description="The core design constraint of the project: model output is untrusted data until deterministic code has validated it. The reviewer never touches GitHub."
       headings={HEADINGS}
     >
       <Section id="boundary" title="Where the boundary sits">
@@ -52,7 +49,7 @@ export default function TrustBoundaryPage() {
         </P>
         <Bullets>
           <Bullet>Zod schema.</Bullet>
-          <Bullet>Category is one of your configured agents.</Bullet>
+          <Bullet>Category is the reviewer's own.</Bullet>
           <Bullet>The file exists in the pull request.</Bullet>
           <Bullet>The line is an added line in the diff.</Bullet>
           <Bullet>Confidence is at least 0.70.</Bullet>
@@ -63,7 +60,7 @@ export default function TrustBoundaryPage() {
 
       <Section id="patches" title="Patch verification">
         <P>
-          A patch never reaches a file on the agent&rsquo;s word. The agent quotes the lines it
+          A patch never reaches a file on the reviewer&rsquo;s word. The reviewer quotes the lines it
           means to replace; <code>verifyPatches()</code> re-reads the file at the head commit
           and discards the patch on any mismatch.
         </P>
@@ -85,7 +82,7 @@ export default function TrustBoundaryPage() {
       <Section id="rules" title="Reinforcing rules">
         <Bullets>
           <Bullet>
-            Agents get <strong>eight read-only tools</strong> and nothing else:{" "}
+            The reviewer gets <strong>eight read-only tools</strong> and nothing else:{" "}
             <code>get_pull_request</code>, <code>list_changed_files</code>,{" "}
             <code>get_diff</code>, <code>get_file</code>, <code>get_base_file</code>,{" "}
             <code>search_repository</code>, <code>find_references</code>,{" "}
@@ -98,7 +95,7 @@ export default function TrustBoundaryPage() {
             data, never instructions, and tool results grant no permissions.
           </Bullet>
           <Bullet>
-            Findings are <strong>filtered to the agent&rsquo;s own category</strong>, not
+            Findings are <strong>filtered to the reviewer&rsquo;s own category</strong>, not
             re-stamped, so category provenance stays deterministic.
           </Bullet>
           <Bullet>

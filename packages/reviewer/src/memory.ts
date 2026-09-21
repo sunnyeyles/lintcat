@@ -8,9 +8,7 @@ import {
   type ReviewPublishClient,
 } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
-import { type SynthesisHints } from "@pr-review/ai";
 import {
-  categoryLabel,
   reviewMemorySchema,
   type MemoryShape,
   type ReviewMemory,
@@ -28,14 +26,8 @@ export interface FindingSignal {
 /** A shape needs this many ignores, and no resolve, before it earns a hint. */
 export const HINT_IGNORED_THRESHOLD = 5;
 
-/** At most this many hints reach the prompt, across every category. */
+/** At most this many hints reach the prompt. */
 export const HINT_CAP = 10;
-
-/** A shape needs this many resolves, and no ignore, before it earns a keep hint. */
-export const HINT_RESOLVED_THRESHOLD = 3;
-
-/** At most this many hints per list reach the synthesiser. */
-export const SYNTHESIS_HINT_CAP = 5;
 
 /** A shape with no fresh signal for this long is forgotten. */
 export const MEMORY_TTL_DAYS = 90;
@@ -216,8 +208,7 @@ export function addSuppression(
     createdAt: now.toISOString(),
   };
   const others = memory.suppressions.filter(
-    (existing) =>
-      existing.category !== finding.category || existing.shape !== shape,
+    (existing) => existing.shape !== shape,
   );
   return { ...memory, suppressions: [...others, suppression] };
 }
@@ -227,10 +218,7 @@ export function isSuppressed(
   finding: SuppressibleFinding,
 ): boolean {
   const shape = titleShape(finding.title);
-  return memory.suppressions.some(
-    (suppression) =>
-      suppression.category === finding.category && suppression.shape === shape,
-  );
+  return memory.suppressions.some((suppression) => suppression.shape === shape);
 }
 
 /** Splits findings into the ones that survive the memory and the ones it hides. */
@@ -251,12 +239,9 @@ function hintSentence(shape: string): string {
   return `Findings like "${quoted}".`;
 }
 
-/** Deprioritise hints per category, most-ignored first, capped overall. */
-export function computeHints(
-  memory: ReviewMemory,
-  now: Date,
-): ReadonlyMap<string, readonly string[]> {
-  const qualifying = memory.shapes
+/** Deprioritise hints, most-ignored first, capped. */
+export function computeHints(memory: ReviewMemory, now: Date): string[] {
+  return memory.shapes
     .filter(
       (shape) =>
         shape.ignored >= HINT_IGNORED_THRESHOLD &&
@@ -264,48 +249,6 @@ export function computeHints(
         isFresh(shape, now),
     )
     .sort((a, b) => b.ignored - a.ignored)
-    .slice(0, HINT_CAP);
-
-  const hints = new Map<string, string[]>();
-  for (const shape of qualifying) {
-    const forCategory = hints.get(shape.category) ?? [];
-    forCategory.push(hintSentence(shape.shape));
-    hints.set(shape.category, forCategory);
-  }
-  return hints;
-}
-
-/** Shapes this repository acted on, and shapes it left alone, for the synthesiser. */
-export function computeSynthesisHints(
-  memory: ReviewMemory,
-  now: Date,
-): SynthesisHints {
-  const fresh = memory.shapes.filter((shape) => isFresh(shape, now));
-  const keep = fresh
-    .filter(
-      (shape) =>
-        shape.resolved >= HINT_RESOLVED_THRESHOLD && shape.ignored === 0,
-    )
-    .sort((a, b) => b.resolved - a.resolved);
-  const drop = fresh
-    .filter(
-      (shape) =>
-        shape.ignored >= HINT_IGNORED_THRESHOLD && shape.resolved === 0,
-    )
-    .sort((a, b) => b.ignored - a.ignored);
-
-  return {
-    keep: describe(keep),
-    drop: describe(drop),
-  };
-}
-
-/** Category-qualified, since the synthesiser sees every category at once. */
-function describe(shapes: readonly MemoryShape[]): string[] {
-  return shapes
-    .slice(0, SYNTHESIS_HINT_CAP)
-    .map(
-      (shape) =>
-        `${categoryLabel(shape.category)}: ${hintSentence(shape.shape)}`,
-    );
+    .slice(0, HINT_CAP)
+    .map((shape) => hintSentence(shape.shape));
 }

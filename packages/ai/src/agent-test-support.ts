@@ -2,8 +2,6 @@
  * Shared fixtures and scripted fakes for the agent tests. Not exported
  * from the package; the model and GitHub clients are structural fakes.
  */
-import { readFileSync } from "node:fs";
-
 import type {
   ChangedFile,
   FileContentsRequest,
@@ -21,39 +19,7 @@ import { vi } from "vitest";
 
 import { MockLanguageModelV4 } from "ai/test";
 
-import type { AgentDefinition } from "#src/agents/definition";
-import { parseAgentConfig } from "#src/agents/config";
 import type { ReviewContext } from "#src/agent-contract";
-
-const REPOSITORY_AGENT_CONFIG = ".github/pr-review-agents.yml";
-
-/** The shipped config file verbatim, for tests that feed it to a fake workspace. */
-export function repositoryAgentConfigYaml(): string {
-  return readFileSync(
-    new URL(`../../../${REPOSITORY_AGENT_CONFIG}`, import.meta.url),
-    "utf8",
-  );
-}
-
-let cachedAgents: AgentDefinition[] | undefined;
-
-/** This repository's own configured agents, used as the test fixture. */
-export function repositoryAgents(): AgentDefinition[] {
-  cachedAgents ??= parseAgentConfig(
-    repositoryAgentConfigYaml(),
-    REPOSITORY_AGENT_CONFIG,
-  );
-  return [...cachedAgents];
-}
-
-/** One named agent from repositoryAgents(); an unknown name is a test bug. */
-export function repositoryAgent(category: string): AgentDefinition {
-  const agent = repositoryAgents().find((entry) => entry.category === category);
-  if (agent === undefined) {
-    throw new Error(`${REPOSITORY_AGENT_CONFIG} defines no "${category}" agent`);
-  }
-  return agent;
-}
 
 /** Every tool createReviewTools exposes, sorted. */
 export const REVIEW_TOOL_NAMES = [

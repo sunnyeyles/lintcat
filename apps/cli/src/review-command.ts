@@ -77,21 +77,15 @@ async function review(
     {
       client: local.client,
       target: local.target,
-      selected: modelReviewEngine(environment, {
-        baseSha: local.baseSha,
-        select: options.agents,
-      }),
+      selected: modelReviewEngine(environment),
       index: options.index,
       memory: await openLocalMemoryStore(local.root),
       signal,
-      ...(options.progress
-        ? { onAgentEvent: ({ agent, phase }) => err(`  ${agent} ${phase}`) }
-        : {}),
     },
   );
 
   if (signal?.aborted === true) return EXIT_CANCELLED;
-  const { findings, suppressed, agentFailures } = result.outcome;
+  const { findings, suppressed } = result.outcome;
   const blocking = blockingFindings(findings, options.failOn);
   const render = { color: options.color ?? false };
   for (const finding of orderFindings(findings)) {
@@ -106,7 +100,6 @@ async function review(
         blocking,
         failOn: options.failOn,
         suppressed,
-        agentFailures: agentFailures.map((failure) => failure.agent),
       },
       render,
     ),

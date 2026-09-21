@@ -2,7 +2,7 @@
  * Delivery: the one seam a review run writes through. GitHub, the dashboard
  * and publishing nothing at all are adapters here.
  */
-import type { AgentDefinition, AgentUsageReport } from "@pr-review/ai";
+import type { TokenUsage } from "@pr-review/ai";
 import type {
   RepositoryHistoryClient,
   ReviewPublishClient,
@@ -26,10 +26,8 @@ import type { ReviewTarget } from "#src/review-target";
 /** One finished run, for anything that mirrors runs rather than reviews. */
 export interface FinishedReviewRun {
   outcome: ReviewOutcome;
-  /** The run's agent set, in configured order. */
-  agents: readonly AgentDefinition[];
-  /** One entry per agent that ran, in the same order. */
-  usage: readonly AgentUsageReport[];
+  /** Tokens the run's model calls spent. */
+  usage: TokenUsage;
   durationMs: number;
 }
 
@@ -119,23 +117,15 @@ export function dashboardReview({
   usage,
   durationMs,
 }: FinishedReviewRun): DashboardReview {
-  const names = usage.map((report) => report.agent);
   const count = outcome.findings.length;
   return {
-    agents: names,
-    summary: `${count === 1 ? "1 finding" : `${count} findings`} from ${names.join(", ") || "no agent"}`,
+    summary: count === 1 ? "1 finding" : `${count} findings`,
     durationMs,
-    agentRuns: usage.map((report) => ({
-      agent: report.agent,
-      durationMs: report.durationMs,
-      findingCount: outcome.findings.filter(
-        (finding) => finding.category === report.agent,
-      ).length,
-      ...report.usage,
-    })),
-    findings: outcome.findings.map((finding) => ({
+    ...usage,
+    // The patch is verbatim source, so the dashboard learns only that one survived.
+    findings: outcome.findings.map(({ patch, ...finding }) => ({
       ...finding,
-      agent: finding.category,
+      hasPatch: patch !== undefined,
     })),
   };
 }

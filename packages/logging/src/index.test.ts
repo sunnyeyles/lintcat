@@ -53,11 +53,11 @@ describe("createConsoleLogger", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const logger = createConsoleLogger();
 
-    logger.info("synthesis.started");
+    logger.info("review.started");
 
     expect(JSON.parse(log.mock.calls[0]?.[0] as string)).toEqual({
       level: "info",
-      event: "synthesis.started",
+      event: "review.started",
     });
   });
 
@@ -65,14 +65,14 @@ describe("createConsoleLogger", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const logger = createConsoleLogger();
 
-    logger.info("synthesis.completed", {
+    logger.info("review.completed", {
       refinedCount: 2,
       inputTokens: undefined,
     });
 
     expect(JSON.parse(log.mock.calls[0]?.[0] as string)).toEqual({
       level: "info",
-      event: "synthesis.completed",
+      event: "review.completed",
       refinedCount: 2,
     });
   });
@@ -121,8 +121,8 @@ describe("errorMessage", () => {
   });
 
   it("keeps a subclass's message", () => {
-    class SynthesisError extends Error {}
-    expect(errorMessage(new SynthesisError("invalid output"))).toBe(
+    class ReviewError extends Error {}
+    expect(errorMessage(new ReviewError("invalid output"))).toBe(
       "invalid output",
     );
   });

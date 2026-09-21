@@ -19,7 +19,7 @@ describe("docsNeighbours", () => {
   it("reads across sections", () => {
     const { previous, next } = docsNeighbours("/docs/trust-boundary");
     expect(previous?.href).toBe("/docs/how-it-works");
-    expect(next?.href).toBe("/docs/agents");
+    expect(next?.href).toBe("/docs/configuration");
   });
 
   it("gives nothing for a page outside the nav", () => {
@@ -34,9 +34,9 @@ describe("isDocsPageActive", () => {
   });
 
   it("matches a page and anything nested under it, trailing slash or not", () => {
-    expect(isDocsPageActive("/docs/agents", "/docs/agents")).toBe(true);
-    expect(isDocsPageActive("/docs/agents/", "/docs/agents")).toBe(true);
-    expect(isDocsPageActive("/docs/agents/security", "/docs/agents")).toBe(true);
-    expect(isDocsPageActive("/docs/agents-and-more", "/docs/agents")).toBe(false);
+    expect(isDocsPageActive("/docs/quickstart", "/docs/quickstart")).toBe(true);
+    expect(isDocsPageActive("/docs/quickstart/", "/docs/quickstart")).toBe(true);
+    expect(isDocsPageActive("/docs/quickstart/extra", "/docs/quickstart")).toBe(true);
+    expect(isDocsPageActive("/docs/quickstart-and-more", "/docs/quickstart")).toBe(false);
   });
 });

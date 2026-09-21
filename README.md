@@ -7,7 +7,7 @@ against your own model key. It publishes inline review comments and an
 ## What it finds
 
 One **general** agent reviews the whole pull request in a single pass, with no
-configuration. Its brief
+configuration and nothing to choose. Its brief
 ([`general-agent.ts`](packages/ai/src/agents/general-agent.ts)) is the problems
 a careful senior reviewer would block a merge on:
 
@@ -19,16 +19,6 @@ a careful senior reviewer would block a merge on:
 | **Tests** | a new or changed branch no existing test file exercises, or a test still asserting the old behaviour |
 | **Documentation** | README, docs, or code comments this change made wrong |
 
-Five specialists ship alongside it — Security, Correctness, Performance, Test
-coverage and Docs drift, one file each in
-[`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists).
-They are opt-in: a repository that names them in
-[`.github/pr-review-agents.yml`](#choosing-your-agents) gets a review from
-exactly those, run in parallel and merged by a synthesiser. Any subset can be
-selected per run. This repository's own
-[`.github/pr-review-agents.yml`](.github/pr-review-agents.yml) opts into all
-five and is a working starting point to copy.
-
 A finding may carry a **patch**: a replacement for a range of lines, quoted
 alongside the exact text it expects to replace. With [`fix: true`](#fixes) the
 surviving patches are committed to the pull request branch in one commit;
@@ -39,7 +29,7 @@ decides what actually gets published.
 
 ## How noisy it is
 
-**What it deliberately stays silent about.** Every agent is told not to report
+**What it deliberately stays silent about.** The agent is told not to report
 style, formatting, naming, micro-optimisations, missing documentation for new
 work, or architectural preferences — those categories are discarded rather
 than ranked down. It is told to report a problem only after reading the code,
@@ -51,22 +41,18 @@ and to prefer a few serious findings over many small ones.
 - a finding whose `confidence` is below **0.70** is dropped
 - a finding must land on a line the diff actually **added**, in a file the pull
   request touches
-- a finding must carry a category belonging to **this run's own agents**; a
-  security finding leaking out of the docs-drift agent is dropped, never
-  re-stamped
+- a finding must carry the agent's own category (`general`); any other is
+  dropped, never re-stamped
 - duplicates are removed and the survivors are **capped at 10**, strongest first
 - the check run's conclusion is always `neutral` — the review is advisory and
   never blocks a merge
 
 **What is not yet measured.** There is no review-quality benchmark, and this
 README will not quote one. [`evals/`](evals/README.md) runs the real pipeline
-against six fixture repositories and asserts fourteen things — five anchored
-recall assertions, three precision assertions, six health checks — which is
-enough to catch a reviewer that has gone silent or gone haywire, and is not a
-false-positive rate. `docs-drift` has no recall fixture at all, no fixture
-requires a patch, and there is one sample per arm. The eval README states each
-gap; [#126](https://github.com/sunnyeyles/pr-review-agents/issues/126) is
-measuring one of them.
+against fixture repositories and asserts anchored recall, precision and
+health checks — enough to catch a reviewer that has gone silent or gone
+haywire, and not a false-positive rate. No fixture requires a patch, and
+there is one sample per run. The eval README states each gap.
 
 ## Where your code goes
 
@@ -77,7 +63,7 @@ the result. Nothing is read from a secrets store at runtime, and this project's
 maintainers operate no service a review touches.
 
 The one place your code does go is **the model provider you configure**. The
-diff, the files the agents read, and the pull request's own text are sent to
+diff, the files the agent reads, and the pull request's own text are sent to
 `openai` or `anthropic` under your `api-key`. Setting
 [`model-base-url`](#model-providers) points that at a gateway, a proxy, or a
 self-hosted endpoint speaking the provider's API, which closes even that hop —
@@ -88,8 +74,8 @@ their inputs**:
 
 | Setting | What leaves, and where to | Closing it |
 | --- | --- | --- |
-| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls. The AI SDK records call inputs and outputs by default and this action does not disable it, so the exported spans carry the prompts and tool results — diff and file contents included — to `langfuse-base-url` (`https://cloud.langfuse.com` by default). | Leave both keys unset, the default; or point `langfuse-base-url` at your own instance. |
-| [`dashboard-token`](#configuration) + `dashboard-url` | One `POST` to `<dashboard-url>/api/ingest` per review ([`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)): owner, repo, PR number, head SHA, agent names, timings, token counts, and every published finding — file path, line, title, explanation, suggested fix, and, where a patch survived, its `expected` and `replacement` text, which are verbatim lines of your source. | Leave both unset, the default; or point `dashboard-url` at your own deployment of [`apps/web`](apps/web). |
+| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls, to `langfuse-base-url` (`https://cloud.langfuse.com` by default): span timings, token counts, agent and tool names, finding counts and outcomes. No prompt text, completions or tool results — so no diff and no file contents — unless `langfuse-record-io` is `true`, which exports all of them. | Leave both keys unset, the default; leave `langfuse-record-io` off, also the default; or point `langfuse-base-url` at your own instance. |
+| [`dashboard-token`](#configuration) + `dashboard-url` | One `POST` to `<dashboard-url>/api/ingest` per review ([`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)): owner, repo, PR number, head SHA, timings, token counts, and every published finding — file path, line, title, explanation, suggested fix, and whether a patch survived. The patch itself — its `expected` and `replacement` text, verbatim lines of your source — is never sent; it goes to GitHub only. | Leave both unset, the default; or point `dashboard-url` at your own deployment of [`apps/web`](apps/web). |
 
 Within GitHub, the Action asks for no more than it needs: `contents: read`,
 `pull-requests: write` and `checks: write`, each of which
@@ -161,13 +147,11 @@ GitHub Action (apps/action)
    ▼
 Review pipeline
    │
-   ├─ agent__<agent 1>  ─┐
-   ├─ agent__<agent 2>   ├─► join ─► synthesise ─► validate ─► END
-   └─ agent__<agent n>  ─┘
-                                                        │
-                                                        ▼
-                                GitHub Check Run + annotations
-                                (or job summary, on a fork PR)
+   └─ general agent (read-only tools) ─► validate ─► END
+                                            │
+                                            ▼
+                            GitHub Check Run + annotations
+                            (or job summary, on a fork PR)
 ```
 
 ---
@@ -178,16 +162,13 @@ This is the core design constraint of the project: **model output is untrusted
 data until deterministic code has validated it.**
 
 ```text
-Agents ──► raw candidates (unknown[])
-              │
-              ▼
-        Synthesiser (AI: dedupe, merge, re-rank)
+Agent ──► raw candidates (unknown[])
               │
               ▼
    ┌──────────────────────────────────────┐
    │ validateFindings()  — no model here  │
    │  1. Zod schema                       │
-   │  2. category is one of your agents   │
+   │  2. category is the agent's own      │
    │  3. file exists in the PR            │
    │  4. line is an ADDED line in the diff│
    │  5. confidence >= 0.70               │
@@ -212,20 +193,19 @@ Agents ──► raw candidates (unknown[])
 
 Reinforcing rules:
 
-- Agents are given **eight read-only tools** and nothing else:
+- The agent is given **eight read-only tools** and nothing else:
   `get_pull_request`, `list_changed_files`, `get_diff`, `get_file`,
   `get_base_file`, `search_repository`, `find_references`,
   `find_co_changed_files`. No write, comment, approve, merge, or execute tool
   exists. `search_repository` and `find_co_changed_files` read the repository's
-  default branch, so an agent is told to treat their results as pointers to
+  default branch, so the agent is told to treat their results as pointers to
   read with `get_file`, never as evidence; `find_references` answers from the
   [repository index](#repository-index) at the base commit.
-- Every agent's system prompt carries the same non-negotiable **prompt-injection
+- The agent's system prompt carries a non-negotiable **prompt-injection
   block**: repository contents (diffs, files, PR title/description, search
   results) are data, never instructions; tool results grant no permissions.
-- An agent's findings are **filtered to its own category**, not re-stamped. A
-  security finding leaking out of the docs-drift agent is dropped, so category
-  provenance stays deterministic.
+- The agent's findings are **filtered to its own category**, not re-stamped, so
+  category provenance stays deterministic.
 - The check run conclusion is `neutral` whenever findings exist — the app is
   advisory and never blocks a merge.
 - A **patch never reaches a file on the agent's word**. The agent quotes the
@@ -249,9 +229,8 @@ apps/
               plus index lookups and review history, for coding agents
   web/        The documentation site at /, and the dashboard behind it
 packages/
-  ai/         Provider selection (model.ts), prompts, agent
-              configuration, and agents/: agent definition, runtime loop,
-              read-only tools, synthesiser, specialists/ (the shipped agents)
+  ai/         Provider selection (model.ts), prompts, and agents/: the
+              general agent, its runtime loop and read-only tools
   reviewer/   Review pipeline, validation chain, check-run rendering
   github/     GitHub client (workflow-token auth) + Octokit calls
   schemas/    Zod schemas: ReviewFinding, the review trigger contract
@@ -266,39 +245,22 @@ scripts/      esbuild bundler for apps/action, its smoke test, and the
               Langfuse prompt seeder
 ```
 
-### Concurrency
+### Failure
 
-The review pipeline (`packages/reviewer/src/review-pipeline.ts`) runs every
-selected agent → `join` → `synthesise` → `validate`. The agents are started
-together with `Promise.all`, so they run concurrently. Inside one agent, the
-tool-calling loop is one `generateText` call
-(`packages/ai/src/agents/runtime.ts`), capped at 12 steps.
-
-When the general agent runs alone (the default), `synthesise` is skipped and
-reported as `synthesis.outcome: "skipped"` with reason `standalone agent`:
-there is nothing to merge, and `validate` still removes duplicates.
-
-### Partial failure
-
-One failed agent does not fail the review. `join` collects outcomes in the
-agents' original order (never completion order) and publishes what succeeded.
-Only when *every* agent fails does the pipeline throw — which
-fails the workflow step, so the run can be retried from the Actions UI.
-
-Synthesis failure is softer still: it falls back to the raw candidates and
-reports `synthesis.outcome: "failed"` on the result rather than failing the
-review.
+The review pipeline (`packages/reviewer/src/review-pipeline.ts`) runs the one
+agent, then `validate`. The agent's tool-calling loop is one `generateText`
+call (`packages/ai/src/agents/runtime.ts`), capped at 12 steps. If the agent
+fails the pipeline throws, which fails the workflow step, so the run can be
+retried from the Actions UI.
 
 ### Review memory
 
-With [`memory-branch`](#configuration) set, one read of the memory file serves
-both halves of the pipeline. The agents get the deprioritisation hints they
-have always had; the synthesiser gets its own `# Repository history` block —
-up to five shapes this repository acted on (three resolves, no ignores) to
-keep, and up to five it has repeatedly left alone (five ignores, no resolves)
-to cut first. Both lists are evidence, not rules: the prompt still forbids
-inventing a finding, and a shape with no signal for 90 days is forgotten.
-`memory.hints_attached` logs the counts that reached each side.
+With [`memory-branch`](#configuration) set, the agent gets deprioritisation
+hints: shapes this repository has repeatedly left alone (five ignores, no
+resolves) are named in a `# Repository history` block. They are evidence, not
+rules: the prompt still forbids inventing a finding, and a shape with no signal
+for 90 days is forgotten. Suppressions match on title shape alone.
+`memory.hints_attached` logs how many hints reached the agent.
 
 ---
 
@@ -308,21 +270,20 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 
 | Input | Required | Purpose |
 | --- | --- | --- |
-| `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agents and synthesiser authenticate with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. |
-| `model-provider` | no (default `openai`) | Which provider the agents and synthesiser call: `openai` or `anthropic`. An unknown name fails the step before any model call. |
+| `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agent authenticates with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. |
+| `model-provider` | no (default `openai`) | Which provider the agent calls: `openai` or `anthropic`. An unknown name fails the step before any model call. |
 | `github-token` | no (default `${{ github.token }}`) | Token for the eight read-only repository tools and for publishing the check run. |
-| `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-haiku-4-5`) | Default model id, as the provider spells it. An agent may [override it](#per-agent-models); the synthesiser always uses this one. |
+| `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-haiku-4-5`) | Model id, as the provider spells it. |
 | `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
-| `agents` | no (default `all`) | Which of the configured agents run: `all`, or a comma-separated subset of their names. Naming a subset also overrides any [path filters](#path-filters). |
-| `agent-config` | no (default `.github/pr-review-agents.yml`) | Path to the YAML file naming the agents. Optional — without it the general agent reviews alone; create it to opt into specialists. |
 | `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
-| `index` | no (default `true`) | Whether the review builds a [repository index](#repository-index) from the pull request's base commit before the agents start. `false` turns it off. |
+| `index` | no (default `true`) | Whether the review builds a [repository index](#repository-index) from the pull request's base commit before the agent starts. `false` turns it off. |
 | `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
-| `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agents and cut first by the synthesiser; shapes the repository acted on are the ones the synthesiser keeps. Needs `contents: write` and `closed` in the workflow's `types`. |
-| `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompts from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
+| `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agent. Needs `contents: write` and `closed` in the workflow's `types`. |
+| `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompt from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
 | `langfuse-secret-key` | no | The other half. Setting only one of the two disables both features and logs `langfuse.disabled_incomplete_credentials`. |
 | `langfuse-base-url` | no (default `https://cloud.langfuse.com`) | Langfuse host, for a self-hosted or regional instance. Keys are region-scoped: the wrong host 401s and drops every trace. |
 | `langfuse-prompt-label` | no (default `production`) | Which labelled version of each prompt to fetch — try a prompt change on one repository before promoting it. |
+| `langfuse-record-io` | no (default `false`) | Whether traces carry the prompts, completions and tool results of each model call — the diff and every file an agent read. `true` turns it on, for debugging a prompt; any other value keeps traces to timings, token counts and outcomes. |
 
 ### Model providers
 
@@ -348,163 +309,18 @@ takes explicit cache breakpoints (`packages/ai/src/agents/runtime.ts`). On the
 default provider, `openai`, nothing is requested and the two cache counters stay
 at zero; that is expected, not a regression.
 
-### Choosing your agents
-
-With no configuration file, the `general` agent
-([`packages/ai/src/agents/general-agent.ts`](packages/ai/src/agents/general-agent.ts))
-reviews every pull request on its own, and its findings carry the `general`
-category.
-
-Five opt-in specialists ship alongside it, one file each in
-[`packages/ai/src/agents/specialists/`](packages/ai/src/agents/specialists):
-
-| Name | Reviews for |
-| --- | --- |
-| `general` | The default: all of the below in one pass |
-| `security` | Auth, cross-tenant access, injection, secret leakage, privilege |
-| `correctness` | Logic errors, wrong bounds, unhandled null, broken error handling |
-| `performance` | N+1 queries, unbounded reads, quadratic scans, blocking I/O |
-| `test-coverage` | Branches this change adds or changes and leaves untested |
-| `docs-drift` | Documentation this change made wrong |
-
-To opt in, a repository names the agents it wants in
-`.github/pr-review-agents.yml` (or wherever `agent-config` points). Once the
-file exists, it replaces the default: `general` runs only if it is listed.
-
-```yaml
-agents:
-  - security
-  - correctness
-  - performance
-  - test-coverage
-  - docs-drift
-```
-
-Adding an agent is a new name; removing one is deleting its line. Everything
-downstream follows from the set — the prompt each agent is given, its Langfuse
-prompt key, the categories the synthesiser is told about, the categories
-validation accepts, and the labels findings are rendered under.
-
-- An agent's name is also the finding category it owns, and the only category
-  its findings may carry — findings in any other are discarded.
-- The role and focus live in the specialist's own file and are dropped into
-  the shared system prompt (`packages/ai/src/agents/definition.ts`); the
-  security hardening, the tool guidance, and the JSON output contract come
-  with it.
-- Order is significant: it is the order findings reach the synthesiser.
-
-Configuration selects and tunes agents; it does not define them. A new
-specialist is a new file under `specialists/` and an entry in its `index.ts`,
-which keeps the reviewers' prompts under code review like the rest of the
-action.
-
-### Per-agent models
-
-An agent can name the model it runs on, written out under `agent:`. Anything
-else uses the action's `model` input, and so does the synthesiser:
-
-```yaml
-agents:
-  # Cheap: it only checks whether the docs still match the code.
-  - agent: docs-drift
-    model: gpt-5-mini
-
-  # No `model`, so this runs on the action's default (`gpt-5.6-luna`).
-  - security
-```
-
-The provider, the API key, and `model-base-url` are the run's, so every agent
-model must be one the selected provider serves. Nothing reads a repository
-variable on its own — this repo's `self-review.yml` passes
-`model: ${{ vars.REVIEW_MODEL }}` explicitly, and a consumer workflow wanting
-the same swap-without-a-commit has to wire the same line.
-
-### Path filters
-
-An agent can declare the paths it cares about, and sit out a pull request
-that touches none of them:
-
-```yaml
-agents:
-  - agent: security
-    paths:
-      - "packages/github/**"
-      - "**/auth/**"
-      - "!**/*.test.ts"
-
-  - agent: docs-drift
-    paths: ["docs/**", "README.md"]
-
-  # No `paths`, so it runs on everything, as every agent does today.
-  - security
-```
-
-Patterns are globs matched against each changed file's repository-relative
-path: `**` crosses directories, `*` does not, dotfiles match (so `.github/**`
-reads the way it is written), and a `!` prefix subtracts from what the
-positive patterns matched. A list of nothing but negations, an empty list, or
-a pattern that is not repository-relative fails the step at config-parse time
-— each would retire the agent without a word.
-
-**This is a gate, not a narrowing.** An agent one changed file wakes reviews
-the *whole* pull request, on the same diff and the same prompt as always. Two
-reasons: a security-relevant change is routinely exploited through a file that
-does not look security-relevant, and handing each agent its own filtered diff
-would break the prompt-cache prefix the agents share, costing more than the
-skips save.
-
-Skipping is never silent:
-
-| Situation | Result |
-| --- | --- |
-| Some agents skipped, others found nothing | `success` — the summary names each skipped agent and the patterns it waited for |
-| Some agents skipped, others found something | `neutral`, as any review with findings is |
-| **No agent matched at all** | `neutral`, titled "No agent reviewed this pull request", listing every agent, its patterns, and the changed files. Never `success` — a green check on a pull request nothing read is indistinguishable from a clean one |
-
-Every skip is also logged as `agent.skipped` with the agent and its patterns,
-and a review that never ran logs `review.no_agents_matched`.
-
-Naming agents on the `agents` input overrides the gate: `agents: security`
-runs Security whatever the pull request touched, because that input exists so
-a person can force a specific review. `all`, or leaving it unset, leaves the
-configured filters deciding.
-
-The action reads the file from the pull request's **base** commit over the
-API, so no `actions/checkout` step is needed — and, more to the point, a pull
-request cannot choose the agents that review it. A head-ref read would let the
-branch under review drop an agent, or gate every one of them away with
-`paths`.
-
-A missing file means the general agent reviews alone. A malformed file, or one
-that names no agents, fails the step before any model call — a review with the
-wrong agents, or none, looks exactly like a clean bill of health, so it must
-never happen quietly.
-
-`pnpm seed-prompts` reads the same file (`--config` to point elsewhere), so
-the prompts published to Langfuse always match the agents configured.
-
 ### What a review costs
 
 A model API is stateless, so every turn resends the whole conversation —
 tools, system prompt, the opening message with the diff, and every tool result
 so far. A ten-turn agent bills its opening message ten times. One measured run
 of this repository's own PR #11, before caching, spent ~1.58M input tokens
-across the three agents it ran at the time:
+across three agents, from 4 to 10 model calls each — an old measurement of an
+older design, whose shape is what carries over.
 
-| Agent | Model calls | Input tokens |
-| --- | --- | --- |
-| Architecture | 10 | ~805k |
-| Correctness | 9 | ~594k |
-| Security | 4 | ~185k |
-
-Architecture was dropped after that run, and today's `correctness` agent is a
-different prompt from the one measured here. The shape of the number is what
-carries over, not the row.
-
-An agent declaring `contextGuidance` costs the most, because it must retrieve
+The agent's `contextGuidance` costs the most, because it must retrieve
 surrounding repository context before it may make a claim, and every retrieval
-is another round trip carrying the whole conversation. Every shipped agent but
-`security` declares one.
+is another round trip carrying the whole conversation.
 
 Prompt caching reprices that traffic rather than reducing it: roughly 0.1x for
 a cache read against 1.25x for the write that put it there. Each agent turn asks
@@ -513,18 +329,16 @@ the system instructions, through a breakpoint on that message, which also
 covers the tool schemas; and the growing conversation tail, through a
 call-level breakpoint that Anthropic places on the request's last block. So
 turn two reads turn one's opening message and tool results from cache rather
-than paying for them again. The synthesiser's single call is not cached; there
-is no next turn to read it.
+than paying for them again.
 
 A cache that stops hitting raises the bill and changes nothing else, so the
-three input counters are reported separately on `agent.completed` and
-`synthesis.completed`, which is where a `pnpm eval` run shows them. On a
+three input counters are reported separately on `agent.completed`, which is where a `pnpm eval` run shows them. On a
 warmed-up review `cacheReadInputTokens` should dominate `inputTokens`; if it
 collapses to zero, something above a breakpoint started varying between turns.
 
 ### Incremental review
 
-Off by default. Turning it on narrows what the agents read on a push to a pull
+Off by default. Turning it on narrows what the agent reads on a push to a pull
 request they have already reviewed:
 
 ```yaml
@@ -550,11 +364,11 @@ than failing, each logged on `review.scope_resolved` as its `reason`:
 The files reviewed are those the comparison reports **intersected with the pull
 request's own changed files**. A merge of the base branch into the branch under
 review otherwise drags in files the pull request never touched. When that
-intersection is empty, no agent runs at all.
+intersection is empty, the agent does not run.
 
-The agents are handed the narrowed diff; `list_changed_files` and `get_diff`
-keep describing the whole pull request, so an agent that needs the full picture
-asks for it and pays for it then. Validation is unchanged — its existing rule
+The agent is handed the narrowed diff; `list_changed_files` and `get_diff`
+keep describing the whole pull request, so it asks for the full picture when it
+needs it and pays for it then. Validation is unchanged — its existing rule
 that a finding must sit on an added line in the diff now confines findings to
 lines added since the baseline, with no new rule.
 
@@ -565,7 +379,7 @@ commits*, and hold the conclusion at `neutral`. A narrowed review that found
 nothing new must not read as a clean one.
 
 **What it costs you:** a bug introduced in an earlier commit but only visible
-given the newest commit's context is outside the diff the agents are handed.
+given the newest commit's context is outside the diff the agent is handed.
 `get_diff` means they can still reach it; nothing makes them. That is the trade
 the input buys, which is why it ships off.
 
@@ -599,7 +413,7 @@ alias scheme this resolver does not understand shows it there rather than
 silently answering `find_references` with too few files. On this repository the
 TypeScript rate is 1.0.
 
-The agents read the graph through `find_references(path, name?)`: without a
+The agent reads the graph through `find_references(path, name?)`: without a
 name, every file importing `path` with the line each import sits on; with one,
 only the files importing that export, default and namespace (`*`) imports
 included and marked. It returns at most 50 files alongside the true `total`,
@@ -625,23 +439,6 @@ failure is logged as `index.failed` and the review runs exactly as it would
 without the index. Set the `index` input to `false` to skip the build entirely.
 
 ---
-
-### Selecting agents
-
-Each agent is an independent tool-calling loop, so a review costs essentially
-the sum of its agents, and narrowing the set cuts that roughly in proportion:
-
-```yaml
-        with:
-          api-key: ${{ secrets.OPENAI_API_KEY }}
-          agents: security        # or: security,correctness
-```
-
-An unrecognised name fails the step **before any model call**, rather than
-quietly running a narrower review whose empty result is indistinguishable from
-a clean one. Synthesis still runs for a single specialist, deliberately: a
-narrowed run must exercise the same path a full review does, or it is useless
-for iterating on a prompt. Only the general agent running alone skips it.
 
 Nothing is read from a secrets store at runtime — the workflow token and the
 `api-key` input are the only credentials involved, and neither ever needs to be
@@ -725,11 +522,9 @@ handler outside Actions. `scripts/seed-prompts.mjs`, the MCP server and
 
 ### Seeding the managed prompts
 
-One agent prompt is editable in Langfuse per configured agent, but a project
-only serves them once it holds them — until then every review falls back to the
-in-code prompts and reports `loadedCount: 0`. The synthesiser's prompt is not
-among them: it names the run's exact categories and is always built from the
-agent set. Publish this build's prompts with:
+The agent's prompt is editable in Langfuse, but a project only serves it once
+it holds it — until then every review falls back to the in-code prompt and
+reports `loadedCount: 0`. Publish this build's prompt with:
 
 ```sh
 pnpm seed-prompts -- --dry-run           # decide everything, write nothing
@@ -780,7 +575,7 @@ git push --no-verify           # skips every pre-push hook
 
 The command is a second entry point onto the local review path the MCP server
 already serves, not a second implementation: the same git-backed client, the
-same agent configuration read at the base commit, and the same
+same agent, and the same
 [validation chain](#the-trust-boundary) between the model and your terminal.
 Options, exit codes and hook installation are in
 [`apps/cli/README.md`](apps/cli/README.md).
@@ -796,21 +591,18 @@ runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
 
 | Tool | What it does |
 | --- | --- |
-| `list_review_agents` | Lists the agents a checkout configures, each one's category and path gate, and which the working tree's changes would wake; no model key needed |
 | `review_local_changes` | Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed |
 | `review_pull_request` | Reviews a GitHub pull request; a dry run unless `publish: true`, which posts the check run and comments as the Action would |
-| `suppress_finding` | Marks a false positive so later reviews of that checkout exclude it and report how many they hid; stored with the checkout, matched by category and title shape |
+| `suppress_finding` | Marks a false positive so later reviews of that checkout exclude it and report how many they hid; stored with the checkout, matched by title shape |
 | `repository_overview`, `find_references`, `describe_file` | The [repository index](#repository-index), built from the working tree, with no network |
-| `validate_agent_config` | Checks a checkout's `.github/pr-review-agents.yml` and reports what it resolves to, or where it is wrong; no model calls |
 | `list_reviews`, `get_review`, `review_trends` | Stored review history, scoped by the dashboard's own access rules to your GitHub account |
 
 Cancelling a review — Ctrl-C in the client, or any `notifications/cancelled` —
-aborts the agents' model calls, and a cancelled run publishes nothing.
+aborts the agent's model calls, and a cancelled run publishes nothing.
 
 A local review takes the same path as the Action, with a git-backed client in
 place of GitHub's, so the [trust boundary](#the-trust-boundary) is unchanged:
-the agent configuration is read at the base commit, and only validated findings
-come back. It needs an `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`; GitHub access
+only validated findings come back. It needs an `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`; GitHub access
 uses `GITHUB_TOKEN` or the `gh` login. Configuration, and the MCP Bundle path
 for shipping it beyond this checkout, are in
 [`apps/mcp/README.md`](apps/mcp/README.md).
@@ -821,8 +613,7 @@ for shipping it beyond this checkout, are in
 
 Every seam that decides what reaches GitHub is covered by unit tests: event
 parsing, the agent loop and its tool dispatch, the diff line index, the
-validation chain, duplicate removal, partial-agent-failure semantics,
-synthesis fallback, check-run rendering, and the fork-PR job-summary fallback.
+validation chain, duplicate removal, check-run rendering, and the fork-PR job-summary fallback.
 The model client and Octokit are both injected behind narrow interfaces, so the
 suite makes no network calls and runs in under two seconds.
 
@@ -920,11 +711,10 @@ under event names, grouped by what they trace:
 
 | Stage | Events |
 | --- | --- |
-| Review | `review.skipped`, `review.started`, `review.model_selected`, `review.agents_selected`, `review.loaded`, `review.no_agents_matched`, `review.cancelled`, `review.failed` |
+| Review | `review.skipped`, `review.started`, `review.model_selected`, `review.loaded`, `review.cancelled`, `review.failed` |
 | Scope | `review.scope_resolved`, `review.scope_unreadable`, `review.incremental.no_changes`, `review.carried_forward.unreadable` |
 | Index | `index.built`, `index.skipped`, `index.failed` |
-| Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled`, `agent.skipped` |
-| Synthesis | `synthesis.started`, `synthesis.skipped`, `synthesis.completed`, `synthesis.failed` |
+| Agent | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
 | Langfuse | `langfuse.disabled_incomplete_credentials`, `langfuse.prompts.loaded`, `langfuse.prompts.unavailable`, `langfuse.prompts.fallback_used`, `tracing.flush_failed` |
 
@@ -932,7 +722,7 @@ That is every event a review run can emit. `pnpm seed-prompts` emits its own
 `langfuse.prompts.seed_*` set, which no review ever writes.
 
 Events carry the repository, PR
-number, head SHA, agent name, duration, finding count, and token usage (four
+number, head SHA, duration, finding count, and token usage (four
 counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 `outputTokens`), so a single review is greppable end to end by `headSha`.
 

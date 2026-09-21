@@ -9,7 +9,6 @@ describe("the command line", () => {
       scope: { kind: "working-tree" },
       failOn: "high",
       index: true,
-      agents: "",
     });
   });
 
@@ -41,16 +40,13 @@ describe("the command line", () => {
   });
 
   it("refuses an option the other command owns", () => {
-    expect(() => parseArguments(["install-hook", "--agents", "security"])).toThrow(
-      /unknown option --agents/,
+    expect(() => parseArguments(["install-hook", "--no-index"])).toThrow(
+      /unknown option --no-index/,
     );
   });
 
-  it("turns the index and the progress lines off", () => {
-    expect(parseArguments(["--no-index", "--no-progress"])).toMatchObject({
-      index: false,
-      progress: false,
-    });
+  it("turns the index off", () => {
+    expect(parseArguments(["--no-index"])).toMatchObject({ index: false });
   });
 
   it("reads the hook installation and its defaults", () => {

@@ -3,13 +3,10 @@
  * rather than in each delivery-path wrapper.
  */
 import {
-  emptySynthesisHints,
-  gateAgentsByPaths,
   isCancellation,
   ReviewCancelledError,
   withRepositoryHints,
   type AgentDefinition,
-  type SynthesisHints,
 } from "@pr-review/ai";
 import type {
   ExistingReviewComment,
@@ -30,13 +27,12 @@ import { deliverReview, type PublishReview } from "#src/publish-review";
 import type { ReviewDelivery } from "#src/review-delivery";
 import {
   computeHints,
-  computeSynthesisHints,
   emptyMemory,
   partitionSuppressed,
   readMemory,
   type MemoryStore,
 } from "#src/memory";
-import { renderCheckRun, renderNoAgentMatched } from "#src/render-check-run";
+import { renderCheckRun } from "#src/render-check-run";
 import { verifyPatches, type PatchSummary } from "#src/validate-patches";
 import {
   findingKey,
@@ -44,10 +40,7 @@ import {
   postedFindingKeys,
   type PostedFinding,
 } from "#src/render-review";
-import {
-  skippedSynthesis,
-  type ReviewPipelineResult,
-} from "#src/review-pipeline";
+import type { ReviewPipelineResult } from "#src/review-pipeline";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 
@@ -55,9 +48,8 @@ import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 export interface ReviewWithDeliveryDeps {
   /** Reads only; every write this review makes goes through `delivery`. */
   client: ReviewClient;
-  /** The run's agent set, already narrowed by the `agents` input. */
-  agents: readonly AgentDefinition[];
-  /** Throws only when every agent failed; a synthesis failure is reported on the result. */
+  agent: AgentDefinition;
+  /** Throws when the agent fails. */
   runReviewPipeline: RunReviewPipeline;
   /** The only route to a publisher: there is no default, and no live fallback. */
   delivery: ReviewDelivery;
@@ -112,26 +104,21 @@ async function openEarlierFindings(
   }
 }
 
-/** One memory read serves every reader: agents, synthesiser and suppressions. */
+/** One memory read serves both readers: the agent's hints and suppressions. */
 interface HintedRun {
-  agents: readonly AgentDefinition[];
-  synthesisHints: SynthesisHints;
+  agent: AgentDefinition;
   memory: ReviewMemory;
 }
 
 /** The run's hints; unhinted when there is no store or the read fails. */
 async function attachRepositoryHints(
-  agents: readonly AgentDefinition[],
+  agent: AgentDefinition,
   store: MemoryStore | undefined,
   target: ReviewTarget,
   logger: StructuredLogger,
   now: Date,
 ): Promise<HintedRun> {
-  const unhinted: HintedRun = {
-    agents,
-    synthesisHints: emptySynthesisHints(),
-    memory: emptyMemory(),
-  };
+  const unhinted: HintedRun = { agent, memory: emptyMemory() };
   if (store === undefined) {
     return unhinted;
   }
@@ -149,65 +136,11 @@ async function attachRepositoryHints(
   }
 
   const hints = computeHints(memory, now);
-  const synthesisHints = computeSynthesisHints(memory, now);
-
-  let hintCount = 0;
-  for (const sentences of hints.values()) {
-    hintCount += sentences.length;
-  }
   logger.info("memory.hints_attached", {
     ...reviewCorrelation(target),
-    hintCount,
-    agents: agents
-      .map((agent) => agent.category)
-      .filter((category) => (hints.get(category)?.length ?? 0) > 0),
-    synthesisKeepCount: synthesisHints.keep.length,
-    synthesisDropCount: synthesisHints.drop.length,
+    hintCount: hints.length,
   });
-  return {
-    agents: agents.map((agent) =>
-      withRepositoryHints(agent, hints.get(agent.category) ?? []),
-    ),
-    synthesisHints,
-    memory,
-  };
-}
-
-/** Logs the synthesis outcome: skipped, completed, or failed. */
-function logSynthesisOutcome(
-  logger: StructuredLogger,
-  target: ReviewTarget,
-  review: ReviewPipelineResult,
-): void {
-  const fields = reviewCorrelation(target);
-  const { synthesis } = review;
-  if (synthesis.outcome === "skipped") {
-    logger.info("synthesis.skipped", { ...fields, reason: synthesis.reason });
-    return;
-  }
-
-  logger.info("synthesis.started", {
-    ...fields,
-    candidateCount: review.candidates.length,
-  });
-  if (synthesis.outcome === "completed") {
-    logger.info("synthesis.completed", {
-      ...fields,
-      candidateCount: review.candidates.length,
-      refinedCount: synthesis.candidates.length,
-      ...synthesis.usage,
-      durationMs: synthesis.durationMs,
-    });
-    return;
-  }
-
-  logger.error("synthesis.failed", {
-    ...fields,
-    error: synthesis.error,
-    errorName: synthesis.errorName,
-    durationMs: synthesis.durationMs,
-    fallback: "publishing validated raw findings",
-  });
+  return { agent: withRepositoryHints(agent, hints), memory };
 }
 
 function stillOpen(
@@ -223,7 +156,7 @@ function incrementalNote(sinceSha: string, fileCount: number): string {
 }
 
 function noNewChangesNote(sinceSha: string): string {
-  return `> **Note:** No file this pull request changed has moved since \`${sinceSha.slice(0, 7)}\`, so no agent ran.`;
+  return `> **Note:** No file this pull request changed has moved since \`${sinceSha.slice(0, 7)}\`, so nothing was reviewed.`;
 }
 
 /** One review's outcome, plus how the patches its agents proposed fared. */
@@ -237,8 +170,6 @@ export interface ReviewOutcome extends ReviewPipelineResult {
 function unreviewed(): ReviewOutcome {
   return {
     candidates: [],
-    agentFailures: [],
-    synthesis: skippedSynthesis("no candidate findings", []),
     findings: [],
     patches: { proposed: 0, verified: 0 },
     suppressed: 0,
@@ -253,7 +184,7 @@ export async function reviewWithDelivery(
   target: ReviewTarget,
   {
     client,
-    agents,
+    agent,
     runReviewPipeline,
     delivery,
     logger = createConsoleLogger(),
@@ -298,8 +229,7 @@ export async function reviewWithDelivery(
     }
     await delivery.publishCheckRun(reviewed, rendered);
   };
-  // Agents see the scope; publishing sees the whole PR, so comments anchor anywhere.
-  const filenames = scope.changedFiles.map((file) => file.filename);
+  // The agent sees the scope; publishing sees the whole PR, so comments anchor anywhere.
   const carriedForward =
     scope.kind === "incremental"
       ? await openEarlierFindings(client, target, logger)
@@ -313,7 +243,7 @@ export async function reviewWithDelivery(
     });
     await publish(
       target,
-      renderCheckRun([], [], {
+      renderCheckRun([], {
         annotate: false,
         carriedForward,
         scopeNote: noNewChangesNote(scope.sinceSha),
@@ -322,37 +252,13 @@ export async function reviewWithDelivery(
     return unreviewed();
   }
 
-  const { agents: hinted, synthesisHints, memory } = await attachRepositoryHints(
-    agents,
+  const { agent: hinted, memory } = await attachRepositoryHints(
+    agent,
     memoryStore,
     target,
     logger,
     now(),
   );
-
-  const { active, skipped } = gateAgentsByPaths(hinted, filenames);
-  const skippedNames = skipped.map((skip) => skip.agent);
-  for (const skip of skipped) {
-    logger.info("agent.skipped", {
-      ...fields,
-      agent: skip.agent,
-      paths: skip.paths,
-      reason: "no changed file matched",
-    });
-  }
-
-  if (active.length === 0) {
-    logger.info("review.no_agents_matched", {
-      ...fields,
-      changedFileCount: changedFiles.length,
-      skippedAgents: skippedNames,
-    });
-    await publish(
-      target,
-      renderNoAgentMatched(skipped, filenames, carriedForward),
-    );
-    return unreviewed();
-  }
 
   // Built once, before any agent starts, and thrown away with this review.
   const repositoryIndex = await buildReviewIndex({
@@ -378,20 +284,18 @@ export async function reviewWithDelivery(
           : undefined,
       signal,
     },
-    agents: active,
-    hints: synthesisHints,
+    agent: hinted,
     index: repositoryIndex,
   }).catch((error: unknown) => {
     if (isCancellation(error, signal)) {
-      cancelled("agents");
+      cancelled("agent");
     }
     throw error;
   });
-  logSynthesisOutcome(logger, target, review);
 
   logger.info("findings.validated", {
     ...fields,
-    candidateCount: review.synthesis.candidates.length,
+    candidateCount: review.candidates.length,
     findingCount: review.findings.length,
   });
 
@@ -427,8 +331,6 @@ export async function reviewWithDelivery(
     target,
     {
       findings: verified.findings,
-      agentFailures: review.agentFailures,
-      skippedAgents: skipped,
       diffLines: buildDiffLineIndex(whole.changedFiles),
       patches: {
         branch: pullRequest.headRef,

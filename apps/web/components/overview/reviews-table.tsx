@@ -12,7 +12,6 @@ import type { ReviewSummary } from "@pr-review/db/dashboard";
 import { formatDuration, formatRelative } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 
-import { AgentChips } from "./agent-chips";
 import { RowLink } from "./row-link";
 import { SeverityMix } from "./severity-mix";
 
@@ -31,7 +30,6 @@ export function ReviewsTable({ slug, reviews, caption }: ReviewsTableProps) {
           <TableHead scope="col">Repository</TableHead>
           <TableHead scope="col">Pull request</TableHead>
           <TableHead scope="col">Findings</TableHead>
-          <TableHead scope="col">Agents</TableHead>
           <TableHead scope="col" className="text-right">
             Duration
           </TableHead>
@@ -57,9 +55,6 @@ export function ReviewsTable({ slug, reviews, caption }: ReviewsTableProps) {
             </TableCell>
             <TableCell>
               <SeverityMix bySeverity={review.bySeverity} />
-            </TableCell>
-            <TableCell>
-              <AgentChips agents={review.agents} />
             </TableCell>
             <TableCell className="text-right tabular-nums whitespace-nowrap">
               {formatDuration(review.durationMs)}
