@@ -76,6 +76,8 @@ export type ReviewEngine =
       createModel?: ((modelId: string) => ReviewModel) | undefined;
       systemPrompts?: ManagedPrompts | undefined;
       maxTurns?: number | undefined;
+      /** Exports prompts, tool results and completions on the model spans. */
+      recordPayloads?: boolean | undefined;
     }
   | { createAgents: CreateReviewAgents; synthesiser: Synthesiser };
 
@@ -138,7 +140,11 @@ function pipelineRunner(
   }
   return createPipelineRunner({
     model: engine.model,
-    synthesiser: createSynthesiser({ model: engine.model, agents }),
+    synthesiser: createSynthesiser({
+      model: engine.model,
+      agents,
+      recordPayloads: engine.recordPayloads,
+    }),
     logger,
     onUsage: (report) => usage.push(report),
     ...(onAgentEvent === undefined ? {} : { onAgentEvent }),
@@ -147,6 +153,7 @@ function pipelineRunner(
       ? {}
       : { systemPrompts: engine.systemPrompts }),
     ...(engine.maxTurns === undefined ? {} : { maxTurns: engine.maxTurns }),
+    recordPayloads: engine.recordPayloads,
   });
 }
 

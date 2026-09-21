@@ -88,7 +88,7 @@ their inputs**:
 
 | Setting | What leaves, and where to | Closing it |
 | --- | --- | --- |
-| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls. The AI SDK records call inputs and outputs by default and this action does not disable it, so the exported spans carry the prompts and tool results — diff and file contents included — to `langfuse-base-url` (`https://cloud.langfuse.com` by default). | Leave both keys unset, the default; or point `langfuse-base-url` at your own instance. |
+| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls, to `langfuse-base-url` (`https://cloud.langfuse.com` by default): span timings, token counts, agent names, models and outcomes. No prompt text, tool results or file contents — payload recording is switched off on every model call. Setting [`langfuse-record-payloads: true`](#configuration) turns it back on for prompt debugging, and the spans then carry the prompts, tool results and completions, diff and file contents included. | Leave both keys unset, the default; or point `langfuse-base-url` at your own instance. Leave `langfuse-record-payloads` unset and no code travels with the traces. |
 | [`dashboard-token`](#configuration) + `dashboard-url` | One `POST` to `<dashboard-url>/api/ingest` per review ([`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)): owner, repo, PR number, head SHA, agent names, timings, token counts, and every published finding — file path, line, title, explanation, suggested fix, and, where a patch survived, its `expected` and `replacement` text, which are verbatim lines of your source. | Leave both unset, the default; or point `dashboard-url` at your own deployment of [`apps/web`](apps/web). |
 
 Within GitHub, the Action asks for no more than it needs: `contents: read`,
@@ -323,6 +323,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `langfuse-secret-key` | no | The other half. Setting only one of the two disables both features and logs `langfuse.disabled_incomplete_credentials`. |
 | `langfuse-base-url` | no (default `https://cloud.langfuse.com`) | Langfuse host, for a self-hosted or regional instance. Keys are region-scoped: the wrong host 401s and drops every trace. |
 | `langfuse-prompt-label` | no (default `production`) | Which labelled version of each prompt to fetch — try a prompt change on one repository before promoting it. |
+| `langfuse-record-payloads` | no (default `false`) | Whether traces carry the prompts, tool results and completions — the diff and every file an agent read. `true` turns it on, for debugging a prompt, and logs `langfuse.payload_capture_enabled`; any other value leaves traces to timings, token counts and outcomes. |
 
 ### Model providers
 
@@ -924,7 +925,7 @@ under event names, grouped by what they trace:
 | Agents | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled`, `agent.skipped` |
 | Synthesis | `synthesis.started`, `synthesis.skipped`, `synthesis.completed`, `synthesis.failed` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
-| Langfuse | `langfuse.disabled_incomplete_credentials`, `langfuse.prompts.loaded`, `langfuse.prompts.unavailable`, `langfuse.prompts.fallback_used`, `tracing.flush_failed` |
+| Langfuse | `langfuse.disabled_incomplete_credentials`, `langfuse.payload_capture_enabled`, `langfuse.prompts.loaded`, `langfuse.prompts.unavailable`, `langfuse.prompts.fallback_used`, `tracing.flush_failed` |
 
 That is every event a review run can emit. `pnpm seed-prompts` emits its own
 `langfuse.prompts.seed_*` set, which no review ever writes.

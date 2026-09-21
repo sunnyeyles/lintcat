@@ -135,6 +135,7 @@ interface LangfuseInputs {
   secretKey: string;
   baseUrl: string;
   promptLabel: string;
+  recordPayloads: boolean;
 }
 
 /**
@@ -168,6 +169,7 @@ function resolveLangfuseInputs(
     // invoking the bundle directly never goes through action.yml.
     baseUrl: getInput(env, "langfuse-base-url") || DEFAULT_LANGFUSE_BASE_URL,
     promptLabel: getInput(env, "langfuse-prompt-label") || DEFAULT_PROMPT_LABEL,
+    recordPayloads: getInput(env, "langfuse-record-payloads") === "true",
   };
 }
 
@@ -420,6 +422,9 @@ export async function runAction(
           baseUrl: langfuse.baseUrl,
           release: env["GITHUB_SHA"],
         });
+  if (langfuse?.recordPayloads === true) {
+    logger.info("langfuse.payload_capture_enabled", { baseUrl: langfuse.baseUrl });
+  }
   // Everything below may emit spans, so it sits inside the flushing block.
   try {
     const prompts =
@@ -453,6 +458,7 @@ export async function runAction(
         model,
         createModel,
         ...(prompts === undefined ? {} : { systemPrompts: prompts }),
+        recordPayloads: langfuse?.recordPayloads === true,
       },
       policy: {
         incremental: getInput(env, "incremental") === "true",

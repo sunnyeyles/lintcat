@@ -28,6 +28,7 @@ import {
 } from "#src/agents/repository-index";
 import { createReviewTools, type ReviewToolsClient } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
+import { callTelemetry } from "#src/telemetry";
 import {
   addTokenUsage,
   emptyTokenUsage,
@@ -145,6 +146,8 @@ export interface ReviewAgentDeps {
   onUsage?: ((report: AgentUsageReport) => void) | undefined;
   /** The repository at the base commit; absent when off, failed or unbuilt. */
   index?: RepositoryIndex | undefined;
+  /** Exports prompts, tool results and completions on the model spans. */
+  recordPayloads?: boolean | undefined;
 }
 
 /** Adds the hint block unless the prompt already carries it. */
@@ -234,7 +237,10 @@ export function createReviewAgent(
               stopWhen: isStepCount(maxTurns),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
               providerOptions: CACHE_BREAKPOINT,
-              telemetry: { functionId: `review-agent-${agent.category}` },
+              telemetry: callTelemetry(
+                `review-agent-${agent.category}`,
+                deps.recordPayloads,
+              ),
               onStepEnd: (step) => {
                 usage = addTokenUsage(usage, toTokenUsage(step.usage));
               },

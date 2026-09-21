@@ -41,6 +41,7 @@ const INPUTS = [
   ["langfuse-secret-key", "(unset)", "The other half. Setting only one disables both features."],
   ["langfuse-base-url", "cloud.langfuse.com", "Langfuse host, for a self-hosted or regional instance. Keys are region-scoped."],
   ["langfuse-prompt-label", "production", "Which labelled version of each prompt to fetch."],
+  ["langfuse-record-payloads", "false", "Exports prompts, tool results and completions with each trace, for prompt debugging. Off, traces carry no code."],
   ["dashboard-token", "(unset)", "The organization's ingest secret. With dashboard-url, records every review on the dashboard."],
   ["dashboard-url", "(unset)", "Base URL of the dashboard. Setting only one of the two records nothing."],
 ] as const;

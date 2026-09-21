@@ -7,6 +7,7 @@ import { generateText } from "ai";
 import { extractAgentOutput } from "#src/agents/output";
 import type { ReviewModel } from "#src/model";
 import { emptyTokenUsage, toTokenUsage, type TokenUsage } from "#src/usage";
+import { callTelemetry } from "#src/telemetry";
 import { errorMessage } from "@pr-review/logging";
 import {
   categoryLabel,
@@ -130,6 +131,8 @@ interface SynthesiserDeps {
   model: ReviewModel;
   /** The run's agent set, which names the categories the prompt accepts. */
   agents: readonly AgentDefinition[];
+  /** Exports the prompt and completion on the model span. */
+  recordPayloads?: boolean | undefined;
 }
 
 /** One synthesis run's refined findings and token usage; skipped runs report zero. */
@@ -199,7 +202,7 @@ export function createSynthesiser(deps: SynthesiserDeps): Synthesiser {
                 { role: "user", content: buildSynthesisMessage(wellFormed) },
               ],
               maxOutputTokens: MAX_OUTPUT_TOKENS,
-              telemetry: { functionId: "synthesise-findings" },
+              telemetry: callTelemetry("synthesise-findings", deps.recordPayloads),
             });
             const usage = toTokenUsage(result.usage);
 

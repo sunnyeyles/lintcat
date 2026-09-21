@@ -138,6 +138,14 @@ inputs:
       prompt change on one repository before promoting it.
     required: false
     default: production
+  langfuse-record-payloads:
+    description: >-
+      Set to "true" to export prompts, tool results and completions with each
+      trace, for debugging a prompt. These carry the diff and the contents of
+      every file an agent read. Off by default: traces keep timings, token
+      counts, agent names and outcomes only.
+    required: false
+    default: "false"
   dashboard-token:
     description: >-
       The organization's ingest secret for the review dashboard. Supply this and

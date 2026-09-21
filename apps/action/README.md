@@ -155,6 +155,7 @@ of this action's repository — copy it and edit.
 | `langfuse-secret-key` | no | — | Langfuse secret key. Store it as a secret. |
 | `langfuse-base-url` | no | `https://cloud.langfuse.com` | Langfuse host, for self-hosted instances. |
 | `langfuse-prompt-label` | no | `production` | Which labelled version of each prompt to fetch. |
+| `langfuse-record-payloads` | no | `false` | `true` exports prompts, tool results and completions with each trace, for prompt debugging. Off, traces carry no code. |
 | `dashboard-token` | no | — | Ingest secret for the review dashboard. Set this and `dashboard-url` to record each review there. Store it as a secret. |
 | `dashboard-url` | no | — | Dashboard base URL, e.g. `https://example.vercel.app`; the action appends `/api/ingest`. |
 
@@ -222,6 +223,11 @@ Supply **both** keys and two things change: the agent system prompts are
 fetched from Langfuse at the start of the run, and the agents, their tool
 calls, and the Synthesiser export traces. One prompt is fetched per selected
 agent, named after it (`security_system`, `docs_drift_system`, …).
+
+Traces carry timings, token counts, agent names and outcomes, never the
+prompts, tool results or completions: those hold the diff and the file
+contents. Set `langfuse-record-payloads: true` to export them while debugging a
+prompt.
 
 The Synthesiser's own prompt is never fetched. It names the exact categories
 the run accepts, so a stored copy would go stale the moment the agent set

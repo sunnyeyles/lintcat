@@ -892,6 +892,40 @@ describe("Langfuse wiring", () => {
     expect(flushCount()).toBe(1);
   });
 
+  it("keeps payloads out of the traces unless langfuse-record-payloads is true", async () => {
+    const { environment, specs, entries } = harness(
+      { ...reviewEnv, ...langfuseInputs },
+      pullRequestEvent(),
+      { prompts: remotePrompts },
+    );
+
+    await runAction(environment);
+
+    expect(specs[0]?.engine).toMatchObject({ recordPayloads: false });
+    expect(events(entries)).not.toContain("langfuse.payload_capture_enabled");
+  });
+
+  it("records payloads and says so when langfuse-record-payloads is true", async () => {
+    const { environment, specs, entries } = harness(
+      {
+        ...reviewEnv,
+        ...langfuseInputs,
+        "INPUT_LANGFUSE-RECORD-PAYLOADS": "true",
+      },
+      pullRequestEvent(),
+      { prompts: remotePrompts },
+    );
+
+    await runAction(environment);
+
+    expect(specs[0]?.engine).toMatchObject({ recordPayloads: true });
+    expect(entries).toContainEqual({
+      level: "info",
+      event: "langfuse.payload_capture_enabled",
+      baseUrl: "https://cloud.langfuse.com",
+    });
+  });
+
   it("honours a custom host and prompt label", async () => {
     const { environment, promptClientConfigs, promptFetches } = harness(
       {
