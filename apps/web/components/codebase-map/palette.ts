@@ -28,7 +28,7 @@ export function readPalette(element: Element): MapPalette {
   const style = getComputedStyle(element);
   const palette = {} as MapPalette;
   for (const token of TOKENS) {
-    palette[token] = style.getPropertyValue(token).trim() || "#888888";
+    palette[token] = style.getPropertyValue(token).trim() || "gray";
   }
   return palette;
 }

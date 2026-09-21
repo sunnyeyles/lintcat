@@ -18,12 +18,17 @@ import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#
 export const EXIT_OK = 0;
 export const EXIT_BLOCKED = 1;
 export const EXIT_ERROR = 2;
+export const EXIT_CANCELLED = 3;
 
 export interface CliDeps {
   environment: McpEnvironment;
   out: (text: string) => void;
   err: (text: string) => void;
+  /** Aborting it cancels the review and its in-flight model calls. */
+  signal?: AbortSignal | undefined;
 }
+
+export const CANCELLED_MESSAGE = "pr-review: review cancelled before it finished; no verdict was reached.";
 
 /** Said before any git or model work, so a keyless machine fails in a second. */
 export function missingKeyMessage(): string {
@@ -33,9 +38,22 @@ export function missingKeyMessage(): string {
   );
 }
 
-export async function runReviewCommand(
+export async function runReviewCommand(options: ReviewOptions, deps: CliDeps): Promise<number> {
+  const { signal, err } = deps;
+  try {
+    const code = await review(options, deps);
+    if (signal?.aborted !== true) return code;
+  } catch (error: unknown) {
+    // Only our own interrupt is a cancellation; a stray AbortError is a failure.
+    if (signal?.aborted !== true) throw error;
+  }
+  err(CANCELLED_MESSAGE);
+  return EXIT_CANCELLED;
+}
+
+async function review(
   options: ReviewOptions,
-  { environment, out, err }: CliDeps,
+  { environment, out, err, signal }: CliDeps,
 ): Promise<number> {
   if (!hasModelApiKey(environment)) {
     err(missingKeyMessage());
@@ -62,9 +80,11 @@ export async function runReviewCommand(
       selected: modelReviewEngine(environment),
       index: options.index,
       memory: await openLocalMemoryStore(local.root),
+      signal,
     },
   );
 
+  if (signal?.aborted === true) return EXIT_CANCELLED;
   const { findings, suppressed } = result.outcome;
   const blocking = blockingFindings(findings, options.failOn);
   const render = { color: options.color ?? false };

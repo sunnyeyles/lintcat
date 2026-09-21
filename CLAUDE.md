@@ -86,8 +86,32 @@ The CLI mis-resolves the `#src/cn` alias and emits `from "cn"` — rewrite those
 to `#src/cn` after every `add`, and drop the stray `cn` npm dependency if it
 reappears in `package.json`. Re-export anything new from `src/index.ts`.
 
-`src/theme.css` holds the palette and is the single source of truth: edit it
-directly. There is no token generator. `docs/tokens.css` is a separate,
+Colour comes from `@primer/primitives` (GitHub's tokens), in three layers
+(see `docs/adr/0002-primer-tokens-under-shadcn.md`):
+
+1. Primer's `light.css` and `dark.css`, imported by `src/theme.css`. Never
+   edited; upgrade the package to move.
+2. `src/brand.css`: the only Primer tokens we override — the teal accent
+   (`#317a71`), the sand light canvases and the teal dark canvases. Values are
+   plain hex, checked by `src/theme.test.ts` for WCAG contrast.
+3. `src/theme.css`: shadcn's semantic names (`--background`, `--primary`,
+   `--link`, …) aliased onto Primer tokens, plus the Tailwind `@theme` block.
+   Components use these names only.
+
+Colour mode is Primer's `data-color-mode` on `<html>`: `auto` follows the OS,
+and the topbar toggle (`apps/web/components/shell/color-mode-toggle.tsx`)
+sets `light` or `dark`, persisted in `localStorage` and restored by an inline
+script before paint. No `.dark` class, no theme library; Tailwind's `dark:`
+variant is a custom one keyed on that attribute. Fonts are the system stacks.
+
+`src/tokens-guard.test.ts` fails the build on Tailwind palette classes
+(`bg-gray-100`) or raw hex in app code.
+
+Brand assets (the LintCat mark and lockup, colour and mono, and the animated
+loaders) live in `apps/web/public/brand/`; `apps/web/components/shell/logo-mark.tsx`
+draws the same mark from the `--brand-*` tokens for inline use, with
+`animate="hover"` (the topbar) or `animate="always"` (a loading state).
+Terminal spinners are in `packages/design/brand/cli/`; `pnpm spinner` demos them. `docs/tokens.css` is a separate,
 unrelated palette for the standalone `docs/index.html` explainer page.
 
 ## Commands

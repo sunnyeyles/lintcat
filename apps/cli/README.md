@@ -42,6 +42,11 @@ else — the line naming what was reviewed, errors — goes to stderr, so
 | `0` | No finding at or above `--fail-on` |
 | `1` | At least one finding at or above `--fail-on` |
 | `2` | The review could not run: a missing key, a bad ref, a bad option |
+| `3` | The review was cancelled by Ctrl-C or `SIGTERM`; no verdict was reached |
+
+The first interrupt cancels the review's in-flight model calls rather than
+abandoning them, so the provider stops generating. A second interrupt quits at
+once with `130` (`143` for `SIGTERM`).
 
 A missing model API key is reported before any git or model work begins. Set
 `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the environment, or in this
@@ -51,7 +56,8 @@ project's `.env.local`.
 
 `install-hook` writes `.git/hooks/pre-push` (or wherever `core.hooksPath`
 points) into the checkout. The hook runs the review and blocks the push when
-anything at or above its severity is found.
+anything at or above its severity is found. A review cancelled with Ctrl-C also
+refuses the push, but the hook says it was cancelled rather than blocked.
 
 ```sh
 node apps/cli/start.mjs install-hook --repo ~/code/some-project --fail-on high

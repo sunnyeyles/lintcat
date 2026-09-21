@@ -30,7 +30,7 @@ function PagerLink({
         newer ? "" : "flex-row-reverse text-right",
       )}
     >
-      <Icon className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary" />
+      <Icon className="size-3.5 shrink-0 text-muted-foreground group-hover:text-link" />
       <span className="min-w-0">
         <span className="text-muted-foreground text-xs tracking-wide uppercase block font-mono">{newer ? "Newer" : "Older"}</span>
         <span className="block truncate font-mono text-sm text-foreground">

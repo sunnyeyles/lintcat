@@ -103,7 +103,31 @@ describe("a push that runs the hook", () => {
 
     expect(status).not.toBe(0);
     expect(output).toContain("push blocked");
+    expect(output).not.toContain("cancelled");
     expect(output).toContain(`${BYPASS_ENV}=1 git push`);
+    expect(() => pushedSha(remote)).toThrow();
+  });
+
+  it("refuses the push, and says it was cancelled, when the review is cancelled", async () => {
+    const remote = remoteRepository();
+    await install({ command: "sh -c 'exit 3'" });
+
+    const { status, output } = pushTo(remote);
+
+    expect(status).not.toBe(0);
+    expect(output).toContain("review cancelled");
+    expect(output).not.toContain("push blocked");
+    expect(() => pushedSha(remote)).toThrow();
+  });
+
+  it("reports a review killed by an interrupt as cancelled", async () => {
+    const remote = remoteRepository();
+    await install({ command: "sh -c 'kill -INT $$'" });
+
+    const { status, output } = pushTo(remote);
+
+    expect(status).not.toBe(0);
+    expect(output).toContain("review cancelled");
     expect(() => pushedSha(remote)).toThrow();
   });
 

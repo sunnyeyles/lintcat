@@ -5,6 +5,7 @@ import path from "node:path";
 import { git, repositoryRoot } from "@pr-review/mcp/local-review";
 
 import type { FailOn } from "#src/options";
+import { EXIT_CANCELLED } from "#src/review-command";
 
 /** Set in the environment of one `git push` to skip the review. */
 export const BYPASS_ENV = "PR_REVIEW_SKIP";
@@ -21,9 +22,14 @@ export function hookScript(command: string, failOn: FailOn): string {
     `  echo "pr-review: review skipped (${BYPASS_ENV} is set)" >&2`,
     "  exit 0",
     "fi",
+    // Caught, not ignored: the review still gets the interrupt, and this script outlives it.
+    "trap : INT TERM",
     `${command} review --fail-on ${failOn} || {`,
     "  status=$?",
-    `  echo "pr-review: push blocked. Bypass with ${BYPASS_ENV}=1 git push, or git push --no-verify." >&2`,
+    '  case "$status" in',
+    `    ${EXIT_CANCELLED}|130|143) echo "pr-review: review cancelled, so the push was not made. Push again to re-run it." >&2 ;;`,
+    `    *) echo "pr-review: push blocked. Bypass with ${BYPASS_ENV}=1 git push, or git push --no-verify." >&2 ;;`,
+    "  esac",
     "  exit $status",
     "}",
     "exit 0",

@@ -1,0 +1,153 @@
+/* Brand overrides on top of @primer/primitives. Only tokens we deliberately change live here. */
+
+/* The logo concept palette: turquoise leads, the rest are secondaries. */
+:root {
+  --brand-navy: #1e2d42;
+  --brand-turquoise: #3aa693;
+  --brand-teal: #1d5c5a;
+  --brand-coral: #f47b4e;
+  --brand-rust: #c4552c;
+  --brand-paper: #f5efe3;
+  --brand-sand: #e4dccc;
+  --brand-slate: #4a5b72;
+}
+
+/* Accent steps keep Primer's lightness deltas, re-anchored on #317a71 (OKLCH hue swap). */
+[data-color-mode="light"][data-light-theme="light"],
+[data-color-mode="auto"][data-light-theme="light"] {
+  /* Rust fills hold white at AA; rust text needs a darker step on paper. */
+  --bgColor-severe-emphasis: #bd4f27;
+  --borderColor-severe-emphasis: #bd4f27;
+  --fgColor-severe: #a8461f;
+  --data-orange-color-emphasis: #c4552c;
+  /* Accent text is one step under the button fill so it clears AA on the paper canvases. */
+  --fgColor-accent: #2c7169;
+  --bgColor-accent-emphasis: #317a71;
+  --bgColor-accent-muted: #3aa69326;
+  --borderColor-accent-emphasis: #317a71;
+  --borderColor-accent-muted: #3aa69366;
+  --control-checked-bgColor-hover: #2b7068;
+  --control-checked-bgColor-active: #26665e;
+  --button-outline-fgColor-rest: #2c7169;
+  --button-outline-bgColor-active: #26665e;
+  --selection-bgColor: #3aa69333;
+
+  /* Paper canvases from the logo concept: #f5efe3 is the page, lighter for cards, sand for edges. */
+  --bgColor-default: #faf6ee;
+  --bgColor-muted: #f5efe3;
+  --bgColor-inset: #f0e9da;
+  --bgColor-disabled: #f0e9da;
+  --control-bgColor-rest: #f0e9da;
+  --control-bgColor-hover: #eae2d1;
+  --control-bgColor-active: #e4dccc;
+  --controlTrack-bgColor-rest: #e4dccc;
+  --borderColor-default: #d9d0c0;
+  --borderColor-muted: #e4dcccb3;
+  --borderColor-emphasis: #8a93a3;
+  --overlay-bgColor: #fffdf8;
+  --sideNav-bgColor-selected: #fffdf8;
+
+  /* Ink is the concept navy, secondary text its slate. */
+  --fgColor-default: #1e2d42;
+  --fgColor-muted: #4a5b72;
+  --fgColor-disabled: #8a93a3;
+  --bgColor-emphasis: #1e2d42;
+  --control-fgColor-rest: #1e2d42;
+  --bgColor-neutral-emphasis: #4a5b72;
+  --borderColor-neutral-emphasis: #4a5b72;
+  --bgColor-neutral-muted: #8a93a31f;
+  --control-transparent-bgColor-hover: #8a93a31a;
+  --control-transparent-bgColor-active: #8a93a326;
+  --control-transparent-bgColor-selected: #8a93a326;
+}
+
+[data-color-mode="dark"][data-dark-theme="dark"],
+[data-color-mode="auto"][data-light-theme="dark"] {
+  /* Link text is the concept turquoise itself; it clears AA on every dark canvas. */
+  --fgColor-accent: #3aa693;
+  --bgColor-accent-emphasis: #317a71;
+  --bgColor-accent-muted: #3aa6931f;
+  --borderColor-accent-emphasis: #317a71;
+  --borderColor-accent-muted: #3aa69366;
+  --control-checked-bgColor-hover: #3e8279;
+  --control-checked-bgColor-active: #4b8a81;
+  --button-outline-fgColor-rest: #3aa693;
+  --button-outline-bgColor-active: #1d5c5a;
+  --selection-bgColor: #317a71b3;
+  --bgColor-severe-emphasis: #bd4f27;
+  --borderColor-severe-emphasis: #bd4f27;
+  --fgColor-severe: #f47b4e;
+  --data-orange-color-emphasis: #f47b4e;
+
+  /* Teal canvases: Primer's dark lightness steps at the accent hue, chroma ≤ 0.012. */
+  --bgColor-default: #0b1311;
+  --bgColor-muted: #141c1b;
+  --bgColor-inset: #010504;
+  --bgColor-emphasis: #3d4644;
+  --bgColor-disabled: #212928;
+  --control-bgColor-rest: #212928;
+  --control-bgColor-hover: #252e2c;
+  --control-bgColor-active: #2a3331;
+  --controlTrack-bgColor-rest: #010504;
+  --borderColor-default: #3d4644;
+  --borderColor-muted: #3d4644b3;
+  --borderColor-emphasis: #646e6c;
+  --overlay-bgColor: #010504;
+  --overlay-backdrop-bgColor: #21292866;
+  --header-bgColor: #141c1bf2;
+  --sideNav-bgColor-selected: #212928;
+  --fgColor-default: #eef8f6;
+  --fgColor-muted: #909a98;
+  --fgColor-disabled: #646e6c;
+  --bgColor-neutral-emphasis: #646e6c;
+  --borderColor-neutral-emphasis: #646e6c;
+  --bgColor-neutral-muted: #646e6c33;
+  --control-transparent-bgColor-hover: #646e6c33;
+  --control-transparent-bgColor-active: #646e6c40;
+  --control-transparent-bgColor-selected: #646e6c33;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-color-mode][data-color-mode="auto"][data-dark-theme="dark"] {
+    --fgColor-accent: #3aa693;
+    --bgColor-accent-emphasis: #317a71;
+    --bgColor-accent-muted: #3aa6931f;
+    --borderColor-accent-emphasis: #317a71;
+    --borderColor-accent-muted: #3aa69366;
+    --control-checked-bgColor-hover: #3e8279;
+    --control-checked-bgColor-active: #4b8a81;
+    --button-outline-fgColor-rest: #3aa693;
+    --button-outline-bgColor-active: #1d5c5a;
+    --selection-bgColor: #317a71b3;
+    --bgColor-severe-emphasis: #bd4f27;
+    --borderColor-severe-emphasis: #bd4f27;
+    --fgColor-severe: #f47b4e;
+    --data-orange-color-emphasis: #f47b4e;
+
+    --bgColor-default: #0b1311;
+    --bgColor-muted: #141c1b;
+    --bgColor-inset: #010504;
+    --bgColor-emphasis: #3d4644;
+    --bgColor-disabled: #212928;
+    --control-bgColor-rest: #212928;
+    --control-bgColor-hover: #252e2c;
+    --control-bgColor-active: #2a3331;
+    --controlTrack-bgColor-rest: #010504;
+    --borderColor-default: #3d4644;
+    --borderColor-muted: #3d4644b3;
+    --borderColor-emphasis: #646e6c;
+    --overlay-bgColor: #010504;
+    --overlay-backdrop-bgColor: #21292866;
+    --header-bgColor: #141c1bf2;
+    --sideNav-bgColor-selected: #212928;
+    --fgColor-default: #eef8f6;
+    --fgColor-muted: #909a98;
+    --fgColor-disabled: #646e6c;
+    --bgColor-neutral-emphasis: #646e6c;
+    --borderColor-neutral-emphasis: #646e6c;
+    --bgColor-neutral-muted: #646e6c33;
+    --control-transparent-bgColor-hover: #646e6c33;
+    --control-transparent-bgColor-active: #646e6c40;
+    --control-transparent-bgColor-selected: #646e6c33;
+  }
+}

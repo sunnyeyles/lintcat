@@ -121,10 +121,10 @@ export default function IntroductionPage() {
                 href={page.href}
                 className="group flex h-full flex-col gap-1.5 p-4 no-underline"
               >
-                <span className="font-mono text-label font-semibold text-foreground group-hover:text-primary">
+                <span className="text-label font-semibold text-foreground group-hover:text-link">
                   {page.title}
                 </span>
-                <span className="font-mono text-caption leading-relaxed text-muted-foreground">
+                <span className="text-caption leading-relaxed text-muted-foreground">
                   {page.summary}
                 </span>
               </Link>
