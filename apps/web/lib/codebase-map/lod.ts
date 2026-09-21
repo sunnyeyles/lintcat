@@ -84,7 +84,7 @@ function openGroups(
 
   scored.sort(
     (a, b) =>
-      Number(b.changed > 0) - Number(a.changed > 0) ||
+      b.changed - a.changed ||
       b.touched - a.touched ||
       a.group.files.length - b.group.files.length ||
       (a.group.id < b.group.id ? -1 : 1),
