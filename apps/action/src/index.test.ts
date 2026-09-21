@@ -92,7 +92,11 @@ interface Harness {
   promptClientConfigs: { publicKey: string; secretKey: string; baseUrl: string }[];
   /** Prompt names fetched, in order, across every client built. */
   promptFetches: { name: string; label: string | undefined }[];
-  tracingConfigs: { baseUrl: string; release?: string | undefined }[];
+  tracingConfigs: {
+    baseUrl: string;
+    release?: string | undefined;
+    recordIo?: boolean | undefined;
+  }[];
   dashboardPosts: {
     url: string;
     headers: Record<string, string>;
@@ -243,6 +247,7 @@ function harness(
         tracingConfigs.push({
           baseUrl: config.baseUrl,
           release: config.release,
+          recordIo: config.recordIo,
         });
         return {
           forceFlush: () => {
@@ -712,9 +717,25 @@ describe("Langfuse wiring", () => {
       }),
     );
     expect(tracingConfigs).toEqual([
-      { baseUrl: "https://cloud.langfuse.com", release: "abc123" },
+      { baseUrl: "https://cloud.langfuse.com", release: "abc123", recordIo: false },
     ]);
     expect(flushCount()).toBe(1);
+  });
+
+  it.each([
+    ["true", true],
+    ["false", false],
+    ["yes", false],
+  ])("reads langfuse-record-io %j as recordIo %s", async (value, expected) => {
+    const { environment, tracingConfigs } = harness(
+      { ...reviewEnv, ...langfuseInputs, "INPUT_LANGFUSE-RECORD-IO": value },
+      pullRequestEvent(),
+      { prompts: remotePrompts },
+    );
+
+    await runAction(environment);
+
+    expect(tracingConfigs.map((config) => config.recordIo)).toEqual([expected]);
   });
 
   it("honours a custom host and prompt label", async () => {

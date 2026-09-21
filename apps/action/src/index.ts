@@ -131,6 +131,7 @@ interface LangfuseInputs {
   secretKey: string;
   baseUrl: string;
   promptLabel: string;
+  recordIo: boolean;
 }
 
 /**
@@ -164,6 +165,7 @@ function resolveLangfuseInputs(
     // invoking the bundle directly never goes through action.yml.
     baseUrl: getInput(env, "langfuse-base-url") || DEFAULT_LANGFUSE_BASE_URL,
     promptLabel: getInput(env, "langfuse-prompt-label") || DEFAULT_PROMPT_LABEL,
+    recordIo: getInput(env, "langfuse-record-io") === "true",
   };
 }
 
@@ -383,6 +385,7 @@ export async function runAction(
           secretKey: langfuse.secretKey,
           baseUrl: langfuse.baseUrl,
           release: env["GITHUB_SHA"],
+          recordIo: langfuse.recordIo,
         });
   // Everything below may emit spans, so it sits inside the flushing block.
   try {

@@ -122,7 +122,11 @@ export function dashboardReview({
     summary: count === 1 ? "1 finding" : `${count} findings`,
     durationMs,
     ...usage,
-    findings: outcome.findings,
+    // The patch is verbatim source, so the dashboard learns only that one survived.
+    findings: outcome.findings.map(({ patch, ...finding }) => ({
+      ...finding,
+      hasPatch: patch !== undefined,
+    })),
   };
 }
 

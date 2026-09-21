@@ -271,7 +271,7 @@ describe("runReview: delivery", () => {
     });
 
     expect(published).toHaveLength(1);
-    expect(published[0]?.findings).toEqual([finding]);
+    expect(published[0]?.findings).toEqual([{ ...finding, hasPatch: false }]);
     expect(published[0]?.summary).toBe("1 finding");
     expect(recorded.runs[0]).toBe(run);
   });
