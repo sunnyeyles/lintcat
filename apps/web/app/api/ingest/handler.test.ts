@@ -1,5 +1,6 @@
 import {
   findings,
+  findRepositoryGraph,
   hashIngestToken,
   repos,
   organizations,
@@ -7,6 +8,11 @@ import {
   type Database,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
+import {
+  buildRepositoryIndex,
+  encodeRepositoryGraph,
+  snapshotRepositoryIndex,
+} from "@pr-review/index";
 import type { ReviewRecord } from "@pr-review/schemas";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -171,5 +177,46 @@ describe("handleIngest", () => {
     });
     const rows = await database.select().from(reviews);
     expect(rows[0]?.summary).toBe("Rerun.");
+  });
+
+  it("stores a posted repository graph once, whatever the base sha repeats", async () => {
+    const snapshot = snapshotRepositoryIndex(
+      buildRepositoryIndex({
+        sha: "b".repeat(40),
+        files: new Map([
+          ["src/session.ts", "export const session = 1;\n"],
+          ["src/login.ts", "import { session } from './session';\n"],
+        ]),
+      }),
+    );
+    const withGraph = {
+      ...record,
+      baseSha: snapshot.sha,
+      changedFiles: [
+        { path: "src/login.ts", status: "modified", additions: 4, deletions: 1 },
+      ],
+      graph: {
+        gzip: Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64"),
+        fileCount: snapshot.files.length,
+        edgeCount: snapshot.edges.length,
+      },
+    };
+
+    expect((await handleIngest(post(withGraph, "secret-token"), database)).status).toBe(200);
+    expect(
+      (await handleIngest(post({ ...withGraph, prNumber: 8 }, "secret-token"), database))
+        .status,
+    ).toBe(200);
+
+    const [repo] = await database.select().from(repos);
+    expect(await findRepositoryGraph(database, repo!.id, snapshot.sha)).toEqual(
+      snapshot,
+    );
+    const rows = await database.select().from(reviews);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      baseSha: snapshot.sha,
+      changedFiles: withGraph.changedFiles,
+    });
   });
 });

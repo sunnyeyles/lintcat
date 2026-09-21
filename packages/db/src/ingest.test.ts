@@ -1,4 +1,14 @@
-import type { ReviewRecord } from "@pr-review/schemas";
+import {
+  buildRepositoryIndex,
+  encodeRepositoryGraph,
+  snapshotRepositoryIndex,
+  type RepositoryGraphSnapshot,
+} from "@pr-review/index";
+import type {
+  ReviewRecord,
+  ReviewRecordChangedFile,
+  ReviewRecordGraph,
+} from "@pr-review/schemas";
 import { asc, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -8,7 +18,17 @@ import {
   hashIngestToken,
   ingestReviewRecord,
 } from "./ingest";
-import { findings, organizations, repos, reviews } from "./schema";
+import {
+  findRepositoryGraph,
+  REPOSITORY_GRAPH_RETENTION,
+} from "./repository-graphs";
+import {
+  findings,
+  organizations,
+  repos,
+  repositoryGraphs,
+  reviews,
+} from "./schema";
 import { createTestDatabase } from "./test-database";
 
 const record: ReviewRecord = {
@@ -240,5 +260,130 @@ describe("ingestReviewRecord", () => {
 
     expect(result).toEqual({ ok: false, reason: "repo-removed" });
     expect(await database.select().from(reviews)).toEqual(before);
+  });
+});
+
+function shaOf(seed: number): string {
+  return seed.toString(16).padStart(40, "0");
+}
+
+function snapshotAt(sha: string) {
+  return snapshotRepositoryIndex(
+    buildRepositoryIndex({
+      sha,
+      files: new Map([
+        ["src/session.ts", "export const session = 1;\n"],
+        ["src/login.ts", "import { session } from './session';\n"],
+      ]),
+    }),
+  );
+}
+
+function graphOf(snapshot: RepositoryGraphSnapshot): ReviewRecordGraph {
+  return {
+    gzip: Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64"),
+    fileCount: snapshot.files.length,
+    edgeCount: snapshot.edges.length,
+  };
+}
+
+const changedFiles: ReviewRecordChangedFile[] = [
+  { path: "src/auth/session.ts", status: "modified", additions: 12, deletions: 3 },
+  { path: "src/gone.ts", status: "removed", additions: 0, deletions: 40 },
+];
+
+const snapshot = snapshotAt(shaOf(1));
+
+const withGraph: ReviewRecord = {
+  ...record,
+  baseSha: snapshot.sha,
+  changedFiles,
+  graph: graphOf(snapshot),
+};
+
+async function repoIdOf(): Promise<number> {
+  const rows = await database.select({ id: repos.id }).from(repos);
+  return rows[0]!.id;
+}
+
+describe("ingestReviewRecord, with a repository graph", () => {
+  it("stores the snapshot, the base sha and the changed files", async () => {
+    const result = await ingestReviewRecord(database, organizationId, withGraph);
+    expect(result.ok).toBe(true);
+
+    const [review] = await database.select().from(reviews);
+    expect(review).toMatchObject({ baseSha: snapshot.sha, changedFiles });
+
+    const rows = await database.select().from(repositoryGraphs);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ baseSha: snapshot.sha, fileCount: 2, edgeCount: 1 });
+    expect(
+      await findRepositoryGraph(database, await repoIdOf(), snapshot.sha),
+    ).toEqual(snapshot);
+  });
+
+  it("neither duplicates nor corrupts the snapshot on a re-ingest", async () => {
+    await ingestReviewRecord(database, organizationId, withGraph);
+    const first = await ingestReviewRecord(database, organizationId, withGraph);
+    expect(first.ok).toBe(true);
+
+    expect(await database.select().from(repositoryGraphs)).toHaveLength(1);
+    expect(await database.select().from(reviews)).toHaveLength(1);
+    expect(
+      await findRepositoryGraph(database, await repoIdOf(), snapshot.sha),
+    ).toEqual(snapshot);
+  });
+
+  it("shares one snapshot between reviews of the same base sha", async () => {
+    await ingestReviewRecord(database, organizationId, withGraph);
+    await ingestReviewRecord(database, organizationId, {
+      ...withGraph,
+      prNumber: 8,
+      headSha: "aaaabbbbccccddddeeeeffff00001111222233334",
+    });
+
+    expect(await database.select().from(reviews)).toHaveLength(2);
+    expect(await database.select().from(repositoryGraphs)).toHaveLength(1);
+  });
+
+  it("ingests a review whose index was off, with no snapshot and no base sha", async () => {
+    const result = await ingestReviewRecord(database, organizationId, record);
+    expect(result.ok).toBe(true);
+
+    const [review] = await database.select().from(reviews);
+    expect(review).toMatchObject({ baseSha: null, changedFiles: [] });
+    expect(await database.select().from(repositoryGraphs)).toEqual([]);
+  });
+
+  it("records changed files even when the index produced no snapshot", async () => {
+    const { graph: _graph, ...noSnapshot } = withGraph;
+    await ingestReviewRecord(database, organizationId, noSnapshot);
+
+    const [review] = await database.select().from(reviews);
+    expect(review).toMatchObject({ baseSha: snapshot.sha, changedFiles });
+    expect(await database.select().from(repositoryGraphs)).toEqual([]);
+  });
+
+  it("keeps only the newest snapshots the retention rule allows", async () => {
+    const stored = REPOSITORY_GRAPH_RETENTION + 2;
+    for (let seed = 1; seed <= stored; seed += 1) {
+      const built = snapshotAt(shaOf(seed));
+      await ingestReviewRecord(database, organizationId, {
+        ...withGraph,
+        headSha: shaOf(seed + 1000),
+        baseSha: built.sha,
+        graph: graphOf(built),
+      });
+    }
+
+    const rows = await database
+      .select({ baseSha: repositoryGraphs.baseSha })
+      .from(repositoryGraphs)
+      .orderBy(asc(repositoryGraphs.id));
+    expect(rows.map((row) => row.baseSha)).toEqual(
+      Array.from({ length: REPOSITORY_GRAPH_RETENTION }, (_, offset) =>
+        shaOf(stored - REPOSITORY_GRAPH_RETENTION + offset + 1),
+      ),
+    );
   });
 });

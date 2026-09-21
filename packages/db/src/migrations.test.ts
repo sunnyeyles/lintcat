@@ -36,8 +36,10 @@ describe("migrations applied in order to an empty database", () => {
     expect(await columns("findings")).not.toContain("agent");
     expect(await columns("agent_runs")).toEqual([]);
     expect(await columns("reviews")).toEqual([
+      "base_sha",
       "cache_creation_input_tokens",
       "cache_read_input_tokens",
+      "changed_files",
       "created_at",
       "duration_ms",
       "head_sha",
@@ -48,6 +50,20 @@ describe("migrations applied in order to an empty database", () => {
       "repo_id",
       "summary",
     ]);
+  });
+
+  it("add repository_graphs and the review's base sha and changed files", async () => {
+    expect(await columns("repository_graphs")).toEqual([
+      "base_sha",
+      "created_at",
+      "edge_count",
+      "file_count",
+      "id",
+      "repo_id",
+      "snapshot",
+    ]);
+    expect(await columns("reviews")).toContain("base_sha");
+    expect(await columns("reviews")).toContain("changed_files");
   });
 
   it("replace teams with organizations and memberships", async () => {

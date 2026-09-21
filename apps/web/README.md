@@ -44,6 +44,11 @@ the installation, or it is a 404. A missing or unknown token, or an uninstalled
 organization's, is a 401 and writes nothing; a rerun of the same commit replaces that review's
 findings.
 
+The record may also carry the pull request's `baseSha`, its `changedFiles` and
+a `graph`: the repository index serialised by `@pr-review/index`, gzipped and
+base64 encoded, which is stored as those bytes under `(repo_id, base_sha)`. A
+review whose index was off or failed simply sends no graph.
+
 ## GitHub App webhook
 
 `POST /api/github/webhook` turns GitHub App installations into organizations.

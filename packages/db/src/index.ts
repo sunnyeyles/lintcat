@@ -32,6 +32,12 @@ export {
   type GithubAccount,
 } from "./memberships";
 export {
+  findRepositoryGraph,
+  pruneRepositoryGraphs,
+  saveRepositoryGraph,
+  REPOSITORY_GRAPH_RETENTION,
+} from "./repository-graphs";
+export {
   deleteOrganizationRepoAccess,
   listPrivateRepos,
   listUserMemberships,

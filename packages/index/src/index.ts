@@ -55,6 +55,13 @@ export {
   type ReferenceImport,
 } from "#src/references";
 export {
+  decodeRepositoryGraph,
+  encodeRepositoryGraph,
+  snapshotRepositoryIndex,
+  type RepositoryGraphSnapshot,
+  type SnapshotEdge,
+} from "#src/snapshot";
+export {
   createImportResolver,
   isRelativeSpecifier,
   moduleCandidates,

@@ -1,3 +1,6 @@
+import type { RepositoryGraphSnapshot } from "@pr-review/index";
+import type { ReviewRecordChangedFile } from "@pr-review/schemas";
+
 import type { Finding, Organization, Repo, Review } from "../schema";
 
 export type Severity = "low" | "medium" | "high";
@@ -73,6 +76,9 @@ export type DataSource = {
   getRepo(owner: string, name: string): Promise<RepoSummary | null>;
   listReviews(opts?: { repoId?: number; limit?: number }): Promise<ReviewSummary[]>;
   getReview(id: number): Promise<ReviewDetail | null>;
+  /** undefined when the review is unreadable, or its index was off or failed. */
+  getRepositoryGraph(id: number): Promise<RepositoryGraphSnapshot | undefined>;
+  getChangedFiles(id: number): Promise<ReviewRecordChangedFile[]>;
   getTrends(range: Range, repoId?: number): Promise<Trends>;
   getUsage(range: Range, repoId?: number): Promise<Usage>;
 };

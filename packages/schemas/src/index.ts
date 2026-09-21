@@ -21,4 +21,12 @@ export {
   type ReviewMemory,
   type Suppression,
 } from "#src/review-memory";
-export { reviewRecordSchema, type ReviewRecord } from "#src/review-record";
+export {
+  MAX_REPOSITORY_GRAPH_BASE64,
+  reviewRecordChangedFileSchema,
+  reviewRecordGraphSchema,
+  reviewRecordSchema,
+  type ReviewRecord,
+  type ReviewRecordChangedFile,
+  type ReviewRecordGraph,
+} from "#src/review-record";
