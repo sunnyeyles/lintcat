@@ -20,15 +20,26 @@ function importers(file: IndexedFile): string {
   return `${file.importerCount} importer${file.importerCount === 1 ? "" : "s"}`;
 }
 
+/** The graph flags, appended only when they are true. */
+function flags(file: IndexedFile): string {
+  return [
+    ...(file.inCycle ? ["in import cycle"] : []),
+    ...(file.dead ? ["dead (not an entry point)"] : []),
+  ]
+    .map((flag) => `, ${flag}`)
+    .join("");
+}
+
 function describe(file: IndexedFile): string {
   const owner = file.package === undefined ? "" : `${file.package}, `;
+  const tail = `${importers(file)}${flags(file)}`;
   if (file.role === "test" && file.covers !== undefined) {
-    return `${owner}test, covers ${file.covers}, ${importers(file)}`;
+    return `${owner}test, covers ${file.covers}, ${tail}`;
   }
   if (file.coveredBy !== undefined) {
-    return `${owner}${file.role}, covered by ${file.coveredBy}, ${importers(file)}`;
+    return `${owner}${file.role}, covered by ${file.coveredBy}, ${tail}`;
   }
-  return `${owner}${file.role}, no test, ${importers(file)}`;
+  return `${owner}${file.role}, no test, ${tail}`;
 }
 
 /** Workspace packages listed in the overview before the list is cut short. */

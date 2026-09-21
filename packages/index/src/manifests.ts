@@ -12,6 +12,10 @@ export interface PackageManifest {
   readonly imports?: unknown;
   /** The legacy entry point, used only when there is no `exports` field. */
   readonly main?: string | undefined;
+  /** The bundler entry point; read only when deciding entry points. */
+  readonly module?: string | undefined;
+  /** The `bin` field verbatim: one path, or a map of command names to paths. */
+  readonly bin?: unknown;
 }
 
 /** One `paths` entry of a tsconfig, with its targets made repository-relative. */
@@ -150,12 +154,17 @@ export function readPackageManifest(
   }
   const name = parsed["name"];
   const main = parsed["main"];
+  const module = parsed["module"];
   return {
     root,
     ...(typeof name === "string" && name !== "" ? { name } : {}),
     ...(typeof main === "string" && main !== "" ? { main: `./${main}` } : {}),
+    ...(typeof module === "string" && module !== ""
+      ? { module: `./${module}` }
+      : {}),
     ...(parsed["exports"] === undefined ? {} : { exports: parsed["exports"] }),
     ...(parsed["imports"] === undefined ? {} : { imports: parsed["imports"] }),
+    ...(parsed["bin"] === undefined ? {} : { bin: parsed["bin"] }),
   };
 }
 
