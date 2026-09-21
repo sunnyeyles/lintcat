@@ -1,23 +1,13 @@
 {
-  "$schema": "https://turbo.build/schema.json",
+  "$schema": "https://turborepo.dev/schema.json",
   "tasks": {
     "transit": { "dependsOn": ["^transit"] },
-    "typecheck": { "dependsOn": ["transit"], "outputs": [] },
+    "typecheck": { "dependsOn": ["transit"] },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/**"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
-    "dev": { "cache": false, "persistent": true },
-    "//#test": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "apps/**",
-        "packages/**",
-        "evals/**",
-        "vitest.config.ts"
-      ],
-      "outputs": []
-    },
-    "//#eval": { "cache": false }
+    "dev": { "cache": false, "persistent": true }
   }
 }
