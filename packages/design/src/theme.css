@@ -88,16 +88,18 @@
   --text-caption--line-height: 1.25;
   --text-label: 0.8125rem;
   --text-label--line-height: 1.25;
-  --text-body: 0.875rem;
+  /* Prose sizes follow GitHub's markdown body (16/24), not its UI chrome (14/21). */
+  --text-body: 1rem;
   --text-body--line-height: 1.5;
-  --text-lede: 1rem;
+  --text-lede: 1.125rem;
   --text-lede--line-height: 1.5;
-  --text-h3: 1rem;
-  --text-h3--line-height: 1.5;
-  --text-h2: 1.25rem;
-  --text-h2--line-height: 1.4;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.4;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 1.3334;
   --text-h1: 2rem;
   --text-h1--line-height: 1.25;
+  --text-sm--line-height: 1.5;
 
   --tracking-display: -0.01em;
   --tracking-ui: 0.02em;
@@ -174,6 +176,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-turquoise: var(--brand-turquoise);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-coral: var(--brand-coral);
+  --color-brand-rust: var(--brand-rust);
+  --color-brand-cream: var(--brand-cream);
 }
 
 @utility eyebrow {

@@ -1,8 +1,22 @@
 /* Brand overrides on top of @primer/primitives. Only tokens we deliberately change live here. */
 
+/* The Funnelweb logo palette: turquoise leads, the rest are secondaries. */
+:root {
+  --brand-navy: #1b2b41;
+  --brand-turquoise: #4aa696;
+  --brand-teal: #1e5d57;
+  --brand-coral: #f47a4d;
+  --brand-rust: #c3552b;
+  --brand-cream: #efe8dc;
+}
+
 /* Accent steps keep Primer's lightness deltas, re-anchored on #317a71 (OKLCH hue swap). */
 [data-color-mode="light"][data-light-theme="light"],
 [data-color-mode="auto"][data-light-theme="light"] {
+  --bgColor-severe-emphasis: #c3552b;
+  --borderColor-severe-emphasis: #c3552b;
+  --fgColor-severe: #c3552b;
+  --data-orange-color-emphasis: #c3552b;
   --fgColor-accent: #317a71;
   --bgColor-accent-emphasis: #317a71;
   --bgColor-accent-muted: #e5efed;
@@ -26,12 +40,12 @@
   --borderColor-muted: #ddd7cfb3;
   --borderColor-emphasis: #8e8880;
 
-  /* Ink and neutrals lean teal so text sits with the accent, not the sand. */
-  --fgColor-default: #1d2423;
+  /* Ink is the logo navy; neutrals lean teal so they sit with the accent, not the sand. */
+  --fgColor-default: #1b2b41;
   --fgColor-muted: #596563;
   --fgColor-disabled: #818d8b;
-  --bgColor-emphasis: #232a29;
-  --control-fgColor-rest: #232a29;
+  --bgColor-emphasis: #1b2b41;
+  --control-fgColor-rest: #1b2b41;
   --bgColor-neutral-emphasis: #596563;
   --borderColor-neutral-emphasis: #596563;
   --bgColor-neutral-muted: #818d8b1f;
@@ -42,16 +56,21 @@
 
 [data-color-mode="dark"][data-dark-theme="dark"],
 [data-color-mode="auto"][data-light-theme="dark"] {
-  --fgColor-accent: #5b948c;
+  /* Link text is the logo turquoise itself; it clears AA on every dark canvas. */
+  --fgColor-accent: #4aa696;
   --bgColor-accent-emphasis: #317a71;
   --bgColor-accent-muted: #4f90871a;
   --borderColor-accent-emphasis: #317a71;
   --borderColor-accent-muted: #4f908766;
   --control-checked-bgColor-hover: #3e8279;
   --control-checked-bgColor-active: #4b8a81;
-  --button-outline-fgColor-rest: #4f9087;
+  --button-outline-fgColor-rest: #4aa696;
   --button-outline-bgColor-active: #104943;
   --selection-bgColor: #317a71b3;
+  --bgColor-severe-emphasis: #c3552b;
+  --borderColor-severe-emphasis: #c3552b;
+  --fgColor-severe: #f47a4d;
+  --data-orange-color-emphasis: #f47a4d;
 
   /* Teal canvases: Primer's dark lightness steps at the accent hue, chroma ≤ 0.012. */
   --bgColor-default: #0b1311;
@@ -83,16 +102,20 @@
 
 @media (prefers-color-scheme: dark) {
   [data-color-mode][data-color-mode="auto"][data-dark-theme="dark"] {
-    --fgColor-accent: #5b948c;
+    --fgColor-accent: #4aa696;
     --bgColor-accent-emphasis: #317a71;
     --bgColor-accent-muted: #4f90871a;
     --borderColor-accent-emphasis: #317a71;
     --borderColor-accent-muted: #4f908766;
     --control-checked-bgColor-hover: #3e8279;
     --control-checked-bgColor-active: #4b8a81;
-    --button-outline-fgColor-rest: #4f9087;
+    --button-outline-fgColor-rest: #4aa696;
     --button-outline-bgColor-active: #104943;
     --selection-bgColor: #317a71b3;
+    --bgColor-severe-emphasis: #c3552b;
+    --borderColor-severe-emphasis: #c3552b;
+    --fgColor-severe: #f47a4d;
+    --data-orange-color-emphasis: #f47a4d;
 
     --bgColor-default: #0b1311;
     --bgColor-muted: #141c1b;

@@ -60,9 +60,12 @@ whole brand deviation; components only ever see the third.
    `theme.test.ts` asserts WCAG AA for accent and muted text on every canvas
    and for white on the accent and attention emphasis fills.
 3. `packages/design/src/theme.css` aliases shadcn names to Primer names. Two
-   additions to shadcn's set: `--link` (Primer `fgColor-accent`, which in dark
-   mode is lighter than the button fill so link text passes AA) and
-   `--attention` (Primer `severe`, the orange that opposes the teal).
+   additions to shadcn's set: `--link` (Primer `fgColor-accent`: in dark mode
+   the logo turquoise `#4aa696`, lighter than the button fill so link text
+   passes AA) and `--attention` (Primer `severe`, overridden to the logo rust
+   `#c3552b` for fills and coral `#f47a4d` for dark-mode text). The logo's
+   navy `#1b2b41` is the light-mode ink and tooltip ground; the full logo
+   palette is exposed as `--brand-*` for marks and illustrations only.
 
 Geometry: radius 6px (`sm` 3px), buttons 32/28/40px, body 14px, Primer's
 resting and floating shadows behind Tailwind's `shadow-*` scale, system sans
