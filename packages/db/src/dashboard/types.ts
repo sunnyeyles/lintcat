@@ -5,16 +5,6 @@ import type { Finding, Organization, Repo, Review } from "../schema";
 
 export type Severity = "low" | "medium" | "high";
 
-export const AGENTS = [
-  "security",
-  "correctness",
-  "performance",
-  "test-coverage",
-  "docs-drift",
-] as const;
-
-export type AgentName = (typeof AGENTS)[number];
-
 export type TokenCounts = {
   inputTokens: number;
   cacheCreationInputTokens: number;
@@ -22,28 +12,16 @@ export type TokenCounts = {
   outputTokens: number;
 };
 
-export type AgentRun = TokenCounts & {
-  id: number;
-  reviewId: number;
-  agent: AgentName;
-  durationMs: number;
-  findingCount: number;
-};
-
-// `agents` narrows Drizzle's text[] to the names the UI can actually render.
-export type ReviewSummary = Omit<Review, "agents"> &
+export type ReviewSummary = Review &
   TokenCounts & {
-    agents: AgentName[];
     repo: Repo;
     findingCount: number;
     bySeverity: Record<Severity, number>;
-    durationMs: number;
     costUsd: number;
   };
 
 export type ReviewDetail = ReviewSummary & {
   findings: Finding[];
-  runs: AgentRun[];
 };
 
 export type RepoSummary = Repo & {
@@ -62,14 +40,6 @@ export type TrendPoint = {
   high: number;
 };
 
-export type AgentBreakdown = TokenCounts & {
-  agent: AgentName;
-  findingCount: number;
-  reviewCount: number;
-  medianDurationMs: number;
-  costUsd: number;
-};
-
 export type CategoryCount = {
   category: string;
   count: number;
@@ -78,7 +48,6 @@ export type CategoryCount = {
 
 export type Trends = {
   points: TrendPoint[];
-  byAgent: AgentBreakdown[];
   byCategory: CategoryCount[];
   totals: {
     reviews: number;
@@ -95,7 +64,6 @@ export type UsagePoint = TokenCounts & {
 
 export type Usage = {
   points: UsagePoint[];
-  byAgent: AgentBreakdown[];
   byRepo: Array<{ repo: Repo; costUsd: number; reviewCount: number } & TokenCounts>;
   totals: TokenCounts & { costUsd: number; reviewCount: number };
 };

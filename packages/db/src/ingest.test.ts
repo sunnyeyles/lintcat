@@ -23,7 +23,6 @@ import {
   REPOSITORY_GRAPH_RETENTION,
 } from "./repository-graphs";
 import {
-  agentRuns,
   findings,
   organizations,
   repos,
@@ -32,38 +31,19 @@ import {
 } from "./schema";
 import { createTestDatabase } from "./test-database";
 
-const securityRun = {
-  agent: "security",
-  durationMs: 41_000,
-  findingCount: 1,
-  inputTokens: 12_000,
-  cacheCreationInputTokens: 4_000,
-  cacheReadInputTokens: 20_000,
-  outputTokens: 800,
-};
-
-const performanceRun = {
-  agent: "performance",
-  durationMs: 30_000,
-  findingCount: 1,
-  inputTokens: 9_000,
-  cacheCreationInputTokens: 0,
-  cacheReadInputTokens: 0,
-  outputTokens: 500,
-};
-
 const record: ReviewRecord = {
   owner: "acme",
   repo: "widgets",
   prNumber: 7,
   headSha: "0f1e2d3c4b5a69788796a5b4c3d2e1f001234567",
-  agents: ["security", "performance"],
   summary: "One high severity finding.",
   durationMs: 45_000,
-  agentRuns: [securityRun, performanceRun],
+  inputTokens: 21_000,
+  cacheCreationInputTokens: 4_000,
+  cacheReadInputTokens: 20_000,
+  outputTokens: 1_300,
   findings: [
     {
-      agent: "security",
       file: "src/auth/session.ts",
       line: 84,
       category: "security",
@@ -128,7 +108,7 @@ describe("findOrganizationByIngestToken", () => {
 });
 
 describe("ingestReviewRecord", () => {
-  it("creates the repo, the review, one agent run per agent and the findings", async () => {
+  it("creates the repo, the review and the findings", async () => {
     const result = await ingestReviewRecord(database, organizationId, record);
     expect(result).toEqual({ ok: true, reviewId: expect.any(Number) });
     if (!result.ok) return;
@@ -149,20 +129,13 @@ describe("ingestReviewRecord", () => {
       repoId: repoRows[0]!.id,
       prNumber: 7,
       headSha: record.headSha,
-      agents: ["security", "performance"],
       summary: "One high severity finding.",
       durationMs: 45_000,
+      inputTokens: 21_000,
+      cacheCreationInputTokens: 4_000,
+      cacheReadInputTokens: 20_000,
+      outputTokens: 1_300,
     });
-
-    const runRows = await database
-      .select()
-      .from(agentRuns)
-      .where(eq(agentRuns.reviewId, result.reviewId))
-      .orderBy(asc(agentRuns.agent));
-    expect(runRows).toEqual([
-      { id: expect.any(Number), reviewId: result.reviewId, ...performanceRun },
-      { id: expect.any(Number), reviewId: result.reviewId, ...securityRun },
-    ]);
 
     const findingRows = await database
       .select()
@@ -171,7 +144,6 @@ describe("ingestReviewRecord", () => {
       .orderBy(asc(findings.id));
     expect(findingRows).toHaveLength(2);
     expect(findingRows[0]).toMatchObject({
-      agent: "security",
       file: "src/auth/session.ts",
       line: 84,
       category: "security",
@@ -181,7 +153,6 @@ describe("ingestReviewRecord", () => {
     });
     expect(findingRows[0]?.confidence).toBeCloseTo(0.9, 5);
     expect(findingRows[1]).toMatchObject({
-      agent: null,
       line: null,
       suggestedFix: null,
       title: "Quadratic scan",
@@ -192,10 +163,9 @@ describe("ingestReviewRecord", () => {
     const first = await ingestReviewRecord(database, organizationId, record);
     const rerun: ReviewRecord = {
       ...record,
-      agents: ["performance"],
       summary: "Now only one finding.",
       durationMs: 30_000,
-      agentRuns: [{ ...performanceRun, outputTokens: 400 }],
+      outputTokens: 400,
       findings: [record.findings[1]!],
     };
     const second = await ingestReviewRecord(database, organizationId, rerun);
@@ -211,15 +181,11 @@ describe("ingestReviewRecord", () => {
     expect(findingRows).toHaveLength(1);
     expect(findingRows[0]).toMatchObject({ title: "Quadratic scan" });
 
-    const runRows = await database.select().from(agentRuns);
-    expect(runRows).toHaveLength(1);
-    expect(runRows[0]).toMatchObject({ agent: "performance", outputTokens: 400 });
-
     const reviewRows = await database.select().from(reviews);
     expect(reviewRows[0]).toMatchObject({
-      agents: ["performance"],
       summary: "Now only one finding.",
       durationMs: 30_000,
+      outputTokens: 400,
     });
   });
 
@@ -230,7 +196,6 @@ describe("ingestReviewRecord", () => {
       headSha: "aaaabbbbccccddddeeeeffff00001111222233334",
     });
     expect(await database.select().from(reviews)).toHaveLength(2);
-    expect(await database.select().from(agentRuns)).toHaveLength(4);
     expect(await database.select().from(repos)).toHaveLength(1);
   });
 

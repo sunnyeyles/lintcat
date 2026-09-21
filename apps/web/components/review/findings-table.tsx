@@ -25,53 +25,36 @@ import {
 } from "@pr-review/design";
 import { useId, useMemo, useState } from "react";
 
-import { AGENT_LABELS, SeverityBadge } from "@/components/ui";
+import { SeverityBadge } from "@/components/ui";
 import type { Severity } from "@pr-review/db/dashboard";
 
 import { ConfidenceMeter } from "./confidence-meter";
 import { FilePath } from "./file-path";
 import { FindingSheet } from "./finding-sheet";
 import { FINDINGS_ANCHOR, useFindingsFocus } from "./findings-focus";
-import {
-  type AgentFilterKey,
-  OTHER_AGENT,
-  SEVERITIES,
-  agentKeyOf,
-  agentKeysOf,
-  sortFindings,
-} from "./sort";
+import { SEVERITIES, sortFindings } from "./sort";
 
 const ALL = "all";
 
-function agentLabel(key: AgentFilterKey): string {
-  return key === OTHER_AGENT ? "other" : AGENT_LABELS[key];
-}
-
 export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
   const severityId = useId();
-  const agentId = useId();
   const [severity, setSeverity] = useState<Severity | typeof ALL>(ALL);
-  const [agent, setAgent] = useState<AgentFilterKey | typeof ALL>(ALL);
   const [selected, setSelected] = useState<Finding | null>(null);
   const { file, clearFile } = useFindingsFocus();
 
   const sorted = useMemo(() => sortFindings(findings), [findings]);
-  const agents = useMemo(() => agentKeysOf(findings), [findings]);
   const rows = useMemo(
     () =>
       sorted.filter(
         (f) =>
-          (severity === ALL || f.severity === severity) &&
-          (agent === ALL || agentKeyOf(f) === agent) &&
-          (file === null || f.file === file),
+          (severity === ALL || f.severity === severity) && (file === null || f.file === file),
       ),
-    [sorted, severity, agent, file],
+    [sorted, severity, file],
   );
 
-  const filtered = severity !== ALL || agent !== ALL || file !== null;
+  const filtered = severity !== ALL || file !== null;
   const reset = () => {
     setSeverity(ALL);
-    setAgent(ALL);
     clearFile();
   };
 
@@ -97,27 +80,6 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
                   {SEVERITIES.map((s) => (
                     <SelectItem key={s} value={s}>
                       {s}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={agentId}>Agent</Label>
-            <Select
-              value={agent}
-              onValueChange={(v) => setAgent(v as AgentFilterKey | typeof ALL)}
-            >
-              <SelectTrigger id={agentId} className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={ALL}>All agents</SelectItem>
-                  {agents.map((a) => (
-                    <SelectItem key={a} value={a}>
-                      {agentLabel(a)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -153,7 +115,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
           <EmptyHeader>
             <EmptyTitle>No findings match these filters</EmptyTitle>
             <EmptyDescription>
-              Widen the severity or agent filter to see the rest of this review.
+              Widen the severity filter to see the rest of this review.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

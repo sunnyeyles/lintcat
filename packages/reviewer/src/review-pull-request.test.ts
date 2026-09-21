@@ -1,8 +1,4 @@
-import {
-  emptyTokenUsage,
-  ReviewCancelledError,
-  type AgentDefinition,
-} from "@pr-review/ai";
+import { ReviewCancelledError, type AgentDefinition } from "@pr-review/ai";
 import { ArchiveTooLargeError } from "@pr-review/github";
 import type {
   ChangedFile,
@@ -39,10 +35,7 @@ import { titleShape, type MemoryStore } from "#src/memory";
 import type { ReviewPipelineRun } from "#src/pipeline-runner";
 import type { PublishReview } from "#src/publish-review";
 import { findingMarker } from "#src/render-review";
-import {
-  skippedSynthesis,
-  type ReviewPipelineResult,
-} from "#src/review-pipeline";
+import type { ReviewPipelineResult } from "#src/review-pipeline";
 import { githubDelivery } from "#src/review-delivery";
 import { reviewWithDelivery } from "#src/review-pull-request";
 import type { ReviewTarget } from "#src/review-target";
@@ -145,36 +138,21 @@ function reviewResult(
   const candidates = overrides.candidates ?? [];
   return {
     candidates,
-    agentFailures: [],
-    synthesis:
-      candidates.length === 0
-        ? skippedSynthesis("no candidate findings", [])
-        : {
-            outcome: "completed",
-            candidates,
-            usage: emptyTokenUsage(),
-            durationMs: 0,
-          },
     findings: candidates as ReviewFinding[],
     ...overrides,
   };
 }
 
-/** An agent definition; `paths` is what the gate reads. */
-function makeAgent(
-  category: string,
-  paths?: readonly string[],
-): AgentDefinition {
+function makeAgent(category: string): AgentDefinition {
   return {
     category,
     role: `${category} reviewer`,
     focus: `Review only for ${category} problems.`,
-    ...(paths === undefined ? {} : { paths }),
   };
 }
 
 interface DepsOptions {
-  agents?: readonly AgentDefinition[];
+  agent?: AgentDefinition;
   /** Replaces the GitHub adapter's check-run publisher, as the fork fallback does. */
   publishReview?: PublishReview;
   commitFixes?: boolean;
@@ -187,7 +165,7 @@ interface DepsOptions {
 function makeDeps(
   review: ReviewPipelineResult = reviewResult(),
   {
-    agents = [makeAgent("correctness")],
+    agent = makeAgent("general"),
     publishReview,
     commitFixes = false,
     ...options
@@ -203,7 +181,7 @@ function makeDeps(
     entries,
     deps: {
       client,
-      agents,
+      agent,
       runReviewPipeline,
       logger,
       delivery:
@@ -231,9 +209,9 @@ describe("reviewWithDelivery", () => {
   });
 
   it("runs the pipeline against the loaded context with the same client", async () => {
-    const agents = [makeAgent("correctness")];
+    const agent = makeAgent("general");
     const { deps, client, runReviewPipeline } = makeDeps(reviewResult(), {
-      agents,
+      agent,
     });
 
     await reviewWithDelivery(target, deps);
@@ -247,8 +225,7 @@ describe("reviewWithDelivery", () => {
         changedFiles,
         diff,
       },
-      agents,
-      hints: { keep: [], drop: [] },
+      agent,
       index: expect.objectContaining({ sha: pullRequest.baseSha }),
     });
   });
@@ -324,7 +301,7 @@ describe("reviewWithDelivery", () => {
     ]);
   });
 
-  it("emits the lifecycle events for one review (spec §26)", async () => {
+  it("emits the lifecycle events for one review", async () => {
     const { deps, entries } = makeDeps(reviewResult({ candidates: [finding] }));
 
     await reviewWithDelivery(target, deps);
@@ -332,8 +309,6 @@ describe("reviewWithDelivery", () => {
     expect(entries.map((entry) => entry["event"])).toEqual([
       "review.loaded",
       "index.built",
-      "synthesis.started",
-      "synthesis.completed",
       "findings.validated",
       "patches.verified",
       "review.comments.published",
@@ -342,42 +317,6 @@ describe("reviewWithDelivery", () => {
     for (const entry of entries) {
       expect(entry).toMatchObject({ repository: "octo-org/example-service" });
     }
-  });
-
-  it("logs synthesis.skipped for a clean review rather than a synthesis pair", async () => {
-    const { deps, entries } = makeDeps();
-
-    await reviewWithDelivery(target, deps);
-
-    const events = entries.map((entry) => entry["event"]);
-    expect(events).toContain("synthesis.skipped");
-    expect(events).not.toContain("synthesis.started");
-  });
-
-  it("logs synthesis.failed and still publishes when synthesis fails", async () => {
-    const { deps, client, entries } = makeDeps(
-      reviewResult({
-        candidates: [finding],
-        synthesis: {
-          outcome: "failed",
-          candidates: [finding],
-          error: "model returned malformed JSON",
-          errorName: "SynthesisError",
-          durationMs: 0,
-        },
-      }),
-    );
-
-    await reviewWithDelivery(target, deps);
-
-    expect(entries).toContainEqual(
-      expect.objectContaining({
-        level: "error",
-        event: "synthesis.failed",
-        fallback: "publishing validated raw findings",
-      }),
-    );
-    expect(client.createCheckRun).toHaveBeenCalledTimes(1);
   });
 
   it("propagates a pipeline failure without publishing", async () => {
@@ -577,7 +516,7 @@ describe("reviewWithDelivery, narrowed to the commits since the last review", ()
     patch: "@@ -2 +2,3 @@\n+const limit = 0;\n",
   };
 
-  it("hands the agents the narrowed diff, and the whole pull request beside it", async () => {
+  it("hands the agent the narrowed diff, and the whole pull request beside it", async () => {
     const { deps, client, runReviewPipeline } = makeDeps(reviewResult(), {
       incremental: true,
     });
@@ -608,7 +547,7 @@ describe("reviewWithDelivery, narrowed to the commits since the last review", ()
     expect(runReviewPipeline.mock.calls[0]?.[0].context.incremental).toBeUndefined();
   });
 
-  it("runs no agent when nothing this pull request changed has moved", async () => {
+  it("runs nothing when nothing this pull request changed has moved", async () => {
     const { deps, client, runReviewPipeline, entries } = makeDeps(
       reviewResult(),
       { incremental: true },
@@ -676,137 +615,7 @@ describe("reviewWithDelivery, narrowed to the commits since the last review", ()
   });
 });
 
-/**
- * The changed file every fixture carries is `src/sessions.ts`, so
- * `packages/**` is the pattern nothing here matches.
- */
-describe("reviewWithDelivery: path filters", () => {
-  const gated = makeAgent("security", ["packages/**"]);
-  const ungated = makeAgent("correctness");
-
-  it("hands the pipeline only the agents the changed files woke", async () => {
-    const { deps, runReviewPipeline } = makeDeps(reviewResult(), {
-      agents: [ungated, gated],
-    });
-
-    await reviewWithDelivery(target, deps);
-
-    expect(runReviewPipeline.mock.calls[0]?.[0].agents).toEqual([ungated]);
-  });
-
-  it("wakes an agent whose pattern one changed file matches", async () => {
-    const matching = makeAgent("security", ["src/**"]);
-    const { deps, runReviewPipeline } = makeDeps(reviewResult(), {
-      agents: [matching],
-    });
-
-    await reviewWithDelivery(target, deps);
-
-    expect(runReviewPipeline.mock.calls[0]?.[0].agents).toEqual([matching]);
-  });
-
-  it("logs each skipped agent with the paths it waited for", async () => {
-    const { deps, entries } = makeDeps(reviewResult(), {
-      agents: [ungated, gated],
-    });
-
-    await reviewWithDelivery(target, deps);
-
-    expect(entries).toContainEqual(
-      expect.objectContaining({
-        event: "agent.skipped",
-        agent: "security",
-        paths: ["packages/**"],
-        repository: "octo-org/example-service",
-      }),
-    );
-  });
-
-  it("names the skipped agent in the published check run", async () => {
-    const { deps, client } = makeDeps(reviewResult({ candidates: [finding] }), {
-      agents: [ungated, gated],
-    });
-
-    await reviewWithDelivery(target, deps);
-
-    expect(client.createCheckRun.mock.calls[0]?.[0].output.summary).toMatch(
-      /security review did not run/i,
-    );
-  });
-
-  describe("when no agent matches", () => {
-    const only = { agents: [gated] };
-
-    it("never calls the pipeline, so the review costs nothing", async () => {
-      const { deps, runReviewPipeline } = makeDeps(reviewResult(), only);
-
-      await reviewWithDelivery(target, deps);
-
-      expect(runReviewPipeline).not.toHaveBeenCalled();
-    });
-
-    it("still publishes a check run, and never a green one", async () => {
-      // The whole point: a pull request nothing reviewed must not be
-      // indistinguishable from one that came back clean.
-      const { deps, client } = makeDeps(reviewResult(), only);
-
-      await reviewWithDelivery(target, deps);
-
-      const published = client.createCheckRun.mock.calls[0]?.[0];
-      expect(published?.conclusion).toBe("neutral");
-      expect(published?.output.title).toBe(
-        "No agent reviewed this pull request",
-      );
-      expect(published?.output.summary).toContain("`packages/**`");
-      expect(published?.output.summary).toContain("`src/sessions.ts`");
-    });
-
-    it("posts no review comments", async () => {
-      const { deps, client } = makeDeps(reviewResult(), only);
-
-      await reviewWithDelivery(target, deps);
-
-      expect(client.createReview).not.toHaveBeenCalled();
-      expect(client.listReviewComments).not.toHaveBeenCalled();
-    });
-
-    it("reports the skip to the caller as an empty review", async () => {
-      const { deps } = makeDeps(reviewResult(), only);
-
-      await expect(reviewWithDelivery(target, deps)).resolves.toMatchObject({
-        findings: [],
-        candidates: [],
-        agentFailures: [],
-        synthesis: { outcome: "skipped" },
-      });
-    });
-
-    it("logs the lifecycle of a review that never ran", async () => {
-      const { deps, entries } = makeDeps(reviewResult(), only);
-
-      await reviewWithDelivery(target, deps);
-
-      expect(entries.map((entry) => entry["event"])).toEqual([
-        "review.loaded",
-        "agent.skipped",
-        "review.no_agents_matched",
-      ]);
-    });
-
-    it("publishes through the delivery, so the fork fallback still applies", async () => {
-      const publishReview = vi.fn<PublishReview>(async () => undefined);
-      const { deps, client } = makeDeps(reviewResult(), {
-        ...only,
-        publishReview,
-      });
-
-      await reviewWithDelivery(target, deps);
-
-      expect(client.createCheckRun).not.toHaveBeenCalled();
-      expect(publishReview).toHaveBeenCalledTimes(1);
-    });
-  });
-
+describe("reviewWithDelivery: fixes", () => {
   describe("fixes", () => {
     const patchedFiles: ChangedFile[] = [
       {
@@ -923,7 +732,7 @@ function readOnlyStore(content: string): MemoryStore {
 }
 
 describe("reviewWithDelivery: repository hints", () => {
-  it("hands the pipeline agents carrying the memory's qualifying shapes", async () => {
+  it("hands the pipeline an agent carrying the memory's qualifying shapes", async () => {
     const { deps, runReviewPipeline } = makeDeps(reviewResult(), {
       memoryStore: readOnlyStore(memoryFile()),
       now: () => NOW,
@@ -931,14 +740,14 @@ describe("reviewWithDelivery: repository hints", () => {
 
     await reviewWithDelivery(target, deps);
 
-    const [hinted] = runReviewPipeline.mock.calls[0]?.[0].agents ?? [];
-    expect(hinted?.repositoryHints).toHaveLength(1);
-    expect(hinted?.repositoryHints?.[0]).toContain(
+    const { agent } = runReviewPipeline.mock.calls[0]?.[0] ?? {};
+    expect(agent?.repositoryHints).toHaveLength(1);
+    expect(agent?.repositoryHints?.[0]).toContain(
       '"assignment instead of comparison in"',
     );
   });
 
-  it("logs which agents the hints reached", async () => {
+  it("logs how many hints reached the agent", async () => {
     const { deps, entries } = makeDeps(reviewResult(), {
       memoryStore: readOnlyStore(memoryFile()),
       now: () => NOW,
@@ -951,7 +760,6 @@ describe("reviewWithDelivery: repository hints", () => {
         event: "memory.hints_attached",
         repository: "octo-org/example-service",
         hintCount: 1,
-        agents: ["correctness"],
       }),
     );
   });
@@ -964,37 +772,33 @@ describe("reviewWithDelivery: repository hints", () => {
 
     await reviewWithDelivery(target, deps);
 
-    const [unhinted] = runReviewPipeline.mock.calls[0]?.[0].agents ?? [];
-    expect(unhinted?.repositoryHints).toBeUndefined();
+    const { agent } = runReviewPipeline.mock.calls[0]?.[0] ?? {};
+    expect(agent?.repositoryHints).toBeUndefined();
     expect(entries).toContainEqual(
-      expect.objectContaining({
-        event: "memory.hints_attached",
-        hintCount: 0,
-        agents: [],
-      }),
+      expect.objectContaining({ event: "memory.hints_attached", hintCount: 0 }),
     );
   });
 
-  it("passes the agents through untouched when there is no memory store", async () => {
-    const agent = makeAgent("correctness");
+  it("passes the agent through untouched when there is no memory store", async () => {
+    const agent = makeAgent("general");
     const { deps, runReviewPipeline, entries } = makeDeps(reviewResult(), {
-      agents: [agent],
+      agent,
     });
 
     await reviewWithDelivery(target, deps);
 
-    expect(runReviewPipeline.mock.calls[0]?.[0].agents?.[0]).toBe(agent);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agent).toBe(agent);
     expect(entries.map((entry) => entry["event"])).not.toContain(
       "memory.hints_attached",
     );
   });
 
   it("reviews without hints when the memory cannot be read", async () => {
-    const agent = makeAgent("correctness");
+    const agent = makeAgent("general");
     const { deps, client, runReviewPipeline, entries } = makeDeps(
       reviewResult({ candidates: [finding] }),
       {
-        agents: [agent],
+        agent,
         memoryStore: {
           read: () => Promise.reject(new Error("branch unreachable")),
           write: () => Promise.resolve(),
@@ -1005,56 +809,11 @@ describe("reviewWithDelivery: repository hints", () => {
     await reviewWithDelivery(target, deps);
 
     expect(client.createCheckRun).toHaveBeenCalledTimes(1);
-    expect(runReviewPipeline.mock.calls[0]?.[0].agents?.[0]).toBe(agent);
+    expect(runReviewPipeline.mock.calls[0]?.[0].agent).toBe(agent);
     // readMemory absorbs the transport error, so it surfaces as memory.invalid.
     expect(entries).toContainEqual(
       expect.objectContaining({ level: "error", event: "memory.invalid" }),
     );
-  });
-});
-
-describe("reviewWithDelivery: orchestrator memory", () => {
-  it("hands the pipeline the synthesis hints the memory earns", async () => {
-    const { deps, runReviewPipeline, entries } = makeDeps(reviewResult(), {
-      memoryStore: readOnlyStore(memoryFile()),
-      now: () => NOW,
-    });
-
-    await reviewWithDelivery(target, deps);
-
-    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({
-      keep: [],
-      drop: ['Correctness: Findings like "assignment instead of comparison in".'],
-    });
-    expect(entries).toContainEqual(
-      expect.objectContaining({
-        event: "memory.hints_attached",
-        synthesisKeepCount: 0,
-        synthesisDropCount: 1,
-      }),
-    );
-  });
-
-  it("keeps a shape the repository has acted on", async () => {
-    const { deps, runReviewPipeline } = makeDeps(reviewResult(), {
-      memoryStore: readOnlyStore(memoryFile({ ignored: 0, resolved: 4 })),
-      now: () => NOW,
-    });
-
-    await reviewWithDelivery(target, deps);
-
-    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({
-      keep: ['Correctness: Findings like "assignment instead of comparison in".'],
-      drop: [],
-    });
-  });
-
-  it("synthesises unhinted when there is no memory store", async () => {
-    const { deps, runReviewPipeline } = makeDeps(reviewResult());
-
-    await reviewWithDelivery(target, deps);
-
-    expect(runReviewPipeline.mock.calls[0]?.[0].hints).toEqual({ keep: [], drop: [] });
   });
 });
 
@@ -1161,7 +920,7 @@ describe("cancellation", () => {
     return entries.find((logged) => logged["event"] === event);
   }
 
-  it("puts the caller's signal on the context the agents receive", async () => {
+  it("puts the caller's signal on the context the agent receives", async () => {
     const controller = new AbortController();
     const { deps, runReviewPipeline } = makeDeps();
 
@@ -1203,7 +962,7 @@ describe("cancellation", () => {
     expect(client.createCheckRun).not.toHaveBeenCalled();
     expect(client.createReview).not.toHaveBeenCalled();
     expect(entry(entries, "review.cancelled")).toMatchObject({
-      stage: "agents",
+      stage: "agent",
     });
   });
 

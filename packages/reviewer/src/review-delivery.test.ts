@@ -1,5 +1,5 @@
 /** What a finished run contributes to the dashboard record. */
-import { emptyTokenUsage, type AgentUsageReport } from "@pr-review/ai";
+import { emptyTokenUsage } from "@pr-review/ai";
 import type { ChangedFile } from "@pr-review/github";
 import {
   buildRepositoryIndex,
@@ -17,7 +17,6 @@ import {
   recordingDelivery,
   type FinishedReviewRun,
 } from "#src/review-delivery";
-import { skippedSynthesis } from "#src/review-pipeline";
 import type { ReviewOutcome } from "#src/review-pull-request";
 import type { ReviewTarget } from "#src/review-target";
 
@@ -51,8 +50,6 @@ const changedFiles: ChangedFile[] = [
 function outcome(overrides: Partial<ReviewOutcome> = {}): ReviewOutcome {
   return {
     candidates: [],
-    agentFailures: [],
-    synthesis: skippedSynthesis("no candidate findings", []),
     findings: [],
     patches: { proposed: 0, verified: 0 },
     suppressed: 0,
@@ -63,10 +60,11 @@ function outcome(overrides: Partial<ReviewOutcome> = {}): ReviewOutcome {
 }
 
 function run(result: ReviewOutcome): FinishedReviewRun {
-  const usage: AgentUsageReport[] = [
-    { agent: "correctness", durationMs: 1_000, usage: emptyTokenUsage() },
-  ];
-  return { outcome: result, agents: [], usage, durationMs: 2_000 };
+  return {
+    outcome: result,
+    usage: { ...emptyTokenUsage(), inputTokens: 1_200, outputTokens: 340 },
+    durationMs: 8_400,
+  };
 }
 
 const expected = "  if (user.isAdmin = true) {\n";
@@ -96,7 +94,6 @@ const unpatched: ReviewFinding = {
 const patchedRun = run(
   outcome({
     candidates: [patched, unpatched],
-    synthesis: skippedSynthesis("standalone agent", [patched, unpatched]),
     findings: [patched, unpatched],
     patches: { proposed: 1, verified: 1 },
   }),

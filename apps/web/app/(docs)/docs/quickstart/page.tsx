@@ -12,7 +12,6 @@ const HEADINGS: Heading[] = [
   { id: "workflow", title: "Add the workflow" },
   { id: "key", title: "Give it a key" },
   { id: "result", title: "What lands on the pull request" },
-  { id: "specialists", title: "Opt into specialists" },
 ];
 
 const WORKFLOW = `name: AI PR Review
@@ -86,20 +85,6 @@ export default function QuickstartPage() {
           instead. Without <code>checks: write</code> the whole review is written to the job
           summary. Only <code>contents: read</code> is required to run at all.
         </Note>
-      </Section>
-
-      <Section id="specialists" title="Opt into specialists">
-        <P>
-          With no configuration file the general agent reviews alone. Name the agents you want
-          in <code>.github/pr-review-agents.yml</code> and that file replaces the default —{" "}
-          <code>general</code> then runs only if it is listed.
-        </P>
-        <Code caption=".github/pr-review-agents.yml">{`agents:
-  - security
-  - correctness
-  - performance
-  - test-coverage
-  - docs-drift`}</Code>
       </Section>
     </DocsArticle>
   );

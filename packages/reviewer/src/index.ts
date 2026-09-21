@@ -1,6 +1,6 @@
 /**
- * The review pipeline: agent fan-out, join, deterministic validation, and
- * check-run rendering. The synthesiser lives in @pr-review/ai.
+ * The review pipeline: one agent, deterministic validation, and check-run
+ * rendering.
  */
 export {
   runReviewPipeline,
@@ -13,7 +13,6 @@ export {
   type ReviewPipelineRun,
   type RunReviewPipeline,
 } from "#src/pipeline-runner";
-export { readAtCommit } from "#src/read-at-commit";
 export { validateFindings } from "#src/validate-findings";
 export type { RenderedCheckRun } from "#src/render-check-run";
 export {
@@ -62,9 +61,8 @@ export {
 } from "#src/review-delivery";
 export {
   runReview,
-  type CreateReviewAgents,
+  type CreateReviewAgent,
   type ReviewAgentRequest,
-  type ReviewAgentSource,
   type ReviewEngine,
   type ReviewMemory,
   type ReviewPolicy,
@@ -78,7 +76,6 @@ export {
 export {
   addSuppression,
   computeHints,
-  computeSynthesisHints,
   createBranchMemoryStore,
   emptyMemory,
   isSuppressed,
@@ -90,9 +87,7 @@ export {
   writeMemory,
   HINT_CAP,
   HINT_IGNORED_THRESHOLD,
-  HINT_RESOLVED_THRESHOLD,
   MEMORY_TTL_DAYS,
-  SYNTHESIS_HINT_CAP,
   type FindingOutcome,
   type FindingSignal,
   type MemoryStore,

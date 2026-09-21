@@ -4,7 +4,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "./client";
 import { saveRepositoryGraph } from "./repository-graphs";
 import {
-  agentRuns,
   findings,
   repos,
   reviews,
@@ -56,7 +55,6 @@ export async function ingestReviewRecord(
   const repoId = await findOrCreateRepo(database, organizationId, record);
   if (repoId === undefined) return { ok: false, reason: "repo-removed" };
   const reviewId = await upsertReview(database, repoId, record);
-  await replaceAgentRuns(database, reviewId, record);
   await replaceFindings(database, reviewId, record);
   if (record.graph !== undefined && record.baseSha !== undefined) {
     await saveRepositoryGraph(database, repoId, record.baseSha, record.graph);
@@ -135,9 +133,12 @@ async function upsertReview(
     headSha: record.headSha,
     baseSha: record.baseSha ?? null,
     changedFiles: record.changedFiles ?? [],
-    agents: record.agents,
     summary: record.summary,
     durationMs: record.durationMs,
+    inputTokens: record.inputTokens,
+    cacheCreationInputTokens: record.cacheCreationInputTokens,
+    cacheReadInputTokens: record.cacheReadInputTokens,
+    outputTokens: record.outputTokens,
   };
   const rows = await database
     .insert(reviews)
@@ -153,18 +154,6 @@ async function upsertReview(
   return row.id;
 }
 
-async function replaceAgentRuns(
-  database: Database,
-  reviewId: number,
-  record: ReviewRecord,
-): Promise<void> {
-  await database.delete(agentRuns).where(eq(agentRuns.reviewId, reviewId));
-  if (record.agentRuns.length === 0) return;
-  await database
-    .insert(agentRuns)
-    .values(record.agentRuns.map((run) => ({ reviewId, ...run })));
-}
-
 async function replaceFindings(
   database: Database,
   reviewId: number,
@@ -175,7 +164,6 @@ async function replaceFindings(
   await database.insert(findings).values(
     record.findings.map((finding) => ({
       reviewId,
-      agent: finding.agent ?? null,
       file: finding.file,
       line: finding.line ?? null,
       category: finding.category,

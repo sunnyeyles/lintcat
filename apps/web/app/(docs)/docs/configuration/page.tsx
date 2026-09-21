@@ -27,26 +27,24 @@ const HEADINGS: Heading[] = [
 
 const INPUTS = [
   ["api-key", "yes", "Key for the selected provider. Store as a secret; falls back to OPENAI_API_KEY or ANTHROPIC_API_KEY when empty."],
-  ["model-provider", "openai", "Which provider the agents and synthesiser call: openai or anthropic. An unknown name fails the step before any model call."],
+  ["model-provider", "openai", "Which provider the reviewer calls: openai or anthropic. An unknown name fails the step before any model call."],
   ["github-token", "github.token", "Token for the eight read-only repository tools and for publishing the check run."],
-  ["model", "provider default", "Default model id, as the provider spells it. An agent may override it; the synthesiser always uses this one."],
+  ["model", "provider default", "Model id, as the provider spells it. Defaults to the provider's own default."],
   ["model-base-url", "provider host", "Points a provider at a gateway, a proxy, or a compatible endpoint."],
-  ["agents", "all", "Which configured agents run: all, or a comma-separated subset. A subset also overrides path filters."],
-  ["agent-config", ".github/pr-review-agents.yml", "Path to the YAML file naming the agents. Without it, the general agent reviews alone."],
   ["incremental", "false", "Read only the commits added since this pull request was last reviewed."],
-  ["index", "true", "Build the repository index from the base commit before the agents start."],
+  ["index", "true", "Build the repository index from the base commit before the reviewer starts."],
   ["fix", "false", "Commit verified fixes to the pull request branch. Needs contents: write."],
   ["memory-branch", "(off)", "Branch the action stores review memory on. Needs contents: write and closed in the workflow's types."],
-  ["langfuse-public-key", "(unset)", "With the secret key, fetches agent prompts from Langfuse and exports traces there."],
+  ["langfuse-public-key", "(unset)", "With the secret key, fetches the reviewer prompt from Langfuse and exports traces there."],
   ["langfuse-secret-key", "(unset)", "The other half. Setting only one disables both features."],
   ["langfuse-base-url", "cloud.langfuse.com", "Langfuse host, for a self-hosted or regional instance. Keys are region-scoped."],
-  ["langfuse-prompt-label", "production", "Which labelled version of each prompt to fetch."],
+  ["langfuse-prompt-label", "production", "Which labelled version of the prompt to fetch."],
   ["dashboard-token", "(unset)", "The organization's ingest secret. With dashboard-url, records every review on the dashboard."],
   ["dashboard-url", "(unset)", "Base URL of the dashboard. Setting only one of the two records nothing."],
 ] as const;
 
 const PERMISSIONS = [
-  ["contents: read", "Reads files at the head and base commits, and the agent configuration", "The action cannot run"],
+  ["contents: read", "Reads files at the head and base commits", "The action cannot run"],
   ["pull-requests: write", "Findings post as inline review comments", "The check run annotates the same lines instead"],
   ["checks: write", "Publishes the AI PR Review check run and its annotations", "The review is written to the job summary instead"],
   ["contents: write", "Commits verified fixes when fix: true", "The same fixes are offered as suggested changes"],

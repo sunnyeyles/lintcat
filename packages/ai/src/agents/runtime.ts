@@ -132,10 +132,7 @@ function buildOpeningMessage(
 
 /** What every review agent needs, regardless of agent. */
 export interface ReviewAgentDeps {
-  /** The default model; an agent's own `model` is built with createModel. */
   model: ReviewModel;
-  /** Builds a model by id. Without it, an agent's `model` is ignored. */
-  createModel?: ((modelId: string) => ReviewModel) | undefined;
   github: ReviewToolsClient;
   maxTurns?: number | undefined;
   /** Receives agent.started / agent.completed / agent.failed. */
@@ -172,14 +169,10 @@ export function createReviewAgent(
       ? buildReviewSystemPrompt(agent)
       : appendRepositoryHints(managed, agent.repositoryHints);
   const logger = deps.logger ?? createConsoleLogger();
-  const model =
-    agent.model === undefined || deps.createModel === undefined
-      ? deps.model
-      : deps.createModel(agent.model);
+  const model = deps.model;
 
   return {
     name: agent.category,
-    ...(agent.standalone === true ? { standalone: true } : {}),
 
     async run(context: ReviewContext): Promise<readonly unknown[]> {
       // Every event of this run carries these fields.

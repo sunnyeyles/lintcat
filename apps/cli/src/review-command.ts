@@ -59,19 +59,13 @@ export async function runReviewCommand(
     {
       client: local.client,
       target: local.target,
-      selected: modelReviewEngine(environment, {
-        baseSha: local.baseSha,
-        select: options.agents,
-      }),
+      selected: modelReviewEngine(environment),
       index: options.index,
       memory: await openLocalMemoryStore(local.root),
-      ...(options.progress
-        ? { onAgentEvent: ({ agent, phase }) => err(`  ${agent} ${phase}`) }
-        : {}),
     },
   );
 
-  const { findings, suppressed, agentFailures } = result.outcome;
+  const { findings, suppressed } = result.outcome;
   const blocking = blockingFindings(findings, options.failOn);
   const render = { color: options.color ?? false };
   for (const finding of orderFindings(findings)) {
@@ -86,7 +80,6 @@ export async function runReviewCommand(
         blocking,
         failOn: options.failOn,
         suppressed,
-        agentFailures: agentFailures.map((failure) => failure.agent),
       },
       render,
     ),

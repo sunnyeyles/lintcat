@@ -13,7 +13,6 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import {
-  AgentRunStrip,
   FindingsFocusProvider,
   FindingsTable,
   ReviewMapSection,
@@ -96,8 +95,6 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
       <ReviewSummaryPanel summary={review.summary} bySeverity={review.bySeverity} />
 
-      {review.runs.length > 0 ? <AgentRunStrip runs={review.runs} /> : null}
-
       <FindingsFocusProvider>
         <Suspense fallback={<ReviewMapSkeleton />}>
           <ReviewMapSection slug={slug} reviewId={review.id} findings={review.findings} />
@@ -111,7 +108,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
               </EmptyMedia>
               <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
               <EmptyDescription>
-                Every agent ran and every candidate finding was dropped before publish.
+                The reviewer ran and every candidate finding was dropped before publish.
                 That is the clean outcome, not a failure.
               </EmptyDescription>
             </EmptyHeader>

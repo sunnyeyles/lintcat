@@ -1,7 +1,7 @@
 # @pr-review/web
 
 The public documentation at `/`, and the dashboard behind it: review history,
-trends, token spend, and an editor for `.github/pr-review-agents.yml`. Also
+trends and token spend. Also
 `POST /api/ingest`, where the action records each review, and
 `POST /api/github/webhook`, where the GitHub App reports installations and
 organization members.
@@ -41,8 +41,8 @@ with `Authorization: Bearer <organization ingest secret>`. The organization's
 row stores only the secret's SHA-256 (`hashIngestToken`). The record's owner
 must be the organization's login, and the repo must not have been removed from
 the installation, or it is a 404. A missing or unknown token, or an uninstalled
-organization's, is a 401 and writes nothing; a rerun of the same commit replaces that review's agent
-runs and findings.
+organization's, is a 401 and writes nothing; a rerun of the same commit replaces that review's
+findings.
 
 The record may also carry the pull request's `baseSha`, its `changedFiles` and
 a `graph`: the repository index serialised by `@pr-review/index`, gzipped and
@@ -257,13 +257,12 @@ const reviews = await (await data(slug)).listReviews({ repoId, limit: 20 });
   Every page uses it.
 
 Trends and usage are computed by the same functions in `packages/db/src/dashboard/aggregate.ts`
-from the database rows. Agents the UI has no colour for (such as `general`) are left
-out of agent chips and run strips; their tokens still count toward cost.
+from the database rows.
 
 ## Cost figures
 
 `packages/db/src/dashboard/aggregate.ts` holds a fixed per-million-token price table and derives
-every dollar figure from the four token counters in `agent_runs`. The prices
+every dollar figure from the four token counters on `reviews`. The prices
 are illustrative.
 
 ## Layout
@@ -299,5 +298,4 @@ lib/
   host.ts               request host -> organization slug, cookie domain
   paths.ts              /o/<slug> paths and callbackUrl checks
   format.ts             number, duration and date formatting
-  agent-config.ts       pr-review-agents.yml serialisation
 ```

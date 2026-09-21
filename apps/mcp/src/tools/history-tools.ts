@@ -64,7 +64,7 @@ export function registerHistoryTools(
       title: "Get a past review",
       description:
         "One stored review with every finding (file, line, severity, category, explanation, suggested fix) " +
-        "and each agent's run: duration, finding count and token usage. Take the id from list_reviews.",
+        "plus the run's duration and token usage. Take the id from list_reviews.",
       inputSchema: { org: orgSchema, id: z.number().int().positive().describe("The review id.") },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -76,8 +76,8 @@ export function registerHistoryTools(
     {
       title: "Review trends and cost",
       description:
-        "Aggregates over a time window: review and finding totals, findings per agent and per category, " +
-        "the daily series, and token usage with estimated cost per agent and per repository.",
+        "Aggregates over a time window: review and finding totals, findings per category, " +
+        "the daily series, and token usage with estimated cost per repository.",
       inputSchema: { org: orgSchema, range: rangeSchema, repo: repoSchema },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -92,7 +92,6 @@ export function registerHistoryTools(
         trends,
         usage: {
           totals: usage.totals,
-          byAgent: usage.byAgent,
           byRepo: usage.byRepo.map(({ repo: entry, ...rest }) => ({
             repo: `${entry.owner}/${entry.name}`,
             ...rest,

@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { PGlite } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -27,15 +31,21 @@ async function columns(table: string): Promise<string[]> {
 }
 
 describe("migrations applied in order to an empty database", () => {
-  it("give reviews its duration once and no token columns", async () => {
+  it("keep the ingest token, and the review's own token counters", async () => {
+    expect(await columns("organizations")).toContain("ingest_token");
+    expect(await columns("findings")).not.toContain("agent");
+    expect(await columns("agent_runs")).toEqual([]);
     expect(await columns("reviews")).toEqual([
-      "agents",
       "base_sha",
+      "cache_creation_input_tokens",
+      "cache_read_input_tokens",
       "changed_files",
       "created_at",
       "duration_ms",
       "head_sha",
       "id",
+      "input_tokens",
+      "output_tokens",
       "pr_number",
       "repo_id",
       "summary",
@@ -54,22 +64,6 @@ describe("migrations applied in order to an empty database", () => {
     ]);
     expect(await columns("reviews")).toContain("base_sha");
     expect(await columns("reviews")).toContain("changed_files");
-  });
-
-  it("add the ingest token, the finding's agent and agent_runs", async () => {
-    expect(await columns("organizations")).toContain("ingest_token");
-    expect(await columns("findings")).toContain("agent");
-    expect(await columns("agent_runs")).toEqual([
-      "agent",
-      "cache_creation_input_tokens",
-      "cache_read_input_tokens",
-      "duration_ms",
-      "finding_count",
-      "id",
-      "input_tokens",
-      "output_tokens",
-      "review_id",
-    ]);
   });
 
   it("replace teams with organizations and memberships", async () => {
@@ -198,5 +192,59 @@ describe("migrations applied in order to an empty database", () => {
     const redirect = { slug: "mona", organizationId: organization!.id };
     await database.insert(organizationSlugRedirects).values(redirect);
     await expect(database.insert(organizationSlugRedirects).values(redirect)).rejects.toThrow();
+  });
+});
+
+describe("the single-reviewer migration on a populated database", () => {
+  it("sums each review's agent runs into the review before dropping them", async () => {
+    const folder = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
+    const journal = JSON.parse(readFileSync(join(folder, "meta/_journal.json"), "utf8")) as {
+      entries: { tag: string }[];
+    };
+    const target = journal.entries.findIndex((entry) => entry.tag.startsWith("0009_"));
+    const pg = new PGlite();
+    const apply = async (tag: string) => {
+      const sqlText = readFileSync(join(folder, `${tag}.sql`), "utf8");
+      for (const statement of sqlText.split("--> statement-breakpoint")) {
+        await pg.exec(statement);
+      }
+    };
+    for (const entry of journal.entries.slice(0, target)) await apply(entry.tag);
+
+    await pg.exec(`
+      insert into organizations (github_account_id, account_type, slug, name) values (1, 'user', 'acme', 'acme');
+      insert into repos (organization_id, owner, name) values (1, 'acme', 'widgets');
+      insert into reviews (repo_id, pr_number, head_sha, agents, summary) values (1, 1, 'a', '{security,performance}', 's'), (1, 2, 'b', '{security}', 's');
+      insert into agent_runs (review_id, agent, duration_ms, finding_count, input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens) values
+        (1, 'security', 1, 0, 100, 10, 1, 5),
+        (1, 'performance', 1, 0, 200, 20, 2, 7);
+    `);
+    await apply(journal.entries[target]!.tag);
+
+    const result = await pg.query<{
+      pr_number: number;
+      input_tokens: number;
+      cache_creation_input_tokens: number;
+      cache_read_input_tokens: number;
+      output_tokens: number;
+    }>(
+      "select pr_number, input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens from reviews order by pr_number",
+    );
+    expect(result.rows).toEqual([
+      {
+        pr_number: 1,
+        input_tokens: 300,
+        cache_creation_input_tokens: 30,
+        cache_read_input_tokens: 3,
+        output_tokens: 12,
+      },
+      {
+        pr_number: 2,
+        input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+        output_tokens: 0,
+      },
+    ]);
   });
 });

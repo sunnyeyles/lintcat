@@ -23,14 +23,10 @@ export {
 } from "#src/review-memory";
 export {
   MAX_REPOSITORY_GRAPH_BASE64,
-  reviewRecordAgentRunSchema,
   reviewRecordChangedFileSchema,
-  reviewRecordFindingSchema,
   reviewRecordGraphSchema,
   reviewRecordSchema,
   type ReviewRecord,
-  type ReviewRecordAgentRun,
   type ReviewRecordChangedFile,
-  type ReviewRecordFinding,
   type ReviewRecordGraph,
 } from "#src/review-record";

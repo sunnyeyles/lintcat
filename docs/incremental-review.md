@@ -9,7 +9,7 @@ every line the first eight already cleared. At roughly 1.58M input tokens for
 one review of [PR #11](../README.md#what-a-review-costs), that is the largest
 avoidable cost in the system.
 
-**Incremental review narrows the diff the agents are handed to the commits
+**Incremental review narrows the diff the agent is handed to the commits
 added since this pull request was last reviewed.** Everything else — the trust
 boundary, validation, patch verification, memory — is untouched.
 
@@ -52,7 +52,7 @@ type ReviewScope =
 ```
 
 `pullRequest` carries the whole diff and file list beside the narrowed ones, so
-one value serves both readers: the agents get the narrowed pair, publishing
+one value serves both readers: the agent gets the narrowed pair, publishing
 gets the whole pair.
 
 `reviewWithDelivery` calls it in place of the `getDiff` / `listChangedFiles`
@@ -80,7 +80,7 @@ This is not the "no agent reviewed this pull request" case the README rules
 against. There, nothing had ever read the change; here an earlier review did,
 and its result is what gets re-stated.
 
-## What the agents see
+## What the agent sees
 
 The opening message carries the incremental diff and the full pull request's
 changed-file list. `get_diff` continues to return the whole diff, so an agent
@@ -127,7 +127,7 @@ One new Action input:
 | --- | --- | --- |
 | `incremental` | no (default `false`) | Review only the commits added since the last review of this pull request, rather than the whole diff. Falls back to a full review whenever the baseline cannot be established. |
 
-Default off. It changes what the agents are shown, which is a behaviour change
+Default off. It changes what the agent is shown, which is a behaviour change
 before it is a cost change, and the evals should carry it before the default
 does.
 
@@ -166,7 +166,7 @@ materially fewer input tokens.
 ## The trade
 
 A bug introduced in an earlier commit, but only visible given the context the
-newest commit adds, is now outside the diff the agents are handed. `get_diff`
+newest commit adds, is now outside the diff the agent is handed. `get_diff`
 means they *can* still reach it; nothing makes them.
 
 That is a real loss of recall, mitigated and not removed, and it is what the

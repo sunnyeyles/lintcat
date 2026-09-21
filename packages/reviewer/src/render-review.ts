@@ -2,18 +2,10 @@
  * Renders validated findings into a review body plus inline comments; the
  * caller owns the API call. validateFindings already settles anchoring.
  */
-import type { SkippedAgent } from "@pr-review/ai";
 import type { ReviewComment } from "@pr-review/github";
 import type { ReviewFinding } from "@pr-review/schemas";
 
-import {
-  countLabel,
-  failureNotes,
-  heading,
-  skipNotes,
-  summarise,
-} from "#src/finding-format";
-import type { AgentFailure } from "#src/review-pipeline";
+import { countLabel, heading, summarise } from "#src/finding-format";
 import {
   compareFindingStrength,
   normaliseTitle,
@@ -130,10 +122,8 @@ function suggestionAnchor(
 }
 
 export interface ReviewNotes {
-  agentFailures: readonly AgentFailure[];
   /** Finding keys already carrying a comment from an earlier commit. */
   alreadyPosted: ReadonlySet<string>;
-  skippedAgents: readonly SkippedAgent[];
   /** New-side lines each file's diff shows; needed to place a suggestion. */
   diffLines: ReadonlyMap<string, ReadonlySet<number>>;
   /** False once the patches were committed, so nothing is offered twice. */
@@ -149,9 +139,7 @@ export interface ReviewNotes {
 export function renderReview(
   findings: readonly ReviewFinding[],
   {
-    agentFailures = [],
     alreadyPosted = new Set(),
-    skippedAgents = [],
     diffLines = new Map(),
     offerSuggestions = false,
     fixNote,
@@ -207,7 +195,6 @@ export function renderReview(
   if (fixNote !== undefined) {
     sections.push(fixNote);
   }
-  sections.push(...failureNotes(agentFailures), ...skipNotes(skippedAgents));
 
   return { body: sections.join("\n\n"), comments };
 }

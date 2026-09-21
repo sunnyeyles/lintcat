@@ -1,6 +1,6 @@
 /**
  * The shared agent-runtime behaviours — loop, tool wiring, output
- * parsing, failure semantics — exercised through the Security agent.
+ * parsing, failure semantics — exercised through the review agent.
  */
 import { buildRepositoryIndex } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
@@ -11,6 +11,7 @@ import {
   buildReviewSystemPrompt,
   withRepositoryHints,
 } from "#src/agents/definition";
+import { GENERAL_AGENT } from "#src/agents/general-agent";
 import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import {
   AgentRunError,
@@ -31,7 +32,6 @@ import {
   makeModel,
   message,
   pullRequest,
-  repositoryAgent,
   textBlock,
   toolUseBlock,
 } from "#src/agent-test-support";
@@ -41,7 +41,7 @@ type ScriptedResponse = ReturnType<typeof message>;
 /** One provider-level call as the SDK assembled it. */
 type Call = { prompt: unknown[]; tools?: unknown[]; providerOptions?: unknown };
 
-const securityAgent = repositoryAgent("security");
+const generalAgent = GENERAL_AGENT;
 
 /** The system instructions of one recorded call. */
 function systemOf(call: Call | undefined): string {
@@ -102,7 +102,7 @@ function toolResultsOf(call: Call | undefined): ToolResultPart[] {
 const finding = {
   file: "src/sessions.ts",
   line: 42,
-  category: "security" as const,
+  category: "general" as const,
   severity: "high" as const,
   title: "Assignment instead of comparison in admin check",
   explanation: "The if condition assigns instead of comparing, so every user passes.",
@@ -127,7 +127,7 @@ function makeAgent(
   const { model, doGenerate: create, calls } = makeModel(responses);
   const github = makeGithub();
   const { logger, entries } = createCapturingLogger();
-  const agent = createReviewAgent(securityAgent, {
+  const agent = createReviewAgent(generalAgent, {
     model,
     github,
     logger,
@@ -140,11 +140,11 @@ function makeAgent(
   return { agent, create, calls: calls as unknown as Call[], github, entries };
 }
 
-describe("the Security agent", () => {
-  it("is named security", () => {
+describe("the review agent", () => {
+  it("is named general", () => {
     const { agent } = makeAgent([]);
 
-    expect(agent.name).toBe("security");
+    expect(agent.name).toBe("general");
   });
 
   it("returns findings parsed from the model's final JSON message", async () => {
@@ -396,7 +396,7 @@ describe("the Security agent", () => {
   it("propagates model API failures", async () => {
     const { model, doGenerate } = makeModel([]);
     doGenerate.mockRejectedValueOnce(new Error("529 overloaded"));
-    const agent = createReviewAgent(securityAgent, {
+    const agent = createReviewAgent(generalAgent, {
       model,
       github: makeGithub(),
       logger: createCapturingLogger().logger,
@@ -410,7 +410,7 @@ describe("category integrity", () => {
   // The runtime filters rather than re-stamps: relabelling would
   // fabricate a claim the model never made.
   it("drops findings outside the agent's own category and keeps its own", async () => {
-    const own = makeFinding("security");
+    const own = makeFinding("general");
     const leakedOther = makeFinding("docs-drift", { line: 43 });
     const leakedThird = makeFinding("performance", { line: 44 });
     const { agent } = makeAgent([
@@ -441,7 +441,7 @@ describe("lifecycle events (spec §26)", () => {
     repository: "octo-org/example-service",
     pullRequestNumber: 42,
     headSha,
-    agent: "security",
+    agent: "general",
   };
 
   it("emits agent.started with the correlation fields before any model call", async () => {
@@ -520,7 +520,7 @@ describe("lifecycle events (spec §26)", () => {
     const { model, doGenerate } = makeModel([]);
     doGenerate.mockRejectedValueOnce(new Error("529 overloaded"));
     const { logger, entries } = createCapturingLogger();
-    const agent = createReviewAgent(securityAgent, {
+    const agent = createReviewAgent(generalAgent, {
       model,
       github: makeGithub(),
       logger,
@@ -550,7 +550,7 @@ describe("lifecycle events (spec §26)", () => {
       .mockImplementationOnce(async () => toolTurn)
       .mockRejectedValueOnce(new Error("529 overloaded"));
     const { logger, entries } = createCapturingLogger();
-    const agent = createReviewAgent(securityAgent, {
+    const agent = createReviewAgent(generalAgent, {
       model,
       github: makeGithub(),
       logger,
@@ -594,7 +594,7 @@ describe("the onUsage callback", () => {
   function makeCollecting(responses: ScriptedResponse[]) {
     const { model, doGenerate } = makeModel(responses);
     const reports: AgentUsageReport[] = [];
-    const agent = createReviewAgent(securityAgent, {
+    const agent = createReviewAgent(generalAgent, {
       model,
       github: makeGithub(),
       logger: createCapturingLogger().logger,
@@ -621,7 +621,7 @@ describe("the onUsage callback", () => {
 
     expect(reports).toEqual([
       {
-        agent: "security",
+        agent: "general",
         durationMs: expect.any(Number),
         usage: {
           inputTokens: 350,
@@ -645,7 +645,7 @@ describe("the onUsage callback", () => {
 
     expect(reports).toEqual([
       {
-        agent: "security",
+        agent: "general",
         durationMs: expect.any(Number),
         usage: {
           inputTokens: 80,
@@ -678,7 +678,7 @@ describe("prompt caching", () => {
 
     expect(create).toHaveBeenCalledTimes(2);
     for (const call of calls) {
-      expect(systemOf(call)).toBe(buildReviewSystemPrompt(securityAgent));
+      expect(systemOf(call)).toBe(buildReviewSystemPrompt(generalAgent));
       expect(cacheMarkersOf(call)).toEqual([{ type: "ephemeral" }]);
     }
   });
@@ -749,7 +749,7 @@ describe("pre-resolved system prompts", () => {
     const injected = "INJECTED CORRECTNESS SYSTEM PROMPT";
     const { agent, calls } = makeAgent(
       [message([textBlock(finalJson)], "end_turn")],
-      { systemPrompts: { security: injected } },
+      { systemPrompts: { general: injected } },
     );
 
     await agent.run(context);
@@ -762,11 +762,11 @@ describe("pre-resolved system prompts", () => {
       'This repository has repeatedly not acted on findings like "missing tenant check in". Report one only if it is clearly severe.';
     const injected = "INJECTED SECURITY SYSTEM PROMPT";
     const { model, calls } = makeModel([message([textBlock(finalJson)], "end_turn")]);
-    const agent = createReviewAgent(withRepositoryHints(securityAgent, [hint]), {
+    const agent = createReviewAgent(withRepositoryHints(generalAgent, [hint]), {
       model,
       github: makeGithub(),
       logger: createCapturingLogger().logger,
-      systemPrompts: { security: injected },
+      systemPrompts: { general: injected },
     });
 
     await agent.run(context);
@@ -785,7 +785,7 @@ describe("pre-resolved system prompts", () => {
 
     await agent.run(context);
 
-    expect(systemOf(calls[0])).toBe(buildReviewSystemPrompt(securityAgent));
+    expect(systemOf(calls[0])).toBe(buildReviewSystemPrompt(generalAgent));
   });
 });
 
@@ -1123,7 +1123,7 @@ describe("cancellation", () => {
   it("emits agent.cancelled, not agent.failed, when the run is aborted", async () => {
     const { model, firstCall } = makeHangingModel();
     const { logger, entries } = createCapturingLogger();
-    const agent = createReviewAgent(securityAgent, {
+    const agent = createReviewAgent(generalAgent, {
       model,
       github: makeGithub(),
       logger,
@@ -1139,6 +1139,6 @@ describe("cancellation", () => {
       "agent.started",
       "agent.cancelled",
     ]);
-    expect(entries[1]).toMatchObject({ level: "info", agent: "security" });
+    expect(entries[1]).toMatchObject({ level: "info", agent: "general" });
   });
 });
