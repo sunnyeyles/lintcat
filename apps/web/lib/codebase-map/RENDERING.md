@@ -4,7 +4,7 @@
 
 ## What was measured
 
-`/dev/codebase-map/spike` draws `sampleRepo(7, n)` three ways — Canvas 2D, React-rendered
+A spike (removed since; last at commit `1c2bcbd`) drew `sampleRepo(7, n)` three ways — Canvas 2D, React-rendered
 SVG, and sigma.js v3 + graphology (WebGL) — with every group expanded, so every file is a
 node. Two numbers per renderer: the gap between painted frames during a scripted pan and
 zoom, and the time from a focus change to the first frame that shows it.
@@ -43,7 +43,7 @@ elements, and at 5k that is 316 ms — a third of a second of frozen page per cl
 programs draw circles. Shape markers per emphasis level and dashed-versus-solid edges for
 import direction are the whole reason this map does not rest on colour, and getting them
 out of sigma means writing custom WebGL programs — more code than the canvas renderer is in
-total, plus a dependency. It stays in the repo as a dev dependency so the spike still runs.
+total, plus a dependency.
 
 ## What the canvas renderer does
 
