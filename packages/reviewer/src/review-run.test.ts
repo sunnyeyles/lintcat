@@ -345,7 +345,7 @@ describe("runReview: delivery", () => {
 
     expect(published).toHaveLength(1);
     expect(published[0]?.findings).toEqual([
-      { ...finding, agent: finding.category },
+      { ...finding, agent: finding.category, hasPatch: false },
     ]);
     expect(recorded.runs[0]).toBe(run);
     expect(run.agents.map((agent) => agent.category)).toEqual(["correctness"]);

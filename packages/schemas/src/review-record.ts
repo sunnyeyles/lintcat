@@ -4,10 +4,13 @@ import { reviewFindingSchema } from "#src/review-finding";
 
 const count = z.number().int().nonnegative();
 
-/** A finding as the dashboard stores it: which agent produced it, if known. */
-export const reviewRecordFindingSchema = reviewFindingSchema.extend({
-  agent: z.string().min(1).optional(),
-});
+/** A finding as the dashboard receives it: no patch source, only whether one survived. */
+export const reviewRecordFindingSchema = reviewFindingSchema
+  .omit({ patch: true })
+  .extend({
+    agent: z.string().min(1).optional(),
+    hasPatch: z.boolean().optional(),
+  });
 
 export type ReviewRecordFinding = z.infer<typeof reviewRecordFindingSchema>;
 

@@ -155,6 +155,26 @@ describe("handleIngest", () => {
     });
   });
 
+  it("accepts a finding that says it had a patch", async () => {
+    const [finding] = record.findings;
+    const response = await handleIngest(
+      post({ ...record, findings: [{ ...finding, hasPatch: true }] }, "secret-token"),
+      database,
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("still accepts an older reviewer's finding that carries patch source", async () => {
+    const [finding] = record.findings;
+    const patch = { startLine: 1, endLine: 1, expected: "a", replacement: "b" };
+    const response = await handleIngest(
+      post({ ...record, findings: [{ ...finding, patch }] }, "secret-token"),
+      database,
+    );
+    expect(response.status).toBe(200);
+    expect((await rowCounts()).findings).toBe(1);
+  });
+
   it("updates rather than duplicates when the same commit is posted again", async () => {
     const first = await handleIngest(post(record, "secret-token"), database);
     const second = await handleIngest(
