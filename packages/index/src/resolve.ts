@@ -31,7 +31,7 @@ function join(directory: string, name: string): string {
 }
 
 /** Every path the specifier could mean, in the order TypeScript tries them. */
-function candidates(base: string): string[] {
+export function moduleCandidates(base: string): string[] {
   const paths = base === "" ? [] : [base];
   const extension = extensionOf(base);
   const typescript = TYPESCRIPT_FOR.get(extension);
@@ -70,7 +70,7 @@ export function resolveRelativeImport(
   if (base === undefined) {
     return undefined;
   }
-  return candidates(base).find(exists);
+  return moduleCandidates(base).find(exists);
 }
 
 /** One import specifier, placed in the tree and judged internal or third-party. */
@@ -136,7 +136,7 @@ export function createImportResolver(
       if (joined === undefined) {
         continue;
       }
-      const found = candidates(joined).find(exists);
+      const found = moduleCandidates(joined).find(exists);
       if (found !== undefined) {
         return found;
       }
