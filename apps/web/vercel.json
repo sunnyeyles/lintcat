@@ -1,4 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "npx turbo-ignore @pr-review/web"
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
+  "ignoreCommand": "[ \"$VERCEL_ENV\" = production ] && exit 1; npx turbo-ignore @pr-review/web"
 }

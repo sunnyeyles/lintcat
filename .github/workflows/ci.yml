@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  # Branches only: a release tag runs this through release-action.yml instead.
+  # Branches only: a tag runs this through release-action.yml, main through production.yml.
   push:
-    branches: ["**"]
+    branches-ignore: [main]
   workflow_dispatch:
   workflow_call:
     inputs:

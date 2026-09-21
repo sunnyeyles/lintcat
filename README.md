@@ -696,7 +696,9 @@ that release, once, and the listing is keyed on the `name:` in `action.yml` —
 change it and the Marketplace URL moves with it. The engine, the tests, the
 spec, and this README stay in this repo, and are not published downstream.
 `.github/workflows/ci.yml` runs typecheck, tests, and the action, cli and mcp
-bundle smoke checks on every branch push (tags go through the release instead);
+bundle smoke checks on every branch push (tags go through the release instead,
+and `main` through `.github/workflows/production.yml`, which then migrates the
+database and deploys the dashboard — see [`apps/web`](apps/web/README.md#deploys));
 `.github/workflows/self-review.yml` dogfoods the Action on this repo's own
 PRs, but only on a pull request labelled `ai-review` — reviews cost tokens, so
 they are opt-in. Add the label to review, remove it to stop. Without a key for

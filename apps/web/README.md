@@ -240,10 +240,43 @@ and use `http://lvh.me:3000` and `http://acme.lvh.me:3000`; register
    `https://example.com/api/auth/callback/github`.
 
 The project's root directory is `apps/web`, so `apps/web/vercel.json` is the
-one Vercel reads. Its `ignoreCommand` runs `turbo-ignore`, which skips the
-build when a push changed nothing this app depends on — most pushes here touch
-the reviewer, the CLI or the action, and each one otherwise costs a full
-deployment.
+one Vercel reads. Its `ignoreCommand` runs `turbo-ignore` for previews, which
+skips the build when a push changed nothing this app depends on — most pushes
+here touch the reviewer, the CLI or the action, and each one otherwise costs a
+full deployment. Production builds always run.
+
+### Deploys
+
+Every branch other than `main` gets a preview from Vercel's Git integration,
+as before. `main` does not: `git.deploymentEnabled` turns that off, and
+`.github/workflows/production.yml` deploys instead, in order:
+
+1. **CI** — `ci.yml`, called on the pushed commit.
+2. **Migrate** — `db-migrate.yml` applies pending Drizzle migrations to
+   `secrets.DATABASE_URL`; with none pending it is a no-op.
+3. **Deploy** — `vercel deploy --prod` from the repo root, built by Vercel with
+   the project's settings and Production environment variables.
+
+A failed step stops the ones after it, so a commit whose CI failed never
+migrates, and production never serves code whose migrations have not applied.
+Vercel moves the production domains only once a build succeeds, so any failure
+leaves the previous deployment live. Pipelines run one at a time; a push that
+lands while one is queued replaces it, since the newer commit contains it.
+Migrations still land before the new code serves, so each one must work with
+the code already in production.
+
+Repository secrets the pipeline needs (Settings > Secrets and variables >
+Actions); it stops before CI if any Vercel one is missing:
+
+| Secret              | Value                                                        |
+| ------------------- | ------------------------------------------------------------ |
+| `VERCEL_TOKEN`      | A Vercel access token scoped to the project's team           |
+| `VERCEL_ORG_ID`     | `orgId` from `.vercel/project.json` after `vercel link`      |
+| `VERCEL_PROJECT_ID` | `projectId` from the same file                               |
+| `DATABASE_URL`      | The production Neon connection string (already used before)  |
+
+To redeploy without a push, run the Production workflow from the Actions tab
+on `main`; `db-migrate.yml` can also still be run by hand on its own.
 
 A preview that fails within seconds of the push, with no preview URL, never
 reached the build: look at the account rather than the diff. A pull request
