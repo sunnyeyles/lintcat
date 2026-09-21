@@ -50,7 +50,7 @@ export function DocsArticle({
         <header className="flex flex-col gap-3 border-b border-border pb-6">
           <p className="eyebrow">{eyebrow}</p>
           <h1 className="font-display text-h1 font-semibold tracking-display text-foreground">{title}</h1>
-          <p className="max-w-measure text-lede leading-relaxed text-muted-foreground">
+          <p className="max-w-measure text-lede text-muted-foreground">
             {description}
           </p>
         </header>

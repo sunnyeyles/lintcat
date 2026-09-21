@@ -6,7 +6,7 @@ import type { Heading } from "@/lib/docs";
 
 function Lede({ children }: { children: ReactNode }) {
   return (
-    <p className="max-w-measure text-lede leading-relaxed text-muted-foreground">{children}</p>
+    <p className="max-w-measure text-lede text-muted-foreground">{children}</p>
   );
 }
 
@@ -37,13 +37,13 @@ export function Subheading({ children }: { children: ReactNode }) {
 
 export function P({ children }: { children: ReactNode }) {
   return (
-    <p className="max-w-measure text-body leading-relaxed text-muted-foreground">{children}</p>
+    <p className="max-w-measure text-body text-muted-foreground">{children}</p>
   );
 }
 
 export function Bullets({ children }: { children: ReactNode }) {
   return (
-    <ul className="flex max-w-measure list-none flex-col gap-2.5 text-body leading-relaxed text-muted-foreground">
+    <ul className="flex max-w-measure list-none flex-col gap-2.5 text-body text-muted-foreground">
       {children}
     </ul>
   );
@@ -76,7 +76,7 @@ export function Note({ title, children }: { title: string; children: ReactNode }
   return (
     <aside className="max-w-measure border-l-2 border-primary bg-primary/10 px-4 py-3">
       <p className="eyebrow text-link">{title}</p>
-      <p className="mt-1.5 text-body leading-relaxed text-muted-foreground">{children}</p>
+      <p className="mt-1.5 text-body text-muted-foreground">{children}</p>
     </aside>
   );
 }
