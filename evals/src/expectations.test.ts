@@ -96,6 +96,8 @@ function review(
       findings: [],
       patches: { proposed: 0, verified: 0 },
       suppressed: 0,
+      baseSha: "0".repeat(40),
+      changedFiles: [],
       ...result,
     },
     rendered: { conclusion: "success", output: { title: "Review", summary: "" } },

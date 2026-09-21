@@ -12,9 +12,14 @@ import {
   type SynthesisHints,
 } from "@pr-review/ai";
 import type {
+  ChangedFile,
   ExistingReviewComment,
   PullRequestReadClient,
 } from "@pr-review/github";
+import {
+  snapshotRepositoryIndex,
+  type RepositoryGraphSnapshot,
+} from "@pr-review/index";
 import {
   createConsoleLogger,
   errorMessage,
@@ -226,15 +231,25 @@ function noNewChangesNote(sinceSha: string): string {
   return `> **Note:** No file this pull request changed has moved since \`${sinceSha.slice(0, 7)}\`, so no agent ran.`;
 }
 
+/** What the review read: the commit it was indexed at and the files it covered. */
+export interface ReviewedTree {
+  /** The pull request's base commit, whatever the index did. */
+  baseSha: string;
+  /** Every file the pull request changed, not just an incremental scope. */
+  changedFiles: readonly ChangedFile[];
+  /** The index, serialised; absent when the index was off or failed. */
+  graph?: RepositoryGraphSnapshot | undefined;
+}
+
 /** One review's outcome, plus how the patches its agents proposed fared. */
-export interface ReviewOutcome extends ReviewPipelineResult {
+export interface ReviewOutcome extends ReviewPipelineResult, ReviewedTree {
   patches: PatchSummary;
   /** Validated findings the memory's suppressions hid from this review. */
   suppressed: number;
 }
 
 /** The result of a review that never reached the pipeline. */
-function unreviewed(): ReviewOutcome {
+function unreviewed(tree: ReviewedTree): ReviewOutcome {
   return {
     candidates: [],
     agentFailures: [],
@@ -242,6 +257,7 @@ function unreviewed(): ReviewOutcome {
     findings: [],
     patches: { proposed: 0, verified: 0 },
     suppressed: 0,
+    ...tree,
   };
 }
 
@@ -282,6 +298,7 @@ export async function reviewWithDelivery(
     changedFileCount: changedFiles.length,
     diffLength: diff.length,
   });
+  const tree: ReviewedTree = { baseSha: pullRequest.baseSha, changedFiles };
 
   const scope = await resolveReviewScope(target, {
     client,
@@ -319,7 +336,7 @@ export async function reviewWithDelivery(
         scopeNote: noNewChangesNote(scope.sinceSha),
       }),
     );
-    return unreviewed();
+    return unreviewed(tree);
   }
 
   const { agents: hinted, synthesisHints, memory } = await attachRepositoryHints(
@@ -351,10 +368,10 @@ export async function reviewWithDelivery(
       target,
       renderNoAgentMatched(skipped, filenames, carriedForward),
     );
-    return unreviewed();
+    return unreviewed(tree);
   }
 
-  // Built once, before any agent starts, and thrown away with this review.
+  // Built once, before any agent starts, and serialised onto the outcome.
   const repositoryIndex = await buildReviewIndex({
     client,
     target,
@@ -459,5 +476,9 @@ export async function reviewWithDelivery(
     findings: verified.findings,
     patches: verified.summary,
     suppressed: suppressed.length,
+    ...tree,
+    ...(repositoryIndex === undefined
+      ? {}
+      : { graph: snapshotRepositoryIndex(repositoryIndex) }),
   };
 }
