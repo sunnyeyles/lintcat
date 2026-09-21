@@ -76,11 +76,11 @@ export function Sidebar({ slug, organizationName, className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "bg-sidebar hidden w-[13rem] shrink-0 border-r md:block",
+        "bg-sidebar hidden w-64 shrink-0 border-r md:block",
         className,
       )}
     >
-      <div className="sticky top-14 px-3 py-5">
+      <div className="sticky top-16 px-3 py-5">
         <p className="text-muted-foreground truncate border-b px-2.5 pb-2.5 text-xs tracking-wide uppercase">
           {organizationName}
         </p>

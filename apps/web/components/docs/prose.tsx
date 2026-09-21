@@ -18,7 +18,7 @@ function Prose({ children, className }: { children: ReactNode; className?: strin
 
 export function Section({ id, title, children }: Heading & { children: ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-20 flex flex-col gap-4 border-t border-border pt-8">
+    <section id={id} className="scroll-mt-24 flex flex-col gap-4 border-t border-border pt-8">
       <h2 className="font-display text-h2 font-semibold tracking-display text-foreground">
         <Link href={`#${id}`} className="text-foreground no-underline hover:text-link">
           {title}

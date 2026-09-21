@@ -45,7 +45,7 @@ export function DocsArticle({
 }: DocsArticleProps) {
   const { previous, next } = docsNeighbours(href);
   return (
-    <div className="mx-auto flex w-full max-w-[72rem] gap-10 px-4 py-8 sm:px-8">
+    <div className="mx-auto flex w-full max-w-[72rem] gap-10 px-6 py-8 sm:px-8">
       <article className="flex min-w-0 flex-1 flex-col gap-8 [&>section:first-of-type]:border-t-0 [&>section:first-of-type]:pt-0">
         <header className="flex flex-col gap-3 border-b border-border pb-6">
           <p className="eyebrow">{eyebrow}</p>
