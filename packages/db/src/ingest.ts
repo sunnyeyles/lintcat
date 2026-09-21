@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { ReviewRecord } from "@pr-review/schemas";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "./client";
+import { saveRepositoryGraph } from "./repository-graphs";
 import {
   agentRuns,
   findings,
@@ -57,6 +58,9 @@ export async function ingestReviewRecord(
   const reviewId = await upsertReview(database, repoId, record);
   await replaceAgentRuns(database, reviewId, record);
   await replaceFindings(database, reviewId, record);
+  if (record.graph !== undefined && record.baseSha !== undefined) {
+    await saveRepositoryGraph(database, repoId, record.baseSha, record.graph);
+  }
   return { ok: true, reviewId };
 }
 
@@ -129,6 +133,8 @@ async function upsertReview(
     repoId,
     prNumber: record.prNumber,
     headSha: record.headSha,
+    baseSha: record.baseSha ?? null,
+    changedFiles: record.changedFiles ?? [],
     agents: record.agents,
     summary: record.summary,
     durationMs: record.durationMs,

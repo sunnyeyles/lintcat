@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { reviewRecordSchema, type ReviewRecord } from "#src/index";
+import {
+  MAX_REPOSITORY_GRAPH_BASE64,
+  reviewRecordSchema,
+  type ReviewRecord,
+} from "#src/index";
 
 const validRecord: ReviewRecord = {
   owner: "acme",
@@ -136,5 +140,67 @@ describe("reviewRecordSchema", () => {
   it("rejects non-object input", () => {
     expect(reviewRecordSchema.safeParse("not a record").success).toBe(false);
     expect(reviewRecordSchema.safeParse(null).success).toBe(false);
+  });
+});
+
+const baseSha = "9a8b7c6d5e4f30211203f4e5d6c7b8a900000000";
+
+describe("reviewRecordSchema, with a repository graph", () => {
+  const withGraph = {
+    ...validRecord,
+    baseSha,
+    changedFiles: [
+      {
+        path: "src/auth/session.ts",
+        status: "modified",
+        additions: 12,
+        deletions: 3,
+      },
+      { path: "src/auth/new.ts", status: "added", additions: 40, deletions: 0 },
+    ],
+    graph: { gzip: "H4sIAAAAAAAAA", fileCount: 120, edgeCount: 310 },
+  };
+
+  it("accepts a record carrying changed files and a snapshot", () => {
+    const result = reviewRecordSchema.safeParse(withGraph);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual(withGraph);
+    }
+  });
+
+  it("accepts changed files with no snapshot, and a record with neither", () => {
+    const { graph: _graph, ...noGraph } = withGraph;
+    expect(reviewRecordSchema.safeParse(noGraph).success).toBe(true);
+    expect(reviewRecordSchema.safeParse(validRecord).success).toBe(true);
+  });
+
+  it("rejects a snapshot without the base sha it was built at", () => {
+    const { baseSha: _baseSha, ...unanchored } = withGraph;
+    expect(reviewRecordSchema.safeParse(unanchored).success).toBe(false);
+  });
+
+  it("rejects a changed file with an unknown status or negative counts", () => {
+    for (const file of [
+      { path: "a.ts", status: "exploded", additions: 1, deletions: 0 },
+      { path: "a.ts", status: "added", additions: -1, deletions: 0 },
+      { path: "", status: "added", additions: 1, deletions: 0 },
+    ]) {
+      expect(
+        reviewRecordSchema.safeParse({ ...withGraph, changedFiles: [file] })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it("rejects an empty or oversized snapshot body", () => {
+    for (const gzip of ["", "x".repeat(MAX_REPOSITORY_GRAPH_BASE64 + 1)]) {
+      expect(
+        reviewRecordSchema.safeParse({
+          ...withGraph,
+          graph: { ...withGraph.graph, gzip },
+        }).success,
+      ).toBe(false);
+    }
   });
 });

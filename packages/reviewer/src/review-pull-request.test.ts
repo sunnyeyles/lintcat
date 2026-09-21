@@ -22,7 +22,11 @@ import type {
   ReviewThread,
   WriteFileRequest,
 } from "@pr-review/github";
-import type { RepositoryIndex } from "@pr-review/index";
+import {
+  buildRepositoryIndex,
+  snapshotRepositoryIndex,
+  type RepositoryIndex,
+} from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import {
   reviewMemorySchema,
@@ -288,7 +292,36 @@ describe("reviewWithDelivery", () => {
       ...review,
       patches: { proposed: 0, verified: 0 },
       suppressed: 0,
+      baseSha: pullRequest.baseSha,
+      changedFiles,
+      graph: snapshotRepositoryIndex(
+        buildRepositoryIndex({ sha: pullRequest.baseSha, files: baseFiles }),
+      ),
     });
+  });
+
+  it("carries the base commit and every changed file, index or no index", async () => {
+    const { deps } = makeDeps(reviewResult(), { index: false });
+
+    const outcome = await reviewWithDelivery(target, deps);
+
+    expect(outcome.baseSha).toBe(pullRequest.baseSha);
+    expect(outcome.changedFiles).toEqual(changedFiles);
+    expect(outcome.graph).toBeUndefined();
+  });
+
+  it("serialises the index it built onto the outcome", async () => {
+    const { deps } = makeDeps(reviewResult());
+
+    const { graph } = await reviewWithDelivery(target, deps);
+
+    expect(graph?.sha).toBe(pullRequest.baseSha);
+    expect(graph?.files.map((file) => file.path)).toEqual(
+      [...baseFiles.keys()].sort(),
+    );
+    expect(graph?.edges).toEqual([
+      { from: "src/sessions.test.ts", to: "src/sessions.ts", names: [] },
+    ]);
   });
 
   it("emits the lifecycle events for one review (spec §26)", async () => {
