@@ -17,12 +17,6 @@ const PROVIDER_ENV = "MODEL_PROVIDER";
 /** Environment variable overriding the model under evaluation. */
 const MODEL_ENV = "MODEL_ID";
 
-/**
- * Narrows which agents the evaluations run, spelled like the action's `agents`
- * input. Expectations for an agent that no longer runs will fail, and should.
- */
-export const AGENTS_ENV = "REVIEW_AGENTS";
-
 /** Model credentials for one evaluation run. */
 export interface ModelAccess {
   provider: ModelProvider;
@@ -34,7 +28,7 @@ export interface ModelAccess {
 function missingApiKeyMessage(provider: ModelProvider): string {
   const keyEnv = apiKeyEnvFor(provider);
   return [
-    `${keyEnv} is not set, so the agent evaluations cannot run against ${provider}.`,
+    `${keyEnv} is not set, so the review evaluations cannot run against ${provider}.`,
     "",
     "These evaluations drive the real review pipeline against the fixtures in",
     "evals/fixtures, which means real model calls and real token spend. No model",
@@ -45,7 +39,6 @@ function missingApiKeyMessage(provider: ModelProvider): string {
     `  export ${keyEnv}=…            # your ${provider} API key`,
     `  export ${PROVIDER_ENV}=…       # optional; ${MODEL_PROVIDERS.join(" | ")}, defaults to ${DEFAULT_MODEL_PROVIDER}`,
     `  export ${MODEL_ENV}=…          # optional; defaults to ${defaultModelFor(provider)}`,
-    `  export ${AGENTS_ENV}=…         # optional; defaults to every review agent`,
     "  pnpm eval",
     "",
     "The fast unit suite (pnpm test) never calls a model and needs no key.",

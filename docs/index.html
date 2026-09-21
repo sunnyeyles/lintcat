@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A stage-by-stage trace of the pr-review-agents pipeline: your configured agents propose, one synthesiser refines, deterministic code decides.">
+<meta name="description" content="A stage-by-stage trace of the pr-review-agents pipeline: one agent proposes, deterministic code decides.">
 <meta name="color-scheme" content="light dark">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="Propose, Refine, Decide">
-<meta property="og:description" content="How the pr-review-agents pipeline executes: your configured agents propose, one synthesiser refines, deterministic code decides.">
+<meta property="og:description" content="How the pr-review-agents pipeline executes: one agent proposes, deterministic code decides.">
 <meta name="twitter:card" content="summary_large_image">
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%8E%3C/text%3E%3C/svg%3E">
@@ -155,11 +155,6 @@ ol.rules li::before, .foot {
 .pipe .k-ink { --c: var(--accent); }
 .pipe .k-brand { --c: var(--brand); }
 .pipe .k-ok { --c: var(--ok); }
-.pipe .a-s { --c: var(--agent-security); }
-.pipe .a-a { --c: var(--agent-correctness); }
-.pipe .a-p { --c: var(--agent-performance); }
-.pipe .a-t { --c: var(--agent-tests); }
-.pipe .a-c { --c: var(--agent-docs); }
 
 .pipe .box { fill: var(--surface-2); stroke: var(--c); stroke-width: 1.4; }
 .pipe .k-term .box { fill: transparent; stroke-dasharray: 4 3; }
@@ -169,9 +164,6 @@ ol.rules li::before, .foot {
 .pipe .k-solid .ico { stroke: var(--c); }
 .pipe .av { fill: var(--c); }
 .pipe .ico { fill: none; stroke: var(--paper); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.pipe .ag .name { fill: var(--c); font-weight: 600; font-size: 11.5px; }
-.pipe .ag .sub { font-size: 8.5px; }
-.pipe .ag .top { fill: var(--c); }
 .pipe .ring { fill: none; stroke: var(--c); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; }
 .pipe .is-now .ring { animation: svg-ring .8s ease-out; }
 @keyframes svg-ring { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.14); } }
@@ -185,11 +177,6 @@ ol.rules li::before, .foot {
 .pipe #arr-k-ink path { fill: var(--accent); }
 .pipe #arr-k-brand path { fill: var(--brand); }
 .pipe #arr-k-ok path { fill: var(--ok); }
-.pipe #arr-a-s path { fill: var(--agent-security); }
-.pipe #arr-a-a path { fill: var(--agent-correctness); }
-.pipe #arr-a-p path { fill: var(--agent-performance); }
-.pipe #arr-a-t path { fill: var(--agent-tests); }
-.pipe #arr-a-c path { fill: var(--agent-docs); }
 .pipe .pk { fill: var(--c); opacity: 0; transition: opacity .3s; }
 .pipe .edge-g.is-on .pk { opacity: .95; }
 .is-flowing .pipe [data-step] { opacity: .18; }
@@ -346,7 +333,7 @@ html { scroll-behavior: smooth; }
     <ol>
       <li><a href="#s1"><span class="n">01</span><span>Inspect event</span></a></li>
       <li><a href="#s2"><span class="n">02</span><span>Boot</span></a></li>
-      <li><a href="#s3"><span class="n">03</span><span>Load &amp; gate</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Load</span></a></li>
       <li><a href="#s4"><span class="n">04</span><span>The pipeline</span></a></li>
       <li><a href="#s5"><span class="n">05</span><span>Render</span></a></li>
       <li><a href="#s6"><span class="n">06</span><span>Publish</span></a></li>
@@ -362,22 +349,21 @@ html { scroll-behavior: smooth; }
     <!-- ========== HERO ========== -->
     <header class="hero">
       <div class="eyebrow">pr-review-agents · architecture</div>
-      <h1>Propose, refine,<br><em>decide.</em></h1>
+      <h1>Propose,<br><em>then decide.</em></h1>
       <p class="lede">
         One pull request event in, one check run out — traced in the order it
         actually executes.
       </p>
       <p class="thesis">
-        The agents you configure <strong>propose</strong> candidate findings.
-        One synthesiser <strong>refines</strong> them. Then deterministic code
-        <strong>decides</strong> — and only that last step is ever allowed to
-        reach the GitHub API.
+        One agent <strong>proposes</strong> candidate findings. Then
+        deterministic code <strong>decides</strong> — and only that last step is
+        ever allowed to reach the GitHub API.
       </p>
 
       <div class="stats">
-        <div class="stat"><span class="stat-n">n</span><span class="stat-l">Review agents, from config</span></div>
+        <div class="stat"><span class="stat-n">1</span><span class="stat-l">Review agent</span></div>
         <div class="stat"><span class="stat-n">8</span><span class="stat-l">Read-only tools</span></div>
-        <div class="stat"><span class="stat-n">12</span><span class="stat-l">Turn cap / agent</span></div>
+        <div class="stat"><span class="stat-n">12</span><span class="stat-l">Turn cap</span></div>
         <div class="stat"><span class="stat-n">7</span><span class="stat-l">Validation steps</span></div>
         <div class="stat"><span class="stat-n">10</span><span class="stat-l">Findings published</span></div>
       </div>
@@ -386,8 +372,8 @@ html { scroll-behavior: smooth; }
     <!-- ========== DIAGRAM ========== -->
     <section class="diagram" aria-label="Pipeline diagram" data-flow>
       <div class="diagram-inner">
-        <svg class="pipe" viewBox="0 0 720 912" role="img" aria-labelledby="pipe-title">
-          <title id="pipe-title">The pipeline: event, boot, load, gate, five agents in parallel, join, synthesise, validate, render, publish.</title>
+        <svg class="pipe" viewBox="0 0 720 608" role="img" aria-labelledby="pipe-title">
+          <title id="pipe-title">The pipeline: event, boot, load, one agent, validate, render, publish.</title>
           <defs>
             <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
             <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
@@ -410,16 +396,11 @@ html { scroll-behavior: smooth; }
             <marker id="arr-k-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
             <marker id="arr-k-brand" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
             <marker id="arr-k-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
-            <marker id="arr-a-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
-            <marker id="arr-a-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
-            <marker id="arr-a-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
-            <marker id="arr-a-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
-            <marker id="arr-a-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z"/></marker>
           </defs>
 
           <!-- untrusted region -->
-          <rect class="band" x="8" y="398" width="704" height="296" rx="6"/>
-          <text class="band-label" x="702" y="416" text-anchor="end">untrusted model output</text>
+          <rect class="band" x="8" y="330" width="704" height="64" rx="6"/>
+          <text class="band-label" x="702" y="346" text-anchor="end">untrusted model output</text>
 
           <!-- edges: one group per edge, packet rides the path -->
           <g class="edge-g k-boot" data-step="2"><path id="pe1" class="edge" d="M360 64V84" marker-end="url(#arr-k-boot)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe1"/></animateMotion></circle></g>
@@ -427,24 +408,10 @@ html { scroll-behavior: smooth; }
           <g class="edge-g k-boot" data-step="6"><path id="pe3" class="edge" d="M360 192V212" marker-end="url(#arr-k-boot)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe3"/></animateMotion></circle></g>
           <g class="edge-g k-boot" data-step="8"><path id="pe4" class="edge" d="M360 256V276" marker-end="url(#arr-k-boot)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe4"/></animateMotion></circle></g>
           <g class="edge-g k-boot" data-step="10"><path id="pe5" class="edge" d="M360 320V340" marker-end="url(#arr-k-boot)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe5"/></animateMotion></circle></g>
-
-          <g class="edge-g a-s" data-step="12"><path id="pf1" class="edge" d="M360 384V406H84V428" marker-end="url(#arr-a-s)"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pf1"/></animateMotion></circle></g>
-          <g class="edge-g a-a" data-step="12"><path id="pf2" class="edge" d="M360 384V406H222V428" marker-end="url(#arr-a-a)"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pf2"/></animateMotion></circle></g>
-          <g class="edge-g a-p" data-step="12"><path id="pf3" class="edge" d="M360 384V428" marker-end="url(#arr-a-p)"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pf3"/></animateMotion></circle></g>
-          <g class="edge-g a-t" data-step="12"><path id="pf4" class="edge" d="M360 384V406H498V428" marker-end="url(#arr-a-t)"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pf4"/></animateMotion></circle></g>
-          <g class="edge-g a-c" data-step="12"><path id="pf5" class="edge" d="M360 384V406H636V428" marker-end="url(#arr-a-c)"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pf5"/></animateMotion></circle></g>
-
-          <g class="edge-g a-s" data-step="14"><path id="pj1" class="edge" d="M84 520V556H360V578"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pj1"/></animateMotion></circle></g>
-          <g class="edge-g a-a" data-step="14"><path id="pj2" class="edge" d="M222 520V556H360V578"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pj2"/></animateMotion></circle></g>
-          <g class="edge-g a-p" data-step="14"><path id="pj3" class="edge" d="M360 520V578" marker-end="url(#arr-a-p)"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pj3"/></animateMotion></circle></g>
-          <g class="edge-g a-t" data-step="14"><path id="pj4" class="edge" d="M498 520V556H360V578"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pj4"/></animateMotion></circle></g>
-          <g class="edge-g a-c" data-step="14"><path id="pj5" class="edge" d="M636 520V556H360V578"/><circle class="pk" r="3.5"><animateMotion dur="2s" begin="indefinite" repeatCount="indefinite"><mpath href="#pj5"/></animateMotion></circle></g>
-
-          <g class="edge-g k-ink" data-step="16"><path id="pe6" class="edge" d="M360 624V644" marker-end="url(#arr-k-ink)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe6"/></animateMotion></circle></g>
-          <g class="edge-g k-ink" data-step="18"><path id="pe7" class="edge" d="M360 688V708" marker-end="url(#arr-k-ink)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe7"/></animateMotion></circle></g>
-          <g class="edge-g k-brand" data-step="20"><path id="pe8" class="edge" d="M360 752V772" marker-end="url(#arr-k-brand)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe8"/></animateMotion></circle></g>
-          <g class="edge-g k-ok" data-step="22"><path id="ps1" class="edge" d="M360 816V836H220V856" marker-end="url(#arr-k-ok)"/><circle class="pk" r="3.5"><animateMotion dur="1.8s" begin="indefinite" repeatCount="indefinite"><mpath href="#ps1"/></animateMotion></circle></g>
-          <g class="edge-g k-ok" data-step="22"><path id="ps2" class="edge" d="M360 816V836H500V856" marker-end="url(#arr-k-ok)"/><circle class="pk" r="3.5"><animateMotion dur="1.8s" begin="indefinite" repeatCount="indefinite"><mpath href="#ps2"/></animateMotion></circle></g>
+          <g class="edge-g k-ink" data-step="12"><path id="pe6" class="edge" d="M360 384V404" marker-end="url(#arr-k-ink)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe6"/></animateMotion></circle></g>
+          <g class="edge-g k-brand" data-step="14"><path id="pe7" class="edge" d="M360 448V468" marker-end="url(#arr-k-brand)"/><circle class="pk" r="3.5"><animateMotion dur="1.4s" begin="indefinite" repeatCount="indefinite"><mpath href="#pe7"/></animateMotion></circle></g>
+          <g class="edge-g k-ok" data-step="16"><path id="ps1" class="edge" d="M360 512V532H220V552" marker-end="url(#arr-k-ok)"/><circle class="pk" r="3.5"><animateMotion dur="1.8s" begin="indefinite" repeatCount="indefinite"><mpath href="#ps1"/></animateMotion></circle></g>
+          <g class="edge-g k-ok" data-step="16"><path id="ps2" class="edge" d="M360 512V532H500V552" marker-end="url(#arr-k-ok)"/><circle class="pk" r="3.5"><animateMotion dur="1.8s" begin="indefinite" repeatCount="indefinite"><mpath href="#ps2"/></animateMotion></circle></g>
 
           <!-- nodes -->
           <g class="n k-term k-boot" transform="translate(210 20)" data-step="1" data-caption="A pull_request event lands on the runner.">
@@ -457,80 +424,42 @@ html { scroll-behavior: smooth; }
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-search" x="15" y="13" width="18" height="18"/>
             <text class="name" x="165" y="19">inspectEvent</text><text class="sub" x="165" y="33">reviewable? otherwise a clean no-op</text>
           </g>
-          <g class="n k-boot" transform="translate(210 148)" data-step="5" data-caption="Wire up the client, the configured agents, the model, tracing and prompts.">
+          <g class="n k-boot" transform="translate(210 148)" data-step="5" data-caption="Wire up the client, the model, tracing and prompts.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-play" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="165" y="19">runAction</text><text class="sub" x="165" y="33">client · agents · model · tracing · prompts</text>
+            <text class="name" x="165" y="19">runAction</text><text class="sub" x="165" y="33">client · model · tracing · prompts</text>
           </g>
           <g class="n k-boot" transform="translate(210 212)" data-step="7" data-caption="Load the pull request, its changed files and the diff.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-pr" x="15" y="13" width="18" height="18"/>
             <text class="name" x="165" y="19">runReview</text><text class="sub" x="165" y="33">delivery adapter + policy in · load PR, changed files, diff</text>
           </g>
-          <g class="n k-boot" transform="translate(210 276)" data-step="9" data-caption="Path filters decide which agents wake. None ⇒ a neutral check and no review.">
-            <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
-            <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-funnel" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="165" y="19">gateAgentsByPaths</text><text class="sub" x="165" y="33">who wakes · none ⇒ neutral check, no review</text>
-          </g>
-          <g class="n k-term k-ink" transform="translate(210 340)" data-step="11" data-caption="The pipeline starts.">
+          <g class="n k-term k-ink" transform="translate(210 276)" data-step="9" data-caption="The pipeline starts.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-flag" x="15" y="13" width="18" height="18"/>
             <text class="name" x="165" y="19">START</text><text class="sub" x="165" y="33">runReviewPipeline</text>
           </g>
-
-          <!-- agents -->
-          <g class="ag a-s" transform="translate(20 430)" data-step="13" data-hold="1300" data-caption="Every active agent starts at once and runs concurrently, each with its own avatar colour.">
-            <rect class="ring" width="128" height="90" rx="4"/><rect class="box" width="128" height="90" rx="4"/><rect class="top" width="128" height="3"/>
-            <circle class="av" cx="64" cy="28" r="15"/><use class="ico" href="#i-shield" x="54" y="18" width="20" height="20"/>
-            <text class="name" x="64" y="60">security</text><text class="sub" x="64" y="75">authz · injection</text>
-          </g>
-          <g class="ag a-a" transform="translate(158 430)" data-step="13">
-            <rect class="ring" width="128" height="90" rx="4"/><rect class="box" width="128" height="90" rx="4"/><rect class="top" width="128" height="3"/>
-            <circle class="av" cx="64" cy="28" r="15"/><use class="ico" href="#i-check" x="54" y="18" width="20" height="20"/>
-            <text class="name" x="64" y="60">correctness</text><text class="sub" x="64" y="75">logic · bounds · nulls</text>
-          </g>
-          <g class="ag a-p" transform="translate(296 430)" data-step="13">
-            <rect class="ring" width="128" height="90" rx="4"/><rect class="box" width="128" height="90" rx="4"/><rect class="top" width="128" height="3"/>
-            <circle class="av" cx="64" cy="28" r="15"/><use class="ico" href="#i-gauge" x="54" y="18" width="20" height="20"/>
-            <text class="name" x="64" y="60">performance</text><text class="sub" x="64" y="75">N+1 · scans · blocking</text>
-          </g>
-          <g class="ag a-t" transform="translate(434 430)" data-step="13">
-            <rect class="ring" width="128" height="90" rx="4"/><rect class="box" width="128" height="90" rx="4"/><rect class="top" width="128" height="3"/>
-            <circle class="av" cx="64" cy="28" r="15"/><use class="ico" href="#i-flask" x="54" y="18" width="20" height="20"/>
-            <text class="name" x="64" y="60">test-coverage</text><text class="sub" x="64" y="75">untested branches</text>
-          </g>
-          <g class="ag a-c" transform="translate(572 430)" data-step="13">
-            <rect class="ring" width="128" height="90" rx="4"/><rect class="box" width="128" height="90" rx="4"/><rect class="top" width="128" height="3"/>
-            <circle class="av" cx="64" cy="28" r="15"/><use class="ico" href="#i-book" x="54" y="18" width="20" height="20"/>
-            <text class="name" x="64" y="60">docs-drift</text><text class="sub" x="64" y="75">README · examples</text>
-          </g>
-
-          <g class="n k-ink" transform="translate(210 580)" data-step="15" data-caption="Fan-in waits for all of them, then re-sorts the candidates to agent order.">
+          <g class="n k-ink" transform="translate(210 340)" data-step="11" data-hold="1300" data-caption="One agent reads the diff and the repository through eight read-only tools, then proposes candidate findings.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
-            <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-merge" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="165" y="19">join</text><text class="sub" x="165" y="33">fan-in, re-sorted to agent order</text>
+            <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-search" x="15" y="13" width="18" height="18"/>
+            <text class="name" x="165" y="19">general agent</text><text class="sub" x="165" y="33">read-only tools · 12-turn loop · candidates</text>
           </g>
-          <g class="n k-ink" transform="translate(210 644)" data-step="17" data-caption="One model call. No tools, no loop.">
-            <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
-            <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-sparkle" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="165" y="19">synthesise</text><text class="sub" x="165" y="33">one model call · no tools · no loop</text>
-          </g>
-          <g class="n k-brand k-solid" transform="translate(210 708)" data-step="19" data-hold="1100" data-caption="The trust boundary. Seven deterministic steps; nothing above this line can reach GitHub.">
+          <g class="n k-brand k-solid" transform="translate(210 404)" data-step="13" data-hold="1100" data-caption="The trust boundary. Seven deterministic steps; nothing above this line can reach GitHub.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-shield-check" x="15" y="13" width="18" height="18"/>
             <text class="name" x="165" y="19">validate</text><text class="sub" x="165" y="33">the trust boundary · 7 deterministic steps</text>
           </g>
-          <g class="n k-ok" transform="translate(210 772)" data-step="21" data-caption="Render is pure: no I/O.">
+          <g class="n k-ok" transform="translate(210 468)" data-step="15" data-caption="Render is pure: no I/O.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-file" x="15" y="13" width="18" height="18"/>
             <text class="name" x="165" y="19">render</text><text class="sub" x="165" y="33">pure · no I/O</text>
           </g>
-          <g class="n k-ok" transform="translate(100 856)" data-step="23" data-caption="Review comments and a check run, or the job summary when a fork denies write access.">
+          <g class="n k-ok" transform="translate(100 552)" data-step="17" data-caption="Review comments and a check run, or the job summary when a fork denies write access.">
             <rect class="ring" width="240" height="44" rx="4"/><rect class="box" width="240" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-comment" x="15" y="13" width="18" height="18"/>
             <text class="name" x="135" y="19">review comments</text><text class="sub" x="135" y="33">then a check run</text>
           </g>
-          <g class="n k-ok" transform="translate(380 856)" data-step="23">
+          <g class="n k-ok" transform="translate(380 552)" data-step="17">
             <rect class="ring" width="240" height="44" rx="4"/><rect class="box" width="240" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-list" x="15" y="13" width="18" height="18"/>
             <text class="name" x="135" y="19">job summary</text><text class="sub" x="135" y="33">fork fallback · 403/404</text>
@@ -541,8 +470,7 @@ html { scroll-behavior: smooth; }
 
         <p class="diagram-note">
           Everything above <b>validate</b> is untrusted model output.<br>
-          Nothing above it can reach the GitHub API.<br>
-          The five agents are this repository's <code>.github/pr-review-agents.yml</code>; yours names its own subset.
+          Nothing above it can reach the GitHub API.
         </p>
       </div>
     </section>
@@ -559,11 +487,11 @@ html { scroll-behavior: smooth; }
       </div>
       <div class="prose">
         <p>
-          This runs before any client, any config read, and any model — it is
+          This runs before any client and any model — it is
           the first thing <code>runAction</code> does after parsing
-          <code>GITHUB_EVENT_PATH</code>. An event that will not be reviewed has
-          no base commit to read an agent config from, so asking the question
-          first is what lets the answer "no" cost nothing.
+          <code>GITHUB_EVENT_PATH</code>. An event that will not be reviewed
+          has nothing to load, so asking the question first is what lets the
+          answer "no" cost nothing.
         </p>
         <p>
           Two outcomes, and the difference between them is the whole point of
@@ -618,41 +546,10 @@ html { scroll-behavior: smooth; }
           configuration.
         </p>
         <p>
-          <code>runAction</code> then resolves configuration in a deliberate
-          order. The GitHub client comes first — the agent config lives in the
-          repository, so reading it needs a client. Agents are resolved next,
-          before the <em>model</em> client exists, because a missing config or a
-          typo'd agent name must cost nothing to discover.
+          <code>runAction</code> then builds each dependency in a deliberate
+          order: the GitHub client first, then the model client, so a missing
+          token or key fails the step before any review work begins.
         </p>
-      </div>
-
-      <figure class="code">
-        <div class="code-head"><span class="p">apps/action/src/index.ts</span><span class="ln">line 272</span></div>
-<pre><span class="c-com">// Resolved before the model client is built, so a bad config fails the step</span>
-<span class="c-com">// rather than producing a review that looks clean.</span>
-<span class="c-key">const</span> configured = <span class="c-key">await</span> loadAgentDefinitions({
-  readFile: readAtCommit(client, target, baseSha),
-  path: getInput(env, <span class="c-str">"agent-config"</span>) || DEFAULT_AGENT_CONFIG_PATH,
-});
-<span class="c-key">const</span> selection = getInput(env, <span class="c-str">"agents"</span>);
-<span class="c-key">const</span> agents = resolveAgentDefinitions(selection, configured);</pre>
-      </figure>
-
-      <div class="prose">
-        <p>
-          The config is read at the <strong>base</strong> commit, so a pull
-          request cannot choose the agents that review it.
-        </p>
-      </div>
-
-      <div class="note">
-        <span class="eyebrow">Why it throws</span>
-        A review with no agents, or a silently dropped
-        <code>agents: secuirty</code>, would report nothing —
-        indistinguishable from a clean bill of health. So
-        <code>loadAgentDefinitions</code> refuses a missing config instead of
-        defaulting, and <code>resolveAgentDefinitions</code> rejects unknown
-        names instead of ignoring them.
       </div>
 
       <div class="table-wrap">
@@ -660,8 +557,6 @@ html { scroll-behavior: smooth; }
           <thead><tr><th>Step</th><th>Function</th><th>Fails the run?</th></tr></thead>
           <tbody>
             <tr><td>GitHub client</td><td><code>createTokenClient</code></td><td><span class="badge stop">Yes</span> missing token</td></tr>
-            <tr><td>Load configured agents</td><td><code>loadAgentDefinitions</code></td><td><span class="badge stop">Yes</span> missing or malformed config</td></tr>
-            <tr><td>Narrow to the selection</td><td><code>resolveAgentDefinitions</code></td><td><span class="badge stop">Yes</span> unknown name</td></tr>
             <tr><td>Model client</td><td><code>createLanguageModel</code></td><td><span class="badge stop">Yes</span> unknown provider or missing key</td></tr>
             <tr><td>Langfuse tracing</td><td><code>createLangfuseRuntime</code></td><td><span class="badge ok">No</span> optional</td></tr>
             <tr><td>Managed prompts</td><td><code>loadManagedPrompts</code></td><td><span class="badge ok">No</span> falls back per prompt</td></tr>
@@ -683,62 +578,17 @@ html { scroll-behavior: smooth; }
         </p>
       </div>
 
-      <h3>1b · What an <code>agents:</code> entry may be</h3>
-      <div class="paths">
-        <span class="chip">packages/ai/src/agents/<b>config.ts</b></span>
-        <span class="chip">packages/ai/src/agents/<b>specialists/</b></span>
-      </div>
-      <div class="prose">
-        <p>
-          Two spellings, one resolved <code>AgentDefinition</code>. Every entry
-          names a specialist that ships with the action; the file selects and
-          tunes them rather than defining them. Nothing runs by default: the
-          action reviews with exactly what this file names, in the order it
-          names them.
-        </p>
-      </div>
-
-      <figure class="code">
-        <div class="code-head"><span class="p">.github/pr-review-agents.yml</span><span class="ln">the two forms</span></div>
-<pre>agents:
-  - security                         <span class="c-com"># a built-in, as shipped</span>
-
-  - agent: docs-drift                <span class="c-com"># a built-in, tuned</span>
-    model: gpt-5-mini
-    paths: [<span class="c-str">"docs/**"</span>, <span class="c-str">"README.md"</span>, <span class="c-str">"!**/*.test.ts"</span>]</pre>
-      </figure>
-
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Field</th><th>Required</th><th>Meaning</th></tr></thead>
-          <tbody>
-            <tr><td><code>agent</code></td><td><span class="badge stop">Yes</span></td><td>A built-in's name: <code>security</code>, <code>correctness</code>, <code>performance</code>, <code>test-coverage</code>, or <code>docs-drift</code>. Also the one finding category it may report</td></tr>
-            <tr><td><code>model</code></td><td><span class="badge ok">No</span></td><td>Model id for this agent alone, as the provider spells it</td></tr>
-            <tr><td><code>paths</code></td><td><span class="badge ok">No</span></td><td>Globs deciding whether the agent runs at all. Never reaches a prompt</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="prose">
-        <p>
-          The schema is <code>.strict()</code>: a misspelled optional key is an
-          error, not a silently dropped field. The role, focus, and context
-          guidance live in the specialist's own file under
-          <code>specialists/</code>, so the reviewers' prompts stay under code
-          review like the rest of the action.
-        </p>
-      </div>
     </section>
 
     <!-- ========== 3 · LOAD ========== -->
     <section class="stage" id="s3">
       <div class="stage-head">
         <span class="stage-num">03</span>
-        <h2>Load the pull request, then gate the agents</h2>
+        <h2>Load the pull request</h2>
       </div>
       <div class="paths">
         <span class="chip">packages/reviewer/src/<b>review-pull-request.ts</b></span>
         <span class="chip">packages/github/src/<b>client.ts</b> · the interface</span>
-        <span class="chip">packages/ai/src/agents/<b>path-filter.ts</b></span>
       </div>
       <div class="prose">
         <p>
@@ -759,40 +609,17 @@ html { scroll-behavior: smooth; }
   client.getPullRequest(target),
   client.listChangedFiles(target),
   client.getDiff(target),
-]);
-<span class="c-key">const</span> { active, skipped } = gateAgentsByPaths(agents, filenames);</pre>
+]);</pre>
       </figure>
 
       <div class="note">
         <span class="eyebrow">One source of truth</span>
-        <code>changedFiles</code> is read by the agents <em>and</em> by
+        <code>changedFiles</code> is read by the agent <em>and</em> by
         <code>validate</code>. Because both read the same list, validation can
         never check findings against a different set of files than the one the
-        agents actually reviewed.
+        agent actually reviewed.
       </div>
 
-      <h3>3b · <code>paths</code> is a gate, not a filter</h3>
-      <div class="prose">
-        <p>
-          An agent that declares no <code>paths</code> runs on every pull
-          request. An agent that declares some runs only when a changed file
-          matches — and once it wakes it reviews the <strong>whole</strong> pull
-          request, not just the files that matched. Patterns are POSIX only, and
-          a leading <code>!</code> negates.
-        </p>
-        <p>
-          Skipped agents are named on the check run alongside the globs they are
-          waiting on, so a quiet agent is always visible rather than missing.
-        </p>
-      </div>
-      <div class="note">
-        <span class="eyebrow">When nothing matches</span>
-        A pull request no agent matched is never reviewed — and never green.
-        <code>renderNoAgentMatched</code> publishes a <strong>neutral</strong>
-        check listing every skipped agent and what it was waiting on, and the
-        pipeline is never entered. A green check would read as a clean bill of
-        health nobody gave.
-      </div>
     </section>
 
     <!-- ========== 4 · PIPELINE ========== -->
@@ -806,23 +633,18 @@ html { scroll-behavior: smooth; }
       </div>
       <div class="prose">
         <p>
-          Every active agent is started together, so they run concurrently. The
-          three steps after them run in sequence once every agent has settled.
+          One agent runs, then its candidates are validated in sequence. If the
+          agent fails, the pipeline throws and the run fails.
         </p>
       </div>
 
       <figure class="code">
         <div class="code-head"><span class="p">packages/reviewer/src/review-pipeline.ts</span><span class="ln">runReviewPipeline</span></div>
-<pre><span class="c-key">const</span> outcomes = <span class="c-key">await</span> Promise.all(
-  agents.map((agent) =&gt; runAgent(agent, context)),
-);                                  <span class="c-com">// fan-in: waits for all</span>
-
-<span class="c-key">const</span> { candidates, agentFailures } = join(outcomes);
-<span class="c-key">const</span> synthesis = <span class="c-key">await</span> synthesise(synthesiser, candidates);
-<span class="c-key">const</span> findings = validateFindings(synthesis.candidates, changedFiles, names);</pre>
+<pre><span class="c-key">const</span> candidates = [...(<span class="c-key">await</span> agent.run(context))];
+<span class="c-key">const</span> findings = validateFindings(candidates, changedFiles, [agent.name]);</pre>
       </figure>
 
-      <h3>4a · Each agent</h3>
+      <h3>4a · The agent</h3>
       <div class="paths">
         <span class="chip">packages/ai/src/agents/<b>runtime.ts</b> · createReviewAgent</span>
         <span class="chip">packages/ai/src/agents/<b>definition.ts</b> · what an agent is</span>
@@ -830,10 +652,9 @@ html { scroll-behavior: smooth; }
       </div>
       <div class="prose">
         <p>
-          Every agent shares one runtime. An <code>AgentDefinition</code>
-          supplies the role, the focus text, and the category; the loop, the eight
-          tools, the injection hardening, and the output contract are identical
-          by construction, so a new agent costs a YAML entry and no code.
+          The agent is an <code>AgentDefinition</code> — role, focus text and
+          category — run by one shared runtime: the loop, the eight tools, the
+          injection hardening and the output contract all live there.
         </p>
         <p>
           The loop itself is the AI SDK's. The runtime's job is the
@@ -903,10 +724,10 @@ html { scroll-behavior: smooth; }
               <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-funnel" x="15" y="13" width="18" height="18"/>
               <text class="name" x="165" y="19">filter to own category</text><text class="sub" x="165" y="33">cross-category leaks dropped</text>
             </g>
-            <g class="n k-term k-ok" transform="translate(210 458)" data-step="17" data-caption="What survives goes to join, alongside every other agent's candidates.">
+            <g class="n k-term k-ok" transform="translate(210 458)" data-step="17" data-caption="What survives goes to validate.">
               <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
               <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-inbox" x="15" y="13" width="18" height="18"/>
-              <text class="name" x="165" y="19">candidates</text><text class="sub" x="165" y="33">to join</text>
+              <text class="name" x="165" y="19">candidates</text><text class="sub" x="165" y="33">to validate</text>
             </g>
           </svg>
 
@@ -949,8 +770,8 @@ html { scroll-behavior: smooth; }
         </p>
         <p>
           Each turn asks for two things to be cached. A breakpoint on the
-          system message pins the shared prefix, tools included, so agents two
-          and three read it rather than paying for it again; a call-level one
+          system message pins the prefix, tools included, so later turns read it
+          rather than paying for it again; a call-level one
           follows the growing conversation tail, so turn two reads turn one's
           opening message and tool results from cache. The three input counters
           are logged separately on <code>agent.completed</code> for exactly this
@@ -960,7 +781,7 @@ html { scroll-behavior: smooth; }
         <p>
           <code>extractAgentOutput</code> takes the outermost JSON object out
           of the final message and Zod-validates it; output it cannot parse
-          fails the agent rather than crashing the run. After that the runtime
+          fails the agent, which fails the run. After that the runtime
           <em>filters</em> findings down to the
           agent's own category. Cross-category leaks are dropped, never
           re-stamped — re-stamping would fabricate a claim the model never made,
@@ -974,7 +795,7 @@ html { scroll-behavior: smooth; }
       </div>
       <div class="prose">
         <p>
-          These are the only tools any agent ever gets. There is no write,
+          These are the only tools the agent ever gets. There is no write,
           comment, approve, merge, or execute tool anywhere in the package — so
           the restriction holds by construction rather than by prompt.
         </p>
@@ -1020,7 +841,7 @@ html { scroll-behavior: smooth; }
           one the index does not hold, comes back as
           <code>known: false</code> with the reason rather than as a file that
           does not exist. With no index for the review it returns one line
-          saying so, and the agents fall back to the other tools.
+          saying so, and the agent falls back to the other tools.
         </p>
         <p>
           The index itself is built once, in memory, from one archive request at
@@ -1067,58 +888,7 @@ html { scroll-behavior: smooth; }
         </p>
       </div>
 
-      <h3>4b · <code>join</code> — the fan-in</h3>
-      <div class="prose">
-        <p>
-          <code>Promise.all</code> resolves once every agent has settled, and
-          preserves the agent's <strong>input position</strong>, never
-          completion order, so the result never depends on which agent happened
-          to settle first.
-        </p>
-      </div>
-      <figure class="code">
-        <div class="code-head"><span class="p">packages/reviewer/src/review-pipeline.ts</span><span class="ln">join</span></div>
-<pre><span class="c-key">if</span> (agentFailures.length === outcomes.length) {
-  <span class="c-key">throw</span> <span class="c-key">new</span> Error(<span class="c-str">"every review agent failed"</span>);
-}</pre>
-      </figure>
-      <div class="prose">
-        <p>One failed agent does not fail the review. All of them does.</p>
-      </div>
-
-      <h3>4c · <code>synthesise</code></h3>
-      <div class="paths">
-        <span class="chip">packages/ai/src/agents/<b>synthesiser.ts</b></span>
-      </div>
-      <div class="prose">
-        <p>
-          <strong>One</strong> model call. No tools, no loop. Candidates that
-          are not well-formed findings are dropped before the call, so
-          malformed agent output never buys tokens. From what is left it removes
-          duplicates, merges overlapping findings, drops speculation, corrects
-          severity where it is clearly wrong, and orders what survives most
-          important first.
-        </p>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Path</th><th>Trigger</th><th>synthesis.outcome</th></tr></thead>
-          <tbody>
-            <tr><td>Skipped</td><td>Zero candidates — nothing to refine, so no model call at all</td><td><code>"skipped"</code></td></tr>
-            <tr><td>Completed</td><td>Model returned valid JSON</td><td><code>"completed"</code></td></tr>
-            <tr><td>Failed</td><td>Bad output or an API error — the <strong>raw</strong> candidates are used instead</td><td><code>"failed"</code></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="prose">
-        <p>
-          A synthesis failure never fails the review. It is safe to fall back to
-          the raw candidates precisely because the synthesiser's output was
-          never trusted either — both paths flow through the same chain next.
-        </p>
-      </div>
-
-      <h3>4d · <code>validate</code> — the trust boundary</h3>
+      <h3>4b · <code>validate</code> — the trust boundary</h3>
       <div class="paths">
         <span class="chip">packages/reviewer/src/<b>validate-findings.ts</b></span>
       </div>
@@ -1130,7 +900,7 @@ html { scroll-behavior: smooth; }
       </div>
       <ol class="rules">
         <li><b>Schema validity</b> — <code>reviewFindingSchema</code> (Zod)</li>
-        <li><b>The category belongs to one of the run's agents</b> — the schema cannot check this, since the set is known only at runtime</li>
+        <li><b>The category is the agent's own</b> — <code>general</code>; the schema cannot check this, since the category is a free slug</li>
         <li><b>The file exists</b> among the PR's changed files</li>
         <li><b>The line is an added line</b> in that file's diff, when a line is given</li>
         <li><b>Confidence ≥ 0.7</b> — <code>CONFIDENCE_THRESHOLD</code></li>
@@ -1141,8 +911,7 @@ html { scroll-behavior: smooth; }
         <p>
           "Strongest" is fully deterministic: severity rank, then confidence
           descending, then input order. Dedup runs <em>before</em> the cap, so
-          duplicates — which several agents reviewing one diff produce routinely
-          — cannot consume cap slots and leave the review short.
+          duplicates cannot consume cap slots and leave the review short.
         </p>
       </div>
       <div class="note">
@@ -1167,7 +936,7 @@ html { scroll-behavior: smooth; }
       </div>
       <ol class="rules">
         <li><b>The range's current text equals <code>expected</code></b> — byte for byte, at the head commit</li>
-        <li><b>The range touches the diff</b> — an agent may not rewrite a part of the file this PR never changed</li>
+        <li><b>The range touches the diff</b> — the agent may not rewrite a part of the file this PR never changed</li>
         <li><b>No two kept patches overlap</b> in one file</li>
         <li><b>Cap at 5 files and 200 lines</b> — <code>MAX_PATCHED_FILES</code>, <code>MAX_PATCHED_LINES</code></li>
       </ol>
@@ -1201,19 +970,15 @@ html { scroll-behavior: smooth; }
         <table>
           <thead><tr><th>Situation</th><th>Conclusion</th><th>Why</th></tr></thead>
           <tbody>
-            <tr><td>No findings, no failures</td><td><span class="badge ok">success</span></td><td>"No issues found"</td></tr>
+            <tr><td>No findings</td><td><span class="badge ok">success</span></td><td>"No issues found"</td></tr>
             <tr><td>Any findings</td><td><span class="badge warn">neutral</span></td><td>Advisory — the app never blocks or approves a merge</td></tr>
-            <tr><td>An agent failed, even with zero findings</td><td><span class="badge warn">neutral</span></td><td>An incomplete review must not publish a clean bill of health</td></tr>
-            <tr><td>No agent's paths matched</td><td><span class="badge warn">neutral</span></td><td>Nothing was reviewed; the summary names each skipped agent</td></tr>
           </tbody>
         </table>
       </div>
       <div class="prose">
         <p>
-          Line-anchored findings also become inline annotations. Failed agents
-          appear in the summary <em>by name only</em> — the error detail was
-          already logged as <code>agent.failed</code> at failure time and is
-          never re-emitted here.
+          Line-anchored findings also become inline annotations when review
+          comments are unavailable.
         </p>
       </div>
     </section>
@@ -1286,15 +1051,11 @@ html { scroll-behavior: smooth; }
         <table>
           <thead><tr><th>Event</th><th>Result</th></tr></thead>
           <tbody>
-            <tr><td>Missing, malformed, or unknown-agent config</td><td><span class="badge stop">Fails</span> before any model call</td></tr>
             <tr><td>Missing API key or token</td><td><span class="badge stop">Fails</span></td></tr>
             <tr><td>Malformed <code>pull_request</code> payload</td><td><span class="badge stop">Fails</span></td></tr>
-            <tr><td><strong>Every</strong> agent fails</td><td><span class="badge stop">Fails</span> — re-runnable from the Actions UI</td></tr>
-            <tr><td>An agent hits the 12-turn cap</td><td><span class="badge stop">Fails that agent</span> — silence is not "found nothing"</td></tr>
+            <tr><td>The agent fails</td><td><span class="badge stop">Fails</span> — re-runnable from the Actions UI</td></tr>
+            <tr><td>The agent hits the 12-turn cap</td><td><span class="badge stop">Fails</span> — silence is not "found nothing"</td></tr>
             <tr><td>Unsupported event or ignored action</td><td><span class="badge ok">Clean no-op</span></td></tr>
-            <tr><td>No agent's <code>paths</code> matched</td><td><span class="badge warn">Neutral check</span> — not reviewed, and not green</td></tr>
-            <tr><td>One or two agents fail</td><td><span class="badge warn">Continues</span> — names listed in the check run</td></tr>
-            <tr><td>Synthesis fails</td><td><span class="badge warn">Continues</span> — raw candidates published</td></tr>
             <tr><td>A tool call fails</td><td><span class="badge warn">Continues</span> — reported to the model</td></tr>
             <tr><td>Langfuse unreachable</td><td><span class="badge warn">Continues</span> — in-code prompts, no traces</td></tr>
             <tr><td>Check run forbidden (fork)</td><td><span class="badge warn">Degrades</span> — job summary instead</td></tr>
@@ -1320,12 +1081,10 @@ html { scroll-behavior: smooth; }
         </p>
       </div>
       <div class="log mono">
-review.agents_selected → review.model_selected<br>
+review.model_selected<br>
 review.started<br>
 &nbsp;&nbsp;→ review.loaded<br>
-&nbsp;&nbsp;&nbsp;&nbsp;→ agent.skipped ×N <span class="dim">/</span> review.no_agents_matched <span class="dim">(then stop)</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;→ agent.started ×N&nbsp;&nbsp;→ agent.completed <span class="dim">/</span> agent.failed ×N<br>
-&nbsp;&nbsp;&nbsp;&nbsp;→ synthesis.started → synthesis.completed <span class="dim">/</span> .failed <span class="dim">/</span> .skipped<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ agent.started&nbsp;&nbsp;→ agent.completed <span class="dim">/</span> agent.failed<br>
 &nbsp;&nbsp;&nbsp;&nbsp;→ findings.validated<br>
 &nbsp;&nbsp;&nbsp;&nbsp;→ patches.verified<br>
 &nbsp;&nbsp;→ review.fixes.applied <span class="dim">/</span> .degraded <span class="dim">/</span> .disabled<br>
@@ -1361,26 +1120,21 @@ review.started<br>
             <tr><td><code>apps/action/src/index.ts</code></td><td>Inputs, client construction, wiring — every dependency is built here</td></tr>
             <tr><td><code>packages/github/src/token.ts</code></td><td>The Octokit client, from the workflow token</td></tr>
             <tr><td><code>packages/ai/src/model.ts</code></td><td>Provider registry: <code>anthropic</code> or <code>openai</code>, and the default model</td></tr>
-            <tr><td><code>.github/pr-review-agents.yml</code></td><td>The agents this repository reviews with</td></tr>
-            <tr><td><code>packages/ai/src/agents/config.ts</code></td><td>Reading and validating a repository's agents</td></tr>
-            <tr><td><code>packages/ai/src/agents/definition.ts</code></td><td>What an agent is, and its shared system prompt</td></tr>
-            <tr><td><code>packages/ai/src/agents/specialists/</code></td><td>The built-ins a config may name: <code>security</code>, <code>correctness</code>, <code>performance</code>, <code>test-coverage</code>, <code>docs-drift</code></td></tr>
-            <tr><td><code>packages/ai/src/agents/agent-set.ts</code></td><td>Narrowing an agent set, gating it, building its agents</td></tr>
+            <tr><td><code>packages/ai/src/agents/definition.ts</code></td><td>What the agent is, and its system prompt</td></tr>
+            <tr><td><code>packages/ai/src/agents/general-agent.ts</code></td><td>The one review agent's role and focus</td></tr>
             <tr><td><code>packages/ai/src/prompts.ts</code></td><td>Managed prompts and their fallback</td></tr>
             <tr><td><code>apps/action/src/langfuse.ts</code></td><td>Span export for one run</td></tr>
-            <tr><th colspan="2" style="padding-top:1.5rem">03 · Load and gate</th></tr>
+            <tr><th colspan="2" style="padding-top:1.5rem">03 · Load</th></tr>
             <tr><td><code>packages/reviewer/src/review-target.ts</code></td><td>The target triple every log event carries</td></tr>
-            <tr><td><code>packages/reviewer/src/review-pull-request.ts</code></td><td>One review, end to end; the path gate; the side-effect boundary</td></tr>
+            <tr><td><code>packages/reviewer/src/review-pull-request.ts</code></td><td>One review, end to end; the side-effect boundary</td></tr>
             <tr><td><code>packages/github/src/client.ts</code></td><td>The client interface and every type the run reads</td></tr>
             <tr><td><code>packages/github/src/app.ts</code></td><td>The Octokit implementation: pagination, Zod-parsed responses</td></tr>
-            <tr><td><code>packages/ai/src/agents/path-filter.ts</code></td><td>The <code>paths</code> globs, and which agents they wake</td></tr>
             <tr><th colspan="2" style="padding-top:1.5rem">04 · The pipeline</th></tr>
-            <tr><td><code>packages/reviewer/src/review-pipeline.ts</code></td><td>Agent fan-out, join, synthesise, validate</td></tr>
-            <tr><td><code>packages/ai/src/agents/runtime.ts</code></td><td>The shared agent loop, its turn cap, and the category filter</td></tr>
+            <tr><td><code>packages/reviewer/src/review-pipeline.ts</code></td><td>Run the agent, then validate</td></tr>
+            <tr><td><code>packages/ai/src/agents/runtime.ts</code></td><td>The agent loop, its turn cap, and the category filter</td></tr>
             <tr><td><code>packages/ai/src/agents/tools.ts</code></td><td>The eight read-only tools</td></tr>
-            <tr><td><code>packages/ai/src/agents/output.ts</code></td><td>Parsing an agent's final JSON; bad output fails the agent, not the run</td></tr>
+            <tr><td><code>packages/ai/src/agents/output.ts</code></td><td>Parsing the agent's final JSON; bad output fails the run</td></tr>
             <tr><td><code>packages/ai/src/usage.ts</code></td><td>Token accounting for every model call</td></tr>
-            <tr><td><code>packages/ai/src/agents/synthesiser.ts</code></td><td>The single refining model call</td></tr>
             <tr><td><code>packages/reviewer/src/validate-findings.ts</code></td><td>The trust boundary</td></tr>
             <tr><td><code>packages/reviewer/src/validate-patches.ts</code></td><td>Proving a proposed fix against the file at head</td></tr>
             <tr><td><code>packages/reviewer/src/diff-lines.ts</code></td><td>Which lines a finding may anchor to</td></tr>
@@ -1395,7 +1149,7 @@ review.started<br>
             <tr><td><code>apps/action/src/summary.ts</code></td><td>Fork fallback to the job summary</td></tr>
             <tr><td><code>packages/logging/src/index.ts</code></td><td>One JSON line per lifecycle event</td></tr>
             <tr><th colspan="2" style="padding-top:1.5rem">Proving it</th></tr>
-            <tr><td><code>evals/fixtures/</code></td><td>Two fixture repositories, each a pull request with a known answer</td></tr>
+            <tr><td><code>evals/fixtures/</code></td><td>Fixture repositories, each a pull request with a known answer</td></tr>
             <tr><td><code>evals/src/run-fixture-review.ts</code></td><td>The real pipeline over a fixture — only the client and publish differ</td></tr>
           </tbody>
         </table>
@@ -1427,7 +1181,7 @@ review.started<br>
 
       <figure class="code">
         <div class="code-head"><span class="p">from the repository root</span><span class="ln">shell</span></div>
-<pre><span class="c-com"># The unit suite: every package, scripted agents, no fixture repositories.</span>
+<pre><span class="c-com"># The unit suite: every package, scripted agent, no fixture repositories.</span>
 <span class="c-com"># No API key, no network.</span>
 pnpm test
 
@@ -1437,24 +1191,18 @@ ANTHROPIC_API_KEY=... pnpm eval</pre>
 
       <div class="prose">
         <p>
-          The fixtures are chosen to fail in different directions. Four plant
-          one bug each for one agent to find —
-          <code>security-tenant-scope</code> queries customers without checking
-          the tenant, <code>correctness-admin-check</code> assigns where it
-          meant to compare, <code>performance-n-plus-one</code> queries once per
-          order line, and <code>test-coverage-untested-branch</code> adds a
-          pricing tier the untouched test never exercises. The fifth,
-          <code>clean-pagination</code>, is correct code that must produce
-          <strong>no</strong> findings at all — the case that catches a model
-          inventing problems to look useful.
+          The fixtures are chosen to fail in different directions. Most plant
+          a known problem for the agent to find; <code>clean-pagination</code>
+          is correct code that must produce <strong>no</strong> findings at
+          all — the case that catches a model inventing problems to look
+          useful.
         </p>
         <p>
-          A run is ten assertions — a finding of the right category anchored to
-          each planted bug, no findings on the clean fixture, and an
-          agents-completed health check on all five. Everything else comes from
-          the ordinary pipeline log:
+          A run asserts a finding anchored to each planted problem, no findings
+          on the clean fixture, and a health check that the agent completed.
+          Everything else comes from the ordinary pipeline log:
           <code>agent.completed</code> carries the duration, the four token
-          counters and the finding count per agent.
+          counters and the finding count.
         </p>
       </div>
 

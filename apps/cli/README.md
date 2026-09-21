@@ -3,7 +3,7 @@
 `pr-review` runs the reviewer over a local checkout from the command line —
 no MCP client, no pull request. It is the same path
 [`apps/mcp`](../mcp) serves to a coding agent: a git-backed client in place of
-GitHub's, the agent configuration read at the base commit, and only findings
+GitHub's, and only findings
 that passed `validateFindings()` printed. Nothing reaches your terminal that
 would not have reached a pull request.
 
@@ -28,15 +28,13 @@ and untracked files.
 | `--base <ref>` | What to compare against; defaults to the remote default branch |
 | `--scope <kind>` | `working-tree` (default), `staged`, or `range` |
 | `--range <range>` | `HEAD~3..HEAD`, `main...feature` or a single commit; implies `--scope range` |
-| `--agents <list>` | Comma-separated categories, e.g. `security,correctness`; defaults to the repository's configured set |
 | `--fail-on <level>` | The severity that fails the command: `low`, `medium`, `high` (default) or `off` |
 | `--no-index` | Skip the repository import index |
-| `--no-progress` | Do not report each agent starting and finishing |
 | `--verbose` | Let the review's structured log through to stderr |
 | `--color` / `--no-color` | Force colour; otherwise it follows the terminal and `NO_COLOR` |
 
 Findings go to stdout, one location per finding, severity first. Everything
-else — progress, the line naming what was reviewed, errors — goes to stderr, so
+else — the line naming what was reviewed, errors — goes to stderr, so
 `pr-review review > findings.txt` keeps the two apart.
 
 | Exit code | Meaning |

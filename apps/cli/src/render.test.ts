@@ -80,7 +80,7 @@ describe("what blocks", () => {
 describe("the summary", () => {
   it("says nothing was found", () => {
     const summary = renderSummary(
-      { findings: [], blocking: [], failOn: "high", suppressed: 0, agentFailures: [] },
+      { findings: [], blocking: [], failOn: "high", suppressed: 0 },
       plain,
     );
 
@@ -96,7 +96,6 @@ describe("the summary", () => {
         blocking: blockingFindings(findings, "high"),
         failOn: "high",
         suppressed: 2,
-        agentFailures: ["correctness"],
       },
       plain,
     );
@@ -104,6 +103,5 @@ describe("the summary", () => {
     expect(summary).toContain("2 finding(s): 1 high, 1 low.");
     expect(summary).toContain("Blocked: 1 finding(s) at or above high.");
     expect(summary).toContain("2 finding(s) hidden");
-    expect(summary).toContain("Correctness review did not complete");
   });
 });

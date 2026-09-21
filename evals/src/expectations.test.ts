@@ -1,8 +1,6 @@
 /** Anchor resolution and expectation judgement, over scripted reviews. */
 import { describe, expect, it } from "vitest";
 
-import { GENERAL_AGENT, type AgentDefinition } from "@pr-review/ai";
-import { repositoryAgents } from "@pr-review/ai/agent-test-support";
 import type { ChangedFile, PullRequestDetails } from "@pr-review/github";
 import type { ReviewOutcome } from "@pr-review/reviewer";
 import type { ReviewFinding } from "@pr-review/schemas";
@@ -71,7 +69,7 @@ const fixture: LoadedFixture = {
 
 function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   return {
-    category: "performance",
+    category: "general",
     severity: "high",
     confidence: 0.9,
     title: "N+1 query",
@@ -82,17 +80,11 @@ function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   };
 }
 
-function review(
-  result: Partial<ReviewOutcome> = {},
-  agents: readonly AgentDefinition[] = repositoryAgents(),
-): FixtureReview {
+function review(result: Partial<ReviewOutcome> = {}): FixtureReview {
   return {
     fixture,
-    agents,
     result: {
       candidates: [],
-      agentFailures: [],
-      synthesis: { outcome: "skipped", candidates: [], reason: "no candidate findings" },
       findings: [],
       patches: { proposed: 0, verified: 0 },
       suppressed: 0,
@@ -152,11 +144,10 @@ describe("evaluateExpectation", () => {
   const expectation = {
     kind: "finding",
     description: "reports the N+1",
-    category: "performance",
     anchors,
   } as const;
 
-  it("passes when a finding of the right category lands in the anchor", () => {
+  it("passes when a finding lands in the anchor", () => {
     const outcome = evaluateExpectation(review({ findings: [finding()] }), expectation);
 
     expect(outcome.passed).toBe(true);
@@ -170,7 +161,7 @@ describe("evaluateExpectation", () => {
     ).toBe(true);
   });
 
-  it("fails a finding of the right category outside the anchor", () => {
+  it("fails a finding outside the anchor", () => {
     const outcome = evaluateExpectation(
       review({ findings: [finding({ line: 9 })] }),
       expectation,
@@ -179,28 +170,6 @@ describe("evaluateExpectation", () => {
     expect(outcome.passed).toBe(false);
     expect(outcome.detail).toContain(`${FILE}:3-7`);
     expect(outcome.detail).toContain("The review produced 1 finding(s)");
-  });
-
-  it("fails a finding in the right place but the wrong category", () => {
-    expect(
-      evaluateExpectation(review({ findings: [finding({ category: "security" })] }), expectation)
-        .passed,
-    ).toBe(false);
-  });
-
-  it("judges a lone standalone agent's findings by location, whatever it calls them", () => {
-    const general = finding({ category: GENERAL_AGENT.category });
-
-    expect(evaluateExpectation(review({ findings: [general] }, [GENERAL_AGENT]), expectation).passed).toBe(
-      true,
-    );
-    expect(
-      evaluateExpectation(review({ findings: [general] }, [GENERAL_AGENT, GENERAL_AGENT]), expectation)
-        .passed,
-    ).toBe(false);
-    expect(
-      evaluateExpectation(review({ findings: [finding()] }, [GENERAL_AGENT]), expectation).passed,
-    ).toBe(false);
   });
 
   it("reports no findings at all in the failure detail", () => {
@@ -217,21 +186,6 @@ describe("evaluateExpectation", () => {
     const noisy = evaluateExpectation(review({ findings: [finding()] }), clean);
     expect(noisy.passed).toBe(false);
     expect(noisy.detail).toContain("false positive");
-  });
-
-  it("judges agents-completed by the failure list", () => {
-    const completed = { kind: "agents-completed", description: "all agents ran" } as const;
-
-    expect(evaluateExpectation(review(), completed)).toEqual({
-      passed: true,
-      detail: "every review agent completed",
-    });
-    const failed = evaluateExpectation(
-      review({ agentFailures: [{ agent: "security", error: "timed out" }] }),
-      completed,
-    );
-    expect(failed.passed).toBe(false);
-    expect(failed.detail).toContain("- security: timed out");
   });
 
   it("judges patches-verify on precision, so proposing none passes", () => {

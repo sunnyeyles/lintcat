@@ -1,4 +1,3 @@
-import { emptyTokenUsage } from "@pr-review/ai";
 import { createCapturingLogger } from "@pr-review/logging";
 import { reviewRecordSchema, type ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
@@ -6,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createDashboardPublisher } from "#src/publish-dashboard";
 import {
   dashboardDelivery,
+  dashboardReview,
   recordingDelivery,
   type FinishedReviewRun,
 } from "#src/review-delivery";
@@ -18,103 +18,79 @@ const target: ReviewTarget = {
   headSha: "6dcb09b5b57875f334f61aebed695e2e4193db5e",
 };
 
+const expected = "  if (user.isAdmin = true) {\n";
+const replacement = "  if (user.isAdmin === true) {\n";
+
 const patched: ReviewFinding = {
   file: "src/sessions.ts",
-  line: 12,
-  category: "correctness",
+  line: 42,
+  category: "security",
   severity: "high",
   title: "Assignment instead of comparison in admin check",
   explanation: "The if condition assigns instead of comparing.",
   suggestedFix: "Compare with ===.",
-  patch: {
-    startLine: 12,
-    endLine: 12,
-    expected: "if (user.isAdmin = SOURCE_SENTINEL_EXPECTED_7f3a) {",
-    replacement: "if (user.isAdmin === SOURCE_SENTINEL_REPLACEMENT_9c1d) {",
-  },
-  confidence: 0.9,
+  patch: { startLine: 42, endLine: 42, expected, replacement },
+  confidence: 0.95,
 };
 
 const unpatched: ReviewFinding = {
   file: "src/limits.ts",
-  category: "correctness",
+  category: "security",
   severity: "low",
-  title: "Limit is never read",
-  explanation: "The constant is declared but unused.",
+  title: "Unbounded retry",
+  explanation: "The retry loop has no cap.",
   confidence: 0.6,
 };
 
-function finishedRun(findings: ReviewFinding[]): FinishedReviewRun {
-  return {
-    outcome: {
-      candidates: findings,
-      agentFailures: [],
-      synthesis: {
-        outcome: "skipped",
-        candidates: findings,
-        reason: "standalone agent",
-      },
-      findings,
-      patches: { proposed: 1, verified: 1 },
-      suppressed: 0,
-    },
-    agents: [],
-    usage: [
-      { agent: "correctness", durationMs: 1_000, usage: emptyTokenUsage() },
-    ],
-    durationMs: 1_200,
-  };
-}
+const run: FinishedReviewRun = {
+  outcome: {
+    candidates: [patched, unpatched],
+    findings: [patched, unpatched],
+    patches: { proposed: 1, verified: 1 },
+    suppressed: 0,
+  },
+  usage: {
+    inputTokens: 1_200,
+    cacheCreationInputTokens: 0,
+    cacheReadInputTokens: 0,
+    outputTokens: 340,
+  },
+  durationMs: 8_400,
+};
 
-async function publishThroughDashboard(run: FinishedReviewRun) {
-  const bodies: string[] = [];
-  const publish = createDashboardPublisher({
-    baseUrl: "https://dash.example.app",
-    token: "ingest-secret",
-    fetch: async (_url, init) => {
-      bodies.push(String(init?.body));
-      return Response.json({ reviewId: 1 });
-    },
-    logger: createCapturingLogger().logger,
+describe("dashboardReview", () => {
+  it("keeps whether a finding had a patch, not the patch", () => {
+    const findings = dashboardReview(run).findings;
+    expect(findings.map((finding) => finding.hasPatch)).toEqual([true, false]);
+    expect(findings.every((finding) => !("patch" in finding))).toBe(true);
   });
-  const { delivery, recorded } = recordingDelivery();
-  await dashboardDelivery(delivery, publish).publishRun?.(target, run);
-  return { body: bodies[0] ?? "", recorded };
-}
+});
 
 describe("dashboardDelivery", () => {
-  it("sends no patch source text to the ingest endpoint", async () => {
-    const { body } = await publishThroughDashboard(
-      finishedRun([patched, unpatched]),
-    );
+  it("sends no patch source text in the ingest body", async () => {
+    const bodies: string[] = [];
+    const fetch = async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(String(init?.body));
+      return Response.json({ reviewId: 1 });
+    };
+    const { delivery, recorded } = recordingDelivery();
 
-    expect(body).toContain("src/sessions.ts");
-    expect(body).not.toContain("SOURCE_SENTINEL_EXPECTED_7f3a");
-    expect(body).not.toContain("SOURCE_SENTINEL_REPLACEMENT_9c1d");
-    expect(body).not.toContain('"patch"');
-  });
+    await dashboardDelivery(
+      delivery,
+      createDashboardPublisher({
+        baseUrl: "https://dash.example.app",
+        token: "t",
+        fetch,
+        logger: createCapturingLogger().logger,
+      }),
+    ).publishRun?.(target, run);
 
-  it("says which findings carried a patch, in a body ingest accepts", async () => {
-    const { body } = await publishThroughDashboard(
-      finishedRun([patched, unpatched]),
-    );
-
-    const parsed = reviewRecordSchema.parse(JSON.parse(body));
-    expect(parsed.findings.map((finding) => finding.hasPatch)).toEqual([
-      true,
-      false,
-    ]);
-    expect(parsed.findings[0]).toMatchObject({
-      file: "src/sessions.ts",
-      line: 12,
-      suggestedFix: "Compare with ===.",
-      agent: "correctness",
-    });
-  });
-
-  it("leaves the run's own findings, patches included, untouched", async () => {
-    const { recorded } = await publishThroughDashboard(finishedRun([patched]));
-
+    expect(bodies).toHaveLength(1);
+    const body = bodies[0]!;
+    expect(body).not.toContain(JSON.stringify(expected).slice(1, -1));
+    expect(body).not.toContain(JSON.stringify(replacement).slice(1, -1));
+    expect(body).not.toContain("isAdmin =");
+    expect(reviewRecordSchema.safeParse(JSON.parse(body)).success).toBe(true);
     expect(recorded.runs[0]?.outcome.findings[0]?.patch).toEqual(patched.patch);
   });
 });

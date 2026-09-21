@@ -27,12 +27,6 @@ describe("renderReview", () => {
     expect(renderReview([])).toBeUndefined();
   });
 
-  it("posts nothing when only an agent failed, leaving the check run to say so", () => {
-    expect(
-      renderReview([], { agentFailures: [{ agent: "security", error: "timed out" }] }),
-    ).toBeUndefined();
-  });
-
   it("turns a line-anchored finding into an inline comment", () => {
     const rendered = renderReview([finding()]);
 
@@ -125,23 +119,6 @@ describe("renderReview", () => {
     expect(body.indexOf(findingMarker(finding()))).toBeLessThan(
       body.indexOf("<!-- pr-review-category:"),
     );
-  });
-
-  it("notes an agent that did not complete", () => {
-    const rendered = renderReview([finding()], {
-      agentFailures: [{ agent: "architecture", error: "timed out" }],
-    });
-
-    expect(rendered?.body).toContain("The Architecture review did not complete");
-  });
-
-  it("notes an agent the changed paths did not wake", () => {
-    const rendered = renderReview([finding()], {
-      skippedAgents: [{ agent: "security", paths: ["packages/github/**"] }],
-    });
-
-    expect(rendered?.body).toContain("The Security review did not run");
-    expect(rendered?.body).toContain("`packages/github/**`");
   });
 });
 

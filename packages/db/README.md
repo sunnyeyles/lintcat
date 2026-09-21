@@ -12,7 +12,6 @@ erDiagram
   repos ||--o{ repo_access : "grants"
   repos ||--o{ reviews : "collects"
   reviews ||--o{ findings : "holds"
-  reviews ||--o{ agent_runs : "times"
 
   users {
     serial id PK
@@ -61,16 +60,8 @@ erDiagram
     int repo_id FK
     int pr_number
     text head_sha
-    text[] agents
     text summary
     int duration_ms
-  }
-  agent_runs {
-    serial id PK
-    int review_id FK
-    text agent
-    int duration_ms
-    int finding_count
     int input_tokens
     int cache_creation_input_tokens
     int cache_read_input_tokens
@@ -79,7 +70,6 @@ erDiagram
   findings {
     serial id PK
     int review_id FK
-    text agent
     text file
     int line
     text category
@@ -94,15 +84,13 @@ erDiagram
 - An organization is one GitHub account, an organization or a user.
   `github_account_id` is the durable key; `slug` is the lowercased login and the
   subdomain: `acme` → `acme.<app-domain>`.
-- `agent_runs` is one row per agent per review, carrying the four token counters
-  the logging events already emit. `ingestReviewRecord` writes it from the
-  record's `agentRuns`.
+- `reviews` carries the run's four token counters, the same ones the logging
+  events emit. `ingestReviewRecord` writes them from the record.
 - `organizations.ingest_token` holds the SHA-256 hex of the ingest secret, never
   the secret. `hashIngestToken` in `src/ingest.ts` computes it.
 - `reviews (repo_id, pr_number, head_sha)` is unique: the ingest upsert's
   conflict target, so a rerun of one commit replaces its runs and findings.
-- `findings.agent` records which review agent produced the finding; `category`
-  stays the finding's own classification.
+- `findings.category` is the finding's own classification.
 - `memberships` is unique on `(user_id, organization_id)`: one role per user
   per organization, and a user may belong to any number of organizations.
 - `repo_access` is a user's GitHub permission on one repo, unique on

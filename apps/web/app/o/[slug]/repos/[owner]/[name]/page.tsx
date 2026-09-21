@@ -17,7 +17,7 @@ import {
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 
-import { AgentChips, RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
+import { RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
 import { InlineSkeleton, StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
 import { Stat, StatGrid } from "@/components/ui/stat";
@@ -129,7 +129,6 @@ async function ReviewHistory({
             <TableRow>
               <TableHead scope="col">Pull request</TableHead>
               <TableHead scope="col">Head</TableHead>
-              <TableHead scope="col">Agents</TableHead>
               <TableHead scope="col">Findings</TableHead>
               <TableHead scope="col" className="text-right">
                 Duration
@@ -151,7 +150,7 @@ async function ReviewHistory({
                   <tr>
                     <th
                       scope="rowgroup"
-                      colSpan={6}
+                      colSpan={5}
                       className="pt-4 pb-1.5 text-left font-mono text-sm font-medium"
                     >
                       PR #{group.prNumber}{" "}
@@ -188,9 +187,6 @@ async function ReviewHistory({
                         </code>
                       </TableCell>
                       <TableCell>
-                        <AgentChips agents={review.agents} max={2} />
-                      </TableCell>
-                      <TableCell>
                         <SeverityMix bySeverity={review.bySeverity} />
                       </TableCell>
                       <TableCell className="text-right tabular-nums whitespace-nowrap">
@@ -213,7 +209,7 @@ async function ReviewHistory({
           <EmptyHeader>
             <EmptyTitle>No reviews for this repository</EmptyTitle>
             <EmptyDescription>
-              The agents have not published a review here yet.
+              No review has been published a review here yet.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

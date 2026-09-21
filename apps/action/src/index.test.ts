@@ -9,7 +9,6 @@ import {
   makeGithub,
   makeModel,
   message,
-  repositoryAgentConfigYaml,
   textBlock,
   validRemotePrompt,
 } from "@pr-review/ai/agent-test-support";
@@ -61,9 +60,6 @@ const validInputs = {
   "INPUT_GITHUB-TOKEN": "ghs-test-token",
 };
 
-/** The agent configuration the repository has committed on its base branch. */
-const agentConfigYaml = repositoryAgentConfigYaml();
-
 /** An HTTP failure shaped the way Octokit raises one. */
 function httpError(status: number): Error {
   return Object.assign(new Error(`HTTP ${status}`), { status });
@@ -96,7 +92,11 @@ interface Harness {
   promptClientConfigs: { publicKey: string; secretKey: string; baseUrl: string }[];
   /** Prompt names fetched, in order, across every client built. */
   promptFetches: { name: string; label: string | undefined }[];
-  tracingConfigs: { baseUrl: string; release?: string | undefined }[];
+  tracingConfigs: {
+    baseUrl: string;
+    release?: string | undefined;
+    recordIo?: boolean | undefined;
+  }[];
   dashboardPosts: {
     url: string;
     headers: Record<string, string>;
@@ -123,8 +123,6 @@ interface Harness {
 interface HarnessOptions {
   /** Absent means the Langfuse seams are wired but must never be reached. */
   prompts?: Record<string, string | Error> | undefined;
-  /** Replaces the agent configuration the base commit serves. */
-  config?: string | Error | undefined;
   /** Fails every model call, after tracing has already started. */
   modelError?: Error | undefined;
   /** The review threads a merged pull request carries. */
@@ -154,19 +152,12 @@ function harness(
   const exitCodes: number[] = [];
   const specs: ReviewRunSpec[] = [];
 
-  const configured = options.config ?? agentConfigYaml;
   const client = {
     ...makeGithub(),
     getFileContents: vi.fn(async (request: FileContentsRequest) => {
       fileReads.push({ path: request.path, ref: request.ref });
       // The branch starts without a memory file, as a first run would.
-      if (request.path === MEMORY_FILE_PATH) {
-        throw httpError(404);
-      }
-      if (configured instanceof Error) {
-        throw configured;
-      }
-      return configured;
+      throw httpError(404);
     }),
     listReviewThreads: vi.fn(async (ref) => {
       threadListings.push(ref.pullRequestNumber);
@@ -225,7 +216,6 @@ function harness(
           if (options.modelError !== undefined) {
             throw options.modelError;
           }
-          // No findings, so the synthesiser is never reached.
           return message([textBlock(finalFindingsJson([]))], "end_turn");
         });
         return model;
@@ -257,6 +247,7 @@ function harness(
         tracingConfigs.push({
           baseUrl: config.baseUrl,
           release: config.release,
+          recordIo: config.recordIo,
         });
         return {
           forceFlush: () => {
@@ -469,35 +460,6 @@ describe("runAction", () => {
     ]);
   });
 
-  const perAgentModelYaml = `agents:
-  - agent: security
-    model: gpt-mini-test
-`;
-
-  it("builds an agent's own model beside the run's default", async () => {
-    const { environment, modelConfigs, entries } = harness(
-      reviewEnv,
-      pullRequestEvent(),
-      { config: perAgentModelYaml },
-    );
-
-    await expect(runAction(environment)).resolves.toBeUndefined();
-
-    // The default is built first, for the Synthesiser and every agent
-    // that names no model of its own.
-    expect(modelConfigs.map((config) => config.modelId)).toEqual([
-      "gpt-run-model",
-      "gpt-mini-test",
-    ]);
-    expect(entries).toContainEqual(
-      expect.objectContaining({
-        event: "review.model_selected",
-        model: "gpt-run-model",
-        agentModels: { security: "gpt-mini-test" },
-      }),
-    );
-  });
-
   it("fails on an unknown provider before building any client", async () => {
     const { environment, modelConfigs } = harness({
       ...reviewEnv,
@@ -694,134 +656,8 @@ describe("review memory", () => {
   });
 });
 
-/**
- * Where the agent configuration comes from. Reading it from the head or merge
- * ref would let the branch under review choose its own reviewers.
- */
-describe("agent configuration", () => {
-  it("reads it from the pull request's base commit", async () => {
-    const { environment, fileReads } = harness(reviewEnv);
-
-    await runAction(environment);
-
-    expect(fileReads).toEqual([{ path: ".github/pr-review-agents.yml", ref: baseSha }]);
-    expect(fileReads.every((read) => read.ref !== headSha)).toBe(true);
-  });
-
-  it("honours the agent-config input", async () => {
-    const { environment, fileReads } = harness({
-      ...reviewEnv,
-      "INPUT_AGENT-CONFIG": "ci/agents.yml",
-    });
-
-    await runAction(environment);
-
-    expect(fileReads).toEqual([{ path: "ci/agents.yml", ref: baseSha }]);
-  });
-
-  it("reviews with the general agent when the base commit has no configuration", async () => {
-    const { environment, entries, modelCalls } = harness(
-      reviewEnv,
-      pullRequestEvent(),
-      { config: httpError(404) },
-    );
-
-    await runAction(environment);
-
-    expect(
-      entries.find((entry) => entry["event"] === "review.agents_selected"),
-    ).toMatchObject({ agents: ["general"], configuredAgents: ["general"] });
-    expect(modelCalls()).toBe(1);
-  });
-
-  it("fails the step when the configuration is malformed", async () => {
-    const { environment } = harness(reviewEnv, pullRequestEvent(), {
-      config: "agents: []\n",
-    });
-
-    await expect(runAction(environment)).rejects.toThrow(/is invalid/);
-  });
-});
-
-/**
- * Selecting which agents run — the wiring only. Selection itself is pinned in
- * @pr-review/ai's agents.test.ts.
- */
-describe("the agents input", () => {
-  /** The set the run was assembled with, which the caller selected. */
-  const selected = (specs: ReviewRunSpec[]): unknown =>
-    specs[0]?.agents !== undefined && "use" in specs[0].agents
-      ? specs[0].agents.use.map((agent) => agent.category)
-      : undefined;
-
-  const everyAgent = [
-    "security",
-    "correctness",
-    "performance",
-    "test-coverage",
-    "docs-drift",
-  ];
-
-  it("runs the configured set when the input is absent", async () => {
-    const { environment, specs, entries } = harness(reviewEnv);
-
-    await runAction(environment);
-
-    expect(selected(specs)).toEqual(everyAgent);
-    expect(entries).toContainEqual({
-      level: "info",
-      event: "review.agents_selected",
-      agents: everyAgent,
-      configuredAgents: everyAgent,
-      pathFilteredAgents: everyAgent,
-    });
-  });
-
-  it("narrows the run to the agents the workflow named, in spec order", async () => {
-    const { environment, specs, entries } = harness({
-      ...reviewEnv,
-      INPUT_AGENTS: "docs-drift,security",
-    });
-
-    await runAction(environment);
-
-    expect(selected(specs)).toEqual(["security", "docs-drift"]);
-    expect(entries).toContainEqual(
-      expect.objectContaining({
-        event: "review.agents_selected",
-        configuredAgents: everyAgent,
-        // Naming an agent drops its path gate, so none is left gated.
-        pathFilteredAgents: [],
-      }),
-    );
-  });
-
-  it("fails on an unknown name before building the model client", async () => {
-    // The whole point of resolving the input first: a typo in the
-    // workflow file must not cost a model call.
-    const { environment, modelConfigs, specs } = harness({
-      ...reviewEnv,
-      INPUT_AGENTS: "secuirty",
-    });
-
-    await expect(runAction(environment)).rejects.toThrow(
-      /Unknown review agent: secuirty/,
-    );
-    expect(modelConfigs).toEqual([]);
-    expect(specs).toEqual([]);
-  });
-});
-
-
 const remotePrompts = {
-  security_system: validRemotePrompt("security", "REMOTE SECURITY"),
-  correctness_system: validRemotePrompt("correctness", "REMOTE CORRECTNESS"),
-  performance_system: validRemotePrompt("performance", "REMOTE PERFORMANCE"),
-  test_coverage_system: validRemotePrompt(
-    "test-coverage",
-    "REMOTE TEST COVERAGE",
-  ),
-  docs_drift_system: validRemotePrompt("docs-drift", "REMOTE DOCS DRIFT"),
+  general_system: validRemotePrompt("general", "REMOTE GENERAL"),
 };
 
 const langfuseInputs = {
@@ -870,26 +706,36 @@ describe("Langfuse wiring", () => {
         baseUrl: "https://cloud.langfuse.com",
       },
     ]);
-    expect(promptFetches.map((fetch) => fetch.name).sort()).toEqual([
-      "correctness_system",
-      "docs_drift_system",
-      "performance_system",
-      "security_system",
-      "test_coverage_system",
-    ]);
+    expect(promptFetches.map((fetch) => fetch.name)).toEqual(["general_system"]);
     expect(promptFetches.every((fetch) => fetch.label === "production")).toBe(true);
     // Fetching is not accepting: the contract guard could still reject them all.
     expect(entries).toContainEqual(
       expect.objectContaining({
         event: "langfuse.prompts.loaded",
-        loadedCount: 5,
+        loadedCount: 1,
         fallbackCount: 0,
       }),
     );
     expect(tracingConfigs).toEqual([
-      { baseUrl: "https://cloud.langfuse.com", release: "abc123" },
+      { baseUrl: "https://cloud.langfuse.com", release: "abc123", recordIo: false },
     ]);
     expect(flushCount()).toBe(1);
+  });
+
+  it.each([
+    ["true", true],
+    ["false", false],
+    ["yes", false],
+  ])("reads langfuse-record-io %j as recordIo %s", async (value, expected) => {
+    const { environment, tracingConfigs } = harness(
+      { ...reviewEnv, ...langfuseInputs, "INPUT_LANGFUSE-RECORD-IO": value },
+      pullRequestEvent(),
+      { prompts: remotePrompts },
+    );
+
+    await runAction(environment);
+
+    expect(tracingConfigs.map((config) => config.recordIo)).toEqual([expected]);
   });
 
   it("honours a custom host and prompt label", async () => {
@@ -955,13 +801,7 @@ describe("Langfuse wiring", () => {
       { ...reviewEnv, ...langfuseInputs },
       pullRequestEvent(),
       {
-        prompts: {
-          security_system: new Error("langfuse unavailable"),
-          correctness_system: new Error("langfuse unavailable"),
-          performance_system: new Error("langfuse unavailable"),
-          test_coverage_system: new Error("langfuse unavailable"),
-          docs_drift_system: new Error("langfuse unavailable"),
-        },
+        prompts: { general_system: new Error("langfuse unavailable") },
       },
     );
 
@@ -971,7 +811,7 @@ describe("Langfuse wiring", () => {
       expect.objectContaining({
         event: "langfuse.prompts.loaded",
         loadedCount: 0,
-        fallbackCount: 5,
+        fallbackCount: 1,
       }),
     );
   });
@@ -1027,7 +867,7 @@ describe("review dashboard wiring", () => {
     );
   });
 
-  it("sends a body the ingest schema accepts, with one run per agent", async () => {
+  it("sends a body the ingest schema accepts, with the run's spend", async () => {
     const { environment, dashboardPosts } = harness({
       ...reviewEnv,
       ...dashboardInputs,
@@ -1037,21 +877,17 @@ describe("review dashboard wiring", () => {
 
     const parsed = reviewRecordSchema.safeParse(dashboardPosts[0]?.body);
     expect(parsed.error?.issues).toBeUndefined();
-    const agents = parsed.data?.agents ?? [];
-    expect(agents.length).toBeGreaterThan(0);
     expect(parsed.data).toMatchObject({
       owner: "octo-org",
       repo: "example-service",
       prNumber: 42,
       headSha,
-      summary: `0 findings from ${agents.join(", ")}`,
+      summary: "0 findings",
       findings: [],
     });
-    expect(parsed.data?.agentRuns.map((run) => run.agent)).toEqual(agents);
-    for (const run of parsed.data?.agentRuns ?? []) {
-      expect(run).toMatchObject({ findingCount: 0 });
-      expect(run.inputTokens + run.outputTokens).toBeGreaterThan(0);
-    }
+    expect(
+      (parsed.data?.inputTokens ?? 0) + (parsed.data?.outputTokens ?? 0),
+    ).toBeGreaterThan(0);
   });
 
   it.each([

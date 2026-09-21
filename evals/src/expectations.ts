@@ -2,7 +2,7 @@
  * What each fixture must produce: category and location, never wording.
  * Locations anchor to source markers, which must match exactly one line.
  */
-import type { FindingCategory, ReviewFinding } from "@pr-review/schemas";
+import type { ReviewFinding } from "@pr-review/schemas";
 
 import type { LoadedFixture } from "#src/fixture";
 import type { FixtureReview } from "#src/run-fixture-review";
@@ -21,12 +21,10 @@ export type FixtureExpectation =
   | {
       kind: "finding";
       description: string;
-      category: FindingCategory;
       /** The finding must land inside at least one of these regions. */
       anchors: FindingAnchor[];
     }
   | { kind: "no-findings"; description: string }
-  | { kind: "agents-completed"; description: string }
   | { kind: "patches-verify"; description: string };
 
 /** The judgement of one expectation against one fixture review. */
@@ -95,17 +93,6 @@ function inAnchor(finding: ReviewFinding, anchor: ResolvedAnchor): boolean {
   );
 }
 
-/** A standalone agent stamps its own name on every finding, so location alone judges it. */
-function expectedCategory(
-  review: FixtureReview,
-  declared: FindingCategory,
-): FindingCategory {
-  const [only] = review.agents;
-  return review.agents.length === 1 && only?.standalone === true
-    ? only.category
-    : declared;
-}
-
 /** One finding rendered for a failure message. */
 function describeFinding(finding: ReviewFinding): string {
   const at = finding.line === undefined ? finding.file : `${finding.file}:${finding.line}`;
@@ -130,19 +117,6 @@ export function evaluateExpectation(
 ): ExpectationOutcome {
   const { findings } = review.result;
   const rendered = `The review produced ${findings.length} finding(s):\n${describeFindings(findings)}`;
-
-  if (expectation.kind === "agents-completed") {
-    const failures = review.result.agentFailures;
-    return {
-      passed: failures.length === 0,
-      detail:
-        failures.length === 0
-          ? "every review agent completed"
-          : `these agents failed:\n${failures
-              .map((failure) => `  - ${failure.agent}: ${failure.error}`)
-              .join("\n")}`,
-    };
-  }
 
   if (expectation.kind === "patches-verify") {
     // Precision only: proposing no patch passes. What fails is a patch whose
@@ -171,11 +145,8 @@ export function evaluateExpectation(
   const anchors = expectation.anchors.map((anchor) =>
     resolveAnchor(review.fixture, anchor),
   );
-  const category = expectedCategory(review, expectation.category);
-  const matched = findings.filter(
-    (finding) =>
-      finding.category === category &&
-      anchors.some((anchor) => inAnchor(finding, anchor)),
+  const matched = findings.filter((finding) =>
+    anchors.some((anchor) => inAnchor(finding, anchor)),
   );
   if (matched.length > 0) {
     return {
@@ -190,7 +161,7 @@ export function evaluateExpectation(
   return {
     passed: false,
     detail:
-      `No ${category} finding landed on the planted problem.\n` +
-      `Expected a ${category} finding within:\n${where}\n\n${rendered}`,
+      "No finding landed on the planted problem.\n" +
+      `Expected a finding within:\n${where}\n\n${rendered}`,
   };
 }
