@@ -119,6 +119,11 @@
   --tracking-caps: 0.08em;
   --container-measure: 67ch;
 
+  /* Primer control heights, as h-control-sm / h-control / h-control-lg. */
+  --spacing-control-sm: 1.75rem;
+  --spacing-control: 2rem;
+  --spacing-control-lg: 2.5rem;
+
   --radius-sm: var(--borderRadius-small);
   --radius-md: var(--borderRadius-medium);
   --radius-lg: var(--borderRadius-medium);

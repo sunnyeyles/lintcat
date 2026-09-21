@@ -65,7 +65,7 @@ export default function McpServerPage() {
               {TOOLS.map(([tool, purpose]) => (
                 <TableRow key={tool}>
                   <TableCell className="font-mono text-foreground">{tool}</TableCell>
-                  <TableCell className="text-muted-foreground">{purpose}</TableCell>
+                  <TableCell className="whitespace-normal text-muted-foreground">{purpose}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -36,7 +36,7 @@ export function Stat({ label, value, delta, hint, children, className }: StatPro
     <Card className={cn("gap-0 py-4", className)}>
       <CardHeader className="gap-1 px-4">
         <CardDescription className="truncate">{label}</CardDescription>
-        <CardTitle className="font-mono text-2xl leading-none font-semibold tabular-nums">
+        <CardTitle className="font-mono text-h1 leading-none font-semibold tabular-nums">
           {value}
         </CardTitle>
         {delta ? (
@@ -54,7 +54,7 @@ export function Stat({ label, value, delta, hint, children, className }: StatPro
       {hint || children ? (
         <CardContent className="px-4 pt-2">
           {hint ? (
-            <p className="text-muted-foreground text-xs leading-relaxed">{hint}</p>
+            <p className="text-muted-foreground text-sm">{hint}</p>
           ) : null}
           {children ? <div className="mt-2 min-w-0">{children}</div> : null}
         </CardContent>

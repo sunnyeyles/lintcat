@@ -60,7 +60,7 @@ export function DocsSidebar({ className }: { className?: string }) {
         className,
       )}
     >
-      <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto px-3 py-6">
+      <div className="sticky top-16 max-h-[calc(100dvh-4rem)] overflow-y-auto px-3 py-6">
         <NavLinks />
       </div>
     </aside>

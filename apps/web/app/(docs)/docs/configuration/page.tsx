@@ -79,7 +79,7 @@ export default function ConfigurationPage() {
                   <TableCell className="font-mono whitespace-nowrap text-muted-foreground">
                     {fallback}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{purpose}</TableCell>
+                  <TableCell className="whitespace-normal text-muted-foreground">{purpose}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -141,8 +141,8 @@ export default function ConfigurationPage() {
                   <TableCell className="font-mono whitespace-nowrap text-foreground">
                     {permission}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{granted}</TableCell>
-                  <TableCell className="text-muted-foreground">{withheld}</TableCell>
+                  <TableCell className="whitespace-normal text-muted-foreground">{granted}</TableCell>
+                  <TableCell className="whitespace-normal text-muted-foreground">{withheld}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

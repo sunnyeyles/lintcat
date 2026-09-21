@@ -22,14 +22,14 @@ const buttonVariants = cva(
       },
       // Primer control sizes: 32px medium, 28px small, 40px large.
       size: {
-        default: "h-8 px-3 py-1.5 has-[>svg]:px-2.5",
+        default: "h-control px-3 py-1.5 has-[>svg]:px-2.5",
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1.5 rounded-md px-2.5 has-[>svg]:px-2",
-        lg: "h-10 rounded-md px-4 has-[>svg]:px-3",
-        icon: "size-8",
+        sm: "h-control-sm gap-1.5 rounded-md px-2.5 text-xs has-[>svg]:px-2",
+        lg: "h-control-lg rounded-md px-4 has-[>svg]:px-3",
+        icon: "size-control",
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-7",
-        "icon-lg": "size-10",
+        "icon-sm": "size-control-sm",
+        "icon-lg": "size-control-lg",
       },
     },
     defaultVariants: {

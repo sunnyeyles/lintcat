@@ -24,7 +24,7 @@ export function TopbarFrame({
         className,
       )}
     >
-      <div className="flex h-14 items-center gap-3 px-3 sm:px-5">
+      <div className="flex h-16 items-center gap-3 px-6 sm:px-8">
         {left}
         <Link
           href={docsHref}

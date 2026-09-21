@@ -33,7 +33,7 @@ export function Toc({ headings }: { headings: Heading[] }) {
 
   return (
     <aside className="hidden w-[13rem] shrink-0 xl:block">
-      <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto">
+      <div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto">
         <p className="eyebrow border-b border-border pb-2">On this page</p>
         <nav aria-label="On this page" className="flex flex-col gap-1.5 pt-3">
           {headings.map(({ id, title }) => (

@@ -30,7 +30,7 @@ export default function NotFound() {
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline">
             <Link href={DASHBOARD_PATH}>Your organizations</Link>
           </Button>
         </EmptyContent>

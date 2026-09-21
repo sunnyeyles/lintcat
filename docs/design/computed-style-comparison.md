@@ -88,6 +88,9 @@ only because its type is set solid and its frame fills the window.
 
 Each phase is independently shippable and measured with the script above.
 
+**Status (2026-09-22):** phases 0–3 shipped except the compact density flag.
+Tabs got no page-level caller, so `variant="line"` is ready but unused.
+
 **Phase 0, tokens (this branch).** `--text-body--line-height: 1.5`,
 `--text-sm--line-height: 1.5` on body; docs prose to 16/24 with the lede at
 18; docs h2 to 24/32, h3 to 20/28. Add `--control-*` heights as Tailwind
