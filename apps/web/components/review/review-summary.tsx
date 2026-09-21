@@ -16,7 +16,7 @@ export function ReviewSummaryPanel({ summary, bySeverity }: ReviewSummaryPanelPr
   return (
     <Card className="border-l-2 border-l-accent">
       <CardContent className="py-5">
-        <h2 className="text-muted-foreground text-xs tracking-wide uppercase mb-2.5 font-mono">Synthesiser summary</h2>
+        <h2 className="text-muted-foreground text-xs tracking-wide uppercase mb-2.5 font-mono">Summary</h2>
         <p className="max-w-prose font-sans text-base leading-[1.62] text-foreground">
           {summary}
         </p>

@@ -1,10 +1,8 @@
 import {
-  emptyTokenUsage,
+  GENERAL_AGENT,
   type AgentDefinition,
   type ReviewAgent,
   type ReviewContext,
-  type Synthesiser,
-  type SynthesisHints,
 } from "@pr-review/ai";
 import type {
   ChangedFile,
@@ -76,7 +74,7 @@ const changedFiles: ChangedFile[] = [
 const finding: ReviewFinding = {
   file: "src/sessions.ts",
   line: 2,
-  category: "correctness",
+  category: "general",
   severity: "high",
   title: "Assignment instead of comparison in admin check",
   explanation:
@@ -84,11 +82,7 @@ const finding: ReviewFinding = {
   confidence: 0.9,
 };
 
-const agentConfig = ["agents:", "  - agent: security", "  - agent: correctness"].join(
-  "\n",
-);
-
-function makeClient(config: string | undefined = agentConfig) {
+function makeClient() {
   return {
     getPullRequest: vi.fn(async (_ref: PullRequestRef) => pullRequest),
     listChangedFiles: vi.fn(async (_ref: PullRequestRef) => changedFiles),
@@ -96,12 +90,7 @@ function makeClient(config: string | undefined = agentConfig) {
       async (_ref: PullRequestRef) =>
         "diff --git a/src/sessions.ts b/src/sessions.ts\n",
     ),
-    getFileContents: vi.fn(async () => {
-      if (config === undefined) {
-        throw Object.assign(new Error("Not Found"), { status: 404 });
-      }
-      return config;
-    }),
+    getFileContents: vi.fn(async () => ""),
     searchCode: vi.fn(async () => ({
       matches: [],
       totalCount: 0,
@@ -150,33 +139,21 @@ function writesOf(client: FakeClient): number {
   );
 }
 
-/** An engine whose agents and synthesiser are scripted, so no model is built. */
+/** An engine whose agent is scripted, so no model is built. */
 function scriptedEngine(candidates: readonly unknown[] = []): {
   engine: ReviewEngine;
-  synthesise: ReturnType<typeof vi.fn>;
-  ran: AgentDefinition[][];
+  ran: AgentDefinition[];
 } {
-  const ran: AgentDefinition[][] = [];
-  const synthesise = vi.fn(
-    async (given: readonly unknown[], _hints?: SynthesisHints) => ({
-      findings: given as ReviewFinding[],
-      usage: emptyTokenUsage(),
-    }),
-  );
-  const synthesiser: Synthesiser = { synthesise };
+  const ran: AgentDefinition[] = [];
   return {
-    synthesise,
     ran,
     engine: {
-      synthesiser,
-      createAgents: ({ agents }) => {
-        ran.push([...agents]);
-        return agents.map(
-          (agent): ReviewAgent => ({
-            name: agent.category,
-            run: async (_context: ReviewContext) => candidates,
-          }),
-        );
+      createAgent: ({ agent }): ReviewAgent => {
+        ran.push(agent);
+        return {
+          name: agent.category,
+          run: async (_context: ReviewContext) => candidates,
+        };
       },
     },
   };
@@ -193,8 +170,8 @@ function memoryFile(): string {
         {
           category: "correctness",
           shape: "assignment instead of comparison in",
-          resolved: 4,
-          ignored: 0,
+          resolved: 0,
+          ignored: 5,
           outdated: 0,
           lastSignalAt: NOW.toISOString(),
         },
@@ -209,8 +186,8 @@ function readOnlyStore(content: string): MemoryStore {
 
 const { logger } = createCapturingLogger();
 
-describe("runReview: the agent set", () => {
-  it("reads the configuration at the commit it is given", async () => {
+describe("runReview: the agent", () => {
+  it("runs the general agent without reading the repository", async () => {
     const client = makeClient();
     const { engine, ran } = scriptedEngine();
 
@@ -218,58 +195,12 @@ describe("runReview: the agent set", () => {
       client,
       target,
       delivery: recordingDelivery().delivery,
-      agents: { readAt: baseSha },
-      engine,
-      logger,
-    });
-
-    expect(client.getFileContents).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: ".github/pr-review-agents.yml",
-        ref: baseSha,
-      }),
-    );
-    expect(ran[0]?.map((agent) => agent.category)).toEqual([
-      "security",
-      "correctness",
-    ]);
-  });
-
-  it("narrows the configured set to the selection", async () => {
-    const { engine, ran } = scriptedEngine();
-
-    await runReview({
-      client: makeClient(),
-      target,
-      delivery: recordingDelivery().delivery,
-      agents: { readAt: baseSha, select: "correctness" },
-      engine,
-      logger,
-    });
-
-    expect(ran[0]?.map((agent) => agent.category)).toEqual(["correctness"]);
-  });
-
-  it("takes a supplied set without reading the repository", async () => {
-    const client = makeClient();
-    const { engine, ran } = scriptedEngine();
-    const agent: AgentDefinition = {
-      category: "correctness",
-      role: "correctness reviewer",
-      focus: "Review only for correctness problems.",
-    };
-
-    await runReview({
-      client,
-      target,
-      delivery: recordingDelivery().delivery,
-      agents: { use: [agent] },
       engine,
       logger,
     });
 
     expect(client.getFileContents).not.toHaveBeenCalled();
-    expect(ran[0]).toEqual([agent]);
+    expect(ran).toEqual([GENERAL_AGENT]);
   });
 });
 
@@ -283,7 +214,6 @@ describe("runReview: delivery", () => {
       client,
       target,
       delivery,
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       logger,
     });
@@ -302,7 +232,6 @@ describe("runReview: delivery", () => {
       client,
       target,
       delivery: githubDelivery({ client, logger }),
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       logger,
     });
@@ -319,7 +248,6 @@ describe("runReview: delivery", () => {
       client,
       target,
       delivery: githubDelivery({ client, logger }),
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       logger,
     });
@@ -338,53 +266,47 @@ describe("runReview: delivery", () => {
       delivery: dashboardDelivery(delivery, async (_target, review) => {
         published.push(review);
       }),
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       logger,
     });
 
     expect(published).toHaveLength(1);
-    expect(published[0]?.findings).toEqual([
-      { ...finding, agent: finding.category },
-    ]);
+    expect(published[0]?.findings).toEqual([{ ...finding, hasPatch: false }]);
+    expect(published[0]?.summary).toBe("1 finding");
     expect(recorded.runs[0]).toBe(run);
-    expect(run.agents.map((agent) => agent.category)).toEqual(["correctness"]);
   });
 });
 
 describe("runReview: repository memory", () => {
-  it("reaches synthesis with the hints the store produced", async () => {
-    const { engine, synthesise } = scriptedEngine([finding]);
+  it("hands the agent the hints the store produced", async () => {
+    const { engine, ran } = scriptedEngine([finding]);
 
     await runReview({
       client: makeClient(),
       target,
       delivery: recordingDelivery().delivery,
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       memory: { store: readOnlyStore(memoryFile()), now: () => NOW },
       logger,
     });
 
-    expect(synthesise.mock.calls[0]?.[1]).toEqual({
-      keep: ['Correctness: Findings like "assignment instead of comparison in".'],
-      drop: [],
-    });
+    expect(ran[0]?.repositoryHints).toEqual([
+      'Findings like "assignment instead of comparison in".',
+    ]);
   });
 
-  it("synthesises without hints when no store is given", async () => {
-    const { engine, synthesise } = scriptedEngine([finding]);
+  it("runs the agent without hints when no store is given", async () => {
+    const { engine, ran } = scriptedEngine([finding]);
 
     await runReview({
       client: makeClient(),
       target,
       delivery: recordingDelivery().delivery,
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       logger,
     });
 
-    expect(synthesise.mock.calls[0]?.[1]).toEqual({ keep: [], drop: [] });
+    expect(ran[0]?.repositoryHints).toBeUndefined();
   });
 });
 
@@ -397,7 +319,6 @@ describe("runReview: policy", () => {
       client,
       target,
       delivery: recordingDelivery().delivery,
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       policy: { index: false },
       logger,
@@ -422,7 +343,6 @@ describe("runReview: policy", () => {
       client,
       target,
       delivery: recordingDelivery().delivery,
-      agents: { readAt: baseSha, select: "correctness" },
       engine,
       policy: { incremental: true },
       logger,
@@ -455,7 +375,6 @@ describe("delivery adapters", () => {
     const spec = {
       client: makeClient(),
       target,
-      agents: { use: [] },
       engine,
       logger,
     };

@@ -7,7 +7,6 @@ import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
 import { registerWorkflowPrompts } from "#src/prompts/workflow-prompts";
 import { registerContextResources } from "#src/resources/context-resources";
-import { registerConfigTools } from "#src/tools/config-tools";
 import { registerFixTools } from "#src/tools/fix-tools";
 import { registerHistoryTools } from "#src/tools/history-tools";
 import { registerIndexTools } from "#src/tools/index-tools";
@@ -16,22 +15,19 @@ import { registerReviewTools } from "#src/tools/review-tools";
 import { registerSearchTools } from "#src/tools/search-tools";
 
 const INSTRUCTIONS = `Tools for the pr-review-agents code reviewer.
-- list_review_agents: which agents a local checkout configures, their path gates, and which the current changes would wake. Fast; no model calls.
 - review_local_changes: review the working tree before pushing, or scope "staged" before committing, or an explicit commit range. Slow (model calls); read-only. With no provider key set it runs through your own model via sampling, and says the review was the reduced single-shot one.
 - review_pull_request: dry-run review of a GitHub PR; publish: true posts to GitHub, so only set it when the user asks.
 - apply_fix: write a verified patch from a review into the working tree. Writes files; never commits or pushes.
 - suppress_finding: mark a false positive so later reviews of the same checkout stop raising it. Writes one local file.
 - repository_overview / find_references / describe_file: import-graph navigation of a local checkout; no network.
 - search_code: literal text search of a local checkout, with path and line number; no network.
-- validate_agent_config: check a checkout's .github/pr-review-agents.yml and see what it resolves to; no model calls.
 - list_reviews / get_review / review_trends: stored review history, scoped to the user's GitHub account.
 
 Prompts for the workflows these tools serve: review_branch (review this branch before pushing),
 triage_finding (is one stored finding worth fixing), review_history (what the stored reviews show over time).
 
-Resources to attach rather than fetch: pr-review://config (this checkout's agent configuration),
-pr-review://review/{org}/{id} (a stored review, as list_reviews links it), pr-review://file/{path}
-(a file of this checkout, read from the working tree).`;
+Resources to attach rather than fetch: pr-review://review/{org}/{id} (a stored review, as
+list_reviews links it), pr-review://file/{path} (a file of this checkout, read from the working tree).`;
 
 export interface ServerOptions {
   loadIndex?: (repoPath: string) => Promise<LocalIndex>;
@@ -95,7 +91,6 @@ export function createServer(base: McpEnvironment, options: ServerOptions = {}):
   registerIndexTools(server, environment, client, options.loadIndex ?? createLocalIndexCache());
   registerSearchTools(server, environment, client);
   registerMemoryTools(server, environment, client);
-  registerConfigTools(server, environment, client);
   const githubId = options.githubId ?? githubUserId(environment);
   registerHistoryTools(server, environment, githubId);
   registerContextResources(server, environment, githubId);

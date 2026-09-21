@@ -18,8 +18,8 @@ export default defineConfig({
     // No key, no run: this refuses to start before any test file is
     // imported, so a keyless run makes no model call.
     globalSetup: ["src/model-access.setup.ts"],
-    // One fixture is a full review: three agentic loops plus
-    // synthesis, each with its own tool round trips.
+    // One fixture is a full review: an agentic loop with its own
+    // tool round trips.
     testTimeout: 60_000,
     hookTimeout: 900_000,
     // Fixtures run one at a time: a quality report is read top to

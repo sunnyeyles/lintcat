@@ -18,7 +18,7 @@ import Link from "next/link";
 
 import { SEVERITIES } from "@/components/review";
 import { PageHeader } from "@/components/shell";
-import { AgentChip, SeverityBadge } from "@/components/ui";
+import { SeverityBadge } from "@/components/ui";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
@@ -38,7 +38,7 @@ export default async function ReviewsIndexPage({
       <PageHeader
         eyebrow="Reviews"
         title="Recent reviews"
-        description={`The last ${reviews.length} runs across every repository, newest first. Open one to read what the agents found.`}
+        description={`The last ${reviews.length} runs across every repository, newest first. Open one to read what the review found.`}
       />
 
       {reviews.length === 0 ? (
@@ -60,7 +60,6 @@ export default async function ReviewsIndexPage({
               <TableRow>
                 <TableHead>Pull request</TableHead>
                 <TableHead>Head</TableHead>
-                <TableHead>Agents</TableHead>
                 <TableHead>Findings</TableHead>
                 <TableHead className="w-[6rem]">Duration</TableHead>
                 <TableHead className="w-[5.5rem]">Cost</TableHead>
@@ -80,13 +79,6 @@ export default async function ReviewsIndexPage({
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {shortSha(review.headSha)}
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex flex-wrap gap-1">
-                      {review.agents.map((agent) => (
-                        <AgentChip key={agent} agent={agent} />
-                      ))}
-                    </span>
                   </TableCell>
                   <TableCell>
                     {review.findingCount === 0 ? (

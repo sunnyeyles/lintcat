@@ -9,7 +9,6 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import {
-  CostByAgentChart,
   CostByRepoTable,
   parseRange,
   RANGE_PHRASE,
@@ -130,10 +129,7 @@ async function UsageBody({ slug, range }: { slug: string; range: Range }) {
               rangePhrase={phrase}
             />
           </div>
-          <div className="min-w-0">
-            <CostByAgentChart byAgent={usage.byAgent} rangePhrase={phrase} />
-          </div>
-          <div className="min-w-0">
+          <div className="min-w-0 xl:col-span-2">
             <CostByRepoTable byRepo={usage.byRepo} rangePhrase={phrase} />
           </div>
         </div>
@@ -158,7 +154,7 @@ export default async function UsagePage({
       <PageHeader
         eyebrow="Usage"
         title="Tokens & cost"
-        description={`What the agents spent in ${phrase}. Cost uses the fixed price table in packages/db/src/dashboard/aggregate.ts, so the figures are illustrative rather than billed.`}
+        description={`What reviews spent in ${phrase}. Cost uses the fixed price table in packages/db/src/dashboard/aggregate.ts, so the figures are illustrative rather than billed.`}
       />
 
       <div className="mt-8">

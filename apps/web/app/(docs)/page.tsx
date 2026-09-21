@@ -8,14 +8,14 @@ import { DOCS_HOME, DOCS_PAGES, type Heading } from "@/lib/docs";
 export const metadata: Metadata = {
   title: "Introduction",
   description:
-    "AI agents review your pull requests and publish inline comments; deterministic code decides what reaches GitHub.",
+    "An AI reviewer reads your pull requests and publishes inline comments; deterministic code decides what reaches GitHub.",
 };
 
 const HEADINGS: Heading[] = [
   { id: "what-it-does", title: "What it does" },
   { id: "delivery", title: "Delivery path" },
   { id: "pipeline", title: "How a review happens" },
-  { id: "agents", title: "The agents that ship" },
+  { id: "reviewer", title: "What the reviewer looks for" },
   { id: "keep-reading", title: "Keep reading" },
 ];
 
@@ -31,21 +31,19 @@ GitHub Action
    ▼
 Review pipeline
    │
-   ├─ agent__<agent 1>  ─┐
-   ├─ agent__<agent 2>   ├─► join ─► synthesise ─► validate ─► END
-   └─ agent__<agent n>  ─┘
-                                    │
-                                    ▼
+   ├─ reviewer
+   ├─ validate
+   │
+   ▼
                     GitHub Check Run + inline comments
                       (or job summary, on a fork PR)`;
 
-const AGENTS = [
-  ["general", "The default: everything below, in one pass"],
-  ["security", "Auth, cross-tenant access, injection, secret leakage, privilege"],
-  ["correctness", "Logic errors, wrong bounds, unhandled null, broken error handling"],
-  ["performance", "N+1 queries, unbounded reads, quadratic scans, blocking I/O"],
-  ["test-coverage", "Branches this change adds or changes and leaves untested"],
-  ["docs-drift", "Documentation this change made wrong"],
+const LOOKS_FOR = [
+  ["Correctness", "Logic errors, wrong bounds, unhandled null, broken error handling"],
+  ["Security", "Auth, cross-tenant access, injection, secret leakage, privilege"],
+  ["Performance", "N+1 queries, unbounded reads, quadratic scans, blocking I/O"],
+  ["Tests", "Branches this change adds or changes and leaves untested"],
+  ["Documentation", "Documentation this change made wrong"],
 ] as const;
 
 export default function IntroductionPage() {
@@ -54,7 +52,7 @@ export default function IntroductionPage() {
       href={DOCS_HOME}
       eyebrow="Documentation"
       title="pr-review-agents"
-      description="AI agents review a pull request and publish the result as inline review comments, alongside an AI PR Review check run carrying the full summary. The agents never touch GitHub — deterministic code decides what gets published."
+      description="An AI reviewer reads a pull request and publishes the result as inline review comments, alongside an AI PR Review check run carrying the full summary. The reviewer never touches GitHub — deterministic code decides what gets published."
       headings={HEADINGS}
     >
       <div className="flex flex-wrap gap-3">
@@ -68,14 +66,8 @@ export default function IntroductionPage() {
 
       <Section id="what-it-does" title="What it does">
         <P>
-          One <strong>general</strong> agent reviews every pull request for correctness,
-          security, performance, test and documentation problems in a single pass. No
-          configuration is needed to get that.
-        </P>
-        <P>
-          Specialist agents are opt-in. Five ship with the action; a repository that names
-          them in <code>.github/pr-review-agents.yml</code> gets a review from exactly those,
-          run in parallel and merged by a synthesiser.
+          One reviewer reads every pull request for correctness, security, performance, test
+          and documentation problems in a single pass. No configuration is needed to get that.
         </P>
         <P>
           A finding may carry a <strong>patch</strong>: a replacement for a range of lines,
@@ -105,24 +97,20 @@ export default function IntroductionPage() {
       <Section id="pipeline" title="How a review happens">
         <Code>{PIPELINE}</Code>
         <P>
-          Agents are started together, so they run concurrently. One failed agent does not
-          fail the review: results are collected in the agents&rsquo; original order and what
-          succeeded is published.
+          The reviewer reads the pull request through read-only tools and proposes findings.
+          Validation then decides which of them are published. If the reviewer fails, the
+          workflow step fails and the run can be retried from the Actions UI.
         </P>
       </Section>
 
-      <Section id="agents" title="The agents that ship">
+      <Section id="reviewer" title="What the reviewer looks for">
         <Bullets>
-          {AGENTS.map(([name, reviews]) => (
+          {LOOKS_FOR.map(([name, reviews]) => (
             <Bullet key={name}>
-              <code className="text-foreground">{name}</code> — {reviews}
+              <strong className="text-foreground">{name}</strong> — {reviews}
             </Bullet>
           ))}
         </Bullets>
-        <P>
-          An agent&rsquo;s name is also the finding category it owns, and the only category
-          its findings may carry.
-        </P>
       </Section>
 
       <Section id="keep-reading" title="Keep reading">

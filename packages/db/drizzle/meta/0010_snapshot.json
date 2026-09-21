@@ -1,6 +1,6 @@
 {
-  "id": "c168b44c-754c-4000-9730-41015af0109f",
-  "prevId": "069f20c4-97d6-4b80-af66-0f6b4af9f4c6",
+  "id": "65d84bae-c2be-4208-9ced-cda580524ae7",
+  "prevId": "c168b44c-754c-4000-9730-41015af0109f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -543,6 +543,98 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.repository_graphs": {
+      "name": "repository_graphs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "repo_id": {
+          "name": "repo_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_sha": {
+          "name": "base_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_count": {
+          "name": "file_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "edge_count": {
+          "name": "edge_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "repository_graphs_repo_base_sha_idx": {
+          "name": "repository_graphs_repo_base_sha_idx",
+          "columns": [
+            {
+              "expression": "repo_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "base_sha",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "repository_graphs_repo_id_repos_id_fk": {
+          "name": "repository_graphs_repo_id_repos_id_fk",
+          "tableFrom": "repository_graphs",
+          "tableTo": "repos",
+          "columnsFrom": [
+            "repo_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.reviews": {
       "name": "reviews",
       "schema": "",
@@ -570,6 +662,19 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "base_sha": {
+          "name": "base_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changed_files": {
+          "name": "changed_files",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "summary": {
           "name": "summary",

@@ -1,19 +1,14 @@
-import path from "node:path";
-
 import { ResourceTemplate, type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
-import { DEFAULT_AGENT_CONFIG_PATH } from "@pr-review/ai";
 
-import { describeAgentConfig } from "#src/agent-config";
 import type { McpEnvironment } from "#src/environment";
 import { readWorkingTreeFile } from "#src/local-git-client";
 import { readStoredReview } from "#src/review-history";
 
-export const CONFIG_RESOURCE_URI = "pr-review://config";
 export const REVIEW_RESOURCE_TEMPLATE = "pr-review://review/{org}/{id}";
 export const FILE_RESOURCE_TEMPLATE = "pr-review://file/{+path}";
 
-export const RESOURCE_FORMS = [CONFIG_RESOURCE_URI, REVIEW_RESOURCE_TEMPLATE, FILE_RESOURCE_TEMPLATE].join(", ");
+export const RESOURCE_FORMS = [REVIEW_RESOURCE_TEMPLATE, FILE_RESOURCE_TEMPLATE].join(", ");
 
 export function reviewResourceUri(org: string, id: number): string {
   return `pr-review://review/${encodeURIComponent(org)}/${id}`;
@@ -48,30 +43,12 @@ export function registerContextResources(
   githubId: () => Promise<number>,
 ): void {
   server.registerResource(
-    "agent_config",
-    CONFIG_RESOURCE_URI,
-    {
-      title: "Agent configuration",
-      description:
-        `The resolved agent configuration (${DEFAULT_AGENT_CONFIG_PATH}) of the checkout the server runs in: ` +
-        "the agents that would run, with their model and path overrides, or the parse error and its location. " +
-        "Attach this to see what a review of this checkout would do.",
-      mimeType: "application/json",
-    },
-    async (uri) => {
-      const root = path.resolve(environment.cwd);
-      const { report } = await describeAgentConfig(root, DEFAULT_AGENT_CONFIG_PATH);
-      return jsonResource(uri, report);
-    },
-  );
-
-  server.registerResource(
     "stored_review",
     new ResourceTemplate(REVIEW_RESOURCE_TEMPLATE, { list: undefined }),
     {
       title: "A stored review",
       description:
-        "One review stored by the dashboard, with every finding and each agent's run, as `get_review` " +
+        "One review stored by the dashboard, with every finding, as `get_review` " +
         "returns it. `org` is the organization slug and `id` the review id that list_reviews links to. " +
         "Only repositories your GitHub account can read resolve.",
       mimeType: "application/json",
