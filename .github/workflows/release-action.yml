@@ -102,6 +102,23 @@ jobs:
           path: .release
           fetch-depth: 0
 
+      # Workflows pinned to the major alias get whatever it points at next.
+      - name: Refuse to drop inputs under an existing major
+        env:
+          MAJOR: ${{ steps.tag.outputs.major }}
+        run: |
+          set -euo pipefail
+          if ! git -C .release rev-parse -q --verify "refs/tags/${MAJOR}" >/dev/null; then
+            echo "${MAJOR} is not published yet; no earlier inputs to keep."
+            exit 0
+          fi
+          published="${RUNNER_TEMP}/published-action.yml"
+          if ! git -C .release show "refs/tags/${MAJOR}:action.yml" > "$published"; then
+            echo "::error::${MAJOR} exists on the release repository but has no action.yml to compare against."
+            exit 1
+          fi
+          node scripts/check-action-inputs.mjs "$published" apps/action/action.yml "$MAJOR"
+
       # Replace, not merge, so a file deleted here disappears downstream too.
       - name: Stage the published tree
         run: |

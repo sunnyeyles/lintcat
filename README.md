@@ -106,7 +106,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: sunnyeyles/pr-review-action@v2
+      - uses: sunnyeyles/pr-review-action@v3
         with:
           api-key: ${{ secrets.OPENAI_API_KEY }}
 ```
@@ -116,14 +116,15 @@ The `closed` trigger and `contents: write` are needed only for
 `types: [opened, synchronize, reopened]` and `contents: read`.
 
 Source lives in [`apps/action`](apps/action); `release-action.yml` publishes the
-bundle to the public action repository. `v2` made the provider configurable and
-renamed the `anthropic-api-key` input to `api-key`; a `v1` workflow needs that
-one rename to move.
+bundle to the public action repository. `v3` removed the `agents` and
+`agent-config` inputs and skips, rather than fails, when the provider key is
+missing; the [action README](apps/action/README.md#moving-from-v2) has the
+migration.
 
 Three names for the same thing, deliberately: this source repo is
 `pr-review-agents`, the published action repo is `pr-review-action` and is
-listed on the Marketplace as **[Review Agent Fleet](https://github.com/marketplace/actions/review-agent-fleet)**
-(the `name:` in `action.yml`), and the check run it writes is `AI PR Review`
+listed on the Marketplace as **LintCat PR Review** (the `name:` in
+`action.yml`), and the check run it writes is `AI PR Review`
 (`CHECK_RUN_NAME` in `packages/github/src/client.ts`).
 
 On a fork PR, `GITHUB_TOKEN` is read-only and can't create a check run — the
@@ -686,8 +687,11 @@ publish method at all.
 it calls `ci.yml` (typecheck → test → build and smoke-test the bundles), then
 takes the smoke-tested action bundle from that run and pushes only `action.yml`,
 `dist/index.mjs`, `LICENSE`, and a usage `README.md` to a separate public repo,
-moving that repo's major-version alias (`v2`) to the new tag and cutting a
-GitHub Release there. Listing the Action on the Marketplace is a manual tick on
+moving that repo's major-version alias (`v3`) to the new tag and cutting a
+GitHub Release there. Before anything is committed there, the job refuses to
+move an alias that already exists if the new `action.yml` drops or renames an
+input the alias still publishes (`scripts/check-action-inputs.mjs`): a breaking
+input change needs the next major. Listing the Action on the Marketplace is a manual tick on
 that release, once, and the listing is keyed on the `name:` in `action.yml` —
 change it and the Marketplace URL moves with it. The engine, the tests, the
 spec, and this README stay in this repo, and are not published downstream.

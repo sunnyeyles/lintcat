@@ -1,11 +1,12 @@
-name: Review Agent Fleet
+name: LintCat PR Review
 description: >-
-  Reviews a pull request with an AI reviewer.
+  LintCat reviews pull requests with AI on your own model key, as inline
+  review comments and a check run.
 author: sunnyeyles
 
 branding:
   icon: check-circle
-  color: purple
+  color: green
 
 inputs:
   model-provider:
