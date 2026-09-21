@@ -39,7 +39,7 @@ jobs:
 
       # tsc and vitest never read the bundles; a bundling regression fails here, not at release.
       - name: Build bundles
-        run: pnpm --filter @pr-review/action --filter @pr-review/cli --filter @pr-review/mcp build
+        run: pnpm turbo run build --filter=@pr-review/action --filter=@pr-review/cli --filter=@pr-review/mcp
 
       # Must import under the declared Node major and stay inert without GITHUB_ACTIONS.
       - name: Smoke-test action bundle

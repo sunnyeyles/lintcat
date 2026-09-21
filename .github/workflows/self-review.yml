@@ -37,7 +37,7 @@ jobs:
       # A local action must have its dist/ built before `uses: ./` runs it;
       # dist/ is gitignored, so it is always built here rather than committed.
       - name: Build the action
-        run: pnpm --filter @pr-review/action build
+        run: pnpm turbo run build --filter=@pr-review/action
 
       - name: Review this pull request
         uses: ./apps/action
