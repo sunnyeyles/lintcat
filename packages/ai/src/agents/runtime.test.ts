@@ -821,7 +821,44 @@ describe("the repository index block", () => {
     const opening = await openingWith(fakeIndex());
 
     expect(opening).toContain(
-      "- src/sessions.ts — source, covered by src/sessions.test.ts, 4 importers",
+      "- src/sessions.ts — source, covered by src/sessions.test.ts, 4 importers\n",
+    );
+  });
+
+  it("says a file nothing imports is dead", async () => {
+    const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        { filename: "src/boot.ts", status: "modified", additions: 1, deletions: 0 },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain(
+      "- src/boot.ts — source, no test, 0 importers, dead (not an entry point)",
+    );
+  });
+
+  it("says a file in an import cycle is in one", async () => {
+    const cycling = buildRepositoryIndex({
+      sha: baseSha,
+      files: new Map([
+        ["src/a.ts", 'import "./b";\n'],
+        ["src/b.ts", 'import "./a";\n'],
+      ]),
+    });
+    const { agent, calls } = makeAgent(scripted, { index: cycling });
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        { filename: "src/a.ts", status: "modified", additions: 1, deletions: 0 },
+      ],
+    });
+
+    expect(openingOf(calls[0])).toContain(
+      "- src/a.ts — source, no test, 1 importer, in import cycle\n",
     );
   });
 
@@ -995,7 +1032,7 @@ describe("the repository block", () => {
     });
 
     expect(openingOf(calls[0])).toContain(
-      "- packages/app/main.ts — @acme/app, source, no test, 0 importers",
+      "- packages/app/main.ts — @acme/app, source, no test, 0 importers, dead (not an entry point)",
     );
   });
 });

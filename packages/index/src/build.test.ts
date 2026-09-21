@@ -28,6 +28,11 @@ function roleOf(paths: readonly string[], path: string): string | undefined {
   return index(paths).files.get(path)?.role;
 }
 
+/** An index whose contents carry the imports, for the graph-shaped tests. */
+function graphIndex(files: Record<string, string>) {
+  return buildRepositoryIndex({ sha, files: new Map(Object.entries(files)) });
+}
+
 describe("classifyFileRole", () => {
   it.each([
     ["src/sessions.ts", "source"],
@@ -227,5 +232,137 @@ describe("buildRepositoryIndex", () => {
     expect(roleOf(["packages/db/src/schema.ts"], "packages/db/src/schema.ts")).toBe(
       "source",
     );
+  });
+});
+
+describe("import cycles", () => {
+  it("flags both files of a two-file cycle", () => {
+    const built = graphIndex({
+      "src/a.ts": 'import { b } from "./b";\nexport const a = b;\n',
+      "src/b.ts": 'import { a } from "./a";\nexport const b = a;\n',
+    });
+
+    expect(built.files.get("src/a.ts")?.inCycle).toBe(true);
+    expect(built.files.get("src/b.ts")?.inCycle).toBe(true);
+  });
+
+  it("does not flag a self-import", () => {
+    const built = graphIndex({
+      "src/a.ts": 'import { a } from "./a";\nexport const b = a;\n',
+    });
+
+    expect(built.files.get("src/a.ts")?.inCycle).toBe(false);
+  });
+
+  it("flags every file of a longer cycle and nothing outside it", () => {
+    const built = graphIndex({
+      "src/a.ts": 'import "./b";\n',
+      "src/b.ts": 'import "./c";\n',
+      "src/c.ts": 'import "./a";\n',
+      "src/entry.ts": 'import "./a";\n',
+    });
+
+    expect(built.files.get("src/a.ts")?.inCycle).toBe(true);
+    expect(built.files.get("src/b.ts")?.inCycle).toBe(true);
+    expect(built.files.get("src/c.ts")?.inCycle).toBe(true);
+    expect(built.files.get("src/entry.ts")?.inCycle).toBe(false);
+  });
+
+  it("does not flag a straight chain", () => {
+    const built = graphIndex({
+      "src/a.ts": 'import "./b";\n',
+      "src/b.ts": 'import "./c";\n',
+      "src/c.ts": "export const c = 1;\n",
+    });
+
+    expect([...built.files.values()].some((file) => file.inCycle)).toBe(false);
+  });
+
+  it("ignores an import it could not resolve", () => {
+    const built = graphIndex({
+      "src/a.ts": 'import "./gone";\nimport "node:fs";\n',
+    });
+
+    expect(built.files.get("src/a.ts")?.inCycle).toBe(false);
+  });
+
+  it("indexes a five thousand file chain quickly", () => {
+    const files: Record<string, string> = {};
+    for (let at = 0; at < 5000; at += 1) {
+      files[`src/f${at}.ts`] =
+        at === 4999 ? "export const end = 1;\n" : `import "./f${at + 1}";\n`;
+    }
+    const started = performance.now();
+    const built = graphIndex(files);
+    const elapsed = performance.now() - started;
+
+    expect(built.files.size).toBe(5000);
+    expect([...built.files.values()].some((file) => file.inCycle)).toBe(false);
+    expect(elapsed).toBeLessThan(10_000);
+  });
+});
+
+describe("dead files", () => {
+  it("flags a source file nobody imports", () => {
+    const built = graphIndex({ "src/orphan.ts": "export const gone = 1;\n" });
+
+    expect(built.files.get("src/orphan.ts")?.dead).toBe(true);
+  });
+
+  it("does not flag a file something imports", () => {
+    const built = graphIndex({
+      "src/a.ts": 'import "./b";\n',
+      "src/b.ts": "export const b = 1;\n",
+    });
+
+    expect(built.files.get("src/b.ts")?.dead).toBe(false);
+  });
+
+  it("does not flag an orphan entry point", () => {
+    const built = graphIndex({
+      "package.json": JSON.stringify({ name: "acme", main: "./src/main.ts" }),
+      "src/main.ts": "export const main = 1;\n",
+      "src/orphan.ts": "export const gone = 1;\n",
+    });
+
+    expect(built.files.get("src/main.ts")?.dead).toBe(false);
+    expect(built.files.get("src/orphan.ts")?.dead).toBe(true);
+  });
+
+  it("never flags a test file", () => {
+    const built = graphIndex({
+      "src/a.test.ts": 'import "./a";\n',
+      "src/a.ts": "export const a = 1;\n",
+    });
+
+    expect(built.files.get("src/a.test.ts")?.dead).toBe(false);
+  });
+
+  it("never flags a file of a non-source role", () => {
+    const built = index([
+      "README.md",
+      "vitest.config.ts",
+      "drizzle/0001_init.sql",
+      "public/logo.svg",
+    ]);
+
+    expect([...built.files.values()].some((file) => file.dead)).toBe(false);
+  });
+
+  it("does not flag a framework route file", () => {
+    const built = graphIndex({
+      "app/dashboard/page.tsx": "export default function Page() {}\n",
+    });
+
+    expect(built.files.get("app/dashboard/page.tsx")?.dead).toBe(false);
+  });
+
+  it("does not flag a file a cycle keeps alive", () => {
+    const built = graphIndex({
+      "src/a.ts": 'import "./b";\n',
+      "src/b.ts": 'import "./a";\n',
+    });
+
+    expect(built.files.get("src/a.ts")?.dead).toBe(false);
   });
 });
