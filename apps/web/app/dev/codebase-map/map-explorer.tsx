@@ -7,9 +7,9 @@ import { FileDetails } from "@/components/codebase-map/file-details";
 import {
   FIXTURE_LABELS,
   FIXTURE_SIZES,
-  fixtureGraph,
-  fixtureHeat,
+  fixtureSource,
   type FixtureKind,
+  type FixtureSource,
 } from "@/components/codebase-map/fixtures";
 import { GroupList } from "@/components/codebase-map/group-list";
 import { MapCanvas } from "@/components/codebase-map/map-canvas";
@@ -18,25 +18,16 @@ import { MapSearch } from "@/components/codebase-map/map-search";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
 import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
 import { buildScene, type SceneNode } from "@/components/codebase-map/scene";
+import { useMapGraph } from "@/components/codebase-map/use-map-graph";
 import { initialBounds, type MapHandle } from "@/components/codebase-map/view";
-import {
-  groupIdFor,
-  mapStatus,
-  navigate,
-  neighbourhood,
-  normaliseGraph,
-} from "@/lib/codebase-map";
-import type { FindingHeat, MapStatus, NavigationAxis, NormalisedGraph } from "@/lib/codebase-map";
+import { groupIdFor, mapStatus, navigate, neighbourhood, normaliseGraph } from "@/lib/codebase-map";
+import type { FindingHeat, MapGraph, NavigationAxis } from "@/lib/codebase-map";
 
 const FIXTURES: FixtureKind[] = ["ready", "partial", "no-changes", "empty"];
 const SURFACE = "h-[68vh] min-h-[420px] w-full";
 
-interface Source {
-  graph: NormalisedGraph;
-  status: MapStatus;
-  heat: FindingHeat;
-  changedPaths: string[];
-}
+const NO_GRAPH: MapGraph = { files: [], imports: [] };
+const NO_HEAT: FindingHeat = {};
 
 interface Hover {
   node: SceneNode;
@@ -47,7 +38,7 @@ interface Hover {
 export function MapExplorer() {
   const [size, setSize] = useState<number>(5000);
   const [fixture, setFixture] = useState<FixtureKind>("ready");
-  const [source, setSource] = useState<Source | null>(null);
+  const [source, setSource] = useState<FixtureSource | null>(null);
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
@@ -64,33 +55,32 @@ export function MapExplorer() {
     setFocusedPath(null);
     setQuery("");
     setExpandedGroups(new Set());
-    const id = setTimeout(() => {
-      const input = fixtureGraph(fixture, size);
-      const graph = normaliseGraph(input);
-      setSource({
-        graph,
-        status: mapStatus(graph),
-        heat: fixtureHeat(input),
-        changedPaths: graph.files.filter((f) => f.changed === true).map((f) => f.path),
-      });
-    }, 0);
+    const id = setTimeout(() => setSource(fixtureSource(fixture, size)), 0);
     return () => clearTimeout(id);
   }, [fixture, size]);
+
+  const { graph, heat, loadedGroups, lod, pending, ensureGroup } = useMapGraph(
+    source?.graph ?? NO_GRAPH,
+    source?.heat ?? NO_HEAT,
+    source?.adapter,
+  );
+
+  const ready = source !== null;
+  const status = useMemo(() => mapStatus(graph), [graph]);
 
   const view = useMemo(
     () => ({ focusedPath, query, expandedGroups }),
     [focusedPath, query, expandedGroups],
   );
 
-  const scene = useMemo(
-    () => (source ? buildScene(source.graph, view, 1, source.heat) : null),
-    [source, view],
-  );
+  const scene = useMemo(() => buildScene(graph, view, 1, heat), [graph, view, heat]);
 
+  // Built from the payload the fixture handed over, so expanding never moves the camera.
   const opening = useMemo(() => {
     if (!source) return null;
     const shut = { focusedPath: null, query: "", expandedGroups: new Set<string>() };
-    return initialBounds(buildScene(source.graph, shut), source.graph, source.changedPaths);
+    const first = normaliseGraph(source.graph);
+    return initialBounds(buildScene(first, shut), first, source.changedPaths);
   }, [source]);
 
   useEffect(() => {
@@ -99,17 +89,22 @@ export function MapExplorer() {
       else handleRef.current?.fit();
     }, 0);
     return () => clearTimeout(id);
-  }, [opening, source]);
+  }, [opening, palette]);
 
   useEffect(() => {
-    if (!scene || focusedPath === null) return;
+    if (focusedPath === null) return;
     const node = scene.byId.get(focusedPath);
-    const handle = handleRef.current;
-    if (node && handle) handle.centreOn(node.x, node.y);
+    if (node) handleRef.current?.centreOn(node.x, node.y);
   }, [focusedPath, scene]);
 
   const toggleGroup = useCallback(
     (groupId: string) => {
+      if (!loadedGroups.has(groupId)) {
+        void ensureGroup(groupId).then((ok) => {
+          if (ok) setExpandedGroups((previous) => new Set(previous).add(groupId));
+        });
+        return;
+      }
       setExpandedGroups((previous) => {
         const next = new Set(previous);
         if (next.has(groupId)) next.delete(groupId);
@@ -119,11 +114,26 @@ export function MapExplorer() {
       // A focused file keeps its group open, so collapsing it has to let the focus go.
       setFocusedPath((previous) => {
         if (previous === null || !expandedGroups.has(groupId)) return previous;
-        const file = source?.graph.byPath.get(previous);
+        const file = graph.byPath.get(previous);
         return file && groupIdFor(file) === groupId ? null : previous;
       });
     },
-    [expandedGroups, source],
+    [ensureGroup, expandedGroups, graph, loadedGroups],
+  );
+
+  const focusFile = useCallback(
+    (path: string, groupId?: string) => {
+      if (groupId === undefined || loadedGroups.has(groupId)) {
+        setFocusedPath(path);
+        return;
+      }
+      void ensureGroup(groupId).then((ok) => {
+        if (!ok) return;
+        setExpandedGroups((previous) => new Set(previous).add(groupId));
+        setFocusedPath(path);
+      });
+    },
+    [ensureGroup, loadedGroups],
   );
 
   const onNodeSelect = useCallback(
@@ -135,14 +145,12 @@ export function MapExplorer() {
   );
 
   const startingPath = useMemo(() => {
-    if (!source) return null;
-    const changed = source.graph.files.find((file) => file.changed === true);
-    return (changed ?? source.graph.files[0])?.path ?? null;
-  }, [source]);
+    const changed = graph.files.find((file) => file.changed === true);
+    return (changed ?? graph.files[0])?.path ?? null;
+  }, [graph]);
 
   const onMapKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!source) return;
       const axis: NavigationAxis | null =
         event.key === "ArrowRight"
           ? "dependencies"
@@ -159,14 +167,14 @@ export function MapExplorer() {
           return;
         }
         const step = event.shiftKey || event.key === "ArrowUp" ? "previous" : "next";
-        const next = navigate(source.graph, focusedPath, axis, step);
+        const next = navigate(graph, focusedPath, axis, step);
         if (next) setFocusedPath(next);
         return;
       }
 
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        const file = focusedPath === null ? undefined : source.graph.byPath.get(focusedPath);
+        const file = focusedPath === null ? undefined : graph.byPath.get(focusedPath);
         if (file) toggleGroup(groupIdFor(file));
         return;
       }
@@ -176,7 +184,7 @@ export function MapExplorer() {
         setFocusedPath(null);
       }
     },
-    [focusedPath, source, startingPath, toggleGroup],
+    [focusedPath, graph, startingPath, toggleGroup],
   );
 
   useEffect(() => {
@@ -200,20 +208,20 @@ export function MapExplorer() {
   }, []);
 
   const focusedGroupId = useMemo(() => {
-    const file = focusedPath === null ? undefined : source?.graph.byPath.get(focusedPath);
+    const file = focusedPath === null ? undefined : graph.byPath.get(focusedPath);
     return file ? groupIdFor(file) : null;
-  }, [focusedPath, source]);
+  }, [focusedPath, graph]);
 
   const focusedGroupCollapsed = useMemo(() => {
-    if (!scene || focusedGroupId === null) return true;
+    if (focusedGroupId === null) return true;
     return scene.clustering.groups.find((group) => group.id === focusedGroupId)?.collapsed ?? true;
   }, [focusedGroupId, scene]);
 
   const announcement = useMemo(() => {
-    if (!source || focusedPath === null) return "No file focused.";
-    const hood = neighbourhood(source.graph, focusedPath, 1);
+    if (focusedPath === null) return "No file focused.";
+    const hood = neighbourhood(graph, focusedPath, 1);
     return `${focusedPath}. ${hood.dependencies.size} dependencies, ${hood.dependents.size} dependents.`;
-  }, [focusedPath, source]);
+  }, [focusedPath, graph]);
 
   return (
     <div className="space-y-4">
@@ -258,22 +266,30 @@ export function MapExplorer() {
         <Button
           size="sm"
           variant="secondary"
-          onClick={() =>
-            setExpandedGroups(new Set((source?.graph.files ?? []).map(groupIdFor)))
-          }
+          onClick={() => setExpandedGroups(new Set(loadedGroups))}
         >
-          Expand all
+          Expand loaded
         </Button>
         <Button size="sm" variant="secondary" onClick={() => setExpandedGroups(new Set())}>
           Reset groups
         </Button>
+        {lod ? (
+          <span className="text-muted-foreground text-xs" data-testid="lod-mode">
+            level of detail
+          </span>
+        ) : null}
+        {pending.size > 0 ? (
+          <span className="text-muted-foreground text-xs" role="status">
+            Loading {pending.size} group{pending.size === 1 ? "" : "s"}
+          </span>
+        ) : null}
       </div>
 
-      {source ? <MapStatusBanner status={source.status} /> : null}
+      {ready ? <MapStatusBanner status={status} /> : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div ref={setHost} className="relative">
-          {!source || !scene || !palette ? (
+          {!ready || !palette ? (
             <div className={`${SURFACE} space-y-3 rounded-lg border border-border bg-surface-1 p-4`}>
               <Skeleton className="h-5 w-40" />
               <Skeleton className="h-[calc(100%-2.5rem)] w-full" />
@@ -281,7 +297,7 @@ export function MapExplorer() {
                 Building the map
               </span>
             </div>
-          ) : source.status.kind === "empty" ? (
+          ) : status.kind === "empty" ? (
             <div
               className={`${SURFACE} flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-1 p-8 text-center`}
             >
@@ -330,25 +346,27 @@ export function MapExplorer() {
         </div>
 
         <aside className="max-h-[68vh] space-y-6 overflow-y-auto pr-1">
-          {source ? (
+          {ready ? (
             <>
               <MapSearch
-                files={source.graph.files}
+                files={graph.files}
                 query={query}
                 onQueryChange={setQuery}
-                onSelect={setFocusedPath}
+                onSelect={focusFile}
                 inputRef={searchRef}
+                searcher={lod ? source?.adapter?.search : undefined}
+                fileCount={graph.totalFileCount}
               />
               <FileDetails
-                graph={source.graph}
+                graph={graph}
                 focusedPath={focusedPath}
                 groupId={focusedGroupId}
                 groupCollapsed={focusedGroupCollapsed}
                 onSelect={setFocusedPath}
                 onToggleGroup={() => focusedGroupId && toggleGroup(focusedGroupId)}
-                heat={source.heat}
+                heat={heat}
               />
-              {scene ? <GroupList clustering={scene.clustering} onToggle={toggleGroup} /> : null}
+              <GroupList clustering={scene.clustering} onToggle={toggleGroup} />
             </>
           ) : (
             <div className="space-y-3">

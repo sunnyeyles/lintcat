@@ -1,5 +1,7 @@
-import { findingHeat, sampleRepo } from "@/lib/codebase-map";
+import { findingHeat, mapPayload, sampleRepo } from "@/lib/codebase-map";
 import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
+
+import { localMapAdapter, type MapAdapter } from "@/components/codebase-map/adapter";
 
 export type FixtureKind = "ready" | "partial" | "no-changes" | "empty";
 
@@ -10,7 +12,10 @@ export const FIXTURE_LABELS: Record<FixtureKind, string> = {
   empty: "Empty",
 };
 
-export const FIXTURE_SIZES = [1000, 5000, 10000] as const;
+export const FIXTURE_SIZES = [1000, 5000, 10000, 50000] as const;
+
+/** Above the stock 5000, so the smaller sizes still draw the whole repo here. */
+export const DEV_LOD_THRESHOLD = 10_000;
 
 const SEED = 7;
 
@@ -51,4 +56,29 @@ export function fixtureHeat(graph: MapGraph): FindingHeat {
       : [],
   );
   return findingHeat(findings);
+}
+
+export interface FixtureSource {
+  graph: MapGraph;
+  heat: FindingHeat;
+  changedPaths: readonly string[];
+  /** Set above the threshold: the same slices the route serves, computed here. */
+  adapter: MapAdapter | undefined;
+}
+
+export function fixtureSource(kind: FixtureKind, files: number): FixtureSource {
+  const graph = fixtureGraph(kind, files);
+  const source = {
+    graph,
+    heat: fixtureHeat(graph),
+    changedPaths: graph.files.filter((f) => f.changed === true).map((f) => f.path),
+  };
+  const payload = mapPayload(source, { threshold: DEV_LOD_THRESHOLD });
+
+  return {
+    graph: payload.graph,
+    heat: payload.heat,
+    changedPaths: payload.changedPaths,
+    adapter: payload.mode === "lod" ? localMapAdapter(source) : undefined,
+  };
 }

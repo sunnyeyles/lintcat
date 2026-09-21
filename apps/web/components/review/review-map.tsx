@@ -3,6 +3,7 @@
 import { Button } from "@pr-review/design";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { httpMapAdapter, type MapAdapter } from "@/components/codebase-map/adapter";
 import { FileDetails } from "@/components/codebase-map/file-details";
 import { GroupList } from "@/components/codebase-map/group-list";
 import { MapCanvas } from "@/components/codebase-map/map-canvas";
@@ -11,8 +12,15 @@ import { MapSearch } from "@/components/codebase-map/map-search";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
 import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
 import { buildScene, type SceneNode } from "@/components/codebase-map/scene";
+import { useMapGraph } from "@/components/codebase-map/use-map-graph";
 import { initialBounds, type MapHandle } from "@/components/codebase-map/view";
-import { groupIdFor, mapStatus, navigate, neighbourhood, normaliseGraph } from "@/lib/codebase-map";
+import {
+  groupIdFor,
+  mapStatus,
+  navigate,
+  neighbourhood,
+  normaliseGraph,
+} from "@/lib/codebase-map";
 import type { FindingHeat, MapGraph, NavigationAxis } from "@/lib/codebase-map";
 
 import { useFindingsFocus } from "./findings-focus";
@@ -29,9 +37,11 @@ export interface ReviewMapProps {
   graph: MapGraph;
   heat: FindingHeat;
   changedPaths: readonly string[];
+  /** Where the map fetches the groups it was not sent. Absent below the threshold. */
+  endpoint?: string;
 }
 
-export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) {
+export function ReviewMap({ graph: input, heat: inputHeat, changedPaths, endpoint }: ReviewMapProps) {
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
@@ -44,7 +54,16 @@ export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) 
   const reducedMotion = usePrefersReducedMotion();
   const { showFile } = useFindingsFocus();
 
-  const graph = useMemo(() => normaliseGraph(input), [input]);
+  const adapter: MapAdapter | undefined = useMemo(
+    () => (endpoint ? httpMapAdapter(endpoint) : undefined),
+    [endpoint],
+  );
+  const { graph, heat, loadedGroups, lod, pending, ensureGroup } = useMapGraph(
+    input,
+    inputHeat,
+    adapter,
+  );
+
   const status = useMemo(() => mapStatus(graph), [graph]);
   const view = useMemo(
     () => ({ focusedPath, query, expandedGroups }),
@@ -52,11 +71,12 @@ export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) 
   );
   const scene = useMemo(() => buildScene(graph, view, 1, heat), [graph, view, heat]);
 
-  // Built from the opening view, so expanding a group later never moves the camera.
+  // Built from the payload the page shipped, so expanding never moves the camera.
   const opening = useMemo(() => {
     const shut = { focusedPath: null, query: "", expandedGroups: new Set<string>() };
-    return initialBounds(buildScene(graph, shut), graph, changedPaths);
-  }, [graph, changedPaths]);
+    const first = normaliseGraph(input);
+    return initialBounds(buildScene(first, shut), first, changedPaths);
+  }, [input, changedPaths]);
 
   useEffect(() => {
     const id = setTimeout(() => handleRef.current?.fitBounds?.(opening), 0);
@@ -71,6 +91,12 @@ export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) 
 
   const toggleGroup = useCallback(
     (groupId: string) => {
+      if (!loadedGroups.has(groupId)) {
+        void ensureGroup(groupId).then((ok) => {
+          if (ok) setExpandedGroups((previous) => new Set(previous).add(groupId));
+        });
+        return;
+      }
       setExpandedGroups((previous) => {
         const next = new Set(previous);
         if (next.has(groupId)) next.delete(groupId);
@@ -83,7 +109,22 @@ export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) 
         return file && groupIdFor(file) === groupId ? null : previous;
       });
     },
-    [expandedGroups, graph],
+    [ensureGroup, expandedGroups, graph, loadedGroups],
+  );
+
+  const focusFile = useCallback(
+    (path: string, groupId?: string) => {
+      if (groupId === undefined || loadedGroups.has(groupId)) {
+        setFocusedPath(path);
+        return;
+      }
+      void ensureGroup(groupId).then((ok) => {
+        if (!ok) return;
+        setExpandedGroups((previous) => new Set(previous).add(groupId));
+        setFocusedPath(path);
+      });
+    },
+    [ensureGroup, loadedGroups],
   );
 
   const onNodeSelect = useCallback(
@@ -186,7 +227,7 @@ export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) 
             )}
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button size="sm" variant="secondary" onClick={() => handleRef.current?.fit()}>
               Show the whole repo
             </Button>
@@ -197,6 +238,11 @@ export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) 
             >
               Back to the change
             </Button>
+            {pending.size > 0 ? (
+              <span className="text-muted-foreground text-xs" role="status">
+                Loading {pending.size} group{pending.size === 1 ? "" : "s"}
+              </span>
+            ) : null}
           </div>
 
           {hover ? (
@@ -224,8 +270,10 @@ export function ReviewMap({ graph: input, heat, changedPaths }: ReviewMapProps) 
             files={graph.files}
             query={query}
             onQueryChange={setQuery}
-            onSelect={setFocusedPath}
+            onSelect={focusFile}
             inputRef={searchRef}
+            searcher={lod && adapter ? adapter.search : undefined}
+            fileCount={graph.totalFileCount}
           />
           <FileDetails
             graph={graph}
