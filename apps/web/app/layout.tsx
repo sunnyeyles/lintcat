@@ -4,7 +4,6 @@ import { JetBrains_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 
 import { ThemeProvider } from "@/components/shell/theme-provider";
-import { Topbar } from "@/components/shell/topbar";
 
 import "./globals.css";
 
@@ -25,12 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" suppressHydrationWarning className={jetbrainsMono.variable}>
       <body>
         <ThemeProvider>
-          <TooltipProvider>
-            <div className="min-h-dvh">
-              <Topbar />
-              {children}
-            </div>
-          </TooltipProvider>
+          <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

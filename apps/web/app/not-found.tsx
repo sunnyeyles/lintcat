@@ -10,12 +10,15 @@ import {
 import { SearchX } from "lucide-react";
 import Link from "next/link";
 
+import { DocsTopbar } from "@/components/shell/docs-topbar";
 import { MainColumn } from "@/components/shell/main-column";
 import { DASHBOARD_PATH } from "@/lib/paths";
 
 export default function NotFound() {
   return (
-    <MainColumn>
+    <div className="min-h-dvh">
+      <DocsTopbar />
+      <MainColumn>
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
@@ -32,6 +35,7 @@ export default function NotFound() {
           </Button>
         </EmptyContent>
       </Empty>
-    </MainColumn>
+      </MainColumn>
+    </div>
   );
 }
