@@ -10,7 +10,7 @@ import {
 } from "@pr-review/design";
 import type { Metadata } from "next";
 
-import { Code, DocsArticle, Note, P, Section } from "@/components/docs";
+import { DocsArticle, Note, P, Section } from "@/components/docs";
 import type { Heading } from "@/lib/docs";
 
 export const metadata: Metadata = {
@@ -39,19 +39,15 @@ export default function McpServerPage() {
       href="/docs/mcp-server"
       eyebrow="Reference"
       title="MCP server"
-      description="apps/mcp runs the reviewer inside a coding agent such as Claude Code, over local stdio, so a change is reviewed before it is pushed."
+      description="Runs the reviewer inside a coding agent such as Claude Code, over local stdio, so a change is reviewed before it is pushed."
       headings={HEADINGS}
     >
       <Section id="running" title="Running it">
         <P>
-          This repository&rsquo;s <code>.mcp.json</code> registers the server as{" "}
-          <code>pr-review</code>, so opening the repo in Claude Code offers it. Any other
-          client runs the start script, which rebuilds the bundle before it starts.
-        </P>
-        <Code>{`node apps/mcp/start.mjs`}</Code>
-        <P>
-          It needs an <code>ANTHROPIC_API_KEY</code> or <code>OPENAI_API_KEY</code>; GitHub
-          access uses <code>GITHUB_TOKEN</code> or the <code>gh</code> login.
+          Register it in any MCP client as a local stdio server named{" "}
+          <code>pr-review</code>. It needs an <code>ANTHROPIC_API_KEY</code> or{" "}
+          <code>OPENAI_API_KEY</code>; GitHub access uses <code>GITHUB_TOKEN</code> or the{" "}
+          <code>gh</code> login.
         </P>
       </Section>
 

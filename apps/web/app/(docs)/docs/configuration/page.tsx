@@ -41,6 +41,8 @@ const INPUTS = [
   ["langfuse-secret-key", "(unset)", "The other half. Setting only one disables both features."],
   ["langfuse-base-url", "cloud.langfuse.com", "Langfuse host, for a self-hosted or regional instance. Keys are region-scoped."],
   ["langfuse-prompt-label", "production", "Which labelled version of each prompt to fetch."],
+  ["dashboard-token", "(unset)", "The organization's ingest secret. With dashboard-url, records every review on the dashboard."],
+  ["dashboard-url", "(unset)", "Base URL of the dashboard. Setting only one of the two records nothing."],
 ] as const;
 
 const PERMISSIONS = [
@@ -89,9 +91,9 @@ export default function ConfigurationPage() {
 
       <Section id="providers" title="Model providers">
         <P>
-          Models are reached through the AI SDK. Which providers are allowed, each one&rsquo;s
-          default model, and which environment variable carries its key live in{" "}
-          <code>packages/ai/src/model.ts</code>, selected by <code>model-provider</code>.
+          <code>model-provider</code> selects <code>openai</code> or <code>anthropic</code>.
+          Each has a default model, used when <code>model</code> is empty, and reads its key
+          from its own environment variable when <code>api-key</code> is empty.
         </P>
         <Code caption="Switching provider">{`with:
   model-provider: anthropic
