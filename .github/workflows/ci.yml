@@ -1,8 +1,24 @@
 name: CI
 
 on:
+  # Branches only: a release tag runs this through release-action.yml instead.
   push:
+    branches: ["**"]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      upload-action-bundle:
+        description: Upload the smoke-tested action bundle as the `action-dist` artifact.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A newer push supersedes a branch's run; main keeps every run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
@@ -12,17 +28,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup workspace
+        uses: ./.github/actions/setup
 
       - name: Typecheck
         run: pnpm typecheck
@@ -30,10 +37,22 @@ jobs:
       - name: Test
         run: pnpm test
 
-      # Nothing else exercises the bundle; a bundling regression fails here, not at release.
-      - name: Build action bundle
-        run: pnpm --filter @pr-review/action build
+      # tsc and vitest never read the bundles; a bundling regression fails here, not at release.
+      - name: Build bundles
+        run: pnpm --filter @pr-review/action --filter @pr-review/cli --filter @pr-review/mcp build
 
-      # The bundle must import under the declared Node major and stay inert without GITHUB_ACTIONS.
+      # Must import under the declared Node major and stay inert without GITHUB_ACTIONS.
       - name: Smoke-test action bundle
         run: node scripts/smoke-bundle.mjs
+
+      - name: Smoke-test cli and mcp bundles
+        run: node scripts/smoke-cli-mcp.mjs
+
+      - name: Upload action bundle
+        if: inputs.upload-action-bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: action-dist
+          path: apps/action/dist/index.mjs
+          if-no-files-found: error
+          retention-days: 1
