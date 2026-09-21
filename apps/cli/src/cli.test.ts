@@ -174,13 +174,6 @@ describe("reviewing a working tree", () => {
     expect(code).toBe(2);
   });
 
-  it("refuses the removed --agents flag by name", async () => {
-    const { code, err } = await run(["--agents", "security"]);
-
-    expect(err).toContain("--agents was removed in v3");
-    expect(code).toBe(2);
-  });
-
   it("reviews only the staged changes when asked", async () => {
     repo.git("add", "src/sessions.ts");
     repo.write("src/api.ts", "export const unstaged = 1;\n");

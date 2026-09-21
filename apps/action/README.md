@@ -71,10 +71,6 @@ Workflows pinned to `@v2` keep working; `v2` is not moved.
 | `agents` | Delete it. One general agent reviews the whole pull request. |
 | `agent-config` | Delete it, and `.github/pr-review-agents.yml` with it; nothing reads that file now. |
 
-Leftover v2 inputs fail the step rather than being ignored: a non-empty
-`agents` or `agent-config` stops the run with a "removed in v3" error before
-any model call.
-
 New inputs, all optional and off or unchanged by default: `fix`,
 `incremental`, `index` (on by default), `memory-branch`, `langfuse-record-io`,
 `dashboard-token` and `dashboard-url`. See [Inputs](#inputs).

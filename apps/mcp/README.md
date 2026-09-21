@@ -34,9 +34,7 @@ Things an agent can attach to its context instead of calling a tool for.
 | `pr-review://review/{org}/{id}` | One stored review with every finding and agent run, as `get_review` returns it. `list_reviews` links each review here. |
 | `pr-review://file/{path}` | One repository-relative file of that checkout, read from the working tree. A path that escapes the checkout is refused. |
 
-There is no agent configuration. A review call that passes the removed
-`agents` argument fails with a "removed in v3" error before any model call.
-A local review assembles the same
+There is no agent configuration. A local review assembles the same
 `runReview` spec the Action does, with a git-backed client in place of GitHub's
 and the recording delivery adapter in place of the publishing one, so a dry run
 has nothing to write through — and the git-backed client declares no publish

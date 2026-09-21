@@ -12,7 +12,6 @@ export {
   type LocalScope,
   type ResolvedScope,
 } from "#src/local-git-client";
-export { REMOVED_AGENTS_FLAG } from "#src/legacy-agent-config";
 export { openLocalMemoryStore, type LocalMemoryStore } from "#src/local-memory-store";
 export { runReview, type ReviewRequest, type ReviewResult } from "#src/review";
 export { modelReviewEngine, type SelectedEngine } from "#src/review-engine";

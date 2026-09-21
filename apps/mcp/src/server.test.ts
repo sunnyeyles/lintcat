@@ -297,21 +297,6 @@ describe("review_local_changes", () => {
     expect(createLanguageModel).toHaveBeenCalledWith(expect.objectContaining({ provider: "anthropic" }));
   });
 
-  it.each(["review_local_changes", "review_pull_request"])(
-    "%s refuses the removed agents argument rather than dropping it",
-    async (tool) => {
-      const createLanguageModel = vi.fn(() => scriptedModel([]));
-      const client = await connect(environment({ createLanguageModel }));
-
-      const args = tool === "review_pull_request" ? { owner: "o", repo: "r", number: 1 } : { base: "main" };
-      const { isError, texts } = await call(client, tool, { ...args, agents: "security" });
-
-      expect(isError).toBe(true);
-      expect(texts[0]).toContain("The `agents` argument was removed in v3");
-      expect(createLanguageModel).not.toHaveBeenCalled();
-    },
-  );
-
   it("names the missing key rather than failing mid-review", async () => {
     const client = await connect(environment({ env: {} }));
 

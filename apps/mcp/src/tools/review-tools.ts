@@ -6,7 +6,6 @@ import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
 import { GitError } from "#src/git";
-import { REMOVED_AGENTS_ARGUMENT } from "#src/legacy-agent-config";
 import { openLocalRepository, type LocalRepository, type LocalScope } from "#src/local-git-client";
 import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
@@ -51,17 +50,6 @@ interface ScopeArgs {
   base?: string | undefined;
   scope?: "working-tree" | "staged" | "range" | undefined;
   range?: string | undefined;
-}
-
-/** Kept loose so a v2 `agents` argument is refused by name rather than silently stripped. */
-function withoutAgents<Shape extends z.ZodRawShape>(shape: Shape) {
-  return z
-    .object(shape)
-    .loose()
-    .refine((args) => !("agents" in args), {
-      message: REMOVED_AGENTS_ARGUMENT,
-      path: ["agents"],
-    });
 }
 
 function chooseScope({ scope, range }: ScopeArgs): LocalScope {
@@ -130,13 +118,13 @@ export function registerReviewTools(
         "excluded and counted. Calls the configured model provider and takes " +
         "a minute or more; nothing is written anywhere. With no provider key set, it asks you to run the " +
         "model instead (MCP sampling), which gives a reduced single-shot review the result declares.",
-      inputSchema: withoutAgents({
+      inputSchema: {
         ...scopeSchema,
         index: z
           .boolean()
           .optional()
           .describe("Build the repository import index for the reviewer; on by default."),
-      }),
+      },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ index, ...args }, extra) => {
@@ -177,7 +165,7 @@ export function registerReviewTools(
         "run that returns the validated findings and writes nothing. With publish: true it posts the " +
         "\"AI PR Review\" check run and inline review comments to the pull request, exactly as the GitHub " +
         "Action does (fix commits are never made). Needs GITHUB_TOKEN or a logged-in gh CLI.",
-      inputSchema: withoutAgents({
+      inputSchema: {
         owner: z.string().min(1).describe("Repository owner, e.g. \"sunnyeyles\"."),
         repo: z.string().min(1).describe("Repository name, e.g. \"pr-review-agents\"."),
         number: z.number().int().positive().describe("Pull request number."),
@@ -185,7 +173,7 @@ export function registerReviewTools(
           .boolean()
           .optional()
           .describe("Post the check run and review comments to GitHub. Defaults to false."),
-      }),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     async ({ owner, repo, number, publish = false }, extra) => {
