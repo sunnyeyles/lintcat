@@ -1,5 +1,5 @@
-import { sampleRepo } from "@/lib/codebase-map";
-import type { MapGraph } from "@/lib/codebase-map";
+import { findingHeat, sampleRepo } from "@/lib/codebase-map";
+import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
 
 export type FixtureKind = "ready" | "partial" | "no-changes" | "empty";
 
@@ -36,4 +36,19 @@ export function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
       return rest;
     }),
   };
+}
+
+const SEVERITY_CYCLE = ["high", "medium", "low", "medium"] as const;
+
+/** Findings on every seventh file, so the heat layer has something to draw. */
+export function fixtureHeat(graph: MapGraph): FindingHeat {
+  const findings = graph.files.flatMap((file, i) =>
+    i % 7 === 0
+      ? Array.from({ length: (i % 9) + 1 }, (_, n) => ({
+          file: file.path,
+          severity: SEVERITY_CYCLE[(i + n) % SEVERITY_CYCLE.length]!,
+        }))
+      : [],
+  );
+  return findingHeat(findings);
 }

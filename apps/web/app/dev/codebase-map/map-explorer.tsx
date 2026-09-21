@@ -8,6 +8,7 @@ import {
   FIXTURE_LABELS,
   FIXTURE_SIZES,
   fixtureGraph,
+  fixtureHeat,
   type FixtureKind,
 } from "@/components/codebase-map/fixtures";
 import { GroupList } from "@/components/codebase-map/group-list";
@@ -17,7 +18,7 @@ import { MapSearch } from "@/components/codebase-map/map-search";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
 import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
 import { buildScene, type SceneNode } from "@/components/codebase-map/scene";
-import type { MapHandle } from "@/components/codebase-map/view";
+import { initialBounds, type MapHandle } from "@/components/codebase-map/view";
 import {
   groupIdFor,
   mapStatus,
@@ -25,7 +26,7 @@ import {
   neighbourhood,
   normaliseGraph,
 } from "@/lib/codebase-map";
-import type { MapStatus, NavigationAxis, NormalisedGraph } from "@/lib/codebase-map";
+import type { FindingHeat, MapStatus, NavigationAxis, NormalisedGraph } from "@/lib/codebase-map";
 
 const FIXTURES: FixtureKind[] = ["ready", "partial", "no-changes", "empty"];
 const SURFACE = "h-[68vh] min-h-[420px] w-full";
@@ -33,6 +34,8 @@ const SURFACE = "h-[68vh] min-h-[420px] w-full";
 interface Source {
   graph: NormalisedGraph;
   status: MapStatus;
+  heat: FindingHeat;
+  changedPaths: string[];
 }
 
 interface Hover {
@@ -62,8 +65,14 @@ export function MapExplorer() {
     setQuery("");
     setExpandedGroups(new Set());
     const id = setTimeout(() => {
-      const graph = normaliseGraph(fixtureGraph(fixture, size));
-      setSource({ graph, status: mapStatus(graph) });
+      const input = fixtureGraph(fixture, size);
+      const graph = normaliseGraph(input);
+      setSource({
+        graph,
+        status: mapStatus(graph),
+        heat: fixtureHeat(input),
+        changedPaths: graph.files.filter((f) => f.changed === true).map((f) => f.path),
+      });
     }, 0);
     return () => clearTimeout(id);
   }, [fixture, size]);
@@ -74,14 +83,23 @@ export function MapExplorer() {
   );
 
   const scene = useMemo(
-    () => (source ? buildScene(source.graph, view) : null),
+    () => (source ? buildScene(source.graph, view, 1, source.heat) : null),
     [source, view],
   );
 
-  useEffect(() => {
-    const id = setTimeout(() => handleRef.current?.fit(), 0);
-    return () => clearTimeout(id);
+  const opening = useMemo(() => {
+    if (!source) return null;
+    const shut = { focusedPath: null, query: "", expandedGroups: new Set<string>() };
+    return initialBounds(buildScene(source.graph, shut), source.graph, source.changedPaths);
   }, [source]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (opening) handleRef.current?.fitBounds?.(opening);
+      else handleRef.current?.fit();
+    }, 0);
+    return () => clearTimeout(id);
+  }, [opening, source]);
 
   useEffect(() => {
     if (!scene || focusedPath === null) return;
@@ -232,6 +250,14 @@ export function MapExplorer() {
         <Button
           size="sm"
           variant="secondary"
+          disabled={opening === null}
+          onClick={() => opening && handleRef.current?.fitBounds?.(opening)}
+        >
+          Open on the change
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
           onClick={() =>
             setExpandedGroups(new Set((source?.graph.files ?? []).map(groupIdFor)))
           }
@@ -320,6 +346,7 @@ export function MapExplorer() {
                 groupCollapsed={focusedGroupCollapsed}
                 onSelect={setFocusedPath}
                 onToggleGroup={() => focusedGroupId && toggleGroup(focusedGroupId)}
+                heat={source.heat}
               />
               {scene ? <GroupList clustering={scene.clustering} onToggle={toggleGroup} /> : null}
             </>
@@ -329,7 +356,7 @@ export function MapExplorer() {
               <Skeleton className="h-24 w-full" />
             </div>
           )}
-          <MapLegend />
+          <MapLegend heat />
         </aside>
       </div>
     </div>
