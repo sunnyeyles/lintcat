@@ -76,23 +76,35 @@ function median(xs: number[]): number {
 }
 
 function agentBreakdown(reviews: ReviewDetail[]): AgentBreakdown[] {
-  return AGENTS.map((agent) => {
-    const runs = reviews.flatMap((v) => v.runs.filter((run) => run.agent === agent));
-    const tokens = zeroTokens();
-    let findingCount = 0;
-    for (const run of runs) {
-      addTokens(tokens, run);
-      findingCount += run.findingCount;
+  const byAgent = new Map<
+    AgentName,
+    { findingCount: number; durations: number[]; tokens: TokenCounts }
+  >();
+  for (const v of reviews) {
+    for (const run of v.runs) {
+      let entry = byAgent.get(run.agent);
+      if (!entry) {
+        entry = { findingCount: 0, durations: [], tokens: zeroTokens() };
+        byAgent.set(run.agent, entry);
+      }
+      entry.findingCount += run.findingCount;
+      entry.durations.push(run.durationMs);
+      addTokens(entry.tokens, run);
     }
+  }
+
+  return AGENTS.flatMap((agent) => {
+    const entry = byAgent.get(agent);
+    if (!entry) return [];
     return {
       agent,
-      findingCount,
-      reviewCount: runs.length,
-      medianDurationMs: median(runs.map((run) => run.durationMs)),
-      costUsd: costOf(tokens),
-      ...tokens,
+      findingCount: entry.findingCount,
+      reviewCount: entry.durations.length,
+      medianDurationMs: median(entry.durations),
+      costUsd: costOf(entry.tokens),
+      ...entry.tokens,
     };
-  }).filter((a) => a.reviewCount > 0);
+  });
 }
 
 function dayBuckets(range: Range): string[] {
@@ -102,30 +114,11 @@ function dayBuckets(range: Range): string[] {
   );
 }
 
-/** Reviews must already be scoped to the range and repo. */
-export function computeTrends(scoped: ReviewDetail[], range: Range): Trends {
-  const byDay = new Map(
-    dayBuckets(range).map((date) => [
-      date,
-      { date, reviews: 0, low: 0, medium: 0, high: 0 },
-    ]),
-  );
-  for (const v of scoped) {
-    const bucket = byDay.get(dayKey(v.createdAt));
-    if (!bucket) continue;
-    bucket.reviews += 1;
-    bucket.low += v.bySeverity.low;
-    bucket.medium += v.bySeverity.medium;
-    bucket.high += v.bySeverity.high;
-  }
-
+/** The JS rollup the SQL one in `source.ts` must agree with; needs loaded findings. */
+export function categoryCounts(scoped: ReviewDetail[]): CategoryCount[] {
   const categories = new Map<string, CategoryCount>();
-  const bySeverity = emptySeverity();
-  let findings = 0;
   for (const v of scoped) {
     for (const f of v.findings) {
-      findings += 1;
-      bySeverity[f.severity as Severity] += 1;
       const entry = categories.get(f.category) ?? {
         category: f.category,
         count: 0,
@@ -136,16 +129,45 @@ export function computeTrends(scoped: ReviewDetail[], range: Range): Trends {
       categories.set(f.category, entry);
     }
   }
+  return [...categories.values()].sort((a, b) => b.count - a.count);
+}
+
+/** Reviews must already be scoped to the range and repo; findings need not be loaded. */
+export function computeTrends(
+  scoped: ReviewDetail[],
+  range: Range,
+  byCategory: CategoryCount[],
+): Trends {
+  const byDay = new Map(
+    dayBuckets(range).map((date) => [
+      date,
+      { date, reviews: 0, low: 0, medium: 0, high: 0 },
+    ]),
+  );
+  const bySeverity = emptySeverity();
+  const durations: number[] = [];
+  for (const v of scoped) {
+    durations.push(v.durationMs);
+    bySeverity.low += v.bySeverity.low;
+    bySeverity.medium += v.bySeverity.medium;
+    bySeverity.high += v.bySeverity.high;
+    const bucket = byDay.get(dayKey(v.createdAt));
+    if (!bucket) continue;
+    bucket.reviews += 1;
+    bucket.low += v.bySeverity.low;
+    bucket.medium += v.bySeverity.medium;
+    bucket.high += v.bySeverity.high;
+  }
 
   return {
     points: [...byDay.values()],
     byAgent: agentBreakdown(scoped),
-    byCategory: [...categories.values()].sort((a, b) => b.count - a.count),
+    byCategory,
     totals: {
       reviews: scoped.length,
-      findings,
+      findings: bySeverity.low + bySeverity.medium + bySeverity.high,
       bySeverity,
-      medianDurationMs: median(scoped.map((v) => v.durationMs)),
+      medianDurationMs: median(durations),
     },
   };
 }
@@ -160,8 +182,16 @@ export function computeUsage(
     dayBuckets(range).map((date) => [date, { date, costUsd: 0, ...zeroTokens() }]),
   );
   const totals = zeroTokens();
+  const byRepo = new Map<number, { reviewCount: number; tokens: TokenCounts }>();
   for (const v of scoped) {
     addTokens(totals, v);
+    let entry = byRepo.get(v.repoId);
+    if (!entry) {
+      entry = { reviewCount: 0, tokens: zeroTokens() };
+      byRepo.set(v.repoId, entry);
+    }
+    entry.reviewCount += 1;
+    addTokens(entry.tokens, v);
     const bucket = byDay.get(dayKey(v.createdAt));
     if (!bucket) continue;
     addTokens(bucket, v);
@@ -170,10 +200,11 @@ export function computeUsage(
 
   const perRepo = repos
     .map((repo) => {
-      const mine = scoped.filter((v) => v.repoId === repo.id);
-      const tokens = zeroTokens();
-      for (const v of mine) addTokens(tokens, v);
-      return { repo, reviewCount: mine.length, costUsd: costOf(tokens), ...tokens };
+      const { reviewCount, tokens } = byRepo.get(repo.id) ?? {
+        reviewCount: 0,
+        tokens: zeroTokens(),
+      };
+      return { repo, reviewCount, costUsd: costOf(tokens), ...tokens };
     })
     .sort((a, b) => b.costUsd - a.costUsd);
 

@@ -5,7 +5,7 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-} from "@pr-review/design";
+} from "@pr-review/design/chart";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatNumber } from "@/lib/format";

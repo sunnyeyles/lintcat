@@ -11,6 +11,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
+import { QueryBuilder } from "drizzle-orm/pg-core";
 
 import type { Database } from "../client";
 import {
@@ -38,6 +39,7 @@ import {
 } from "./aggregate";
 import type {
   AgentRun,
+  CategoryCount,
   DataSource,
   RepoSummary,
   ReviewDetail,
@@ -51,6 +53,15 @@ type ReviewFilter = {
   since?: Date;
   limit?: number;
 };
+
+type CategoryRow = {
+  category: string;
+  severity: Severity;
+  n: number;
+  firstSeen: number;
+};
+
+const subqueries = new QueryBuilder();
 
 const tokenSums = {
   inputTokens: sql<number>`coalesce(sum(${agentRuns.inputTokens}), 0)`.mapWith(Number),
@@ -92,6 +103,38 @@ function strip(review: ReviewDetail): ReviewSummary {
   return rest;
 }
 
+function groupBy<T>(rows: T[], keyOf: (row: T) => number): Map<number, T[]> {
+  const grouped = new Map<number, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const bucket = grouped.get(key);
+    if (bucket) bucket.push(row);
+    else grouped.set(key, [row]);
+  }
+  return grouped;
+}
+
+// `firstSeen` breaks ties exactly as the JS rollup's insertion order did.
+function toCategoryCounts(rows: CategoryRow[]): CategoryCount[] {
+  const seen = new Map<string, { entry: CategoryCount; firstSeen: number }>();
+  for (const row of rows) {
+    let hit = seen.get(row.category);
+    if (!hit) {
+      hit = {
+        entry: { category: row.category, count: 0, bySeverity: emptySeverity() },
+        firstSeen: row.firstSeen,
+      };
+      seen.set(row.category, hit);
+    }
+    hit.firstSeen = Math.min(hit.firstSeen, row.firstSeen);
+    hit.entry.count += row.n;
+    hit.entry.bySeverity[row.severity] += row.n;
+  }
+  return [...seen.values()]
+    .sort((a, b) => b.entry.count - a.entry.count || a.firstSeen - b.firstSeen)
+    .map((hit) => hit.entry);
+}
+
 /** Every read is scoped through the review's repo to the repos `authorize` let the viewer read. */
 export function createDbSource(
   database: Database,
@@ -105,7 +148,20 @@ export function createDbSource(
     inArray(repos.id, [...readableRepoIds]),
   )!;
 
-  async function organizationRepos(): Promise<Repo[]> {
+  // Per-instance, so one request's source shares reads and no state outlives it.
+  const reviewReads = new Map<string, Promise<ReviewDetail[]>>();
+  const categoryReads = new Map<string, Promise<CategoryCount[]>>();
+  let repoRead: Promise<Repo[]> | undefined;
+
+  function scopeOf(filter: ReviewFilter): SQL[] {
+    const conditions: SQL[] = [liveRepos];
+    if (filter.id !== undefined) conditions.push(eq(reviews.id, filter.id));
+    if (filter.repoId !== undefined) conditions.push(eq(reviews.repoId, filter.repoId));
+    if (filter.since !== undefined) conditions.push(gte(reviews.createdAt, filter.since));
+    return conditions;
+  }
+
+  async function fetchOrganizationRepos(): Promise<Repo[]> {
     return database
       .select()
       .from(repos)
@@ -113,21 +169,21 @@ export function createDbSource(
       .orderBy(asc(repos.owner), asc(repos.name));
   }
 
+  function organizationRepos(): Promise<Repo[]> {
+    repoRead ??= fetchOrganizationRepos();
+    return repoRead;
+  }
+
   // withFindings false loads severity counts only, for list pages.
-  async function loadReviews(
+  async function fetchReviews(
     filter: ReviewFilter,
     withFindings: boolean,
   ): Promise<ReviewDetail[]> {
-    const conditions: SQL[] = [liveRepos];
-    if (filter.id !== undefined) conditions.push(eq(reviews.id, filter.id));
-    if (filter.repoId !== undefined) conditions.push(eq(reviews.repoId, filter.repoId));
-    if (filter.since !== undefined) conditions.push(gte(reviews.createdAt, filter.since));
-
     const base = database
       .select({ review: reviews, repo: repos })
       .from(reviews)
       .innerJoin(repos, eq(repos.id, reviews.repoId))
-      .where(and(...conditions))
+      .where(and(...scopeOf(filter)))
       .orderBy(desc(reviews.createdAt), desc(reviews.id));
     const rows = await (filter.limit === undefined ? base : base.limit(filter.limit));
     if (rows.length === 0) return [];
@@ -157,19 +213,94 @@ export function createDbSource(
           .where(inArray(findings.reviewId, ids))
           .groupBy(findings.reviewId, findings.severity);
 
-    return rows.map(({ review, repo }) => {
-      const bySeverity = emptySeverity();
-      for (const row of severityRows) {
-        if (row.reviewId === review.id) bySeverity[row.severity] += row.n;
-      }
-      return toDetail(
+    const findingsFor = groupBy(findingRows, (f) => f.reviewId);
+    const runsFor = groupBy(runRows, (run) => run.reviewId);
+    const severityFor = new Map<number, Record<Severity, number>>();
+    for (const row of severityRows) {
+      let counts = severityFor.get(row.reviewId);
+      if (!counts) severityFor.set(row.reviewId, (counts = emptySeverity()));
+      counts[row.severity] += row.n;
+    }
+
+    return rows.map(({ review, repo }) =>
+      toDetail(
         review,
         repo,
-        findingRows.filter((f) => f.reviewId === review.id),
-        runRows.filter((run) => run.reviewId === review.id),
-        bySeverity,
-      );
-    });
+        findingsFor.get(review.id) ?? [],
+        runsFor.get(review.id) ?? [],
+        severityFor.get(review.id) ?? emptySeverity(),
+      ),
+    );
+  }
+
+  function filterKey(filter: ReviewFilter): string {
+    return JSON.stringify([
+      filter.id ?? null,
+      filter.repoId ?? null,
+      filter.since?.getTime() ?? null,
+      filter.limit ?? null,
+    ]);
+  }
+
+  function reviewKey(filter: ReviewFilter, withFindings: boolean): string {
+    return `${filterKey(filter)}:${withFindings}`;
+  }
+
+  // Caches the in-flight promise so concurrent callers share one round trip.
+  function loadReviews(
+    filter: ReviewFilter,
+    withFindings: boolean,
+  ): Promise<ReviewDetail[]> {
+    const key = reviewKey(filter, withFindings);
+    // A withFindings read is a superset, so it also answers one without.
+    const hit =
+      reviewReads.get(key) ??
+      (withFindings ? undefined : reviewReads.get(reviewKey(filter, true)));
+    if (hit) return hit;
+
+    const pending = fetchReviews(filter, withFindings);
+    reviewReads.set(key, pending);
+    pending.catch(() => reviewReads.delete(key));
+    return pending;
+  }
+
+  // Counted in Postgres: the window's finding rows never cross the wire.
+  async function fetchCategoryCounts(filter: ReviewFilter): Promise<CategoryCount[]> {
+    const ordered = subqueries
+      .select({
+        category: findings.category,
+        severity: findings.severity,
+        seq: sql<number>`row_number() over (order by ${reviews.createdAt} desc, ${reviews.id} desc, ${findings.severity} desc, ${findings.file} asc, ${findings.id} asc)`.as(
+          "seq",
+        ),
+      })
+      .from(findings)
+      .innerJoin(reviews, eq(reviews.id, findings.reviewId))
+      .innerJoin(repos, eq(repos.id, reviews.repoId))
+      .where(and(...scopeOf(filter)))
+      .as("ordered");
+
+    const rows = await database
+      .select({
+        category: ordered.category,
+        severity: ordered.severity,
+        n: count(),
+        firstSeen: sql<number>`min(${ordered.seq})`.mapWith(Number),
+      })
+      .from(ordered)
+      .groupBy(ordered.category, ordered.severity);
+    return toCategoryCounts(rows);
+  }
+
+  function loadCategoryCounts(filter: ReviewFilter): Promise<CategoryCount[]> {
+    const key = filterKey(filter);
+    const hit = categoryReads.get(key);
+    if (hit) return hit;
+
+    const pending = fetchCategoryCounts(filter);
+    categoryReads.set(key, pending);
+    pending.catch(() => categoryReads.delete(key));
+    return pending;
   }
 
   async function repoSummaries(where: SQL): Promise<RepoSummary[]> {
@@ -207,10 +338,14 @@ export function createDbSource(
         .groupBy(reviews.repoId),
     ]);
 
+    const reviewStatFor = new Map(reviewStats.map((row) => [row.repoId, row]));
+    const findingStatFor = new Map(findingStats.map((row) => [row.repoId, row]));
+    const tokenStatFor = new Map(tokenStats.map((row) => [row.repoId, row]));
+
     return repoRows.map((repo) => {
-      const reviewStat = reviewStats.find((row) => row.repoId === repo.id);
-      const findingStat = findingStats.find((row) => row.repoId === repo.id);
-      const tokens = tokenStats.find((row) => row.repoId === repo.id);
+      const reviewStat = reviewStatFor.get(repo.id);
+      const findingStat = findingStatFor.get(repo.id);
+      const tokens = tokenStatFor.get(repo.id);
       return {
         ...repo,
         reviewCount: reviewStat?.reviewCount ?? 0,
@@ -254,11 +389,12 @@ export function createDbSource(
 
     async getTrends(range, repoId) {
       const since = new Date(windowStart(range));
-      const scoped = await loadReviews(
-        { since, ...(repoId === undefined ? {} : { repoId }) },
-        true,
-      );
-      return computeTrends(scoped, range);
+      const filter = { since, ...(repoId === undefined ? {} : { repoId }) };
+      const [scoped, byCategory] = await Promise.all([
+        loadReviews(filter, false),
+        loadCategoryCounts(filter),
+      ]);
+      return computeTrends(scoped, range, byCategory);
     },
 
     async getUsage(range, repoId) {

@@ -20,15 +20,7 @@ export {
   CardHeader,
   CardTitle,
 } from "#src/components/card";
-export {
-  type ChartConfig,
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartStyle,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "#src/components/chart";
+// Chart lives at @pr-review/design/chart: re-exporting it here pulls recharts into every route.
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,

@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": ["*.css"],
   "imports": {
     "#src/components/*": "./src/components/*.tsx",
     "#src/*": "./src/*.ts"
   },
   "exports": {
     ".": "./src/index.ts",
+    "./chart": "./src/components/chart.tsx",
     "./theme.css": "./src/theme.css"
   },
   "scripts": {

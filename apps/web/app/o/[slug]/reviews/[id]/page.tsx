@@ -10,6 +10,7 @@ import { ArrowLeft, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import {
   AgentRunStrip,
@@ -37,19 +38,29 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: `${review.repo.owner}/${review.repo.name} #${review.prNumber}` };
 }
 
+async function AdjacentReviews({
+  slug,
+  repoId,
+  reviewId,
+}: {
+  slug: string;
+  repoId: number;
+  reviewId: number;
+}) {
+  const siblings = await (await data(slug)).listReviews({ repoId });
+  const at = siblings.findIndex((r) => r.id === reviewId);
+  const newer = at > 0 ? (siblings[at - 1] ?? null) : null;
+  const older = at >= 0 ? (siblings[at + 1] ?? null) : null;
+  return <ReviewPager slug={slug} newer={newer} older={older} />;
+}
+
 export default async function ReviewDetailPage({ params }: PageProps) {
   const { slug, id } = await params;
-  const source = await data(slug);
   const parsed = parseId(id);
   if (parsed === null) notFound();
 
-  const review = await source.getReview(parsed);
+  const review = await (await data(slug)).getReview(parsed);
   if (!review) notFound();
-
-  const siblings = await source.listReviews({ repoId: review.repoId });
-  const at = siblings.findIndex((r) => r.id === review.id);
-  const newer = at > 0 ? (siblings[at - 1] ?? null) : null;
-  const older = at >= 0 ? (siblings[at + 1] ?? null) : null;
 
   const repoHref = organizationPath(slug, `/repos/${review.repo.owner}/${review.repo.name}`);
 
@@ -101,7 +112,9 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         <FindingsTable findings={review.findings} />
       )}
 
-      <ReviewPager slug={slug} newer={newer} older={older} />
+      <Suspense fallback={null}>
+        <AdjacentReviews slug={slug} repoId={review.repoId} reviewId={review.id} />
+      </Suspense>
     </div>
   );
 }

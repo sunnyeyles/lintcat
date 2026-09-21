@@ -1,4 +1,4 @@
-import type { ChartConfig } from "@pr-review/design";
+import type { ChartConfig } from "@pr-review/design/chart";
 import type { AgentName, Severity, TokenCounts } from "@pr-review/db/dashboard";
 
 export type SeriesDef<K extends string> = { key: K; label: string };
