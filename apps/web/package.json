@@ -13,6 +13,7 @@
     "@pr-review/db": "workspace:*",
     "@pr-review/design": "workspace:*",
     "@pr-review/github": "workspace:*",
+    "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",
     "@pr-review/schemas": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",

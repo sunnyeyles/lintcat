@@ -1,4 +1,13 @@
-import type { ReviewRecord, ReviewRecordAgentRun } from "@pr-review/schemas";
+import {
+  buildRepositoryIndex,
+  encodeRepositoryGraph,
+  snapshotRepositoryIndex,
+} from "@pr-review/index";
+import type {
+  ReviewRecord,
+  ReviewRecordAgentRun,
+  ReviewRecordChangedFile,
+} from "@pr-review/schemas";
 import { eq, inArray } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -230,6 +239,49 @@ describe("createDbSource", () => {
     const usage = await source.getUsage("30d");
     expect(usage.totals.reviewCount).toBe(1);
     expect(usage.byRepo.map((row) => row.repo.name)).toEqual(["widgets"]);
+  });
+
+  it("returns the review's graph snapshot and changed files, decompressed", async () => {
+    const snapshot = snapshotRepositoryIndex(
+      buildRepositoryIndex({
+        sha: "b".repeat(40),
+        files: new Map([
+          ["src/session.ts", "export const session = 1;\n"],
+          ["src/login.ts", "import { session } from './session';\n"],
+        ]),
+      }),
+    );
+    const changedFiles: ReviewRecordChangedFile[] = [
+      { path: "src/login.ts", status: "modified", additions: 4, deletions: 1 },
+    ];
+    const id = await ingest(
+      acme,
+      record({
+        baseSha: snapshot.sha,
+        changedFiles,
+        graph: {
+          gzip: Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64"),
+          fileCount: snapshot.files.length,
+          edgeCount: snapshot.edges.length,
+        },
+      }),
+    );
+    const source = await sourceFor(acme);
+
+    expect(await source.getRepositoryGraph(id)).toEqual(snapshot);
+    expect(await source.getChangedFiles(id)).toEqual(changedFiles);
+  });
+
+  it("has no graph for a review whose index was off, or one it may not read", async () => {
+    const mine = await ingest(acme, record());
+    const theirs = await ingest(globex, record({ owner: "globex", repo: "secret" }));
+    const source = await sourceFor(acme);
+
+    expect(await source.getRepositoryGraph(mine)).toBeUndefined();
+    expect(await source.getChangedFiles(mine)).toEqual([]);
+    expect(await source.getRepositoryGraph(theirs)).toBeUndefined();
+    expect(await source.getChangedFiles(theirs)).toEqual([]);
+    expect(await source.getRepositoryGraph(999_999)).toBeUndefined();
   });
 
   it("is empty for an organization with nothing recorded", async () => {
