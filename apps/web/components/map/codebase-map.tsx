@@ -11,7 +11,7 @@ import {
   type MapGraph,
   type MapView,
   type NodeState,
-} from "@/lib/codebase-map";
+} from "@/lib/codebase-map-view";
 
 export const KIND_COLOR: Record<FileKind, string> = {
   source: "var(--map-module)",

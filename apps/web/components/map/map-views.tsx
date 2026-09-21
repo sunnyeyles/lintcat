@@ -24,7 +24,7 @@ import {
   neighbours,
   type NodeState,
   treemapLayout,
-} from "@/lib/codebase-map";
+} from "@/lib/codebase-map-view";
 
 export type MapViewProps = {
   graph: MapGraph;

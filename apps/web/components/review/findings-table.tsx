@@ -31,6 +31,7 @@ import type { Severity } from "@pr-review/db/dashboard";
 import { ConfidenceMeter } from "./confidence-meter";
 import { FilePath } from "./file-path";
 import { FindingSheet } from "./finding-sheet";
+import { FINDINGS_ANCHOR, useFindingsFocus } from "./findings-focus";
 import { SEVERITIES, sortFindings } from "./sort";
 
 const ALL = "all";
@@ -39,23 +40,28 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
   const severityId = useId();
   const [severity, setSeverity] = useState<Severity | typeof ALL>(ALL);
   const [selected, setSelected] = useState<Finding | null>(null);
+  const { file, clearFile } = useFindingsFocus();
 
   const sorted = useMemo(() => sortFindings(findings), [findings]);
   const rows = useMemo(
     () =>
-      sorted.filter((f) => severity === ALL || f.severity === severity),
-    [sorted, severity],
+      sorted.filter(
+        (f) =>
+          (severity === ALL || f.severity === severity) && (file === null || f.file === file),
+      ),
+    [sorted, severity, file],
   );
 
-  const filtered = severity !== ALL;
+  const filtered = severity !== ALL || file !== null;
   const reset = () => {
     setSeverity(ALL);
+    clearFile();
   };
 
   return (
     <section aria-labelledby="findings-heading">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-        <h2 id="findings-heading" className="text-muted-foreground font-mono text-xs tracking-wide uppercase">
+        <h2 id={FINDINGS_ANCHOR} className="text-muted-foreground font-mono text-xs tracking-wide uppercase">
           Findings
         </h2>
         <div className="flex flex-wrap items-end gap-3">
@@ -87,6 +93,18 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
           ) : null}
         </div>
       </div>
+
+      {file === null ? null : (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-xs">Showing findings on</span>
+          <code className="rounded-sm border border-border bg-muted px-1 py-0.5 font-mono text-xs">
+            {file}
+          </code>
+          <Button variant="ghost" size="sm" onClick={clearFile}>
+            Show all files
+          </Button>
+        </div>
+      )}
 
       <p aria-live="polite" className="text-muted-foreground mb-3 font-mono text-xs">
         {rows.length} of {sorted.length} shown · sorted by severity, then confidence

@@ -1,4 +1,4 @@
-import type { FileKind, MapGraph, MapNode } from "@/lib/codebase-map";
+import type { FileKind, MapGraph, MapNode } from "@/lib/codebase-map-view";
 
 // This repository, roughly, with the current design PR as the "changed" set.
 const FILES: [string, FileKind, number, Partial<MapNode>?][] = [

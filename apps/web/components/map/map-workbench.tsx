@@ -54,7 +54,7 @@ import {
   type MapView,
   neighbours,
   stats,
-} from "@/lib/codebase-map";
+} from "@/lib/codebase-map-view";
 
 const KIND_LABEL: Record<FileKind, string> = {
   source: "Source",

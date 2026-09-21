@@ -11,7 +11,7 @@ import {
   neighbours,
   stats,
   treemapLayout,
-} from "./codebase-map";
+} from "./codebase-map-view";
 
 const graph: MapGraph = {
   nodes: [
