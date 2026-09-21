@@ -304,6 +304,14 @@ export function MapCanvas({
     let lastY = 0;
     let moved = false;
 
+    // Capture is a nicety; losing it must never swallow the click that follows.
+    const capture = (on: boolean, pointerId: number) => {
+      try {
+        if (on) canvas.setPointerCapture(pointerId);
+        else canvas.releasePointerCapture(pointerId);
+      } catch {}
+    };
+
     const local = (event: PointerEvent | WheelEvent) => {
       const rect = canvas.getBoundingClientRect();
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -316,7 +324,7 @@ export function MapCanvas({
       const point = local(event);
       lastX = point.x;
       lastY = point.y;
-      canvas.setPointerCapture(event.pointerId);
+      capture(true, event.pointerId);
     };
 
     const onPointerMove = (event: PointerEvent) => {
@@ -341,7 +349,7 @@ export function MapCanvas({
     const onPointerUp = (event: PointerEvent) => {
       if (!dragging) return;
       dragging = false;
-      canvas.releasePointerCapture(event.pointerId);
+      capture(false, event.pointerId);
       if (moved) return;
       const point = local(event);
       const hit = pick(point.x, point.y);

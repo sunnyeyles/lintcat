@@ -269,6 +269,7 @@ export function MapExplorer() {
             <div
               role="application"
               tabIndex={0}
+              data-reduced-motion={reducedMotion}
               aria-label="Codebase map. Arrow keys move along dependencies, dependents and siblings. Enter toggles a group. Slash opens search. Escape clears the focus."
               onKeyDown={onMapKeyDown}
               className="focus-visible:ring-ring rounded-lg border border-border bg-surface-1 focus-visible:ring-2 focus-visible:outline-none"
