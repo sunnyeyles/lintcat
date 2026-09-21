@@ -1,9 +1,6 @@
 import type { Repo } from "../schema";
 
 import {
-  AGENTS,
-  type AgentBreakdown,
-  type AgentName,
   type CategoryCount,
   type Range,
   type ReviewDetail,
@@ -16,12 +13,6 @@ import {
 
 // USD per million tokens; cache reads bill at a tenth of input.
 const PRICE = { input: 3, cacheWrite: 3.75, cacheRead: 0.3, output: 15 };
-
-const KNOWN_AGENTS = new Set<string>(AGENTS);
-
-export function isAgentName(name: string): name is AgentName {
-  return KNOWN_AGENTS.has(name);
-}
 
 export function emptySeverity(): Record<Severity, number> {
   return { low: 0, medium: 0, high: 0 };
@@ -73,38 +64,6 @@ function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
   return s.length % 2 === 0 ? Math.round((s[mid - 1]! + s[mid]!) / 2) : s[mid]!;
-}
-
-function agentBreakdown(reviews: ReviewDetail[]): AgentBreakdown[] {
-  const byAgent = new Map<
-    AgentName,
-    { findingCount: number; durations: number[]; tokens: TokenCounts }
-  >();
-  for (const v of reviews) {
-    for (const run of v.runs) {
-      let entry = byAgent.get(run.agent);
-      if (!entry) {
-        entry = { findingCount: 0, durations: [], tokens: zeroTokens() };
-        byAgent.set(run.agent, entry);
-      }
-      entry.findingCount += run.findingCount;
-      entry.durations.push(run.durationMs);
-      addTokens(entry.tokens, run);
-    }
-  }
-
-  return AGENTS.flatMap((agent) => {
-    const entry = byAgent.get(agent);
-    if (!entry) return [];
-    return {
-      agent,
-      findingCount: entry.findingCount,
-      reviewCount: entry.durations.length,
-      medianDurationMs: median(entry.durations),
-      costUsd: costOf(entry.tokens),
-      ...entry.tokens,
-    };
-  });
 }
 
 function dayBuckets(range: Range): string[] {
@@ -161,7 +120,6 @@ export function computeTrends(
 
   return {
     points: [...byDay.values()],
-    byAgent: agentBreakdown(scoped),
     byCategory,
     totals: {
       reviews: scoped.length,
@@ -210,7 +168,6 @@ export function computeUsage(
 
   return {
     points: [...byDay.values()],
-    byAgent: agentBreakdown(scoped),
     byRepo: perRepo,
     totals: { ...totals, costUsd: costOf(totals), reviewCount: scoped.length },
   };

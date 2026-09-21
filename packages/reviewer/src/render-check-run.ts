@@ -1,6 +1,6 @@
 /**
  * Renders validated findings into the check-run payload; the caller owns the
- * API call. Never "failure" (advisory), never "success" when an agent failed.
+ * API call. Never "failure": the review is advisory.
  */
 import type {
   AnnotationLevel,
@@ -8,25 +8,14 @@ import type {
   CheckRunConclusion,
   CheckRunOutput,
 } from "@pr-review/github";
-import type { SkippedAgent } from "@pr-review/ai";
 import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
 
-import {
-  countLabel,
-  failureNotes,
-  pathList,
-  skipNotes,
-  summarise,
-} from "#src/finding-format";
+import { countLabel, summarise } from "#src/finding-format";
 import type { PostedFinding } from "#src/render-review";
-import type { AgentFailure } from "#src/review-pipeline";
 import { compareFindingStrength } from "#src/validate-findings";
 
 /** The GitHub checks API accepts at most 50 annotations per request. */
 export const MAX_ANNOTATIONS_PER_REQUEST = 50;
-
-/** Enough to recognise a pull request; a bump of 300 files would bury the reason. */
-const MAX_LISTED_CHANGED_FILES = 10;
 
 export interface RenderedCheckRun {
   conclusion: CheckRunConclusion;
@@ -36,8 +25,6 @@ export interface RenderedCheckRun {
 interface RenderCheckRunOptions {
   /** Whether line-anchored findings also become annotations; false once comments carry them. */
   annotate: boolean;
-  /** Agents whose paths no changed file matched, named in the summary. */
-  skippedAgents?: readonly SkippedAgent[] | undefined;
   carriedForward?: readonly PostedFinding[] | undefined;
   scopeNote?: string | undefined;
 }
@@ -66,23 +53,6 @@ function annotate(finding: ReviewFinding, line: number): CheckRunAnnotation {
   };
 }
 
-/**
- * Names the files nobody reviewed, so the reason a gate held is legible
- * without opening the pull request.
- */
-function changedFilesNote(changedFiles: readonly string[]): string[] {
-  if (changedFiles.length === 0) {
-    return [];
-  }
-  const listed = pathList(changedFiles.slice(0, MAX_LISTED_CHANGED_FILES));
-  const remaining = changedFiles.length - MAX_LISTED_CHANGED_FILES;
-  return [
-    remaining > 0
-      ? `Changed: ${listed}, and ${remaining} more.`
-      : `Changed: ${listed}.`,
-  ];
-}
-
 // Listed so a narrowed review cannot read as a clean one.
 function carriedNotes(carried: readonly PostedFinding[]): string[] {
   if (carried.length === 0) {
@@ -98,44 +68,14 @@ function carriedNotes(carried: readonly PostedFinding[]): string[] {
   ];
 }
 
-/**
- * The check run for a pull request no agent's paths matched. Never "success":
- * a green check reads as a clean bill of health.
- */
-export function renderNoAgentMatched(
-  skippedAgents: readonly SkippedAgent[],
-  changedFiles: readonly string[],
-  carriedForward: readonly PostedFinding[] = [],
-): RenderedCheckRun {
-  return {
-    conclusion: "neutral",
-    output: {
-      title: "No agent reviewed this pull request",
-      summary: [
-        `None of the ${countLabel(skippedAgents.length, "configured agent")} matched the ${countLabel(changedFiles.length, "changed file")}, so this pull request was not reviewed.`,
-        ...skippedAgents.map(
-          (skipped) =>
-            `- ${categoryLabel(skipped.agent)} — waiting on ${pathList(skipped.paths)}`,
-        ),
-        ...changedFilesNote(changedFiles),
-        ...carriedNotes(carriedForward),
-      ].join("\n\n"),
-    },
-  };
-}
-
 /** Findings render strongest first; line-anchored ones also become annotations. */
 export function renderCheckRun(
   findings: readonly ReviewFinding[],
-  agentFailures: readonly AgentFailure[],
   options: RenderCheckRunOptions,
 ): RenderedCheckRun {
-  const skipped = skipNotes(options.skippedAgents ?? []);
   const carried = options.carriedForward ?? [];
   const notes = [
     ...carriedNotes(carried),
-    ...failureNotes(agentFailures),
-    ...skipped,
     ...(options.scopeNote === undefined ? [] : [options.scopeNote]),
   ];
   if (findings.length === 0 && carried.length > 0) {
@@ -152,7 +92,7 @@ export function renderCheckRun(
   }
   if (findings.length === 0) {
     return {
-      conclusion: agentFailures.length === 0 ? "success" : "neutral",
+      conclusion: "success",
       output: {
         title: "No issues found",
         summary: [

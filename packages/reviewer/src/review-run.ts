@@ -1,20 +1,17 @@
 /**
  * One review run, assembled: a client, a target, a delivery adapter and a
- * policy in; agents, model, synthesiser, pipeline and memory held here.
+ * policy in; agent, model, pipeline and memory held here.
  */
 import {
-  createSynthesiser,
-  loadAgentDefinitions,
-  resolveAgentDefinitions,
+  addTokenUsage,
+  emptyTokenUsage,
+  GENERAL_AGENT,
   type AgentDefinition,
-  type AgentLifecycleListener,
-  type AgentUsageReport,
   type ManagedPrompts,
   type ReviewAgent,
   type ReviewModel,
-  type Synthesiser,
+  type TokenUsage,
 } from "@pr-review/ai";
-import type { PullRequestReadClient } from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 import { createConsoleLogger, type StructuredLogger } from "@pr-review/logging";
 
@@ -24,11 +21,10 @@ import {
   type ReviewClient,
   type RunReviewPipeline,
 } from "#src/pipeline-runner";
-import { readAtCommit } from "#src/read-at-commit";
 import type { FinishedReviewRun, ReviewDelivery } from "#src/review-delivery";
 import { runReviewPipeline } from "#src/review-pipeline";
 import { reviewWithDelivery } from "#src/review-pull-request";
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 
 /** What the run does, as opposed to what it reads or where it writes. */
 export interface ReviewPolicy {
@@ -38,48 +34,27 @@ export interface ReviewPolicy {
   index?: boolean | undefined;
 }
 
-/**
- * The run's agent set: read from the repository at one commit, so the branch
- * under review cannot choose its own reviewers, or supplied outright.
- */
-export type ReviewAgentSource =
-  | {
-      /** The commit the agent configuration is read at. */
-      readAt: string;
-      /** Comma-separated categories; empty runs the configured set. */
-      select?: string | undefined;
-      path?: string | undefined;
-    }
-  | { use: readonly AgentDefinition[] };
-
-/** What an agent set is built over, once the run has resolved it. */
+/** What the agent is built over, once the run has resolved it. */
 export interface ReviewAgentRequest {
   client: ReviewClient;
-  /** The subset the path gate woke. */
-  agents: readonly AgentDefinition[];
+  agent: AgentDefinition;
   index: RepositoryIndex | undefined;
   logger: StructuredLogger;
 }
 
-export type CreateReviewAgents = (
-  request: ReviewAgentRequest,
-) => readonly ReviewAgent[];
+export type CreateReviewAgent = (request: ReviewAgentRequest) => ReviewAgent;
 
 /**
- * What runs the agents. The model form builds the runtime and the synthesiser
- * itself; the scripted form is for harnesses that substitute both.
+ * What runs the agent. The model form builds the runtime itself; the
+ * scripted form is for harnesses that substitute it.
  */
 export type ReviewEngine =
   | {
       model: ReviewModel;
-      /** Builds a model by id. Without it, an agent's own `model` is ignored. */
-      createModel?: ((modelId: string) => ReviewModel) | undefined;
       systemPrompts?: ManagedPrompts | undefined;
       maxTurns?: number | undefined;
-      /** Exports prompts, tool results and completions on the model spans. */
-      recordPayloads?: boolean | undefined;
     }
-  | { createAgents: CreateReviewAgents; synthesiser: Synthesiser };
+  | { createAgent: CreateReviewAgent };
 
 /** Repository memory, with the clock that decides what counts as fresh. */
 export interface ReviewMemory {
@@ -93,79 +68,34 @@ export interface ReviewRunSpec {
   client: ReviewClient;
   target: ReviewTarget;
   delivery: ReviewDelivery;
-  agents: ReviewAgentSource;
   engine: ReviewEngine;
   policy?: ReviewPolicy | undefined;
   /** Omitted, the run reads no memory and attaches no hints. */
   memory?: ReviewMemory | undefined;
   logger?: StructuredLogger | undefined;
-  /** Aborting it stops the agents and publishes nothing. */
+  /** Aborting it stops the agent and publishes nothing. */
   signal?: AbortSignal | undefined;
-  /** Reports each agent's start and finish while the run is still going. */
-  onAgentEvent?: AgentLifecycleListener | undefined;
-}
-
-async function resolveAgents(
-  client: PullRequestReadClient,
-  target: ReviewTarget,
-  source: ReviewAgentSource,
-): Promise<AgentDefinition[]> {
-  if ("use" in source) {
-    return [...source.use];
-  }
-  const configured = await loadAgentDefinitions({
-    readFile: readAtCommit(client, target, source.readAt),
-    ...(source.path === undefined ? {} : { path: source.path }),
-  });
-  return resolveAgentDefinitions(source.select ?? "", configured);
 }
 
 function pipelineRunner(
   engine: ReviewEngine,
-  agents: readonly AgentDefinition[],
   logger: StructuredLogger,
-  usage: AgentUsageReport[],
-  onAgentEvent: AgentLifecycleListener | undefined,
+  onUsage: (usage: TokenUsage) => void,
 ): RunReviewPipeline {
-  if ("createAgents" in engine) {
-    const { createAgents, synthesiser } = engine;
-    return ({ client, context, agents: active, hints, index }) =>
-      runReviewPipeline(
-        createAgents({ client, agents: active, index, logger }),
-        synthesiser,
-        context,
-        hints,
-        onAgentEvent,
-      );
+  if ("createAgent" in engine) {
+    const { createAgent } = engine;
+    return ({ client, context, agent, index }) =>
+      runReviewPipeline(createAgent({ client, agent, index, logger }), context);
   }
   return createPipelineRunner({
     model: engine.model,
-    synthesiser: createSynthesiser({
-      model: engine.model,
-      agents,
-      recordPayloads: engine.recordPayloads,
-    }),
     logger,
-    onUsage: (report) => usage.push(report),
-    ...(onAgentEvent === undefined ? {} : { onAgentEvent }),
-    ...(engine.createModel === undefined ? {} : { createModel: engine.createModel }),
+    onUsage: (report) => onUsage(report.usage),
     ...(engine.systemPrompts === undefined
       ? {}
       : { systemPrompts: engine.systemPrompts }),
     ...(engine.maxTurns === undefined ? {} : { maxTurns: engine.maxTurns }),
-    recordPayloads: engine.recordPayloads,
   });
-}
-
-/** Configured order, so a run's reports read the same way every time. */
-function inAgentOrder(
-  reports: readonly AgentUsageReport[],
-  agents: readonly AgentDefinition[],
-): AgentUsageReport[] {
-  const order = agents.map((agent) => agent.category);
-  return [...reports].sort(
-    (left, right) => order.indexOf(left.agent) - order.indexOf(right.agent),
-  );
 }
 
 /** Assembles and runs one review. Throws what the review itself throws. */
@@ -173,30 +103,21 @@ export async function runReview({
   client,
   target,
   delivery,
-  agents: source,
   engine,
   policy = {},
   memory,
   logger = createConsoleLogger(),
   signal,
-  onAgentEvent,
 }: ReviewRunSpec): Promise<FinishedReviewRun> {
-  const agents = await resolveAgents(client, target, source);
-  // A supplied set was selected by the caller, which logs what it knows of it.
-  if (!("use" in source)) {
-    logger.info("review.agents_selected", {
-      ...reviewCorrelation(target),
-      agents: agents.map((agent) => agent.category),
-    });
-  }
-
-  const usage: AgentUsageReport[] = [];
+  let usage = emptyTokenUsage();
   const startedAt = Date.now();
   const outcome = await reviewWithDelivery(target, {
     client,
-    agents,
+    agent: GENERAL_AGENT,
     delivery,
-    runReviewPipeline: pipelineRunner(engine, agents, logger, usage, onAgentEvent),
+    runReviewPipeline: pipelineRunner(engine, logger, (spent) => {
+      usage = addTokenUsage(usage, spent);
+    }),
     logger,
     signal,
     ...(memory === undefined
@@ -213,8 +134,7 @@ export async function runReview({
 
   const run: FinishedReviewRun = {
     outcome,
-    agents,
-    usage: inAgentOrder(usage, agents),
+    usage,
     durationMs: Date.now() - startedAt,
   };
   await delivery.publishRun?.(target, run);

@@ -25,11 +25,9 @@ const HEADINGS: Heading[] = [
 ];
 
 const TOOLS = [
-  ["list_review_agents", "Lists the agents a checkout configures, each one's category and path gate, and which the working tree's changes would wake. No model key needed."],
   ["review_local_changes", "Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed."],
   ["review_pull_request", "Reviews a GitHub pull request; a dry run unless publish: true, which posts the check run and comments as the Action would."],
   ["repository_overview, find_references, describe_file", "The repository index, built from the working tree, with no network."],
-  ["validate_agent_config", "Checks a checkout's .github/pr-review-agents.yml and reports what it resolves to, or where it is wrong. No model calls."],
   ["list_reviews, get_review, review_trends", "Stored review history, scoped by the dashboard's own access rules to your GitHub account."],
 ] as const;
 
@@ -75,15 +73,15 @@ export default function McpServerPage() {
         </Card>
         <Note title="Cancelling is honoured">
           Ctrl-C in the client, or any <code>notifications/cancelled</code>, aborts the
-          agents&rsquo; model calls — and a cancelled run publishes nothing.
+          reviewer&rsquo;s model calls — and a cancelled run publishes nothing.
         </Note>
       </Section>
 
       <Section id="same-path" title="The same path as the Action">
         <P>
           A local review takes the same path, with a git-backed client in place of
-          GitHub&rsquo;s, so the trust boundary is unchanged: the agent configuration is read
-          at the base commit, and only validated findings come back.
+          GitHub&rsquo;s, so the trust boundary is unchanged: only validated findings come
+          back.
         </P>
       </Section>
     </DocsArticle>

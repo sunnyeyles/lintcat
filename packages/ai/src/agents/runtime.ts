@@ -28,7 +28,6 @@ import {
 } from "#src/agents/repository-index";
 import { createReviewTools, type ReviewToolsClient } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
-import { callTelemetry } from "#src/telemetry";
 import {
   addTokenUsage,
   emptyTokenUsage,
@@ -133,10 +132,7 @@ function buildOpeningMessage(
 
 /** What every review agent needs, regardless of agent. */
 export interface ReviewAgentDeps {
-  /** The default model; an agent's own `model` is built with createModel. */
   model: ReviewModel;
-  /** Builds a model by id. Without it, an agent's `model` is ignored. */
-  createModel?: ((modelId: string) => ReviewModel) | undefined;
   github: ReviewToolsClient;
   maxTurns?: number | undefined;
   /** Receives agent.started / agent.completed / agent.failed. */
@@ -146,8 +142,6 @@ export interface ReviewAgentDeps {
   onUsage?: ((report: AgentUsageReport) => void) | undefined;
   /** The repository at the base commit; absent when off, failed or unbuilt. */
   index?: RepositoryIndex | undefined;
-  /** Exports prompts, tool results and completions on the model spans. */
-  recordPayloads?: boolean | undefined;
 }
 
 /** Adds the hint block unless the prompt already carries it. */
@@ -175,14 +169,10 @@ export function createReviewAgent(
       ? buildReviewSystemPrompt(agent)
       : appendRepositoryHints(managed, agent.repositoryHints);
   const logger = deps.logger ?? createConsoleLogger();
-  const model =
-    agent.model === undefined || deps.createModel === undefined
-      ? deps.model
-      : deps.createModel(agent.model);
+  const model = deps.model;
 
   return {
     name: agent.category,
-    ...(agent.standalone === true ? { standalone: true } : {}),
 
     async run(context: ReviewContext): Promise<readonly unknown[]> {
       // Every event of this run carries these fields.
@@ -237,10 +227,7 @@ export function createReviewAgent(
               stopWhen: isStepCount(maxTurns),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
               providerOptions: CACHE_BREAKPOINT,
-              telemetry: callTelemetry(
-                `review-agent-${agent.category}`,
-                deps.recordPayloads,
-              ),
+              telemetry: { functionId: `review-agent-${agent.category}` },
               onStepEnd: (step) => {
                 usage = addTokenUsage(usage, toTokenUsage(step.usage));
               },

@@ -1,14 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import type {
-  CallToolResult,
-  ServerNotification,
-  ServerRequest,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { AgentLifecycleListener } from "@pr-review/ai";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import { listAgents, type AgentListing } from "#src/agent-listing";
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
@@ -18,20 +11,12 @@ import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
 import { selectReviewEngine } from "#src/review-engine";
 
-const agentsSchema = z
-  .string()
-  .optional()
-  .describe(
-    'Comma-separated agent categories, e.g. "security,correctness". Omit to run the repository\'s configured agents.',
-  );
-
 /** Said whenever sampling stood in for a provider key, so nobody reads this as a full review. */
 export const SINGLE_SHOT_NOTICE =
   "Reduced single-shot review: no model API key is set, so this ran as one sampling request to your " +
-  "client instead of the tool-calling agents. One general pass over the diff, the changed-file list and " +
-  "the repository index, with no follow-up reads of the surrounding code and no synthesis. The " +
-  "repository's agent configuration and any `agents` argument do not apply: there is one pass, not one " +
-  "per agent. It is shallower than a key-backed review and misses anything that needs reading further.";
+  "client instead of the tool-calling agent. One general pass over the diff, the changed-file list and " +
+  "the repository index, with no follow-up reads of the surrounding code. It is shallower than a " +
+  "key-backed review and misses anything that needs reading further.";
 
 const scopeSchema = {
   repoPath: z
@@ -97,9 +82,6 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
   const { outcome } = result;
   const details = {
     singleShot: result.singleShot,
-    agents: result.agents,
-    agentFailures: outcome.agentFailures,
-    synthesis: outcome.synthesis.outcome,
     patches: outcome.patches,
     suppressed: outcome.suppressed,
     findings: outcome.findings,
@@ -119,73 +101,17 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
   };
 }
 
-type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
-
-/** Reports agent progress to the caller; undefined when it sent no progress token. */
-function progressReporter(extra: ToolExtra): AgentLifecycleListener | undefined {
-  const progressToken = extra._meta?.progressToken;
-  if (progressToken === undefined) {
-    return undefined;
-  }
-  return ({ agent, phase, finished, total }) => {
-    // A dropped notification must not disturb the review that is still running.
-    void extra
-      .sendNotification({
-        method: "notifications/progress",
-        params: { progressToken, progress: finished, total, message: `${agent} ${phase}` },
-      })
-      .catch(() => undefined);
-  };
-}
-
-/** The one-line headline above the listing's JSON. */
-function agentHeadline(listing: AgentListing): string {
-  const woken = listing.agents.filter((agent) => agent.wakes).map((agent) => agent.category);
-  const source = listing.configured
-    ? `${listing.configPath} at ${listing.baseSha.slice(0, 7)}`
-    : `no ${listing.configPath}, so these are the defaults`;
-  const wakes =
-    woken.length === 0
-      ? "none would run on the current changes"
-      : `${woken.join(", ")} would run on the current changes`;
-  return `${listing.agents.length} agent(s) from ${source}; ${wakes}.`;
-}
-
 export function registerReviewTools(
   server: McpServer,
   environment: McpEnvironment,
   connection: ConnectedClient,
 ): void {
   server.registerTool(
-    "list_review_agents",
-    {
-      title: "List the review agents",
-      description:
-        "List the review agents configured for a local checkout: each agent's category, its path gate, " +
-        "and whether the reviewed changes would wake it. Reads the configuration at the " +
-        "base commit exactly as a review does, so an uncommitted config is not yet in effect. A " +
-        "repository with no configuration gets the default agent. Makes no model or network calls.",
-      inputSchema: scopeSchema,
-      annotations: { readOnlyHint: true, openWorldHint: false },
-    },
-    async (args) => {
-      const local = await openScoped(environment, connection, args);
-      const listing = await listAgents(local);
-      return {
-        content: [
-          { type: "text", text: agentHeadline(listing) },
-          { type: "text", text: JSON.stringify(listing, null, 2) },
-        ],
-      };
-    },
-  );
-
-  server.registerTool(
     "review_local_changes",
     {
       title: "Review local changes",
       description:
-        "Run the AI review agents over a local checkout: by default commits since the merge-base with the " +
+        "Run the AI review over a local checkout: by default commits since the merge-base with the " +
         "base branch plus uncommitted and untracked files, or only the staged changes, or an explicit " +
         "commit range. Returns only findings that passed the same " +
         "deterministic validation the GitHub Action applies. Findings suppressed with suppress_finding are " +
@@ -194,15 +120,14 @@ export function registerReviewTools(
         "model instead (MCP sampling), which gives a reduced single-shot review the result declares.",
       inputSchema: {
         ...scopeSchema,
-        agents: agentsSchema,
         index: z
           .boolean()
           .optional()
-          .describe("Build the repository import index for the agents; on by default."),
+          .describe("Build the repository import index for the reviewer; on by default."),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ agents, index, ...args }, extra) => {
+    async ({ index, ...args }, extra) => {
       const local = await openScoped(environment, connection, args);
       const files = await local.client.listChangedFiles(local.target);
       if (files.length === 0) {
@@ -218,14 +143,10 @@ export function registerReviewTools(
       const result = await runReview(environment, {
         client: local.client,
         target: local.target,
-        selected: selectReviewEngine(environment, connection, {
-          baseSha: local.baseSha,
-          select: agents ?? "",
-        }),
+        selected: selectReviewEngine(environment, connection),
         index,
         memory: await openLocalMemoryStore(local.root),
         signal: extra.signal,
-        onAgentEvent: progressReporter(extra),
       });
       return reviewResult(
         result,
@@ -240,7 +161,7 @@ export function registerReviewTools(
     {
       title: "Review a GitHub pull request",
       description:
-        "Run the AI review agents over a GitHub pull request at its current head. By default this is a dry " +
+        "Run the AI review over a GitHub pull request at its current head. By default this is a dry " +
         "run that returns the validated findings and writes nothing. With publish: true it posts the " +
         "\"AI PR Review\" check run and inline review comments to the pull request, exactly as the GitHub " +
         "Action does (fix commits are never made). Needs GITHUB_TOKEN or a logged-in gh CLI.",
@@ -248,7 +169,6 @@ export function registerReviewTools(
         owner: z.string().min(1).describe("Repository owner, e.g. \"sunnyeyles\"."),
         repo: z.string().min(1).describe("Repository name, e.g. \"pr-review-agents\"."),
         number: z.number().int().positive().describe("Pull request number."),
-        agents: agentsSchema,
         publish: z
           .boolean()
           .optional()
@@ -256,20 +176,16 @@ export function registerReviewTools(
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    async ({ owner, repo, number, agents, publish = false }, extra) => {
+    async ({ owner, repo, number, publish = false }, extra) => {
       const client = environment.createTokenClient({ token: await resolveGithubToken(environment) });
       const ref = { owner, repo, pullRequestNumber: number };
       const pullRequest = await client.getPullRequest(ref);
       const result = await runReview(environment, {
         client,
         target: { ...ref, headSha: pullRequest.headSha },
-        selected: selectReviewEngine(environment, connection, {
-          baseSha: pullRequest.baseSha,
-          select: agents ?? "",
-        }),
+        selected: selectReviewEngine(environment, connection),
         ...(publish ? { publishTo: client } : {}),
         signal: extra.signal,
-        onAgentEvent: progressReporter(extra),
       });
       const where = `${owner}/${repo}#${number} at ${pullRequest.headSha.slice(0, 7)}`;
       return reviewResult(

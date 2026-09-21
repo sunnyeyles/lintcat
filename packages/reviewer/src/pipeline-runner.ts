@@ -1,11 +1,8 @@
 import {
-  createReviewAgents,
+  createReviewAgent,
   type AgentDefinition,
-  type AgentLifecycleListener,
   type ReviewAgentDeps,
   type ReviewContext,
-  type Synthesiser,
-  type SynthesisHints,
 } from "@pr-review/ai";
 import type {
   PullRequestReadClient,
@@ -27,39 +24,27 @@ export type ReviewClient = PullRequestReadClient &
 export interface ReviewPipelineRun {
   client: ReviewClient;
   context: ReviewContext;
-  /** The subset of the run's agents the path gate woke. */
-  agents: readonly AgentDefinition[];
-  hints: SynthesisHints;
+  /** The review agent, already carrying this run's repository hints. */
+  agent: AgentDefinition;
   index: RepositoryIndex | undefined;
 }
 
-/** Runs one review's agents, then synthesise and validate. */
+/** Runs the review agent, then validates what it proposed. */
 export type RunReviewPipeline = (
   run: ReviewPipelineRun,
 ) => Promise<ReviewPipelineResult>;
 
-export interface PipelineRunnerDeps
-  extends Omit<ReviewAgentDeps, "github" | "index"> {
-  synthesiser: Synthesiser;
-  /** Receives each agent's started / completed / failed step. */
-  onAgentEvent?: AgentLifecycleListener | undefined;
-}
+export type PipelineRunnerDeps = Omit<ReviewAgentDeps, "github" | "index">;
 
-/** Binds the agents to each review's client and index, then runs the pipeline. */
-export function createPipelineRunner({
-  synthesiser,
-  onAgentEvent,
-  ...agentDeps
-}: PipelineRunnerDeps): RunReviewPipeline {
-  return ({ client, context, agents, hints, index }) =>
+/** Binds the agent to each review's client and index, then runs the pipeline. */
+export function createPipelineRunner(deps: PipelineRunnerDeps): RunReviewPipeline {
+  return ({ client, context, agent, index }) =>
     runReviewPipeline(
-      createReviewAgents(
-        { ...agentDeps, github: client, ...(index === undefined ? {} : { index }) },
-        agents,
-      ),
-      synthesiser,
+      createReviewAgent(agent, {
+        ...deps,
+        github: client,
+        ...(index === undefined ? {} : { index }),
+      }),
       context,
-      hints,
-      onAgentEvent,
     );
 }

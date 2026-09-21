@@ -109,7 +109,6 @@ export function createSamplingAgent(deps: SamplingAgentDeps): ReviewAgent {
 
   return {
     name: agent.category,
-    standalone: true,
 
     async run(context: ReviewContext): Promise<readonly unknown[]> {
       const text = await deps.sample({

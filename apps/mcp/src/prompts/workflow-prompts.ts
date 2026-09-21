@@ -20,7 +20,7 @@ export function registerWorkflowPrompts(server: McpServer): void {
       title: "Review the current branch",
       description:
         "Review the work in progress on this branch before pushing or opening a pull request. Runs the " +
-        "review agents over the diff against the base branch (commits, uncommitted and untracked files) " +
+        "reviewer over the diff against the base branch (commits, uncommitted and untracked files) " +
         "and walks through the findings worth acting on. Use this when the user asks for a review of " +
         "their changes, their branch or their diff, or before they open a PR.",
       argsSchema: {
@@ -28,17 +28,12 @@ export function registerWorkflowPrompts(server: McpServer): void {
           .string()
           .optional()
           .describe('Branch or commit to compare against, e.g. "origin/main"; defaults to the remote default branch.'),
-        agents: z
-          .string()
-          .optional()
-          .describe('Comma-separated agent categories, e.g. "security,correctness". Omit for the configured set.'),
         repoPath: z.string().optional().describe("Path to the checkout; defaults to the server's working directory."),
       },
     },
-    ({ base, agents, repoPath }) => {
+    ({ base, repoPath }) => {
       const args = [
         base === undefined ? undefined : `base "${base}"`,
-        agents === undefined ? undefined : `agents "${agents}"`,
         repoPath === undefined ? undefined : `repoPath "${repoPath}"`,
       ].filter((part) => part !== undefined);
       return userPrompt(

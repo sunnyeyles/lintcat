@@ -101,17 +101,12 @@ export interface ReportSummary {
   failOn: FailOn;
   /** Findings this checkout's review memory hid. */
   suppressed: number;
-  /** Agents that did not complete, by category. */
-  agentFailures: readonly string[];
 }
 
 /** The last lines of a review: what was found, and whether it blocks. */
 export function renderSummary(summary: ReportSummary, options: RenderOptions): string {
-  const { findings, blocking, failOn, suppressed, agentFailures } = summary;
+  const { findings, blocking, failOn, suppressed } = summary;
   const lines: string[] = [];
-  for (const agent of agentFailures) {
-    lines.push(`Note: the ${categoryLabel(agent)} review did not complete, so its findings are missing.`);
-  }
   if (suppressed > 0) {
     lines.push(`${suppressed} finding(s) hidden by this checkout's suppressions.`);
   }

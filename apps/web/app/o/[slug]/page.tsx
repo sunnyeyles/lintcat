@@ -53,7 +53,7 @@ async function TrendStats({ slug }: { slug: string }) {
       <Stat
         label="Median duration"
         value={formatDuration(totals.medianDurationMs)}
-        hint="slowest agent leg per review"
+        hint="per review"
       />
     </>
   );
@@ -132,7 +132,7 @@ export default async function OverviewPage({
       <PageHeader
         eyebrow="Dashboard"
         title="Overview"
-        description={`${source.organization.name} — every review the agents published in the last 30 days, newest first.`}
+        description={`${source.organization.name} — every review published in the last 30 days, newest first.`}
         actions={
           <Button asChild variant="outline" size="sm">
             <Link href={organizationPath(slug, "/repos")}>All repositories</Link>

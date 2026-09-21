@@ -29,10 +29,8 @@ Review options:
   --base <ref>         Branch or commit to compare against (default: the remote default branch)
   --scope <kind>       working-tree (default), staged, or range
   --range <range>      Commits to review, e.g. HEAD~3..HEAD; implies --scope range
-  --agents <list>      Comma-separated agent categories (default: the repository's own)
   --fail-on <level>    Exit non-zero at this severity or above: low, medium, high (default), off
   --no-index           Skip the repository import index
-  --no-progress        Do not report each agent starting and finishing
   --verbose            Let the review's structured log through to stderr
   --color / --no-color Force colour on or off (default: on for a terminal, off otherwise)
 

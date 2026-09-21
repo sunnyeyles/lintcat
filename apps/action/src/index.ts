@@ -7,15 +7,12 @@ import process from "node:process";
 
 import {
   DEFAULT_LANGFUSE_BASE_URL,
-  DEFAULT_AGENT_CONFIG_PATH,
   DEFAULT_PROMPT_LABEL,
   createLangfusePromptClient,
   apiKeyEnvFor,
   createLanguageModel,
   defaultModelFor,
-  loadAgentDefinitions,
   loadManagedPrompts,
-  resolveAgentDefinitions,
   resolveModelProvider,
   type ModelProvider,
   type LangfusePromptClient,
@@ -23,7 +20,7 @@ import {
   type ManagedPrompts,
   type LanguageModelConfig,
   type ReviewModel,
-  type AgentDefinition,
+  GENERAL_AGENT,
 } from "@pr-review/ai";
 import {
   createTokenClient,
@@ -45,7 +42,6 @@ import {
   githubDelivery,
   isFixCommit,
   learnFromMergedPullRequest,
-  readAtCommit,
   reviewCorrelation,
   runReview,
   type DashboardPublisherConfig,
@@ -135,7 +131,7 @@ interface LangfuseInputs {
   secretKey: string;
   baseUrl: string;
   promptLabel: string;
-  recordPayloads: boolean;
+  recordIo: boolean;
 }
 
 /**
@@ -169,7 +165,7 @@ function resolveLangfuseInputs(
     // invoking the bundle directly never goes through action.yml.
     baseUrl: getInput(env, "langfuse-base-url") || DEFAULT_LANGFUSE_BASE_URL,
     promptLabel: getInput(env, "langfuse-prompt-label") || DEFAULT_PROMPT_LABEL,
-    recordPayloads: getInput(env, "langfuse-record-payloads") === "true",
+    recordIo: getInput(env, "langfuse-record-io") === "true",
   };
 }
 
@@ -239,7 +235,6 @@ function actionDelivery(
 async function resolveManagedPrompts(
   environment: ActionEnvironment,
   inputs: LangfuseInputs,
-  agents: readonly AgentDefinition[],
 ): Promise<ManagedPrompts | undefined> {
   try {
     const client = environment.createPromptClient({
@@ -248,7 +243,7 @@ async function resolveManagedPrompts(
       baseUrl: inputs.baseUrl,
     });
     const { prompts } = await loadManagedPrompts(client, {
-      agents,
+      agents: [GENERAL_AGENT],
       label: inputs.promptLabel,
       logger: environment.logger,
     });
@@ -261,14 +256,12 @@ async function resolveManagedPrompts(
   }
 }
 
-/** The run's default model, its provider, and the factory an agent's own uses. */
 interface ModelInputs {
   model: ReviewModel;
   provider: ModelProvider;
-  createModel: (modelId: string) => ReviewModel;
 }
 
-/** Builds the run's default model, and the factory for a per-agent one. */
+/** Builds the run's model. */
 function resolveModelInputs(
   env: Record<string, string | undefined>,
   environment: Pick<ActionEnvironment, "createLanguageModel">,
@@ -284,17 +277,14 @@ function resolveModelInputs(
     );
   }
   const baseUrl = getInput(env, "model-base-url");
-  const createModel = (modelId: string): ReviewModel =>
-    environment.createLanguageModel({
+  return {
+    provider,
+    model: environment.createLanguageModel({
       provider,
       apiKey,
       ...(baseUrl === "" ? {} : { baseUrl }),
-      modelId,
-    });
-  return {
-    provider,
-    createModel,
-    model: createModel(getInput(env, "model") || defaultModelFor(provider)),
+      modelId: getInput(env, "model") || defaultModelFor(provider),
+    }),
   };
 }
 
@@ -375,40 +365,14 @@ export async function runAction(
     });
     return;
   }
-  const { target, isFork, baseSha } = inspection;
+  const { target, isFork } = inspection;
 
   const client = environment.createTokenClient({
     token: requireInput(env, "github-token"),
   });
 
-  // Resolved before the model client is built, so a bad config fails the step
-  // rather than producing a review that looks clean.
-  const configured = await loadAgentDefinitions({
-    readFile: readAtCommit(client, target, baseSha),
-    path: getInput(env, "agent-config") || DEFAULT_AGENT_CONFIG_PATH,
-  });
-  const selection = getInput(env, "agents");
-  const agents = resolveAgentDefinitions(selection, configured);
-  logger.info("review.agents_selected", {
-    agents: agents.map((agent) => agent.category),
-    configuredAgents: configured.map((agent) => agent.category),
-    // Empty when the `agents` input named agents: naming one drops its gate.
-    pathFilteredAgents: agents
-      .filter((agent) => agent.paths !== undefined)
-      .map((agent) => agent.category),
-  });
-
-  const { model, provider, createModel } = resolveModelInputs(env, environment);
-  logger.info("review.model_selected", {
-    provider,
-    model: model.modelId,
-    // Only the agents that override the default; empty when none do.
-    agentModels: Object.fromEntries(
-      agents
-        .filter((agent) => agent.model !== undefined)
-        .map((agent) => [agent.category, agent.model]),
-    ),
-  });
+  const { model, provider } = resolveModelInputs(env, environment);
+  logger.info("review.model_selected", { provider, model: model.modelId });
 
   const langfuse = resolveLangfuseInputs(env, logger);
   const dashboard = resolveDashboardInputs(env, logger);
@@ -421,16 +385,14 @@ export async function runAction(
           secretKey: langfuse.secretKey,
           baseUrl: langfuse.baseUrl,
           release: env["GITHUB_SHA"],
+          recordIo: langfuse.recordIo,
         });
-  if (langfuse?.recordPayloads === true) {
-    logger.info("langfuse.payload_capture_enabled", { baseUrl: langfuse.baseUrl });
-  }
   // Everything below may emit spans, so it sits inside the flushing block.
   try {
     const prompts =
       langfuse === undefined
         ? undefined
-        : await resolveManagedPrompts(environment, langfuse, agents);
+        : await resolveManagedPrompts(environment, langfuse);
 
     // Event-inspection knowledge: the reviewer only ever sees the permission
     // failure a fork's token causes, never the fork itself.
@@ -453,12 +415,9 @@ export async function runAction(
         summaryPath: env["GITHUB_STEP_SUMMARY"],
         logger,
       }),
-      agents: { use: agents },
       engine: {
         model,
-        createModel,
         ...(prompts === undefined ? {} : { systemPrompts: prompts }),
-        recordPayloads: langfuse?.recordPayloads === true,
       },
       policy: {
         incremental: getInput(env, "incremental") === "true",

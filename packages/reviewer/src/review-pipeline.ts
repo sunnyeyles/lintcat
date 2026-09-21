@@ -1,210 +1,42 @@
-/**
- * The review pipeline: agents run concurrently, then join -> synthesise ->
- * validate in sequence.
- */
+/** The review pipeline: one agent runs, then its candidates are validated. */
 import {
   isCancellation,
+  ReviewCancelledError,
   throwIfCancelled,
-  type AgentLifecycleEvent,
-  type AgentLifecycleListener,
   type ReviewAgent,
   type ReviewContext,
-  type Synthesiser,
-  type SynthesisHints,
-  type TokenUsage,
 } from "@pr-review/ai";
-import { errorMessage, errorName } from "@pr-review/logging";
 import type { ReviewFinding } from "@pr-review/schemas";
 
 import { validateFindings } from "#src/validate-findings";
 
-/** One agent that did not produce candidates, and why. */
-export interface AgentFailure {
-  agent: string;
-  error: string;
-}
-
-/** One agent's outcome; the tag decides which field exists. */
-type AgentOutcome =
-  | { name: string; candidates: readonly unknown[] }
-  | { name: string; error: string };
-
-/** The synthesise step's outcome; the tag decides which fields exist. */
-export type SynthesisState =
-  | { outcome: "skipped"; candidates: unknown[]; reason: SkipReason }
-  | {
-      outcome: "completed";
-      candidates: unknown[];
-      usage: TokenUsage;
-      durationMs: number;
-    }
-  | {
-      outcome: "failed";
-      candidates: unknown[];
-      error: string;
-      errorName: string;
-      durationMs: number;
-    };
-
-type SkipReason = "no candidate findings" | "standalone agent";
-
-/** The outcome of a synthesise step that never ran. */
-export function skippedSynthesis(
-  reason: SkipReason,
-  candidates: unknown[],
-): SynthesisState {
-  return { outcome: "skipped", candidates, reason };
-}
-
-/** Reports one agent's phase, counting the run's finished agents. */
-type ReportPhase = (agent: string, phase: AgentLifecycleEvent["phase"]) => void;
-
-/** A reporter over `listener`; a no-op when the caller wants no events. */
-function lifecycleReporter(
-  total: number,
-  listener: AgentLifecycleListener | undefined,
-): ReportPhase {
-  if (listener === undefined) {
-    return () => {};
-  }
-  let finished = 0;
-  return (agent, phase) => {
-    if (phase !== "started") {
-      finished += 1;
-    }
-    try {
-      listener({ agent, phase, finished, total });
-    } catch {
-      // Progress reporting must never fail a review.
-    }
-  };
-}
-
-/** Runs one agent, recording success or failure; never throws. */
-async function runAgent(
-  agent: ReviewAgent,
-  context: ReviewContext,
-  report: ReportPhase,
-): Promise<AgentOutcome> {
-  report(agent.name, "started");
-  try {
-    const candidates = await agent.run(context);
-    report(agent.name, "completed");
-    return { name: agent.name, candidates };
-  } catch (error) {
-    report(agent.name, "failed");
-    return { name: agent.name, error: errorMessage(error) };
-  }
-}
-
-/** Throws only when every agent failed. */
-function join(
-  outcomes: readonly AgentOutcome[],
-): Pick<ReviewPipelineResult, "candidates" | "agentFailures"> {
-  const candidates: unknown[] = [];
-  const agentFailures: AgentFailure[] = [];
-  for (const outcome of outcomes) {
-    if ("error" in outcome) {
-      agentFailures.push({ agent: outcome.name, error: outcome.error });
-    } else {
-      candidates.push(...outcome.candidates);
-    }
-  }
-
-  if (agentFailures.length === outcomes.length) {
-    const details = agentFailures
-      .map((failure) => `${failure.agent}: ${failure.error}`)
-      .join("; ");
-    throw new Error(`every review agent failed — ${details}`);
-  }
-
-  return { candidates, agentFailures };
-}
-
-/**
- * "skipped" means the Synthesiser was never invoked. A failure falls
- * back to the raw candidates rather than failing the review.
- */
-async function synthesise(
-  synthesiser: Synthesiser,
-  candidates: unknown[],
-  hints: SynthesisHints | undefined,
-  signal: AbortSignal | undefined,
-): Promise<SynthesisState> {
-  if (candidates.length === 0) {
-    return skippedSynthesis("no candidate findings", candidates);
-  }
-
-  const startedAt = Date.now();
-  try {
-    const result = await synthesiser.synthesise(candidates, hints, signal);
-    return {
-      outcome: "completed",
-      candidates: result.findings,
-      usage: result.usage,
-      durationMs: Date.now() - startedAt,
-    };
-  } catch (error) {
-    // A cancelled synthesis has no partial result to fall back to.
-    if (isCancellation(error, signal)) {
-      throw error;
-    }
-    return {
-      outcome: "failed",
-      candidates,
-      error: errorMessage(error),
-      errorName: errorName(error),
-      durationMs: Date.now() - startedAt,
-    };
-  }
-}
-
 /** The full outcome of one review-pipeline run, for the caller to log and publish. */
 export interface ReviewPipelineResult {
-  /** Untrusted candidate findings from every successful agent, in agent order. */
+  /** Untrusted candidate findings the agent proposed. */
   candidates: unknown[];
-  /** Agents that failed while at least one other agent succeeded. */
-  agentFailures: AgentFailure[];
-  /** The synthesise step's own outcome. */
-  synthesis: SynthesisState;
   /** The final, deterministically validated findings. */
   findings: ReviewFinding[];
 }
 
-/** Throws when every agent failed or the run was cancelled; a synthesis failure never throws. */
+/** Throws when the agent failed or the run was cancelled. */
 export async function runReviewPipeline(
-  agents: readonly ReviewAgent[],
-  synthesiser: Synthesiser,
+  agent: ReviewAgent,
   context: ReviewContext,
-  hints?: SynthesisHints,
-  onAgentEvent?: AgentLifecycleListener,
 ): Promise<ReviewPipelineResult> {
-  if (agents.length === 0) {
-    throw new Error("runReviewPipeline requires at least one review agent");
+  throwIfCancelled(context.signal);
+  let candidates: unknown[];
+  try {
+    candidates = [...(await agent.run(context))];
+  } catch (error) {
+    if (isCancellation(error, context.signal)) {
+      throw new ReviewCancelledError();
+    }
+    throw error;
   }
-
   throwIfCancelled(context.signal);
-  const report = lifecycleReporter(agents.length, onAgentEvent);
-  const outcomes = await Promise.all(
-    agents.map((agent) => runAgent(agent, context, report)),
-  );
-  // Before join: agents aborted mid-run report failures nobody should act on.
-  throwIfCancelled(context.signal);
-  const { candidates, agentFailures } = join(outcomes);
-  // Nothing to merge; a lone specialist still synthesises so narrowed runs test the full path.
-  const synthesis =
-    agents.length === 1 && agents[0]?.standalone === true
-      ? skippedSynthesis("standalone agent", candidates)
-      : await synthesise(synthesiser, candidates, hints, context.signal);
 
   return {
     candidates,
-    agentFailures,
-    synthesis,
-    findings: validateFindings(
-      synthesis.candidates,
-      context.changedFiles,
-      agents.map((agent) => agent.name),
-    ),
+    findings: validateFindings(candidates, context.changedFiles, [agent.name]),
   };
 }

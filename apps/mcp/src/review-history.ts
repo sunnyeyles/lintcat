@@ -15,7 +15,6 @@ export function summariseReview(review: ReviewSummary) {
     prNumber: review.prNumber,
     headSha: review.headSha.slice(0, 7),
     createdAt: review.createdAt,
-    agents: review.agents,
     summary: review.summary,
     findingCount: review.findingCount,
     bySeverity: review.bySeverity,
@@ -52,7 +51,7 @@ export async function scopeToOrganization(
   };
 }
 
-/** One stored review with every finding and agent run, or a throw if it is not readable. */
+/** One stored review with every finding, or a throw if it is not readable. */
 export async function readStoredReview(
   environment: McpEnvironment,
   githubId: () => Promise<number>,
@@ -67,6 +66,5 @@ export async function readStoredReview(
   return {
     ...summariseReview(review),
     findings: review.findings.map(({ id: _id, reviewId: _reviewId, ...finding }) => finding),
-    runs: review.runs.map(({ id: _id, reviewId: _reviewId, ...run }) => run),
   };
 }

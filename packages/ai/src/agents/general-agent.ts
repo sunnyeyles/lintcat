@@ -1,10 +1,8 @@
 import type { AgentDefinition } from "#src/agents/definition";
 
-// The default review: what runs when a repository configures no agents.
 export const GENERAL_AGENT: AgentDefinition = {
   category: "general",
   role: "Code reviewer",
-  standalone: true,
   focus: `Review the pull request for the problems a careful senior reviewer would block a merge on:
 - correctness: logic errors, wrong conditions or bounds, unhandled null or empty input, wrong return values, swallowed errors, missing awaits and ordering bugs
 - security: missing or bypassable authentication or authorisation, cross-tenant access, injection, leaked secrets, sensitive data in logs, unsafely trusted input

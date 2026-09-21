@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
   addSuppression,
   computeHints,
-  computeSynthesisHints,
   emptyMemory,
   isSuppressed,
   partitionSuppressed,
@@ -14,7 +13,6 @@ import {
   titleShape,
   writeMemory,
   HINT_CAP,
-  SYNTHESIS_HINT_CAP,
   type FindingSignal,
   type MemoryStore,
 } from "#src/memory";
@@ -155,23 +153,21 @@ describe("computeHints", () => {
   it("hints once a shape is ignored five times and never resolved", () => {
     const hints = computeHints(memory([shape({ ignored: 5 })]), NOW);
 
-    expect(hints.get("security")).toEqual([
-      'Findings like "missing tenant check in".',
-    ]);
+    expect(hints).toEqual(['Findings like "missing tenant check in".']);
   });
 
   it("stays quiet at four ignores", () => {
-    expect(computeHints(memory([shape({ ignored: 4 })]), NOW).size).toBe(0);
+    expect(computeHints(memory([shape({ ignored: 4 })]), NOW)).toEqual([]);
   });
 
   it("stays quiet when a single finding of that shape was resolved", () => {
-    expect(computeHints(memory([shape({ ignored: 9, resolved: 1 })]), NOW).size).toBe(0);
+    expect(computeHints(memory([shape({ ignored: 9, resolved: 1 })]), NOW)).toEqual([]);
   });
 
   it("ignores a shape whose last signal has expired", () => {
     const stale = memory([shape({ ignored: 9, lastSignalAt: daysBefore(91) })]);
 
-    expect(computeHints(stale, NOW).size).toBe(0);
+    expect(computeHints(stale, NOW)).toEqual([]);
   });
 
   it("caps the hints at ten, keeping the most ignored", () => {
@@ -179,73 +175,15 @@ describe("computeHints", () => {
       shape({ shape: `pattern ${"x".repeat(index + 1)}`, ignored: 5 + index }),
     );
     const hints = computeHints(memory(shapes), NOW);
-    const all = [...hints.values()].flat();
 
-    expect(all).toHaveLength(HINT_CAP);
-    expect(all[0]).toContain("x".repeat(14));
+    expect(hints).toHaveLength(HINT_CAP);
+    expect(hints[0]).toContain("x".repeat(14));
   });
 
   it("strips quotes and newlines from an untrusted shape", () => {
     const injected = shape({ shape: 'a"\nb', ignored: 5 });
 
-    expect(computeHints(memory([injected]), NOW).get("security")?.[0]).toContain('like "ab"');
-  });
-});
-
-describe("computeSynthesisHints", () => {
-  it("keeps a shape resolved three times and never ignored", () => {
-    const hints = computeSynthesisHints(memory([shape({ resolved: 3 })]), NOW);
-
-    expect(hints.keep).toEqual([
-      'Security: Findings like "missing tenant check in".',
-    ]);
-    expect(hints.drop).toEqual([]);
-  });
-
-  it("stays quiet at two resolves", () => {
-    expect(
-      computeSynthesisHints(memory([shape({ resolved: 2 })]), NOW).keep,
-    ).toEqual([]);
-  });
-
-  it("keeps nothing for a shape the repository has also ignored", () => {
-    const mixed = memory([shape({ resolved: 9, ignored: 1 })]);
-
-    expect(computeSynthesisHints(mixed, NOW).keep).toEqual([]);
-  });
-
-  it("drops a shape ignored five times and never resolved", () => {
-    const hints = computeSynthesisHints(memory([shape({ ignored: 5 })]), NOW);
-
-    expect(hints.drop).toEqual([
-      'Security: Findings like "missing tenant check in".',
-    ]);
-    expect(hints.keep).toEqual([]);
-  });
-
-  it("forgets a shape whose last signal has expired", () => {
-    const stale = memory([
-      shape({ resolved: 9, lastSignalAt: daysBefore(91) }),
-      shape({ ignored: 9, lastSignalAt: daysBefore(91) }),
-    ]);
-
-    expect(computeSynthesisHints(stale, NOW)).toEqual({ keep: [], drop: [] });
-  });
-
-  it("caps each list, keeping the strongest signals", () => {
-    const shapes = Array.from({ length: 8 }, (_, index) =>
-      shape({ shape: `pattern ${"x".repeat(index + 1)}`, resolved: 3 + index }),
-    );
-    const { keep } = computeSynthesisHints(memory(shapes), NOW);
-
-    expect(keep).toHaveLength(SYNTHESIS_HINT_CAP);
-    expect(keep[0]).toContain("x".repeat(8));
-  });
-
-  it("strips quotes and newlines from an untrusted shape", () => {
-    const injected = memory([shape({ shape: 'a"\nb', ignored: 5 })]);
-
-    expect(computeSynthesisHints(injected, NOW).drop[0]).toContain('like "ab"');
+    expect(computeHints(memory([injected]), NOW)[0]).toContain('like "ab"');
   });
 });
 
@@ -263,10 +201,10 @@ describe("suppressions", () => {
     ).toBe(true);
   });
 
-  it("leaves a different category or a different shape alone", () => {
+  it("matches a shape whatever its category, and leaves another shape alone", () => {
     const suppressed = addSuppression(emptyMemory(), finding, NOW);
 
-    expect(isSuppressed(suppressed, { ...finding, category: "performance" })).toBe(false);
+    expect(isSuppressed(suppressed, { ...finding, category: "general" })).toBe(true);
     expect(isSuppressed(suppressed, { ...finding, title: "Unbounded query in getCustomer" })).toBe(
       false,
     );
