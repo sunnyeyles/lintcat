@@ -99,6 +99,30 @@ describe("reviewRecordSchema", () => {
     }
   });
 
+  it("accepts a finding's hasPatch flag", () => {
+    const [finding] = validRecord.findings;
+    const result = reviewRecordSchema.safeParse({
+      ...validRecord,
+      findings: [{ ...finding, hasPatch: true }],
+    });
+    expect(result.success && result.data.findings[0]?.hasPatch).toBe(true);
+  });
+
+  it("drops patch source text an older sender still includes", () => {
+    const [finding] = validRecord.findings;
+    const result = reviewRecordSchema.safeParse({
+      ...validRecord,
+      findings: [
+        {
+          ...finding,
+          patch: { startLine: 1, endLine: 1, expected: "a", replacement: "b" },
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.findings[0]).not.toHaveProperty("patch");
+  });
+
   it("rejects a finding that breaks the finding contract", () => {
     const [finding] = validRecord.findings;
     const result = reviewRecordSchema.safeParse({
