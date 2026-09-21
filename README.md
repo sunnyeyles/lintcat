@@ -88,7 +88,7 @@ their inputs**:
 
 | Setting | What leaves, and where to | Closing it |
 | --- | --- | --- |
-| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls. The AI SDK records call inputs and outputs by default and this action does not disable it, so the exported spans carry the prompts and tool results — diff and file contents included — to `langfuse-base-url` (`https://cloud.langfuse.com` by default). | Leave both keys unset, the default; or point `langfuse-base-url` at your own instance. |
+| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls, to `langfuse-base-url` (`https://cloud.langfuse.com` by default): span timings, token counts, agent and tool names, finding counts and outcomes. No prompt text, completions or tool results — so no diff and no file contents — unless `langfuse-record-io` is `true`, which exports all of them. | Leave both keys unset, the default; leave `langfuse-record-io` off, also the default; or point `langfuse-base-url` at your own instance. |
 | [`dashboard-token`](#configuration) + `dashboard-url` | One `POST` to `<dashboard-url>/api/ingest` per review ([`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)): owner, repo, PR number, head SHA, agent names, timings, token counts, and every published finding — file path, line, title, explanation, suggested fix, and, where a patch survived, its `expected` and `replacement` text, which are verbatim lines of your source. | Leave both unset, the default; or point `dashboard-url` at your own deployment of [`apps/web`](apps/web). |
 
 Within GitHub, the Action asks for no more than it needs: `contents: read`,
@@ -323,6 +323,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `langfuse-secret-key` | no | The other half. Setting only one of the two disables both features and logs `langfuse.disabled_incomplete_credentials`. |
 | `langfuse-base-url` | no (default `https://cloud.langfuse.com`) | Langfuse host, for a self-hosted or regional instance. Keys are region-scoped: the wrong host 401s and drops every trace. |
 | `langfuse-prompt-label` | no (default `production`) | Which labelled version of each prompt to fetch — try a prompt change on one repository before promoting it. |
+| `langfuse-record-io` | no (default `false`) | Whether traces carry the prompts, completions and tool results of each model call — the diff and every file an agent read. `true` turns it on, for debugging a prompt; any other value keeps traces to timings, token counts and outcomes. |
 
 ### Model providers
 
