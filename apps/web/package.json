@@ -31,6 +31,8 @@
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "graphology": "^0.26.0",
+    "sigma": "^3.0.3",
     "typescript": "^5.9.3"
   }
 }
