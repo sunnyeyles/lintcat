@@ -27,11 +27,11 @@ export default function HowItWorksPage() {
       href="/docs/how-it-works"
       eyebrow="How it works"
       title="The review pipeline"
-      description="One pipeline runs every review, whether it came from the Action or the MCP server: the selected agents propose, one synthesiser refines, and deterministic code decides."
+      description="One pipeline runs every review, whether it came from the Action, the MCP server or the command line: the selected agents propose, one synthesiser refines, and deterministic code decides."
       headings={HEADINGS}
     >
       <Section id="stages" title="The stages">
-        <Code caption="packages/reviewer/src/review-pipeline.ts">{STAGES}</Code>
+        <Code>{STAGES}</Code>
         <Bullets>
           <Bullet>
             <strong>Agents</strong> read the pull request through eight read-only tools and
@@ -60,9 +60,8 @@ export default function HowItWorksPage() {
 
       <Section id="concurrency" title="Concurrency">
         <P>
-          The agents are started together with <code>Promise.all</code>, so they run
-          concurrently. Inside one agent, the tool-calling loop is a single{" "}
-          <code>generateText</code> call, capped at 12 steps.
+          The agents start together and run concurrently. Inside one agent, the tool-calling
+          loop is capped at 12 steps.
         </P>
       </Section>
 

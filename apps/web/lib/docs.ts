@@ -38,11 +38,6 @@ export const DOCS_NAV: DocsSection[] = [
         title: "Agents",
         summary: "The general agent, the five specialists, and how a repository picks.",
       },
-      {
-        href: "/docs/walkthrough",
-        title: "Propose, refine, decide",
-        summary: "The whole run traced in execution order, with the file that owns each step.",
-      },
     ],
   },
   {
@@ -56,12 +51,7 @@ export const DOCS_NAV: DocsSection[] = [
       {
         href: "/docs/mcp-server",
         title: "MCP server",
-        summary: "The same pipeline over a working tree, inside your coding agent.",
-      },
-      {
-        href: "/docs/development",
-        title: "Local development",
-        summary: "Commands, tests, and the events a run logs.",
+        summary: "The same review over a working tree, inside your coding agent.",
       },
     ],
   },

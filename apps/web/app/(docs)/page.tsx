@@ -22,7 +22,7 @@ const HEADINGS: Heading[] = [
 const PIPELINE = `GitHub PR event (opened / synchronize / reopened)
    │
    ▼
-GitHub Action (apps/action)
+GitHub Action
    │
    ├── authenticate with the workflow token
    ├── load PR, changed files, diff

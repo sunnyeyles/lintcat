@@ -22,7 +22,6 @@ const HEADINGS: Heading[] = [
   { id: "shipped", title: "What ships" },
   { id: "opting-in", title: "Opting in" },
   { id: "rules", title: "What follows from the set" },
-  { id: "adding", title: "Adding a specialist" },
 ];
 
 const AGENTS = [
@@ -40,15 +39,14 @@ export default function AgentsPage() {
       href="/docs/agents"
       eyebrow="How it works"
       title="Agents"
-      description="Configuration selects and tunes agents; it does not define them. Each one is a file in the repository, under code review like the rest of the action."
+      description="Configuration selects agents; it does not define them. The prompts ship with the action, so a pull request cannot rewrite the reviewers."
       headings={HEADINGS}
     >
       <Section id="shipped" title="What ships">
         <P>
           With no configuration file, the <code>general</code> agent reviews every pull request
           on its own and its findings carry the <code>general</code> category. Five opt-in
-          specialists ship alongside it, one file each in{" "}
-          <code>packages/ai/src/agents/specialists/</code>.
+          specialists ship alongside it.
         </P>
         <Card className="py-0">
           <Table>
@@ -96,30 +94,18 @@ export default function AgentsPage() {
       <Section id="rules" title="What follows from the set">
         <P>
           Everything downstream follows from the configured agents: the prompt each one is
-          given, its Langfuse prompt key, the categories the synthesiser is told about, the
-          categories validation accepts, and the labels findings are rendered under.
+          given, the categories the synthesiser is told about, the categories validation
+          accepts, and the labels findings are rendered under.
         </P>
         <Bullets>
           <Bullet>
             An agent&rsquo;s name is also the finding category it owns, and the only category
             its findings may carry — findings in any other are discarded.
           </Bullet>
-          <Bullet>
-            The role and focus live in the specialist&rsquo;s own file and are dropped into the
-            shared system prompt; the security hardening, tool guidance and JSON output
-            contract come with it.
-          </Bullet>
           <Bullet>Order is significant: it is the order findings reach the synthesiser.</Bullet>
         </Bullets>
       </Section>
 
-      <Section id="adding" title="Adding a specialist">
-        <P>
-          A new specialist is a new file under <code>specialists/</code> and an entry in its{" "}
-          <code>index.ts</code>. That keeps the reviewers&rsquo; prompts in version control,
-          reviewed like any other change.
-        </P>
-      </Section>
     </DocsArticle>
   );
 }
