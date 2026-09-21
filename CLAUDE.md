@@ -86,8 +86,24 @@ The CLI mis-resolves the `#src/cn` alias and emits `from "cn"` — rewrite those
 to `#src/cn` after every `add`, and drop the stray `cn` npm dependency if it
 reappears in `package.json`. Re-export anything new from `src/index.ts`.
 
-`src/theme.css` holds the palette and is the single source of truth: edit it
-directly. There is no token generator. `docs/tokens.css` is a separate,
+Colour comes from `@primer/primitives` (GitHub's tokens), in three layers
+(see `docs/adr/0002-primer-tokens-under-shadcn.md`):
+
+1. Primer's `light.css` and `dark.css`, imported by `src/theme.css`. Never
+   edited; upgrade the package to move.
+2. `src/brand.css`: the only Primer tokens we override — the teal accent
+   (`#317a71`), the sand light canvases and the teal dark canvases. Values are
+   plain hex, checked by `src/theme.test.ts` for WCAG contrast.
+3. `src/theme.css`: shadcn's semantic names (`--background`, `--primary`,
+   `--link`, …) aliased onto Primer tokens, plus the Tailwind `@theme` block.
+   Components use these names only.
+
+The theme follows the OS (`data-color-mode="auto"` on `<html>`); there is no
+in-app toggle and no `.dark` class. Tailwind's `dark:` variant is the default
+`prefers-color-scheme` one. Fonts are the system stacks.
+
+`src/tokens-guard.test.ts` fails the build on Tailwind palette classes
+(`bg-gray-100`) or raw hex in app code. `docs/tokens.css` is a separate,
 unrelated palette for the standalone `docs/index.html` explainer page.
 
 ## Commands

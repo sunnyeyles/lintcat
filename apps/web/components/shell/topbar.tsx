@@ -2,7 +2,6 @@ import { Button } from "@pr-review/design";
 import Link from "next/link";
 
 import { SidebarDrawer } from "@/components/shell/sidebar";
-import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { TopbarFrame } from "@/components/shell/topbar-frame";
 import { UserMenu } from "@/components/shell/user-menu";
 import { DOCS_HOME } from "@/lib/docs";
@@ -27,7 +26,6 @@ export async function Topbar({ className }: { className?: string }) {
           <Button asChild variant="outline" size="sm">
             <Link href={dashboard}>Dashboard</Link>
           </Button>
-          <ThemeToggle />
           <UserMenu signInHref={signInHref} />
         </>
       }

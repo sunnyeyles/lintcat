@@ -1,0 +1,123 @@
+/* Brand overrides on top of @primer/primitives. Only tokens we deliberately change live here. */
+
+/* Accent steps keep Primer's lightness deltas, re-anchored on #317a71 (OKLCH hue swap). */
+[data-color-mode="light"][data-light-theme="light"],
+[data-color-mode="auto"][data-light-theme="light"] {
+  --fgColor-accent: #317a71;
+  --bgColor-accent-emphasis: #317a71;
+  --bgColor-accent-muted: #e5efed;
+  --borderColor-accent-emphasis: #317a71;
+  --borderColor-accent-muted: #7db1a966;
+  --control-checked-bgColor-hover: #2b7068;
+  --control-checked-bgColor-active: #26665e;
+  --button-outline-fgColor-rest: #317a71;
+  --button-outline-bgColor-active: #26665e;
+  --selection-bgColor: #317a7133;
+
+  /* Sand canvases: Primer's lightness steps at hue 75, chroma ≤ 0.014. */
+  --bgColor-default: #fff9f1;
+  --bgColor-muted: #f7f1ea;
+  --bgColor-disabled: #f2ece4;
+  --control-bgColor-rest: #f7f1ea;
+  --control-bgColor-hover: #f2ece4;
+  --control-bgColor-active: #eae4dd;
+  --controlTrack-bgColor-rest: #eae4dd;
+  --borderColor-default: #dad3ca;
+  --borderColor-muted: #ddd7cfb3;
+  --borderColor-emphasis: #8e8880;
+
+  /* Ink and neutrals lean teal so text sits with the accent, not the sand. */
+  --fgColor-default: #1d2423;
+  --fgColor-muted: #596563;
+  --fgColor-disabled: #818d8b;
+  --bgColor-emphasis: #232a29;
+  --control-fgColor-rest: #232a29;
+  --bgColor-neutral-emphasis: #596563;
+  --borderColor-neutral-emphasis: #596563;
+  --bgColor-neutral-muted: #818d8b1f;
+  --control-transparent-bgColor-hover: #818d8b1a;
+  --control-transparent-bgColor-active: #818d8b26;
+  --control-transparent-bgColor-selected: #818d8b26;
+}
+
+[data-color-mode="dark"][data-dark-theme="dark"],
+[data-color-mode="auto"][data-light-theme="dark"] {
+  --fgColor-accent: #5b948c;
+  --bgColor-accent-emphasis: #317a71;
+  --bgColor-accent-muted: #4f90871a;
+  --borderColor-accent-emphasis: #317a71;
+  --borderColor-accent-muted: #4f908766;
+  --control-checked-bgColor-hover: #3e8279;
+  --control-checked-bgColor-active: #4b8a81;
+  --button-outline-fgColor-rest: #4f9087;
+  --button-outline-bgColor-active: #104943;
+  --selection-bgColor: #317a71b3;
+
+  /* Teal canvases: Primer's dark lightness steps at the accent hue, chroma ≤ 0.012. */
+  --bgColor-default: #0b1311;
+  --bgColor-muted: #141c1b;
+  --bgColor-inset: #010504;
+  --bgColor-emphasis: #3d4644;
+  --bgColor-disabled: #212928;
+  --control-bgColor-rest: #212928;
+  --control-bgColor-hover: #252e2c;
+  --control-bgColor-active: #2a3331;
+  --controlTrack-bgColor-rest: #010504;
+  --borderColor-default: #3d4644;
+  --borderColor-muted: #3d4644b3;
+  --borderColor-emphasis: #646e6c;
+  --overlay-bgColor: #010504;
+  --overlay-backdrop-bgColor: #21292866;
+  --header-bgColor: #141c1bf2;
+  --sideNav-bgColor-selected: #212928;
+  --fgColor-default: #eef8f6;
+  --fgColor-muted: #909a98;
+  --fgColor-disabled: #646e6c;
+  --bgColor-neutral-emphasis: #646e6c;
+  --borderColor-neutral-emphasis: #646e6c;
+  --bgColor-neutral-muted: #646e6c33;
+  --control-transparent-bgColor-hover: #646e6c33;
+  --control-transparent-bgColor-active: #646e6c40;
+  --control-transparent-bgColor-selected: #646e6c33;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-color-mode][data-color-mode="auto"][data-dark-theme="dark"] {
+    --fgColor-accent: #5b948c;
+    --bgColor-accent-emphasis: #317a71;
+    --bgColor-accent-muted: #4f90871a;
+    --borderColor-accent-emphasis: #317a71;
+    --borderColor-accent-muted: #4f908766;
+    --control-checked-bgColor-hover: #3e8279;
+    --control-checked-bgColor-active: #4b8a81;
+    --button-outline-fgColor-rest: #4f9087;
+    --button-outline-bgColor-active: #104943;
+    --selection-bgColor: #317a71b3;
+
+    --bgColor-default: #0b1311;
+    --bgColor-muted: #141c1b;
+    --bgColor-inset: #010504;
+    --bgColor-emphasis: #3d4644;
+    --bgColor-disabled: #212928;
+    --control-bgColor-rest: #212928;
+    --control-bgColor-hover: #252e2c;
+    --control-bgColor-active: #2a3331;
+    --controlTrack-bgColor-rest: #010504;
+    --borderColor-default: #3d4644;
+    --borderColor-muted: #3d4644b3;
+    --borderColor-emphasis: #646e6c;
+    --overlay-bgColor: #010504;
+    --overlay-backdrop-bgColor: #21292866;
+    --header-bgColor: #141c1bf2;
+    --sideNav-bgColor-selected: #212928;
+    --fgColor-default: #eef8f6;
+    --fgColor-muted: #909a98;
+    --fgColor-disabled: #646e6c;
+    --bgColor-neutral-emphasis: #646e6c;
+    --borderColor-neutral-emphasis: #646e6c;
+    --bgColor-neutral-muted: #646e6c33;
+    --control-transparent-bgColor-hover: #646e6c33;
+    --control-transparent-bgColor-active: #646e6c40;
+    --control-transparent-bgColor-selected: #646e6c33;
+  }
+}

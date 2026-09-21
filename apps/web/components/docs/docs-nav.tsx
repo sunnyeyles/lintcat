@@ -18,7 +18,7 @@ import { useState } from "react";
 import { DOCS_NAV, isDocsPageActive } from "@/lib/docs";
 
 const LINK_CLASS =
-  "block rounded-sm border border-transparent px-2.5 py-1.5 font-mono text-label tracking-ui transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "block rounded-sm border border-transparent px-2.5 py-1.5 text-label tracking-ui transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -38,7 +38,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                 className={cn(
                   LINK_CLASS,
                   active
-                    ? "border-border-subtle bg-primary/10 font-semibold text-primary"
+                    ? "border-border-subtle bg-primary/10 font-semibold text-link"
                     : "text-muted-foreground hover:border-border-subtle hover:bg-surface-2 hover:text-foreground",
                 )}
               >
@@ -73,7 +73,7 @@ export function DocsNavDrawer({ className }: { className?: string }) {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
         className={cn(
-          "inline-flex items-center gap-2 rounded-sm border border-border bg-card px-2.5 py-1.5 font-mono text-label tracking-ui text-muted-foreground transition-colors outline-none hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden",
+          "inline-flex items-center gap-2 rounded-sm border border-border bg-card px-2.5 py-1.5 text-label tracking-ui text-muted-foreground transition-colors outline-none hover:border-primary hover:text-link focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden",
           className,
         )}
       >

@@ -5,8 +5,8 @@ import { cn } from "#src/cn"
 import * as RechartsPrimitive from "recharts"
 import type { TooltipValueType } from "recharts"
 
-// Format: { THEME_NAME: CSS_SELECTOR }
-const THEMES = { light: "", dark: ".dark" } as const
+// Format: { THEME_NAME: AT_RULE_WRAPPER }; the theme follows the OS, so dark is a media query.
+const THEMES = { light: "", dark: "@media (prefers-color-scheme: dark)" } as const
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const
 type TooltipNameType = number | string
@@ -93,9 +93,8 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     <style
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+          .map(([theme, wrapper]) => {
+            const rule = `[data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
@@ -104,9 +103,9 @@ ${colorConfig
     return color ? `  --color-${key}: ${color};` : null
   })
   .join("\n")}
-}
-`
-          )
+}`
+            return wrapper ? `${wrapper} {\n${rule}\n}` : rule
+          })
           .join("\n"),
       }}
     />

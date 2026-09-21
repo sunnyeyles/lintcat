@@ -35,7 +35,7 @@ export function TopbarFrame({
         <nav aria-label="Site" className="ml-4 hidden items-center gap-1 sm:flex">
           <Link
             href={docsHref}
-            className="rounded-sm px-2 py-1 font-mono text-xs text-muted-foreground no-underline transition-colors hover:text-foreground"
+            className="rounded-sm px-2 py-1 text-xs text-muted-foreground no-underline transition-colors hover:text-foreground"
           >
             Docs
           </Link>
