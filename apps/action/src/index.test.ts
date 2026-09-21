@@ -40,8 +40,6 @@ const originalGithubActions = vi.hoisted(() => {
 import {
   actionEnvironment,
   getInput,
-  LEGACY_AGENT_CONFIG_PATH,
-  MIGRATION_NOTE_URL,
   requireInput,
   runAction,
   runEntrypoint,
@@ -132,8 +130,6 @@ interface HarnessOptions {
   reviewThreads?: readonly ReviewThread[] | undefined;
   /** What the dashboard answers; a 200 carrying a review id by default. */
   dashboardResponse?: (() => Promise<Response>) | undefined;
-  /** Paths present in the workflow's checkout; none by default. */
-  checkoutFiles?: readonly string[] | undefined;
 }
 
 function harness(
@@ -206,8 +202,6 @@ function harness(
           ? Promise.reject(eventFile)
           : Promise.resolve(eventFile);
       },
-      fileExists: (path) =>
-        Promise.resolve((options.checkoutFiles ?? []).includes(path)),
       createLanguageModel: (config) => {
         modelConfigs.push({
           provider: config.provider,
@@ -611,83 +605,6 @@ const postedThread: ReviewThread = {
   isResolved: false,
   isOutdated: false,
 };
-
-describe("v2 agent configuration", () => {
-  const workspaceEnv = { ...reviewEnv, GITHUB_WORKSPACE: "/work/repo" };
-
-  it.each([
-    ["agents", "INPUT_AGENTS", "security,correctness"],
-    ["agent-config", "INPUT_AGENT-CONFIG", ".github/pr-review-agents.yml"],
-  ])(
-    "fails on the removed %s input before any model or GitHub client",
-    async (name, variable, value) => {
-      const { environment, modelConfigs, modelCalls, tokenConfigs, fileReads } =
-        harness({ ...workspaceEnv, [variable]: value });
-
-      const run = runAction(environment);
-
-      await expect(run).rejects.toThrow(
-        `The \`${name}\` input was removed in v3: every review now runs the single general reviewer`,
-      );
-      await expect(run).rejects.toThrow(MIGRATION_NOTE_URL);
-      expect(modelConfigs).toEqual([]);
-      expect(modelCalls()).toBe(0);
-      expect(tokenConfigs).toEqual([]);
-      expect(fileReads).toEqual([]);
-    },
-  );
-
-  it("fails when the legacy config file is in the checkout", async () => {
-    const { environment, modelConfigs, modelCalls, tokenConfigs } = harness(
-      workspaceEnv,
-      pullRequestEvent(),
-      { checkoutFiles: [`/work/repo/${LEGACY_AGENT_CONFIG_PATH}`] },
-    );
-
-    await expect(runAction(environment)).rejects.toThrow(
-      /`\.github\/pr-review-agents\.yml` was removed in v3: .*Delete the file/,
-    );
-    expect(modelConfigs).toEqual([]);
-    expect(modelCalls()).toBe(0);
-    expect(tokenConfigs).toEqual([]);
-  });
-
-  it("fails a merge-learning run too, before its GitHub client", async () => {
-    const { environment, tokenConfigs } = harness(
-      { ...workspaceEnv, "INPUT_MEMORY-BRANCH": "pr-review-memory", INPUT_AGENTS: "security" },
-      mergedEvent(),
-    );
-
-    await expect(runAction(environment)).rejects.toThrow(/removed in v3/);
-    expect(tokenConfigs).toEqual([]);
-  });
-
-  it("reviews as usual when neither is present", async () => {
-    const { environment, modelCalls, entries } = harness(workspaceEnv, pullRequestEvent(), {
-      checkoutFiles: ["/work/repo/.github/workflows/review.yml"],
-    });
-
-    await expect(runAction(environment)).resolves.toBeUndefined();
-
-    expect(modelCalls()).toBeGreaterThan(0);
-    expect(events(entries)).toContain("review.started");
-  });
-
-  it("ignores an empty removed input, which is how an unset one arrives", async () => {
-    const { environment } = harness({ ...workspaceEnv, INPUT_AGENTS: "  " });
-
-    await expect(runAction(environment)).resolves.toBeUndefined();
-  });
-
-  it("leaves an event nobody reviews a clean no-op", async () => {
-    const { environment } = harness(
-      { ...workspaceEnv, INPUT_AGENTS: "security" },
-      pullRequestEvent({ action: "labeled" }),
-    );
-
-    await expect(runAction(environment)).resolves.toBeUndefined();
-  });
-});
 
 describe("review memory", () => {
   const memoryEnv = { ...reviewEnv, "INPUT_MEMORY-BRANCH": "pr-review-memory" };
@@ -1147,7 +1064,6 @@ describe("actionEnvironment", () => {
     const environment = actionEnvironment();
     expect(environment.env).toBe(process.env);
     expect(typeof environment.readEventFile).toBe("function");
-    expect(typeof environment.fileExists).toBe("function");
     expect(typeof environment.createLanguageModel).toBe("function");
     expect(typeof environment.createTokenClient).toBe("function");
     expect(typeof environment.createPromptClient).toBe("function");

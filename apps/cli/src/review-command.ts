@@ -8,7 +8,6 @@ import {
   modelReviewEngine,
   openLocalMemoryStore,
   openLocalRepository,
-  rejectLegacyAgentConfig,
   runReview,
   type McpEnvironment,
 } from "@pr-review/mcp/local-review";
@@ -65,7 +64,6 @@ async function review(
     options.base,
     options.scope,
   );
-  await rejectLegacyAgentConfig(local.root);
   const changed = await local.client.listChangedFiles(local.target);
   const where = `${local.scope.headLabel} of ${local.root} against ${local.baseRef} (${local.baseSha.slice(0, 7)})`;
   if (changed.length === 0) {

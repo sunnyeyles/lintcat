@@ -2,8 +2,7 @@
  * The GitHub Action entrypoint. Wiring only: read action inputs, build
  * the clients, hand off to runReview.
  */
-import { access, readFile } from "node:fs/promises";
-import path from "node:path";
+import { readFile } from "node:fs/promises";
 import process from "node:process";
 
 import {
@@ -67,8 +66,6 @@ export interface ActionEnvironment {
   env: Record<string, string | undefined>;
   /** Reads the workflow event payload file as UTF-8 text. */
   readEventFile: (path: string) => Promise<string>;
-  /** Whether a file exists in the workflow's checkout. */
-  fileExists: (path: string) => Promise<boolean>;
   createLanguageModel: (config: LanguageModelConfig) => ReviewModel;
   createTokenClient: (
     config: GithubTokenConfig,
@@ -94,11 +91,6 @@ export function actionEnvironment(): ActionEnvironment {
   return {
     env: process.env,
     readEventFile: (filePath) => readFile(filePath, "utf8"),
-    fileExists: (filePath) =>
-      access(filePath).then(
-        () => true,
-        () => false,
-      ),
     createLanguageModel,
     createTokenClient,
     createPromptClient: createLangfusePromptClient,
@@ -136,42 +128,6 @@ export function requireInput(
     throw new Error(`Missing required action input: ${name}`);
   }
   return value;
-}
-
-export const MIGRATION_NOTE_URL =
-  "https://github.com/sunnyeyles/pr-review-action#moving-from-v2";
-
-export const LEGACY_AGENT_CONFIG_PATH = ".github/pr-review-agents.yml";
-
-const REMOVED_INPUTS = ["agents", "agent-config"] as const;
-
-function removedInV3(what: string, fix: string): Error {
-  return new Error(
-    `${what} was removed in v3: every review now runs the single general reviewer, ` +
-      `so it would be ignored. ${fix} See ${MIGRATION_NOTE_URL}`,
-  );
-}
-
-/** Fails on v2 agent configuration rather than letting it be silently ignored. */
-async function rejectLegacyAgentConfig(
-  environment: Pick<ActionEnvironment, "env" | "fileExists">,
-): Promise<void> {
-  const { env } = environment;
-  // Undeclared inputs still arrive as INPUT_<NAME>.
-  const input = REMOVED_INPUTS.find((name) => getInput(env, name) !== "");
-  if (input !== undefined) {
-    throw removedInV3(
-      `The \`${input}\` input`,
-      "Delete it from the step's `with:` block.",
-    );
-  }
-  const workspace = env["GITHUB_WORKSPACE"] || ".";
-  if (await environment.fileExists(path.join(workspace, LEGACY_AGENT_CONFIG_PATH))) {
-    throw removedInV3(
-      `\`${LEGACY_AGENT_CONFIG_PATH}\``,
-      "Delete the file; nothing reads it.",
-    );
-  }
 }
 
 /** The Langfuse settings one run needs, once they are known to be usable. */
@@ -390,13 +346,11 @@ export async function runAction(
   // An event that will not be reviewed is a clean no-op: it must not fail
   // on configuration, and it has no base commit to read one from anyway.
   const inspection = inspectEvent(payload, eventName);
-  if (!inspection.review && inspection.learn !== true) {
-    logger.info("review.skipped", { reason: inspection.reason });
-    return;
-  }
-  // Before any client exists: a removed setting must fail, not narrow nothing quietly.
-  await rejectLegacyAgentConfig(environment);
   if (!inspection.review) {
+    if (inspection.learn !== true) {
+      logger.info("review.skipped", { reason: inspection.reason });
+      return;
+    }
     if (memoryBranch === "") {
       logger.info("review.skipped", { reason: "memory-branch not set" });
       return;
