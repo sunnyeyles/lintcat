@@ -559,9 +559,11 @@ node apps/cli/start.mjs review --fail-on medium  # stricter than the default `hi
 node apps/cli/start.mjs install-hook             # block a push that carries a high finding
 ```
 
-It exits `0` when nothing reaches the threshold, `1` when something does, and
-`2` when the review could not run — a missing model key is reported before any
-git or model work begins. Findings print to stdout, one location each;
+It exits `0` when nothing reaches the threshold, `1` when something does, `2`
+when the review could not run — a missing model key is reported before any
+git or model work begins — and `3` when Ctrl-C cancelled it. Cancelling aborts
+the in-flight model calls, and the pre-push hook refuses the push saying the
+review was cancelled, not that it found something. Findings print to stdout, one location each;
 progress and errors go to stderr.
 
 The installed `pre-push` hook is bypassed without editing it:
