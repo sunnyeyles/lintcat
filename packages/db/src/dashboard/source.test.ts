@@ -10,17 +10,22 @@ import {
   organizations,
   repoAccess,
   repos,
+  reviews,
   users,
   type Organization,
 } from "../schema";
 import { createTestDatabase } from "../test-database";
-import { costOf } from "./aggregate";
+import { categoryCounts, computeTrends, costOf } from "./aggregate";
 import { createDbSource } from "./source";
 
-function run(agent: string, findingCount: number): ReviewRecordAgentRun {
+function run(
+  agent: string,
+  findingCount: number,
+  durationMs = 10_000,
+): ReviewRecordAgentRun {
   return {
     agent,
-    durationMs: 10_000,
+    durationMs,
     findingCount,
     inputTokens: 1_000,
     cacheCreationInputTokens: 2_000,
@@ -322,5 +327,217 @@ describe("createDbSource for the repos authorize lets a viewer read", () => {
     expect(await source.listRepos()).toEqual([]);
     expect(await source.listReviews()).toEqual([]);
     expect((await source.getUsage("30d")).totals.reviewCount).toBe(0);
+  });
+});
+
+// Counts round trips by intercepting the one call every read goes through.
+function countingDatabase(target: Database) {
+  let selects = 0;
+  const counted = new Proxy(target, {
+    get(source, property, receiver) {
+      if (property !== "select") return Reflect.get(source, property, receiver);
+      return (...args: never[]) => {
+        selects += 1;
+        return (source.select as (...a: never[]) => unknown)(...args);
+      };
+    },
+  });
+  return { database: counted as Database, selects: () => selects };
+}
+
+async function repoIdsOf(organization: Organization): Promise<number[]> {
+  const rows = await database
+    .select({ id: repos.id })
+    .from(repos)
+    .where(eq(repos.organizationId, organization.id));
+  return rows.map((row) => row.id);
+}
+
+describe("createDbSource deduplicates reads within one instance", () => {
+  beforeEach(async () => {
+    await ingest(acme, record());
+    await ingest(acme, record({ headSha: "b".repeat(40), prNumber: 8 }));
+  });
+
+  it("fetches one window's reviews once for trends and usage together", async () => {
+    const ids = await repoIdsOf(acme);
+
+    const separate = countingDatabase(database);
+    const apartTrends = await createDbSource(separate.database, acme, ids).getTrends("30d");
+    const apartUsage = await createDbSource(separate.database, acme, ids).getUsage("30d");
+
+    const shared = countingDatabase(database);
+    const source = createDbSource(shared.database, acme, ids);
+    const [trends, usage] = await Promise.all([
+      source.getTrends("30d"),
+      source.getUsage("30d"),
+    ]);
+
+    expect(separate.selects()).toBe(8);
+    expect(shared.selects()).toBe(5);
+    expect(trends).toEqual(apartTrends);
+    expect(usage).toEqual(apartUsage);
+  });
+
+  it("shares one in-flight fetch between concurrent callers of the same filter", async () => {
+    const counted = countingDatabase(database);
+    const source = createDbSource(counted.database, acme, await repoIdsOf(acme));
+
+    const [first, second] = await Promise.all([
+      source.listReviews(),
+      source.listReviews(),
+    ]);
+
+    expect(counted.selects()).toBe(3);
+    expect(first).toEqual(second);
+  });
+
+  it("re-reads nothing on a repeated usage call", async () => {
+    const counted = countingDatabase(database);
+    const source = createDbSource(counted.database, acme, await repoIdsOf(acme));
+
+    const first = await source.getUsage("30d");
+    const after = counted.selects();
+
+    expect(await source.getUsage("30d")).toEqual(first);
+    expect(counted.selects()).toBe(after);
+  });
+
+  it("adds only the category rollup for trends after a usage read", async () => {
+    const counted = countingDatabase(database);
+    const source = createDbSource(counted.database, acme, await repoIdsOf(acme));
+
+    await source.getUsage("30d");
+    const afterUsage = counted.selects();
+    const trends = await source.getTrends("30d");
+
+    expect(counted.selects()).toBe(afterUsage + 1);
+    expect(trends.totals.findings).toBe(4);
+  });
+});
+
+describe("createDbSource rolls trends up in Postgres", () => {
+  async function backdate(reviewId: number, days: number): Promise<void> {
+    await database
+      .update(reviews)
+      .set({ createdAt: new Date(Date.now() - days * 864e5) })
+      .where(eq(reviews.id, reviewId));
+  }
+
+  function finding(
+    agent: string,
+    category: string,
+    severity: "low" | "medium" | "high",
+    file: string,
+  ) {
+    return {
+      agent,
+      file,
+      category,
+      severity,
+      title: `${category} in ${file}`,
+      explanation: "Fixture.",
+      confidence: 0.5,
+    };
+  }
+
+  // The reviews as the JS rollup sees them: newest first, findings loaded.
+  async function loadedReviews(source: Awaited<ReturnType<typeof sourceFor>>) {
+    const summaries = await source.listReviews();
+    const loaded = await Promise.all(summaries.map((s) => source.getReview(s.id)));
+    return loaded.flatMap((v) => (v === null ? [] : [v]));
+  }
+
+  beforeEach(async () => {
+    const today = await ingest(acme, record());
+    const yesterday = await ingest(
+      acme,
+      record({
+        headSha: "b".repeat(40),
+        prNumber: 8,
+        agents: ["correctness", "security"],
+        agentRuns: [run("correctness", 2, 8_000), run("security", 1, 4_000)],
+        findings: [
+          finding("correctness", "correctness", "medium", "src/a.ts"),
+          finding("correctness", "correctness", "low", "src/b.ts"),
+          finding("security", "security", "high", "src/c.ts"),
+        ],
+      }),
+    );
+    const empty = await ingest(
+      acme,
+      record({
+        headSha: "c".repeat(40),
+        prNumber: 9,
+        agents: ["security"],
+        agentRuns: [run("security", 0)],
+        findings: [],
+      }),
+    );
+    const older = await ingest(
+      acme,
+      record({
+        headSha: "d".repeat(40),
+        prNumber: 10,
+        agents: ["docs-drift"],
+        agentRuns: [run("docs-drift", 1, 20_000)],
+        findings: [finding("docs-drift", "docs", "low", "docs/readme.md")],
+      }),
+    );
+    await ingest(globex, record({ owner: "globex", repo: "secret" }));
+
+    await backdate(today, 0);
+    await backdate(yesterday, 1);
+    await backdate(empty, 1);
+    await backdate(older, 3);
+  });
+
+  it("matches the JS rollup over reviews spanning days, agents and severities", async () => {
+    const source = await sourceFor(acme);
+    const scoped = await loadedReviews(source);
+
+    expect(scoped).toHaveLength(4);
+    expect(await source.getTrends("30d")).toEqual(
+      computeTrends(scoped, "30d", categoryCounts(scoped)),
+    );
+  });
+
+  it("counts categories in Postgres, breaking ties as the JS rollup does", async () => {
+    const source = await sourceFor(acme);
+    const scoped = await loadedReviews(source);
+    const { byCategory } = await source.getTrends("30d");
+
+    expect(byCategory).toEqual(categoryCounts(scoped));
+    expect(byCategory.map((c) => [c.category, c.count])).toEqual([
+      ["security", 2],
+      ["correctness", 2],
+      ["performance", 1],
+      ["docs", 1],
+    ]);
+    expect(byCategory[0]!.bySeverity).toEqual({ low: 0, medium: 0, high: 2 });
+    expect(byCategory[1]!.bySeverity).toEqual({ low: 1, medium: 1, high: 0 });
+  });
+
+  it("keeps a bucket for a day with no reviews and a review with no findings", async () => {
+    const { points, totals } = await (await sourceFor(acme)).getTrends("30d");
+
+    expect(points).toHaveLength(30);
+    const [older, quiet, yesterday, today] = points.slice(-4);
+    expect(older).toMatchObject({ reviews: 1, low: 1, medium: 0, high: 0 });
+    expect(quiet).toMatchObject({ reviews: 0, low: 0, medium: 0, high: 0 });
+    expect(yesterday).toMatchObject({ reviews: 2, low: 1, medium: 1, high: 1 });
+    expect(today).toMatchObject({ reviews: 1, low: 1, medium: 0, high: 1 });
+    expect(totals).toMatchObject({
+      reviews: 4,
+      findings: 6,
+      bySeverity: { low: 3, medium: 1, high: 2 },
+    });
+  });
+
+  it("never lets another organization's findings into the rollup", async () => {
+    const { byCategory, totals } = await (await sourceFor(globex)).getTrends("30d");
+
+    expect(totals.reviews).toBe(1);
+    expect(byCategory.map((c) => c.category)).toEqual(["security", "performance"]);
   });
 });
