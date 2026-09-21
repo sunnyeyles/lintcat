@@ -6,10 +6,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  type ChartConfig,
-  ChartContainer,
   cn,
 } from "@pr-review/design";
+import { type ChartConfig, ChartContainer } from "@pr-review/design/chart";
 import { type ReactElement, type ReactNode, useId } from "react";
 
 export type ChartFrameProps = {

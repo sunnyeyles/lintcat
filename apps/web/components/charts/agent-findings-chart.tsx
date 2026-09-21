@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartTooltip, ChartTooltipContent } from "@pr-review/design";
+import { ChartTooltip, ChartTooltipContent } from "@pr-review/design/chart";
 import type { ReactNode } from "react";
 import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts";
 

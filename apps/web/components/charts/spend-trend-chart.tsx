@@ -4,7 +4,7 @@ import {
   type ChartConfig,
   ChartTooltip,
   ChartTooltipContent,
-} from "@pr-review/design";
+} from "@pr-review/design/chart";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatUsd } from "@/lib/format";

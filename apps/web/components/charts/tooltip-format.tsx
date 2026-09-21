@@ -2,7 +2,7 @@
 
 import type { ComponentProps } from "react";
 
-import type { ChartTooltipContent } from "@pr-review/design";
+import type { ChartTooltipContent } from "@pr-review/design/chart";
 
 type Formatter = NonNullable<ComponentProps<typeof ChartTooltipContent>["formatter"]>;
 
