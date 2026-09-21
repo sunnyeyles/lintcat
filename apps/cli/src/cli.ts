@@ -46,6 +46,7 @@ Exit codes:
   0  no finding at or above --fail-on
   1  at least one finding at or above --fail-on
   2  the review could not run
+  3  the review was cancelled (Ctrl-C or SIGTERM); a second interrupt quits at once
 
 Bypass the installed hook with ${BYPASS_ENV}=1 git push, or git push --no-verify.
 A model API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) must be set before a review runs.`;

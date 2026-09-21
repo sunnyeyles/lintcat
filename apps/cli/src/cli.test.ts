@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   finalFindingsJson,
   makeFinding,
+  makeHangingModel,
   makeModel,
   message,
   textBlock,
@@ -64,7 +65,11 @@ interface Run {
   err: string;
 }
 
-async function run(argv: string[], overrides: Partial<McpEnvironment> = {}): Promise<Run> {
+async function run(
+  argv: string[],
+  overrides: Partial<McpEnvironment> = {},
+  signal?: AbortSignal,
+): Promise<Run> {
   const out: string[] = [];
   const err: string[] = [];
   const deps: CliEnvironment = {
@@ -72,6 +77,7 @@ async function run(argv: string[], overrides: Partial<McpEnvironment> = {}): Pro
     out: (text) => out.push(text),
     err: (text) => err.push(text),
     commandLine: "node /opt/pr-review/start.mjs",
+    signal,
   };
   return { code: await runCli(argv, deps), out: out.join("\n"), err: err.join("\n") };
 }
@@ -178,6 +184,36 @@ describe("reviewing a working tree", () => {
     expect(err).toContain("Reviewing 1 changed file(s)");
     expect(err).toContain("the staged changes");
     expect(code).toBe(0);
+  });
+});
+
+describe("cancelling a review", () => {
+  it("aborts the in-flight model calls and prints no verdict", async () => {
+    const { model, firstCall } = makeHangingModel();
+    const controller = new AbortController();
+
+    const pending = run(["--base", "main", "--no-index"], { createLanguageModel: () => model }, controller.signal);
+    await firstCall;
+    controller.abort();
+    const { code, out, err } = await pending;
+
+    expect(model.doGenerateCalls.length).toBeGreaterThan(0);
+    for (const call of model.doGenerateCalls) expect(call.abortSignal?.aborted).toBe(true);
+    expect(err).toContain("review cancelled");
+    expect(out).not.toContain("No findings");
+    expect(out).not.toContain("Blocked");
+    expect(code).toBe(3);
+  });
+
+  it("prints no finding when cancelled before the agents start", async () => {
+    const createLanguageModel = vi.fn(() => scriptedModel([admin]));
+    const controller = new AbortController();
+    controller.abort();
+
+    const { code, out } = await run(["--base", "main", "--no-index"], { createLanguageModel }, controller.signal);
+
+    expect(out).not.toContain("Admin is always on");
+    expect(code).toBe(3);
   });
 });
 
