@@ -115,7 +115,7 @@ export default function IntroductionPage() {
         <Bullets>
           {AGENTS.map(([name, reviews]) => (
             <Bullet key={name}>
-              <code className="text-ink">{name}</code> — {reviews}
+              <code className="text-foreground">{name}</code> — {reviews}
             </Bullet>
           ))}
         </Bullets>
@@ -128,15 +128,15 @@ export default function IntroductionPage() {
       <Section id="keep-reading" title="Keep reading">
         <div className="grid gap-3 sm:grid-cols-2">
           {DOCS_PAGES.filter((page) => page.href !== DOCS_HOME).map((page) => (
-            <Card key={page.href} className="transition-colors hover:border-accent">
+            <Card key={page.href} className="transition-colors hover:border-primary">
               <Link
                 href={page.href}
                 className="group flex h-full flex-col gap-1.5 p-4 no-underline"
               >
-                <span className="font-mono text-label font-semibold text-ink group-hover:text-accent">
+                <span className="font-mono text-label font-semibold text-foreground group-hover:text-primary">
                   {page.title}
                 </span>
-                <span className="font-mono text-caption leading-relaxed text-slate">
+                <span className="font-mono text-caption leading-relaxed text-muted-foreground">
                   {page.summary}
                 </span>
               </Link>

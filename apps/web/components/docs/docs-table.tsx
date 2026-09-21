@@ -36,7 +36,7 @@ export function DocsTable({ caption, columns, rows }: DocsTableProps) {
               {cells.map((cell, column) => (
                 <TableCell
                   key={column}
-                  className={column === 0 ? "font-mono text-ink" : "text-slate"}
+                  className={column === 0 ? "font-mono text-foreground" : "text-muted-foreground"}
                 >
                   {cell}
                 </TableCell>
