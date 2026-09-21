@@ -11,32 +11,21 @@ interface EvalCase {
   expectations: FixtureExpectation[];
 }
 
-/**
- * A failed agent makes the fixture's real expectation unmeasurable, so
- * it is reported separately rather than as a quality result.
- */
-const agentsCompleted: FixtureExpectation = {
-  kind: "agents-completed",
-  description: "every review agent completes",
-};
-
 /** Precision on fixes: a proposed patch must match the file it edits. */
 const patchesVerify: FixtureExpectation = {
   kind: "patches-verify",
-  description: "every patch an agent proposed matches the file at head",
+  description: "every patch the reviewer proposed matches the file at head",
 };
 
 export const evalCases: EvalCase[] = [
   {
     fixture: "security-tenant-scope",
     expectations: [
-      agentsCompleted,
       patchesVerify,
       {
         kind: "finding",
         description:
-          "reports a security finding on the customer query that never validates the tenant",
-        category: "security",
+          "reports a finding on the customer query that never validates the tenant",
         anchors: [
           {
             file: "src/data/customers.ts",
@@ -53,12 +42,10 @@ export const evalCases: EvalCase[] = [
   {
     fixture: "correctness-admin-check",
     expectations: [
-      agentsCompleted,
       {
         kind: "finding",
         description:
-          "reports a correctness finding on the since filter, which keeps the events before the timestamp instead of the events after it",
-        category: "correctness",
+          "reports a finding on the since filter, which keeps the events before the timestamp instead of the events after it",
         anchors: [
           {
             file: "src/routes/admin-audit.ts",
@@ -71,12 +58,10 @@ export const evalCases: EvalCase[] = [
   {
     fixture: "correctness-cross-file-caller",
     expectations: [
-      agentsCompleted,
       {
         kind: "finding",
         description:
-          "reports a correctness finding on the quote whose total changed from a formatted string to a Money value, which an untouched caller still renders straight into an email",
-        category: "correctness",
+          "reports a finding on the quote whose total changed from a formatted string to a Money value, which an untouched caller still renders straight into an email",
         anchors: [
           {
             file: "src/pricing/quote.ts",
@@ -94,12 +79,10 @@ export const evalCases: EvalCase[] = [
   {
     fixture: "test-coverage-untested-branch",
     expectations: [
-      agentsCompleted,
       {
         kind: "finding",
         description:
-          "reports a test-coverage finding on the new bulk tier branch the untouched discount test never exercises",
-        category: "test-coverage",
+          "reports a finding on the new bulk tier branch the untouched discount test never exercises",
         anchors: [
           {
             file: "src/pricing/discount.ts",
@@ -116,12 +99,10 @@ export const evalCases: EvalCase[] = [
   {
     fixture: "performance-n-plus-one",
     expectations: [
-      agentsCompleted,
       {
         kind: "finding",
         description:
-          "reports a performance finding on the summary loop that queries one product per order line",
-        category: "performance",
+          "reports a finding on the summary loop that queries one product per order line",
         anchors: [
           {
             file: "src/services/order-summary.ts",
@@ -134,12 +115,10 @@ export const evalCases: EvalCase[] = [
   {
     fixture: "docs-drift-retry-budget",
     expectations: [
-      agentsCompleted,
       {
         kind: "finding",
         description:
-          "reports a docs-drift finding on the retry budget that replaced the attempt count the README and the runbook still document",
-        category: "docs-drift",
+          "reports a finding on the retry budget that replaced the attempt count the README and the runbook still document",
         anchors: [
           {
             file: "src/config.ts",
@@ -156,7 +135,6 @@ export const evalCases: EvalCase[] = [
   {
     fixture: "clean-pagination",
     expectations: [
-      agentsCompleted,
       patchesVerify,
       {
         kind: "no-findings",

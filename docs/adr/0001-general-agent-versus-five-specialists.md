@@ -1,6 +1,6 @@
 # 1. The general agent versus the five specialists
 
-- **Status:** Accepted
+- **Status:** Superseded by [0002](0002-single-general-agent.md)
 - **Date:** 2026-09-21
 - **Deciders:** sunny
 - **Issue:** [#126](https://github.com/sunnyeyles/pr-review-agents/issues/126)

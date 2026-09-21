@@ -1,6 +1,6 @@
 name: Review Agent Fleet
 description: >-
-  Reviews a pull request with configurable agents.
+  Reviews a pull request with an AI reviewer.
 author: sunnyeyles
 
 branding:
@@ -10,8 +10,7 @@ branding:
 inputs:
   model-provider:
     description: >-
-      Which model provider the review agents and Synthesiser call: `openai`
-      or `anthropic`. An unknown name fails the step before any model call.
+      Which model provider the reviewer calls: `openai` or `anthropic`. An unknown name fails the step before any model call.
     required: false
     default: openai
   api-key:
@@ -44,9 +43,7 @@ inputs:
     default: "false"
   model:
     description: >-
-      Default model id, as the selected provider spells it. An agent may
-      override it with its own `model` in the agent configuration; the
-      Synthesiser always uses this one. Leave empty for the provider's default
+      Model id, as the selected provider spells it. Leave empty for the provider's default
       (gpt-5.6-luna on openai, claude-haiku-4-5 on anthropic).
     required: false
     default: ""
@@ -58,28 +55,6 @@ inputs:
       provider's own host.
     required: false
     default: ""
-  agents:
-    description: >-
-      Which of the configured review agents run: `all`, or a comma-separated
-      subset of their names. Each agent is an independent set of model calls,
-      so narrowing the set cuts cost roughly in proportion — use it to iterate
-      on one agent without paying for the others. A name the configuration
-      does not define fails the step before any model call, rather than
-      quietly running a narrower review. Naming agents also overrides their
-      `paths`: the run is someone asking for those agents specifically, so a
-      path filter does not then decide for them.
-    required: false
-    default: all
-  agent-config:
-    description: >-
-      Repository-relative path to the YAML file naming this repository's
-      review agents. It is read from the pull request's base commit over the
-      API, never from the workspace, so a pull request cannot choose the
-      agents that review it. Without this file the general agent reviews
-      alone; create it to opt into the specialist agents. A malformed or empty
-      one fails the step rather than running a review nobody configured.
-    required: false
-    default: .github/pr-review-agents.yml
   incremental:
     description: >-
       Whether a review reads only the commits added since this pull request was
@@ -94,11 +69,11 @@ inputs:
     default: "false"
   index:
     description: >-
-      Whether the review builds a repository index before the agents start. On
+      Whether the review builds a repository index before the reviewer starts. On
       by default; set to `false` to turn it off. The index is one archive
       request for the repository's files at the pull request's base commit —
       never its head, so a branch cannot shape what the reviewer believes about
-      the repository. From it the agents are told each changed file's role and
+      the repository. From it the reviewer is told each changed file's role and
       its covering test. It is held in memory for the review and discarded;
       nothing is stored and no permission beyond contents: read is needed. A
       repository too large to archive, or any failure fetching or building it,

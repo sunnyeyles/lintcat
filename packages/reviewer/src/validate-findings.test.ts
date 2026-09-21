@@ -99,7 +99,7 @@ describe("validateFindings", () => {
   });
 
   it("drops a category outside the run's agents", () => {
-    // The synthesiser must not be able to invent a category.
+    // An agent must not be able to invent a category.
     const invented = finding({ category: "performance" });
     const kept = finding({ line: 11, category: "security" });
 

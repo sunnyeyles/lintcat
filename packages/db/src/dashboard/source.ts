@@ -15,30 +15,23 @@ import { QueryBuilder } from "drizzle-orm/pg-core";
 
 import type { Database } from "../client";
 import {
-  agentRuns,
   findings,
   repos,
   reviews,
-  type AgentRun as AgentRunRow,
   type Finding,
   type Repo,
   type Organization,
   type Review,
 } from "../schema";
 
-
 import {
-  addTokens,
   computeTrends,
   computeUsage,
   costOf,
   emptySeverity,
-  isAgentName,
   windowStart,
-  zeroTokens,
 } from "./aggregate";
 import type {
-  AgentRun,
   CategoryCount,
   DataSource,
   RepoSummary,
@@ -64,42 +57,32 @@ type CategoryRow = {
 const subqueries = new QueryBuilder();
 
 const tokenSums = {
-  inputTokens: sql<number>`coalesce(sum(${agentRuns.inputTokens}), 0)`.mapWith(Number),
+  inputTokens: sql<number>`coalesce(sum(${reviews.inputTokens}), 0)`.mapWith(Number),
   cacheCreationInputTokens:
-    sql<number>`coalesce(sum(${agentRuns.cacheCreationInputTokens}), 0)`.mapWith(Number),
+    sql<number>`coalesce(sum(${reviews.cacheCreationInputTokens}), 0)`.mapWith(Number),
   cacheReadInputTokens:
-    sql<number>`coalesce(sum(${agentRuns.cacheReadInputTokens}), 0)`.mapWith(Number),
-  outputTokens: sql<number>`coalesce(sum(${agentRuns.outputTokens}), 0)`.mapWith(Number),
+    sql<number>`coalesce(sum(${reviews.cacheReadInputTokens}), 0)`.mapWith(Number),
+  outputTokens: sql<number>`coalesce(sum(${reviews.outputTokens}), 0)`.mapWith(Number),
 };
-
-function knownRuns(rows: AgentRunRow[]): AgentRun[] {
-  return rows.filter((run): run is AgentRun => isAgentName(run.agent));
-}
 
 function toDetail(
   review: Review,
   repo: Repo,
   reviewFindings: Finding[],
-  runs: AgentRunRow[],
   bySeverity: Record<Severity, number>,
 ): ReviewDetail {
-  const totals = zeroTokens();
-  for (const run of runs) addTokens(totals, run);
   return {
     ...review,
-    agents: review.agents.filter(isAgentName),
     repo,
     findings: reviewFindings,
-    runs: knownRuns(runs),
     findingCount: bySeverity.low + bySeverity.medium + bySeverity.high,
     bySeverity,
-    costUsd: costOf(totals),
-    ...totals,
+    costUsd: costOf(review),
   };
 }
 
 function strip(review: ReviewDetail): ReviewSummary {
-  const { findings: _f, runs: _r, ...rest } = review;
+  const { findings: _f, ...rest } = review;
   return rest;
 }
 
@@ -189,11 +172,6 @@ export function createDbSource(
     if (rows.length === 0) return [];
 
     const ids = rows.map((row) => row.review.id);
-    const runRows = await database
-      .select()
-      .from(agentRuns)
-      .where(inArray(agentRuns.reviewId, ids))
-      .orderBy(asc(agentRuns.agent));
     const findingRows = withFindings
       ? await database
           .select()
@@ -214,7 +192,6 @@ export function createDbSource(
           .groupBy(findings.reviewId, findings.severity);
 
     const findingsFor = groupBy(findingRows, (f) => f.reviewId);
-    const runsFor = groupBy(runRows, (run) => run.reviewId);
     const severityFor = new Map<number, Record<Severity, number>>();
     for (const row of severityRows) {
       let counts = severityFor.get(row.reviewId);
@@ -227,7 +204,6 @@ export function createDbSource(
         review,
         repo,
         findingsFor.get(review.id) ?? [],
-        runsFor.get(review.id) ?? [],
         severityFor.get(review.id) ?? emptySeverity(),
       ),
     );
@@ -331,8 +307,7 @@ export function createDbSource(
         .groupBy(reviews.repoId),
       database
         .select({ repoId: reviews.repoId, ...tokenSums })
-        .from(agentRuns)
-        .innerJoin(reviews, eq(reviews.id, agentRuns.reviewId))
+        .from(reviews)
         .innerJoin(repos, eq(repos.id, reviews.repoId))
         .where(where)
         .groupBy(reviews.repoId),

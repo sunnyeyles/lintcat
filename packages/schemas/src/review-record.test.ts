@@ -7,32 +7,14 @@ const validRecord: ReviewRecord = {
   repo: "widgets",
   prNumber: 42,
   headSha: "0f1e2d3c4b5a69788796a5b4c3d2e1f001234567",
-  agents: ["security", "performance"],
-  summary: "Two findings worth a look.",
+  summary: "One finding worth a look.",
   durationMs: 45_000,
-  agentRuns: [
-    {
-      agent: "security",
-      durationMs: 41_000,
-      findingCount: 1,
-      inputTokens: 12_000,
-      cacheCreationInputTokens: 4_000,
-      cacheReadInputTokens: 20_000,
-      outputTokens: 800,
-    },
-    {
-      agent: "performance",
-      durationMs: 30_000,
-      findingCount: 0,
-      inputTokens: 9_000,
-      cacheCreationInputTokens: 0,
-      cacheReadInputTokens: 0,
-      outputTokens: 500,
-    },
-  ],
+  inputTokens: 12_000,
+  cacheCreationInputTokens: 4_000,
+  cacheReadInputTokens: 20_000,
+  outputTokens: 800,
   findings: [
     {
-      agent: "security",
       file: "src/auth/session.ts",
       line: 84,
       category: "security",
@@ -54,27 +36,41 @@ describe("reviewRecordSchema", () => {
     }
   });
 
-  it("accepts a record with no agents, runs or findings", () => {
+  it("accepts a record with no findings", () => {
     const result = reviewRecordSchema.safeParse({
       ...validRecord,
-      agents: [],
-      agentRuns: [],
       summary: "",
       findings: [],
     });
     expect(result.success).toBe(true);
   });
 
-  it("treats a finding's agent as optional", () => {
-    const [finding] = validRecord.findings;
-    const { agent: _agent, ...withoutAgent } = finding!;
+  it("defaults missing token counters to zero", () => {
+    const {
+      inputTokens: _in,
+      cacheCreationInputTokens: _cw,
+      cacheReadInputTokens: _cr,
+      outputTokens: _out,
+      ...withoutTokens
+    } = validRecord;
+    const result = reviewRecordSchema.safeParse(withoutTokens);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.inputTokens).toBe(0);
+      expect(result.data.outputTokens).toBe(0);
+    }
+  });
+
+  it("strips fields an older action still sends", () => {
     const result = reviewRecordSchema.safeParse({
       ...validRecord,
-      findings: [withoutAgent],
+      agents: ["security"],
+      agentRuns: [{ agent: "security", durationMs: 1 }],
+      findings: [{ ...validRecord.findings[0], agent: "security" }],
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.findings[0]?.agent).toBeUndefined();
+      expect(result.data).toEqual(validRecord);
     }
   });
 
@@ -104,33 +100,15 @@ describe("reviewRecordSchema", () => {
   });
 
   it("rejects negative or fractional token counts and durations", () => {
-    const [run] = validRecord.agentRuns;
     for (const bad of [
-      { ...run, inputTokens: -1 },
-      { ...run, cacheReadInputTokens: 0.5 },
-      { ...run, durationMs: -5 },
+      { inputTokens: -1 },
+      { cacheReadInputTokens: 0.5 },
+      { durationMs: -5 },
     ]) {
       expect(
-        reviewRecordSchema.safeParse({ ...validRecord, agentRuns: [bad] })
-          .success,
+        reviewRecordSchema.safeParse({ ...validRecord, ...bad }).success,
       ).toBe(false);
     }
-    expect(
-      reviewRecordSchema.safeParse({ ...validRecord, durationMs: -5 }).success,
-    ).toBe(false);
-  });
-
-  it("rejects the same agent twice", () => {
-    const [run] = validRecord.agentRuns;
-    expect(
-      reviewRecordSchema.safeParse({ ...validRecord, agentRuns: [run, run] })
-        .success,
-    ).toBe(false);
-  });
-
-  it("rejects a missing agentRuns array", () => {
-    const { agentRuns: _runs, ...withoutRuns } = validRecord;
-    expect(reviewRecordSchema.safeParse(withoutRuns).success).toBe(false);
   });
 
   it("rejects non-object input", () => {

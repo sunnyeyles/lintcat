@@ -58,7 +58,7 @@ export type PublishFixes = (
 interface ReviewDeliveryInput
   extends Pick<
     ReviewNotes,
-    "agentFailures" | "alreadyPosted" | "skippedAgents" | "diffLines"
+    "alreadyPosted" | "diffLines"
   > {
   findings: readonly ReviewFinding[];
   /** Verified patches: committed when a publisher can, offered otherwise. */
@@ -187,9 +187,8 @@ export async function deliverReview(
   const annotated = comments === "unavailable";
   await deps.publishCheckRun(
     target,
-    renderCheckRun(input.findings, input.agentFailures, {
+    renderCheckRun(input.findings, {
       annotate: annotated,
-      skippedAgents: input.skippedAgents,
       carriedForward: input.carriedForward,
       scopeNote: input.scopeNote,
     }),
@@ -199,7 +198,6 @@ export async function deliverReview(
     ...fields,
     findingCount: input.findings.length,
     carriedForwardCount: input.carriedForward?.length ?? 0,
-    skippedAgents: input.skippedAgents.map((skip) => skip.agent),
     comments,
     annotated,
     fixes: fixes.status,

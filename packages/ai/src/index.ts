@@ -15,8 +15,6 @@ export {
   type ReviewModel,
 } from "#src/model";
 export type {
-  AgentLifecycleEvent,
-  AgentLifecycleListener,
   ReviewAgent,
   ReviewContext,
 } from "#src/agent-contract";
@@ -25,7 +23,7 @@ export {
   isCancellation,
   throwIfCancelled,
 } from "#src/cancellation";
-export { emptyTokenUsage, type TokenUsage } from "#src/usage";
+export { addTokenUsage, emptyTokenUsage, type TokenUsage } from "#src/usage";
 export {
   createReviewAgent,
   type AgentUsageReport,
@@ -48,25 +46,6 @@ export {
   withRepositoryHints,
   type AgentDefinition,
 } from "#src/agents/definition";
-export {
-  createReviewAgents,
-  gateAgentsByPaths,
-  resolveAgentDefinitions,
-  type SkippedAgent,
-} from "#src/agents/agent-set";
-export {
-  DEFAULT_AGENT_CONFIG_PATH,
-  loadAgentDefinitions,
-  type ReadOptionalFile,
-} from "#src/agents/config";
-export {
-  SynthesisError,
-  createSynthesiser,
-  emptySynthesisHints,
-  renderSynthesisHints,
-  type Synthesiser,
-  type SynthesisHints,
-} from "#src/agents/synthesiser";
 export {
   DEFAULT_LANGFUSE_BASE_URL,
   DEFAULT_PROMPT_LABEL,

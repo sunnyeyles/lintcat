@@ -14,12 +14,8 @@ export interface ReviewOptions {
   repoPath: string | undefined;
   base: string | undefined;
   scope: LocalScope;
-  /** Comma-separated agent categories; empty runs the configured set. */
-  agents: string;
   index: boolean;
   failOn: FailOn;
-  /** Report each agent starting and finishing on stderr. */
-  progress: boolean;
   /** Let the review's own structured log through to stderr. */
   verbose: boolean;
   color: boolean | undefined;
@@ -58,7 +54,6 @@ interface Flags {
 
 const SWITCHES = new Set([
   "no-index",
-  "no-progress",
   "verbose",
   "force",
   "color",
@@ -145,10 +140,8 @@ const REVIEW_FLAGS = [
   "base",
   "scope",
   "range",
-  "agents",
   "fail-on",
   "no-index",
-  "no-progress",
   "verbose",
   "color",
   "no-color",
@@ -161,10 +154,8 @@ function reviewOptions(flags: Flags): ReviewOptions {
     repoPath: flags.values.get("repo"),
     base: flags.values.get("base"),
     scope: readScope(flags),
-    agents: flags.values.get("agents") ?? "",
     index: !flags.switches.has("no-index"),
     failOn: readFailOn(flags),
-    progress: !flags.switches.has("no-progress"),
     verbose: flags.switches.has("verbose"),
     color: readColor(flags),
   };
