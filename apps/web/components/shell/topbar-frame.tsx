@@ -2,6 +2,8 @@ import { cn } from "@pr-review/design";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { ColorModeToggle } from "@/components/shell/color-mode-toggle";
+
 /** The topbar's chrome, with no request-bound data, so a static page can render it. */
 export function TopbarFrame({
   className,
@@ -40,7 +42,10 @@ export function TopbarFrame({
             Docs
           </Link>
         </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-2">{right}</div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {right}
+          <ColorModeToggle />
+        </div>
       </div>
     </header>
   );

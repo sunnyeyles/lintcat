@@ -69,9 +69,10 @@ whole brand deviation; components only ever see the third.
 
 Geometry: radius 6px (`sm` 3px), buttons 32/28/40px, body 14px, Primer's
 resting and floating shadows behind Tailwind's `shadow-*` scale, system sans
-and mono stacks with no web font. The theme follows the OS only: Primer's
-`data-color-mode="auto"` and Tailwind's default `dark:` variant; `next-themes`
-and the toggle are removed.
+and mono stacks with no web font. Colour mode is Primer's `data-color-mode`
+attribute: `auto` follows the OS, and a topbar toggle sets `light` or `dark`,
+persisted in `localStorage` and restored before paint. Tailwind's `dark:` is a
+custom variant on that attribute, so `next-themes` and the `.dark` class go.
 
 `tokens-guard.test.ts` fails on Tailwind palette classes or raw hex in app
 code, which is what stops a second palette from growing back.

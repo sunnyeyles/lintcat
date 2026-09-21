@@ -98,9 +98,11 @@ Colour comes from `@primer/primitives` (GitHub's tokens), in three layers
    `--link`, …) aliased onto Primer tokens, plus the Tailwind `@theme` block.
    Components use these names only.
 
-The theme follows the OS (`data-color-mode="auto"` on `<html>`); there is no
-in-app toggle and no `.dark` class. Tailwind's `dark:` variant is the default
-`prefers-color-scheme` one. Fonts are the system stacks.
+Colour mode is Primer's `data-color-mode` on `<html>`: `auto` follows the OS,
+and the topbar toggle (`apps/web/components/shell/color-mode-toggle.tsx`)
+sets `light` or `dark`, persisted in `localStorage` and restored by an inline
+script before paint. No `.dark` class, no theme library; Tailwind's `dark:`
+variant is a custom one keyed on that attribute. Fonts are the system stacks.
 
 `src/tokens-guard.test.ts` fails the build on Tailwind palette classes
 (`bg-gray-100`) or raw hex in app code. `docs/tokens.css` is a separate,

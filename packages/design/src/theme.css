@@ -5,7 +5,19 @@
 @import "@primer/primitives/dist/css/functional/themes/dark.css";
 @import "./brand.css";
 
-/* shadcn semantic tokens, each aliased to a Primer token so the theme follows the OS. */
+/* `dark:` follows Primer's colour mode: forced dark, or auto plus the OS preference. */
+@custom-variant dark {
+  &:where([data-color-mode="dark"], [data-color-mode="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where([data-color-mode="auto"], [data-color-mode="auto"] *) {
+      @slot;
+    }
+  }
+}
+
+/* shadcn semantic tokens, each aliased to a Primer token so the theme follows the colour mode. */
 :root {
   --radius: var(--borderRadius-default);
 
@@ -199,8 +211,11 @@
   html {
     color-scheme: light;
   }
+  html[data-color-mode="dark"] {
+    color-scheme: dark;
+  }
   @media (prefers-color-scheme: dark) {
-    html {
+    html[data-color-mode="auto"] {
       color-scheme: dark;
     }
   }
