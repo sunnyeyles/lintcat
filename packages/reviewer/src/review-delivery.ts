@@ -133,9 +133,11 @@ export function dashboardReview({
       ).length,
       ...report.usage,
     })),
-    findings: outcome.findings.map((finding) => ({
+    // The patch is verbatim source, so the dashboard learns only that one survived.
+    findings: outcome.findings.map(({ patch, ...finding }) => ({
       ...finding,
       agent: finding.category,
+      hasPatch: patch !== undefined,
     })),
   };
 }
