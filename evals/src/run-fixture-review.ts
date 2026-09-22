@@ -2,7 +2,11 @@
  * Drives the real review pipeline for one fixture. Only the GitHub client and
  * the delivery adapter differ from production.
  */
-import { createLanguageModel, createReviewAgent } from "@pr-review/ai";
+import {
+  createLanguageModel,
+  createReviewAgent,
+  type AgentUsageReport,
+} from "@pr-review/ai";
 import type { StructuredLogger } from "@pr-review/logging";
 import {
   recordingDelivery,
@@ -39,6 +43,7 @@ export interface FixtureReview {
 export function modelBackedDeps(
   access: ModelAccess,
   logger: StructuredLogger,
+  onUsage?: (report: AgentUsageReport) => void,
 ): FixtureReviewDeps {
   const model = createLanguageModel({
     provider: access.provider,
@@ -52,6 +57,7 @@ export function modelBackedDeps(
         github: client,
         logger: reviewLogger,
         index,
+        onUsage,
       }),
     logger,
   };

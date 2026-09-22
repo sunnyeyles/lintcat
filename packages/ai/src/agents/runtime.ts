@@ -39,6 +39,8 @@ import {
 export interface AgentUsageReport {
   agent: string;
   durationMs: number;
+  /** Model round trips made; each one resends the whole conversation. */
+  steps: number;
   usage: TokenUsage;
 }
 
@@ -186,6 +188,7 @@ export function createReviewAgent(
       const startedAt = Date.now();
       // Outside the try: a mid-loop API error still reports its spend.
       let usage = emptyTokenUsage();
+      let steps = 0;
 
       // Active, not detached: the SDK's model spans nest under this one, so
       // their cost lands on the agent trace instead of a trace of its own.
@@ -229,6 +232,7 @@ export function createReviewAgent(
               providerOptions: CACHE_BREAKPOINT,
               telemetry: { functionId: `review-agent-${agent.category}` },
               onStepEnd: (step) => {
+                steps += 1;
                 usage = addTokenUsage(usage, toTokenUsage(step.usage));
               },
             });
@@ -256,13 +260,15 @@ export function createReviewAgent(
             logger.info("agent.completed", {
               ...eventFields,
               durationMs,
+              steps,
               ...usage,
               findingCount: findings.length,
             });
-            deps.onUsage?.({ agent: agent.category, durationMs, usage });
+            deps.onUsage?.({ agent: agent.category, durationMs, steps, usage });
             agentObservation.update({
               output: { findingCount: findings.length },
               metadata: {
+                steps,
                 ...usage,
               },
             });
@@ -272,6 +278,7 @@ export function createReviewAgent(
             const fields = {
               ...eventFields,
               durationMs,
+              steps,
               ...usage,
               error: errorMessage(error),
               errorName: errorName(error),
@@ -281,11 +288,12 @@ export function createReviewAgent(
             } else {
               logger.error("agent.failed", fields);
             }
-            deps.onUsage?.({ agent: agent.category, durationMs, usage });
+            deps.onUsage?.({ agent: agent.category, durationMs, steps, usage });
             agentObservation.update({
               level: "ERROR",
               statusMessage: errorMessage(error),
               metadata: {
+                steps,
                 ...usage,
               },
             });

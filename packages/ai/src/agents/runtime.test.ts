@@ -482,6 +482,7 @@ describe("lifecycle events (spec §26)", () => {
       level: "info",
       event: "agent.completed",
       ...correlation,
+      steps: 2,
       inputTokens: 350,
       outputTokens: 35,
       findingCount: 1,
@@ -583,6 +584,7 @@ describe("lifecycle events (spec §26)", () => {
       event: "agent.failed",
       ...correlation,
       errorName: "AgentRunError",
+      steps: 2,
       inputTokens: 80,
       outputTokens: 8,
     });
@@ -623,6 +625,7 @@ describe("the onUsage callback", () => {
       {
         agent: "general",
         durationMs: expect.any(Number),
+        steps: 2,
         usage: {
           inputTokens: 350,
           cacheCreationInputTokens: 4_000,
@@ -647,6 +650,7 @@ describe("the onUsage callback", () => {
       {
         agent: "general",
         durationMs: expect.any(Number),
+        steps: 1,
         usage: {
           inputTokens: 80,
           cacheCreationInputTokens: 0,
@@ -664,6 +668,7 @@ describe("the onUsage callback", () => {
     await expect(agent.run(context)).rejects.toThrow("529 overloaded");
 
     expect(reports.map((report) => report.usage)).toEqual([emptyTokenUsage()]);
+    expect(reports.map((report) => report.steps)).toEqual([0]);
   });
 });
 

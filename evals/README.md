@@ -85,6 +85,11 @@ SCIP, no second language.
 The on arm cost 1.5k input, 28k cache-write, 199k cache-read and 8.8k output
 tokens on the cross-file fixture alone.
 
+Every run now ends with a token-spend table — steps, the four token counters,
+an estimated cost and the assertion tally per fixture — and writes the same
+numbers to `evals/results/<time>-<provider>-<model>.json`. Commit the file
+when a run is meant as evidence, so a cost change has a before and an after.
+
 Until the control arm runs to completion, the on arm's pass is one sample and
 proves nothing on its own: the gate needs both halves.
 
@@ -119,6 +124,7 @@ fixture-client.ts      the reads a fixture can serve; publishing is undeclared,
 *.conformance.test.ts  the shared adapter suite, @pr-review/github/conformance
 unified-diff.ts        synthesises patches from the two trees
 run-fixture-review.ts  drives the real pipeline; only client and publish differ
+usage-report.ts        the token-spend table and results/ JSON every run writes
 model-access.ts        credentials, and the fail-fast before any spend
 *.test.ts              the harness's own unit tests, run by pnpm test
 ```
