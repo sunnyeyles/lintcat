@@ -12,12 +12,13 @@ export default async function OrganizationLayout({
   children: ReactNode;
   params: Promise<{ slug: string }>;
 }) {
-  const { organization } = await requireOrganization((await params).slug);
+  const { organization, role } = await requireOrganization((await params).slug);
+  const isOwner = role === "owner";
   return (
     <div className="min-h-dvh">
-      <Topbar />
+      <Topbar isOwner={isOwner} />
       <div className="flex">
-        <Sidebar slug={organization.slug} organizationName={organization.name} />
+        <Sidebar slug={organization.slug} organizationName={organization.name} isOwner={isOwner} />
         <MainColumn>{children}</MainColumn>
       </div>
     </div>

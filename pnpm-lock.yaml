@@ -156,6 +156,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@pr-review/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0

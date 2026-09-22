@@ -9,7 +9,7 @@ import { appDomain } from "@/lib/host";
 import { apexUrl, DASHBOARD_PATH, topbarSignInHref } from "@/lib/paths";
 import { requestLocation } from "@/lib/request";
 
-export async function Topbar({ className }: { className?: string }) {
+export async function Topbar({ isOwner = false, className }: { isOwner?: boolean; className?: string }) {
   const { host, protocol, path } = await requestLocation();
   const domain = appDomain();
   const signInHref = topbarSignInHref(path, domain);
@@ -20,7 +20,7 @@ export async function Topbar({ className }: { className?: string }) {
     <TopbarFrame
       className={className}
       docsHref={docs}
-      left={<SidebarDrawer />}
+      left={<SidebarDrawer isOwner={isOwner} />}
       right={
         <>
           <Button asChild variant="outline" size="sm">
