@@ -12,7 +12,7 @@ import { runReview, type ReviewResult } from "#src/review";
 import { selectReviewEngine } from "#src/review-engine";
 
 /** Said whenever sampling stood in for a provider key, so nobody reads this as a full review. */
-export const SINGLE_SHOT_NOTICE =
+const SINGLE_SHOT_NOTICE =
   "Reduced single-shot review: no model API key is set, so this ran as one sampling request to your " +
   "client instead of the tool-calling agent. One general pass over the diff, the changed-file list and " +
   "the repository index, with no follow-up reads of the surrounding code. It is shallower than a " +

@@ -24,7 +24,7 @@ export function InlineSkeleton({ className }: { className?: string }) {
   );
 }
 
-export function StatCardSkeleton() {
+function StatCardSkeleton() {
   return (
     <Card className="gap-0 py-4">
       <CardHeader className="gap-1 px-4">

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 export type ColorMode = "light" | "dark" | "auto";
 
-export const COLOR_MODE_KEY = "color-mode";
+const COLOR_MODE_KEY = "color-mode";
 const ORDER: ColorMode[] = ["light", "dark", "auto"];
 const LABEL: Record<ColorMode, string> = { light: "Light", dark: "Dark", auto: "System" };
 

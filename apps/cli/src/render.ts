@@ -4,9 +4,9 @@ import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
 import type { FailOn } from "#src/options";
 
 /** Severity order, lowest first; the index is what a threshold compares. */
-export const SEVERITIES = ["low", "medium", "high"] as const;
+const SEVERITIES = ["low", "medium", "high"] as const;
 
-export type Severity = (typeof SEVERITIES)[number];
+type Severity = (typeof SEVERITIES)[number];
 
 const COLOURS: Record<Severity, string> = {
   low: "\u001b[36m",

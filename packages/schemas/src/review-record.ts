@@ -5,11 +5,9 @@ import { reviewFindingSchema } from "#src/review-finding";
 const count = z.number().int().nonnegative();
 
 /** A finding as the dashboard receives it: no patch source, only whether one survived. */
-export const reviewRecordFindingSchema = reviewFindingSchema
+const reviewRecordFindingSchema = reviewFindingSchema
   .omit({ patch: true })
   .extend({ hasPatch: z.boolean().optional() });
-
-export type ReviewRecordFinding = z.infer<typeof reviewRecordFindingSchema>;
 
 /** One file the pull request touched, with its line counts. */
 export const reviewRecordChangedFileSchema = z.object({

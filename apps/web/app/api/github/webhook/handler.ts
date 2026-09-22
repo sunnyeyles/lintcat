@@ -126,7 +126,7 @@ const pullRequestEventSchema = z.object({
 });
 
 /** Adding this label to a pull request asks for a hosted review. */
-export const REVIEW_LABEL = "ai-review";
+const REVIEW_LABEL = "ai-review";
 
 const MEMBER_ACTIONS: Record<string, readonly string[]> = {
   organization: ["member_added", "member_removed"],

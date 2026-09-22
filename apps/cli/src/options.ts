@@ -21,7 +21,7 @@ export interface ReviewOptions {
   color: boolean | undefined;
 }
 
-export interface InstallHookOptions {
+interface InstallHookOptions {
   kind: "install-hook";
   repoPath: string | undefined;
   failOn: FailOn;

@@ -11,7 +11,7 @@ import { EXIT_CANCELLED } from "#src/review-command";
 export const BYPASS_ENV = "PR_REVIEW_SKIP";
 
 /** How an installed hook identifies itself, so an upgrade replaces only our own. */
-export const HOOK_MARKER = "# pr-review-agents pre-push hook";
+const HOOK_MARKER = "# pr-review-agents pre-push hook";
 
 export function hookScript(command: string, failOn: FailOn): string {
   return [

@@ -56,7 +56,7 @@ export function seedPosition(
   return { x: round(centre.x + offset.x), y: round(centre.y + offset.y) };
 }
 
-export function seedPositionFor(file: MapFile, options: LayoutOptions = {}): LayoutPoint {
+function seedPositionFor(file: MapFile, options: LayoutOptions = {}): LayoutPoint {
   return seedPosition(file.path, groupIdFor(file), options);
 }
 
