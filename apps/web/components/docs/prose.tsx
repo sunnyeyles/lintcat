@@ -1,20 +1,7 @@
-import { cn } from "@pr-review/design";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { Heading } from "@/lib/docs";
-
-function Lede({ children }: { children: ReactNode }) {
-  return (
-    <p className="max-w-measure text-lede text-muted-foreground">{children}</p>
-  );
-}
-
-function Prose({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={cn("flex max-w-measure flex-col gap-4", className)}>{children}</div>
-  );
-}
 
 export function Section({ id, title, children }: Heading & { children: ReactNode }) {
   return (

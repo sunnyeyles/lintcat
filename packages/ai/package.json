@@ -11,7 +11,8 @@
     "./agent-test-support": "./src/agent-test-support.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.49",
@@ -24,5 +25,8 @@
     "@pr-review/schemas": "workspace:*",
     "ai": "^7.0.93",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@pr-review/eslint-config": "workspace:*"
   }
 }

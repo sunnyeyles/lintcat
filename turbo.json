@@ -1,8 +1,21 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
+  "globalPassThroughEnv": [
+    "GITHUB_ACTIONS",
+    "APP_DOMAIN",
+    "PORT",
+    "WORKER_POLL_MS",
+    "DATABASE_URL",
+    "MODEL_KEY_ENCRYPTION_KEY",
+    "NODE_ENV",
+    "CODEBASE_MAP_LOD_THRESHOLD",
+    "GITHUB_APP_SLUG",
+    "WORKER_URL"
+  ],
   "tasks": {
     "transit": { "dependsOn": ["^transit"] },
     "typecheck": { "dependsOn": ["transit"] },
+    "lint": { "dependsOn": ["transit"] },
     "build": {
       "dependsOn": ["^build", "transit"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/**"],

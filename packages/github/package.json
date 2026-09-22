@@ -11,11 +11,15 @@
     "./conformance": "./src/conformance.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@octokit/auth-app": "^8.3.1",
     "@octokit/rest": "^22.0.1",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@pr-review/eslint-config": "workspace:*"
   }
 }

@@ -1,0 +1,22 @@
+{
+  "name": "@pr-review/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./base": "./base.js",
+    "./next-js": "./next.js",
+    "./react-internal": "./react-internal.js"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.5",
+    "@next/eslint-plugin-next": "^16.3.5",
+    "eslint-config-turbo": "^2.5.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "typescript-eslint": "^8.70.1"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  }
+}
