@@ -30,11 +30,10 @@ function TrendsSkeleton() {
   return (
     <>
       <StatGridSkeleton count={4} />
-      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2">
-        <ChartCardSkeleton className="xl:col-span-2" />
+      <div className="grid min-w-0 grid-cols-1 gap-5">
         <ChartCardSkeleton />
         <ChartCardSkeleton />
-        <ChartCardSkeleton className="xl:col-span-2" />
+        <ChartCardSkeleton height={200} />
       </div>
     </>
   );

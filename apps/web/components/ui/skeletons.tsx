@@ -1,19 +1,18 @@
-import { Card, CardContent, CardHeader, cn, Skeleton } from "@pr-review/design";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  cn,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@pr-review/design";
 
 import { StatGrid } from "./stat";
-
-export function PageHeaderSkeleton({ actions = false }: { actions?: boolean }) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b pb-5">
-      <div className="min-w-0 flex-1 basis-[18rem]">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="mt-2.5 h-8 w-64" />
-        <Skeleton className="mt-3 h-4 w-full max-w-prose" />
-      </div>
-      {actions ? <Skeleton className="h-8 w-36 shrink-0" /> : null}
-    </div>
-  );
-}
 
 // A span, because the header's description places it inside a <p>.
 export function InlineSkeleton({ className }: { className?: string }) {
@@ -24,25 +23,49 @@ export function InlineSkeleton({ className }: { className?: string }) {
   );
 }
 
-export function StatCardSkeleton() {
+type StatShape = {
+  hint?: boolean;
+  sparkline?: boolean;
+};
+
+// Each bar takes its height from the line box of the type it stands in for (h-lh).
+export function StatCardSkeleton({ hint = true, sparkline = false }: StatShape) {
   return (
     <Card className="gap-0 py-4">
       <CardHeader className="gap-1 px-4">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-6 w-16" />
+        <div className="text-sm">
+          <Skeleton className="h-lh w-24" />
+        </div>
+        <div className="text-h1 leading-none">
+          <Skeleton className="h-lh w-16" />
+        </div>
       </CardHeader>
-      <CardContent className="px-4 pt-2">
-        <Skeleton className="h-3 w-28" />
-      </CardContent>
+      {hint || sparkline ? (
+        <CardContent className="px-4 pt-2">
+          {hint ? (
+            <div className="text-sm">
+              <Skeleton className="h-lh w-28" />
+            </div>
+          ) : null}
+          {sparkline ? (
+            <Skeleton className="mt-2 h-[26px] w-full max-w-[120px]" />
+          ) : null}
+        </CardContent>
+      ) : null}
     </Card>
   );
 }
 
-export function StatCardsSkeleton({ count }: { count: number }) {
+// `sparkline` applies to the first card only, as in the overview's leading stat.
+export function StatCardsSkeleton({
+  count,
+  hint,
+  sparkline,
+}: StatShape & { count: number }) {
   return (
     <>
       {Array.from({ length: count }, (_, i) => (
-        <StatCardSkeleton key={i} />
+        <StatCardSkeleton key={i} hint={hint} sparkline={i === 0 && sparkline} />
       ))}
     </>
   );
@@ -64,34 +87,42 @@ export function StatGridSkeleton({
 
 export function TableCardSkeleton({
   rows = 6,
+  columns = 5,
   className,
 }: {
   rows?: number;
+  columns?: number;
   className?: string;
 }) {
   return (
     <Card className={cn("py-0", className)}>
-      <div className="px-4">
-        <div className="border-border flex h-10 items-center gap-4 border-b">
-          <Skeleton className="h-3 w-28" />
-          <Skeleton className="h-3 w-16" />
-          <Skeleton className="ml-auto h-3 w-16" />
-        </div>
-        {Array.from({ length: rows }, (_, i) => (
-          <div
-            key={i}
-            className="border-border flex h-12 items-center gap-4 border-b last:border-b-0"
-          >
-            <Skeleton className="h-4 w-44" />
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="ml-auto h-4 w-16" />
-          </div>
-        ))}
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {Array.from({ length: columns }, (_, i) => (
+              <TableHead key={i}>
+                <Skeleton className="h-3 w-16" />
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Array.from({ length: rows }, (_, r) => (
+            <TableRow key={r}>
+              {Array.from({ length: columns }, (_, c) => (
+                <TableCell key={c}>
+                  <Skeleton className={cn("h-4", c === 0 ? "w-40" : "w-14")} />
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </Card>
   );
 }
 
+// Mirrors ChartFrame: title, description, plot, caption, collapsed data table.
 export function ChartCardSkeleton({
   height = 260,
   className,
@@ -102,12 +133,21 @@ export function ChartCardSkeleton({
   return (
     <Card className={cn("flex min-w-0 flex-col", className)}>
       <CardHeader>
-        <Skeleton className="h-5 w-40" />
-        <Skeleton className="mt-1.5 h-3 w-56" />
+        <div className="leading-none">
+          <Skeleton className="h-lh w-40" />
+        </div>
+        <div className="text-sm">
+          <Skeleton className="h-lh w-56" />
+        </div>
       </CardHeader>
       <CardContent className="flex min-w-0 flex-1 flex-col">
         <Skeleton className="w-full" style={{ height }} />
-        <Skeleton className="mt-3 h-3 w-3/4" />
+        <div className="mt-3 text-xs leading-relaxed">
+          <Skeleton className="h-lh w-3/4" />
+        </div>
+        <div className="mt-3 border-t pt-2 text-xs">
+          <Skeleton className="h-lh w-32" />
+        </div>
       </CardContent>
     </Card>
   );
