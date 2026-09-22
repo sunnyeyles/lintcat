@@ -11,12 +11,17 @@ export const DOCS_NAV: DocsSection[] = [
       {
         href: DOCS_HOME,
         title: "Introduction",
-        summary: "What the reviewer looks for, and what it is never allowed to do.",
+        summary: "What LintCat reviews, and how it gets onto your repositories.",
       },
       {
         href: "/docs/quickstart",
         title: "Quickstart",
-        summary: "One workflow file, no infrastructure, a review on the next pull request.",
+        summary: "Install the GitHub App, add a model key, label a pull request.",
+      },
+      {
+        href: "/docs/configuration",
+        title: "Configuration",
+        summary: "The model key, when each repository is reviewed, models and fixes.",
       },
     ],
   },
@@ -38,11 +43,6 @@ export const DOCS_NAV: DocsSection[] = [
   {
     title: "Reference",
     pages: [
-      {
-        href: "/docs/configuration",
-        title: "Configuration",
-        summary: "Every Action input, the providers, fixes, and token permissions.",
-      },
       {
         href: "/docs/mcp-server",
         title: "MCP server",

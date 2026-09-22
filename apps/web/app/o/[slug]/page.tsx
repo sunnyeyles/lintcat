@@ -110,7 +110,7 @@ async function ReposGlance({ slug }: { slug: string }) {
           <EmptyHeader>
             <EmptyTitle>No repositories connected</EmptyTitle>
             <EmptyDescription>
-              Add the review workflow to a repository to see it here.
+              Give the LintCat GitHub App access to a repository to see it here.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

@@ -27,7 +27,7 @@ export default async function SettingsPage({
       <PageHeader
         eyebrow="Settings"
         title="Model key"
-        description="Hosted reviews run on your organization's own model provider key. Add the ai-review label to a pull request on an installed repository and it is reviewed with this key, with no workflow in the repository."
+        description="Reviews run on your organization's own model provider key. Once it is saved, add the ai-review label to a pull request on an installed repository and LintCat reviews it with this key."
       />
       <div className="mt-8 max-w-2xl">
         <ModelKeyForm

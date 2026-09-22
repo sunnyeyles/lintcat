@@ -121,7 +121,7 @@ export function SidebarDrawer({ isOwner = false, className }: { isOwner?: boolea
       <SheetContent side="left" className="max-w-[16rem]">
         <SheetHeader>
           <SheetTitle>Navigate</SheetTitle>
-          <SheetDescription>pr-review-agents dashboard</SheetDescription>
+          <SheetDescription>LintCat dashboard</SheetDescription>
         </SheetHeader>
         <div className="px-3 py-4">
           <NavLinks slug={slug} isOwner={isOwner} onNavigate={() => setOpen(false)} />

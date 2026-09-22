@@ -83,7 +83,7 @@ export function DocsNavDrawer({ className }: { className?: string }) {
       <SheetContent side="left" className="max-w-[17rem]">
         <SheetHeader>
           <SheetTitle>Documentation</SheetTitle>
-          <SheetDescription>pr-review-agents</SheetDescription>
+          <SheetDescription>LintCat</SheetDescription>
         </SheetHeader>
         <div className="overflow-y-auto px-3 py-4">
           <NavLinks onNavigate={() => setOpen(false)} />

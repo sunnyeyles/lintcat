@@ -19,7 +19,7 @@ describe("docsNeighbours", () => {
   it("reads across sections", () => {
     const { previous, next } = docsNeighbours("/docs/trust-boundary");
     expect(previous?.href).toBe("/docs/how-it-works");
-    expect(next?.href).toBe("/docs/configuration");
+    expect(next?.href).toBe("/docs/mcp-server");
   });
 
   it("gives nothing for a page outside the nav", () => {

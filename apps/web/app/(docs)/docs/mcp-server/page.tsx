@@ -21,12 +21,12 @@ export const metadata: Metadata = {
 const HEADINGS: Heading[] = [
   { id: "running", title: "Running it" },
   { id: "tools", title: "Tools" },
-  { id: "same-path", title: "The same path as the Action" },
+  { id: "same-path", title: "The same review as the App" },
 ];
 
 const TOOLS = [
   ["review_local_changes", "Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed."],
-  ["review_pull_request", "Reviews a GitHub pull request; a dry run unless publish: true, which posts the check run and comments as the Action would."],
+  ["review_pull_request", "Reviews a GitHub pull request; a dry run unless publish: true, which posts the check run and comments as the GitHub App would."],
   ["repository_overview, find_references, describe_file", "The repository index, built from the working tree, with no network."],
   ["list_reviews, get_review, review_trends", "Stored review history, scoped by the dashboard's own access rules to your GitHub account."],
 ] as const;
@@ -77,11 +77,11 @@ export default function McpServerPage() {
         </Note>
       </Section>
 
-      <Section id="same-path" title="The same path as the Action">
+      <Section id="same-path" title="The same review as the App">
         <P>
-          A local review takes the same path, with a git-backed client in place of
-          GitHub&rsquo;s, so the trust boundary is unchanged: only validated findings come
-          back.
+          A local review runs the same pipeline as the GitHub App but reads your git checkout
+          instead of GitHub, so the trust boundary is unchanged: only validated findings come
+          back. It runs on your machine with your own key, not the organization&rsquo;s.
         </P>
       </Section>
     </DocsArticle>
