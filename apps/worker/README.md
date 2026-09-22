@@ -38,7 +38,15 @@ pnpm --filter @pr-review/worker start -- --once # drain the queue, then exit
    commit, the job is superseded and nothing is published.
 4. Opens the organization's model key. With no key saved, it publishes a
    neutral check run asking an owner to add one, and calls no model.
-5. Runs `runReview` from `@pr-review/reviewer` with the GitHub delivery.
+5. Reads the repo's settings. The model is the repo's choice or the key's
+   provider default; a model the provider does not offer fails the job at once,
+   with no retry, and a `failure` check run naming it.
+6. Runs `runReview` from `@pr-review/reviewer` with the GitHub delivery. With
+   the repo's fixes on, verified patches are committed to the head branch under
+   the Action's limits; otherwise they arrive as suggested changes.
+7. Writes the review straight to the database through ingest's write path, so a
+   rerun of the same commit replaces its findings. A failure here is logged and
+   never fails a review already on GitHub.
 
 ## Superseding
 
@@ -55,6 +63,4 @@ logged and stored with the model key and the installation token redacted.
 
 ## Not here yet
 
-Deploying to Cloud Run (#177), per-repository settings and dashboard review
-history (#178). Hosted reviews are not written to the dashboard's `reviews`
-table.
+Deploying to Cloud Run (#177).
