@@ -294,7 +294,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agent authenticates with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. With neither set, the step skips the review with a notice and succeeds. |
 | `model-provider` | no (default `openai`) | Which provider the agent calls: `openai` or `anthropic`. An unknown name fails the step before any model call. |
 | `github-token` | no (default `${{ github.token }}`) | Token for the eight read-only repository tools and for publishing the check run. |
-| `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-haiku-4-5`) | Model id, as the provider spells it. |
+| `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-sonnet-5`) | Model id, as the provider spells it. |
 | `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
 | `index` | no (default `true`) | Whether the review builds a [repository index](#repository-index) from the pull request's base commit before the agent starts. `false` turns it off. |

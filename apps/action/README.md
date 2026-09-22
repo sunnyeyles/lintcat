@@ -47,7 +47,7 @@ review is never executed.
 | `api-key` | yes, as the input or through `env` | — | Key for the selected provider, which the reviewer authenticates with. Store it as a secret. Falls back to that provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty. With neither set, the step skips the review with a notice and succeeds. |
 | `model-provider` | no | `openai` | Which provider to call: `openai` or `anthropic`. An unknown name fails the step before any model call. |
 | `github-token` | no | `${{ github.token }}` | Token for the read-only tools, the review comments, and the check run. |
-| `model` | no | the provider's own | Default model id, as the provider spells it: `gpt-5.6-luna` on `openai`, `claude-haiku-4-5` on `anthropic`. |
+| `model` | no | the provider's own | Default model id, as the provider spells it: `gpt-5.6-luna` on `openai`, `claude-sonnet-5` on `anthropic`. |
 | `model-base-url` | no | the provider's own host | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `index` | no | `true` | Whether the review builds a repository index from the pull request's base commit before the reviewer starts. One archive request, `contents: read` only, held in memory and discarded. Any failure is logged and the review runs without it. `false` turns it off. |
 | `incremental` | no | `false` | `true` reviews only the commits added since the last completed `AI PR Review` check run on this pull request, falling back to the whole pull request when there is no usable baseline. |

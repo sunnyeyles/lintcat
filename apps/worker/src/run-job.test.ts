@@ -295,7 +295,7 @@ describe("runReviewJob repo settings", () => {
     expect(await runReviewJob(d, job)).toBe("succeeded");
 
     expect(createLanguageModel).toHaveBeenCalledWith(
-      expect.objectContaining({ modelId: "claude-haiku-4-5" }),
+      expect.objectContaining({ modelId: "claude-sonnet-5" }),
     );
   });
 

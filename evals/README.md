@@ -97,11 +97,12 @@ proves nothing on its own: the gate needs both halves.
 
 - **No fixture requires a patch.** `patches-verify` catches a wrong patch but
   cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
-- **The Anthropic default model does not clear the suite.** On
-  `claude-haiku-4-5` the reviewer hits the turn cap or returns unparseable
-  JSON. Run Anthropic with `MODEL_ID=claude-sonnet-5`. Sonnet is not immune:
-  unparseable JSON on a fixture fails the whole fixture without saying anything
-  about recall.
+- **`claude-haiku-4-5` does not clear the suite**, which is why the Anthropic
+  default is now `claude-sonnet-5`. On Haiku the reviewer hits the turn cap or
+  returns prose; the forced final turn and the one repair turn soften both, but
+  neither has been measured on Haiku. Sonnet is not immune: a run that still
+  fails the repair turn fails the whole fixture without saying anything about
+  recall.
 - **One sample per arm.** A fixture is one non-deterministic review, so a
   single on-versus-off pair is a signal, not a measurement. Read the gate with
   that in mind, and repeat the pair before concluding the index does nothing.
