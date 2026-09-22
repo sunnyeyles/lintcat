@@ -56,7 +56,6 @@ function systemOf(call: Call | undefined): string {
   return String((system as { content?: string } | undefined)?.content ?? "");
 }
 
-/** The text of the first or last recorded user message in one call. */
 function userTextOf(call: Call | undefined, which: "first" | "last"): string {
   const users = (call?.prompt ?? []).filter(
     (entry) => (entry as { role?: string }).role === "user",

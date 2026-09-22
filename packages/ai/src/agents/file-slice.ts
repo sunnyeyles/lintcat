@@ -5,10 +5,7 @@ export interface LineRange {
   endLine?: number | undefined;
 }
 
-/**
- * Returns the whole content with no range, else the 1-based inclusive range
- * clamped to the file, under a `[lines a-b of n]` header.
- */
+/** No range returns the content whole; a 1-based inclusive range is clamped to the file. */
 export function sliceLines(content: string, range: LineRange = {}): string {
   if (range.startLine === undefined && range.endLine === undefined) {
     return content;

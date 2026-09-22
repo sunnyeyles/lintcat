@@ -40,9 +40,7 @@ import {
 export interface AgentUsageReport {
   agent: string;
   durationMs: number;
-  /** Model round trips made; each one resends the whole conversation. */
   steps: number;
-  /** The turn cap was reached and the last turn was forced tool-free. */
   salvaged: boolean;
   usage: TokenUsage;
 }
@@ -72,7 +70,6 @@ const CACHE_BREAKPOINT = {
   anthropic: { cacheControl: { type: "ephemeral" as const } },
 };
 
-/** Adds an OpenAI-only prompt cache key on top of the shared breakpoint. */
 function callProviderOptions(context: ReviewContext, category: string) {
   const { owner, repo, pullRequest } = context;
   return {
@@ -242,7 +239,6 @@ export function createReviewAgent(
           });
 
           try {
-            // Both calls below share this, so the cached prefix is byte-identical.
             const call = {
               model,
               abortSignal: context.signal,
@@ -271,7 +267,6 @@ export function createReviewAgent(
               ...call,
               messages: [opening],
               stopWhen: isStepCount(maxTurns),
-              // The last allowed turn is tool-free, so the cap yields findings, not a retry.
               prepareStep: ({ stepNumber, messages }) => {
                 if (stepNumber !== maxTurns - 1) {
                   return undefined;
@@ -293,7 +288,6 @@ export function createReviewAgent(
 
             let output = extractAgentOutput(result.text);
             if (!output.ok) {
-              // One tool-free turn to restate the answer costs far less than a re-review.
               const repaired = await generateText({
                 ...call,
                 messages: [

@@ -35,7 +35,6 @@ describe("estimateCostUsd", () => {
   it("prices each counter at its own rate", () => {
     const cost = estimateCostUsd("claude-sonnet-5", report().usage);
 
-    // 1k×2 + 10k×2.5 + 100k×0.2 + 5k×10 = 97,000 per million.
     expect(cost).toBeCloseTo(0.097, 6);
   });
 
@@ -131,7 +130,6 @@ describe("the rendered table", () => {
     const table = renderUsageTable(usageReport);
     const lines = table.split("\n");
 
-    // A title, a header, the two fixtures, and the total.
     expect(lines).toHaveLength(5);
     expect(lines[2]).toMatch(/^clean-pagination\s+4\s+1\.0k\s+10\.0k\s+100\.0k\s+5\.0k\s+0\.10\s+30s\s+2\/2$/);
     expect(lines[4]).toMatch(/^TOTAL\s+10\s+2\.0k\s+20\.0k\s+200\.0k\s+10\.0k\s+0\.19\s+75s\s+2\/3$/);

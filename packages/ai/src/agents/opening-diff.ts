@@ -28,7 +28,6 @@ export const DEFAULT_OPENING_DIFF_LIMITS: OpeningDiffLimits = {
   maxFileChars: 20_000,
 };
 
-/** Omitted files named in the opening message before "and N more". */
 const MAX_NAMED_OMISSIONS = 30;
 
 const FILE_CUT_MARKER = "\n[... patch truncated; get_diff with this path returns it whole]";
@@ -41,7 +40,6 @@ function skipReason(file: ChangedFile): OmissionReason | undefined {
   return role === "vendored" || role === "generated" ? role : undefined;
 }
 
-/** Cuts on a line boundary so no hunk line is left half-rendered. */
 function capPatch(patch: string, maxChars: number): string {
   if (patch.length <= maxChars) {
     return patch;
@@ -50,7 +48,6 @@ function capPatch(patch: string, maxChars: number): string {
   return patch.slice(0, cut > 0 ? cut : maxChars) + FILE_CUT_MARKER;
 }
 
-// Mirrors renderDiff's header lines; reviewer can't be imported here (circular).
 function renderPatch(file: ChangedFile, patch: string): string {
   return [
     `diff --git a/${file.filename} b/${file.filename}`,
@@ -60,7 +57,6 @@ function renderPatch(file: ChangedFile, patch: string): string {
   ].join("\n");
 }
 
-/** Renders the reviewable patches in order until the budget runs out. */
 export function buildOpeningDiff(
   changedFiles: readonly ChangedFile[],
   limits: OpeningDiffLimits = DEFAULT_OPENING_DIFF_LIMITS,
@@ -93,7 +89,6 @@ export function buildOpeningDiff(
   return { diff: rendered.join("\n"), omitted };
 }
 
-/** Names what the diff left out; empty when nothing was left out. */
 export function renderOmitted(omitted: readonly OmittedFile[]): string[] {
   if (omitted.length === 0) {
     return [];

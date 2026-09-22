@@ -23,11 +23,9 @@ const PRICES: Record<string, readonly [number, number, number, number]> = {
 export interface FixtureUsageRow {
   fixture: string;
   steps: number;
-  /** Agent runs that hit the turn cap and answered on a forced final turn. */
   salvaged: number;
   durationMs: number;
   usage: TokenUsage;
-  /** Absent when the model is not in the price table. */
   costUsd: number | undefined;
   passed: number;
   total: number;
@@ -60,10 +58,6 @@ export function estimateCostUsd(
   );
 }
 
-/**
- * Attributes agent reports to fixtures. Fixtures run one at a time, so the
- * fixture begun last owns every report until the next begins.
- */
 export function createUsageCollector(model: string) {
   const rows = new Map<string, FixtureUsageRow>();
   let current: FixtureUsageRow | undefined;
