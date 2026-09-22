@@ -88,7 +88,7 @@ function unknownModelOutput(message: string): CheckRunOutput {
   return {
     title: "The chosen model is not recognized",
     summary:
-      `${message} An organization owner can change the repository's model in its settings, ` +
+      `${message} A repository owner can change the model in the repository's settings, ` +
       "then push a commit or re-add the `ai-review` label.",
   };
 }

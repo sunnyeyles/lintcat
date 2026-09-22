@@ -415,6 +415,24 @@ describe("runReviewJob dashboard recording", () => {
     expect(text).not.toContain("top secret replacement text");
   });
 
+  it("replaces the review's findings when the same commit is reviewed again", async () => {
+    await withKey();
+    const first = [makeFinding("general", { line: 41, title: "First problem" })];
+    const { deps: d1 } = deps({ createLanguageModel: () => answering(first) });
+    expect(await runReviewJob(d1, await claim())).toBe("succeeded");
+    expect(await database.select().from(findings)).toMatchObject([{ title: "First problem" }]);
+
+    const rerun = [makeFinding("general", { line: 41, title: "Only problem left" })];
+    const { deps: d2 } = deps({ createLanguageModel: () => answering(rerun) });
+    expect(await runReviewJob(d2, await claim())).toBe("succeeded");
+
+    const stored = await database.select().from(reviews);
+    expect(stored).toMatchObject([{ repoId, prNumber: 42, headSha }]);
+    expect(await database.select().from(findings)).toMatchObject([
+      { reviewId: stored[0]!.id, title: "Only problem left" },
+    ]);
+  });
+
   it("does not record anything when the job fails", async () => {
     await withKey();
     const job = await claim();
