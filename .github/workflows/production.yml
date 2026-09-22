@@ -1,4 +1,4 @@
-# The only path to production: CI, then migrations, then the Vercel deploy.
+# The only path to production: CI, then migrations, then the Vercel and Cloud Run deploys.
 # apps/web/vercel.json turns off Vercel's own git deploys for main.
 
 name: Production
@@ -47,6 +47,30 @@ jobs:
           fi
           echo "Vercel token and project link are configured."
 
+      - name: Require the Cloud Run deploy configuration
+        env:
+          # Only tested for emptiness, never printed.
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          GCP_ARTIFACT_REPOSITORY: ${{ secrets.GCP_ARTIFACT_REPOSITORY }}
+          CLOUD_RUN_SERVICE: ${{ secrets.CLOUD_RUN_SERVICE }}
+        run: |
+          set -euo pipefail
+          ok=true
+          for name in GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REPOSITORY CLOUD_RUN_SERVICE; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Secret ${name} is not set. Add it under Settings > Secrets and variables > Actions > Secrets; apps/worker/README.md says where each value comes from."
+              ok=false
+            fi
+          done
+          if [ "${ok}" != true ]; then
+            echo "::error::Stopped before CI and migrations: nothing could be deployed afterwards."
+            exit 1
+          fi
+          echo "Cloud Run deploy configuration is present."
+
   ci:
     name: CI
     needs: preflight
@@ -59,7 +83,7 @@ jobs:
     secrets:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  deploy:
+  deploy-web:
     name: Deploy to Vercel production
     needs: migrate
     runs-on: ubuntu-latest
@@ -84,3 +108,47 @@ jobs:
           set -euo pipefail
           url="$(npx --yes vercel@59 deploy --prod --yes --token "$VERCEL_TOKEN")"
           echo "Production deployment: ${url}" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-worker:
+    name: Deploy worker to Cloud Run
+    needs: migrate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ secrets.GCP_REGION }}-docker.pkg.dev" --quiet
+
+      # apps/worker/Dockerfile bundles from the repo root; nothing but dist/index.mjs ships.
+      - name: Build and push the worker image
+        id: image
+        run: |
+          set -euo pipefail
+          image="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REPOSITORY }}/pr-review-worker:${{ github.sha }}"
+          docker build -f apps/worker/Dockerfile -t "$image" .
+          docker push "$image"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+
+      # Secrets and env vars stay whatever the service already has (see apps/worker/README.md);
+      # this only swaps the image, so a one-time manual setup is never repeated here.
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: ${{ secrets.CLOUD_RUN_SERVICE }}
+          region: ${{ secrets.GCP_REGION }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          image: ${{ steps.image.outputs.image }}

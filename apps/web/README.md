@@ -28,6 +28,8 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `GITHUB_APP_SLUG`           | The App's URL slug; shows the Install button (optional)          |
 | `APP_DOMAIN`                | Apex domain organizations are subdomains of; default `localhost` |
 | `MODEL_KEY_ENCRYPTION_KEY`  | 32 bytes of base64 sealing model keys; `openssl rand -base64 32` |
+| `WORKER_URL`                | The worker's Cloud Run URL; unset locally, so the ping is a no-op |
+| `WORKER_PING_SECRET`        | Bearer token the worker checks; shared with `apps/worker`, required once `WORKER_URL` is set |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
 lists them. Give the GitHub App the callback URL
@@ -152,6 +154,12 @@ in a suspended or uninstalled organization get a 204 and write nothing
 - The worker writes the finished review straight to the database through
   ingest's write path, so it shows in the review pages with no
   `dashboard-token`, and a rerun of the same commit replaces its findings.
+- After a successful enqueue, the route pings the worker's Cloud Run endpoint
+  (`WORKER_URL`, a bearer `WORKER_PING_SECRET`) so it drains immediately; it
+  never awaits or blocks on that call (`lib/worker-ping.ts`, `after()`), and a
+  lost or failed ping is not fatal — the worker's own periodic sweep and its
+  next ping both drain the same queue. `WORKER_URL` unset (local dev) makes the
+  ping a no-op; run the worker's poll loop instead.
 
 ### Repository settings
 
@@ -304,8 +312,13 @@ as before. `main` does not: `git.deploymentEnabled` turns that off, and
 1. **CI** — `ci.yml`, called on the pushed commit.
 2. **Migrate** — `db-migrate.yml` applies pending Drizzle migrations to
    `secrets.DATABASE_URL`; with none pending it is a no-op.
-3. **Deploy** — `vercel deploy --prod` from the repo root, built by Vercel with
-   the project's settings and Production environment variables.
+3. **Deploy web** — `vercel deploy --prod` from the repo root, built by Vercel
+   with the project's settings and Production environment variables.
+4. **Deploy worker** — in parallel with the Vercel deploy, builds
+   [`apps/worker`](../worker)'s image (`apps/worker/Dockerfile`), pushes it to
+   Artifact Registry and deploys it to Cloud Run via Workload Identity
+   Federation. See `apps/worker/README.md`'s Deploy section for the one-time
+   GCP setup this depends on.
 
 A failed step stops the ones after it, so a commit whose CI failed never
 migrates, and production never serves code whose migrations have not applied.
@@ -316,7 +329,7 @@ Migrations still land before the new code serves, so each one must work with
 the code already in production.
 
 Repository secrets the pipeline needs (Settings > Secrets and variables >
-Actions); it stops before CI if any Vercel one is missing:
+Actions); it stops before CI if any of them is missing:
 
 | Secret              | Value                                                        |
 | ------------------- | ------------------------------------------------------------ |
@@ -324,6 +337,11 @@ Actions); it stops before CI if any Vercel one is missing:
 | `VERCEL_ORG_ID`     | `orgId` from `.vercel/project.json` after `vercel link`      |
 | `VERCEL_PROJECT_ID` | `projectId` from the same file                               |
 | `DATABASE_URL`      | The production Neon connection string (already used before)  |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | The WIF provider the worker deploy authenticates through |
+| `GCP_SERVICE_ACCOUNT` | The service account it impersonates |
+| `GCP_PROJECT_ID`, `GCP_REGION` | Where the Artifact Registry repo and Cloud Run service live |
+| `GCP_ARTIFACT_REPOSITORY` | The Artifact Registry repo the worker image is pushed to |
+| `CLOUD_RUN_SERVICE` | The Cloud Run service name to deploy |
 
 To redeploy without a push, run the Production workflow from the Actions tab
 on `main`; `db-migrate.yml` can also still be run by hand on its own.

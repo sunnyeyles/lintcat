@@ -67,6 +67,7 @@ let githubCalls: number;
 // "owner/name" (lowercased) -> who can read it on GitHub; a missing repo makes a listing fail.
 let collaborators: Record<string, RepositoryCollaborator[]>;
 let log: CapturedLogEvent[];
+let pingCalls: number;
 
 // GitHub's current truth; tests change `members` to simulate edits made on GitHub.
 const github: GithubAppClient = {
@@ -117,6 +118,7 @@ beforeEach(async () => {
   githubCalls = 0;
   collaborators = {};
   log = [];
+  pingCalls = 0;
 });
 
 function installation(
@@ -170,6 +172,9 @@ function deliver(request: Request): Promise<Response> {
     github,
     logger: capturing.logger,
     webhookSecret: SECRET,
+    pingWorker: () => {
+      pingCalls += 1;
+    },
   });
 }
 
@@ -290,7 +295,13 @@ describe("handleGithubWebhook signature", () => {
       delivery("installation", { action: "created", installation: installation() }, (body) =>
         signature("", body),
       ),
-      { database, github, logger: createCapturingLogger().logger, webhookSecret: "" },
+      {
+        database,
+        github,
+        logger: createCapturingLogger().logger,
+        webhookSecret: "",
+        pingWorker: () => {},
+      },
     );
     expect(response.status).toBe(401);
     expect(await state()).toEqual(empty);
@@ -1165,6 +1176,7 @@ describe("handleGithubWebhook pull_request", () => {
     const response = await deliver(pullRequestEvent("labeled", { label: "ai-review" }));
     expect(response.status).toBe(200);
     expect(await jobs()).toEqual([queued("head-1")]);
+    expect(pingCalls).toBe(1);
   });
 
   it("ignores any other label", async () => {
@@ -1173,6 +1185,7 @@ describe("handleGithubWebhook pull_request", () => {
     );
     expect(response.status).toBe(204);
     expect(await jobs()).toEqual([]);
+    expect(pingCalls).toBe(0);
   });
 
   it("queues a push or a reopen on a labelled pull request, superseding the older head", async () => {
@@ -1184,6 +1197,7 @@ describe("handleGithubWebhook pull_request", () => {
       { ...queued("head-2"), status: "superseded" },
       queued("head-3"),
     ]);
+    expect(pingCalls).toBe(3);
   });
 
   it("ignores a push or a reopen on a pull request without the label", async () => {
@@ -1215,6 +1229,7 @@ describe("handleGithubWebhook pull_request", () => {
     expect(log).toContainEqual(
       expect.objectContaining({ event: "review_job.duplicate", deliveryId: "same" }),
     );
+    expect(pingCalls).toBe(1);
   });
 
   it("ignores a repository the installation does not cover", async () => {

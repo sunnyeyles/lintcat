@@ -1,0 +1,12 @@
+# Keeps the Cloud Run build context to source only; pnpm reinstalls, esbuild rebundles.
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.git
+.claude/worktrees
+*.tsbuildinfo
+.env
+.env.local
+.vercel
