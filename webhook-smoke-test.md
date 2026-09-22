@@ -5,3 +5,5 @@ Temporary file to trigger a `pull_request.opened` webhook delivery for testing.
 Repush to trigger `pull_request.synchronize`.
 
 Second repush attempt.
+
+Third repush, tailing Vercel logs live to catch the 500.
