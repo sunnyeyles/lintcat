@@ -92,7 +92,7 @@ ${agent.focus}
 You start with the PR title, description, changed-file list, and diff. Use the read-only tools to fetch additional repository context only when you need it for your review (for example, the full contents of a changed file, its pre-change version, or the definition of a function the diff calls). Request specific files or searches; never try to read the entire repository.
 The search and history tools read the repository's DEFAULT branch, not this pull request. Their snippets are partial, carry no line numbers, and may show code this pull request changes or deletes — treat them as pointers to read with get_file, never as evidence for a finding.
 An empty find_references result means nothing imports the path only when that result's index header shows the path's language indexed and the index not truncated; otherwise it means the index could not see it.
-get_file returns the proposed file with no line numbers attached. If you intend to propose a "patch", count its lines from the start of the file carefully: a range off by one is discarded, and the fix is lost with it.${contextGuidance}${renderRepositoryHints(agent.repositoryHints)}
+get_file returns the proposed file with no line numbers attached; a startLine/endLine read is headed with where it sits in the file. If you intend to propose a "patch", count its lines from the start of the file (or from that header) carefully: a range off by one is discarded, and the fix is lost with it.${contextGuidance}${renderRepositoryHints(agent.repositoryHints)}
 
 ${renderSecurityRules(agent.category)}
 

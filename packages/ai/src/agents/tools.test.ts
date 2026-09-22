@@ -74,10 +74,13 @@ describe("createReviewTools on a narrowed review", () => {
     expect(listed.map((file) => file.filename)).toContain("docs/sessions.md");
   });
 
-  it("serves the whole pull request's diff, so an agent can widen", async () => {
+  it("lists every changed file when get_diff names no path, so an agent can widen", async () => {
     const tools = createReviewTools(makeGithub(), narrowed);
 
-    expect(await run(tools, "get_diff", {})).toBe(context.diff);
+    const listed = String(await run(tools, "get_diff", {}));
+
+    expect(listed).toContain("docs/sessions.md");
+    expect(listed).not.toContain("+docs");
   });
 
   it("serves a patch for a file the narrowed diff does not cover", async () => {
@@ -104,8 +107,8 @@ describe("createReviewTools", () => {
 
   /** Descriptions live on the Zod schemas, where a new field is easy to forget. */
   it.each([
-    ["get_file", ["path"]],
-    ["get_base_file", ["path"]],
+    ["get_file", ["path", "startLine", "endLine"]],
+    ["get_base_file", ["path", "startLine", "endLine"]],
     ["search_repository", ["query"]],
     ["get_diff", ["path"]],
     ["find_references", ["path", "name"]],
@@ -168,12 +171,19 @@ describe("review tool execution", () => {
     ]);
   });
 
-  it("returns the loaded diff verbatim when get_diff names no path", async () => {
+  it("lists changed files with patch sizes, never the diff, when get_diff names no path", async () => {
     const github = makeGithub();
-    const result = await run(createReviewTools(github, scope), "get_diff", {});
+    const result = String(await run(createReviewTools(github, scope), "get_diff", {}));
 
     expect(github.getDiff).not.toHaveBeenCalled();
-    expect(result).toBe(context.diff);
+    expect(result).toBe(
+      [
+        "2 changed file(s); call get_diff with a path for one patch.",
+        `src/sessions.ts  modified  +3 -0  patch: ${context.changedFiles[0]?.patch?.length} chars`,
+        "assets/logo.png  added  +0 -0  no patch",
+      ].join("\n"),
+    );
+    expect(result).not.toContain("user.isAdmin");
   });
 
   it("returns one file's patch when get_diff names a path", async () => {
@@ -212,6 +222,31 @@ describe("review tool execution", () => {
       path: "src/sessions.ts",
       ref: headSha,
     });
+  });
+
+  it("returns one line range of get_file under a header saying where it sits", async () => {
+    const github = makeGithub();
+    github.getFileContents.mockResolvedValueOnce("a\nb\nc\nd\ne\n");
+
+    const result = await run(createReviewTools(github, scope), "get_file", {
+      path: "src/sessions.ts",
+      startLine: 2,
+      endLine: 3,
+    });
+
+    expect(result).toBe("[lines 2-3 of 6]\nb\nc");
+  });
+
+  it("rejects a get_file range that ends before it starts", () => {
+    const tools = createReviewTools(makeGithub(), scope);
+
+    const parsed = schemaOf(tools, "get_file").safeParse({
+      path: "src/sessions.ts",
+      startLine: 5,
+      endLine: 2,
+    });
+
+    expect(parsed.success).toBe(false);
   });
 
   it("reads get_base_file at the base commit", async () => {
@@ -589,17 +624,16 @@ describe("review tool execution", () => {
     );
   });
 
-  it("truncates oversized tool results", async () => {
-    const huge = { ...scope, diff: "x".repeat(200_000) };
+  it("truncates oversized tool results and says how to read the rest", async () => {
+    const github = makeGithub();
+    github.getFileContents.mockResolvedValueOnce("x".repeat(200_000));
 
-    const result = (await run(
-      createReviewTools(makeGithub(), huge),
-      "get_diff",
-      {},
-    )) as string;
+    const result = (await run(createReviewTools(github, scope), "get_file", {
+      path: "src/sessions.ts",
+    })) as string;
 
     expect(result.length).toBeLessThan(200_000);
-    expect(result).toMatch(/truncated/i);
+    expect(result).toMatch(/truncated.*startLine and endLine/);
   });
 
   /** The SDK turns a rejected execute into a tool-error the model reads. */
