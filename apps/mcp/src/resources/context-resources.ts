@@ -5,17 +5,13 @@ import type { McpEnvironment } from "#src/environment";
 import { readWorkingTreeFile } from "#src/local-git-client";
 import { readStoredReview } from "#src/review-history";
 
-export const REVIEW_RESOURCE_TEMPLATE = "pr-review://review/{org}/{id}";
-export const FILE_RESOURCE_TEMPLATE = "pr-review://file/{+path}";
+const REVIEW_RESOURCE_TEMPLATE = "pr-review://review/{org}/{id}";
+const FILE_RESOURCE_TEMPLATE = "pr-review://file/{+path}";
 
-export const RESOURCE_FORMS = [REVIEW_RESOURCE_TEMPLATE, FILE_RESOURCE_TEMPLATE].join(", ");
+const RESOURCE_FORMS = [REVIEW_RESOURCE_TEMPLATE, FILE_RESOURCE_TEMPLATE].join(", ");
 
 export function reviewResourceUri(org: string, id: number): string {
   return `pr-review://review/${encodeURIComponent(org)}/${id}`;
-}
-
-export function fileResourceUri(file: string): string {
-  return `pr-review://file/${encodeURI(file)}`;
 }
 
 type Variables = Record<string, string | string[] | undefined>;

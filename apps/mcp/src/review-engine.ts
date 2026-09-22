@@ -16,7 +16,7 @@ export interface SelectedEngine {
 }
 
 /** Said when the machine has neither a key nor a client willing to run the model. */
-export function noModelAccessMessage(): string {
+function noModelAccessMessage(): string {
   const keys = MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ");
   return (
     `No model API key is set and this client does not offer sampling, so there is no way to run a review. ` +

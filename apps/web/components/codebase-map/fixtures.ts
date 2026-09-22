@@ -15,12 +15,12 @@ export const FIXTURE_LABELS: Record<FixtureKind, string> = {
 export const FIXTURE_SIZES = [1000, 5000, 10000, 50000] as const;
 
 /** Above the stock 5000, so the smaller sizes still draw the whole repo here. */
-export const DEV_LOD_THRESHOLD = 10_000;
+const DEV_LOD_THRESHOLD = 10_000;
 
 const SEED = 7;
 
 /** Fixtures only: the page feeds the graph, the pure module still decides the status. */
-export function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
+function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
   if (kind === "empty") return { files: [], imports: [], truncated: false };
 
   const graph = sampleRepo(SEED, files);
@@ -46,7 +46,7 @@ export function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
 const SEVERITY_CYCLE = ["high", "medium", "low", "medium"] as const;
 
 /** Findings on every seventh file, so the heat layer has something to draw. */
-export function fixtureHeat(graph: MapGraph): FindingHeat {
+function fixtureHeat(graph: MapGraph): FindingHeat {
   const findings = graph.files.flatMap((file, i) =>
     i % 7 === 0
       ? Array.from({ length: (i % 9) + 1 }, (_, n) => ({

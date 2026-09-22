@@ -1,8 +1,8 @@
 /** Ctrl-C cancels the review through its signal; a second one quits on the spot. */
 
-export type StopSignal = "SIGINT" | "SIGTERM";
+type StopSignal = "SIGINT" | "SIGTERM";
 
-export interface SignalSource {
+interface SignalSource {
   on(event: StopSignal, listener: () => void): unknown;
   off(event: StopSignal, listener: () => void): unknown;
 }

@@ -16,12 +16,6 @@ export function Section({ id, title, children }: Heading & { children: ReactNode
   );
 }
 
-export function Subheading({ children }: { children: ReactNode }) {
-  return (
-    <h3 className="font-display text-h3 font-semibold tracking-display text-foreground">{children}</h3>
-  );
-}
-
 export function P({ children }: { children: ReactNode }) {
   return (
     <p className="max-w-measure text-body text-muted-foreground">{children}</p>

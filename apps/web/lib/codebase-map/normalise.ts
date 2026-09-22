@@ -7,7 +7,7 @@ import type {
   MapImport,
 } from "@/lib/codebase-map/types";
 
-export interface DroppedCounts {
+interface DroppedCounts {
   invalidFiles: number;
   duplicateFiles: number;
   duplicateImports: number;

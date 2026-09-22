@@ -1,8 +1,8 @@
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 
-export type MapStatusKind = "empty" | "no-changes" | "partial" | "ready";
+type MapStatusKind = "empty" | "no-changes" | "partial" | "ready";
 
-export type StatusReasonCode =
+type StatusReasonCode =
   | "level-of-detail"
   | "unresolved-imports"
   | "truncated"
@@ -10,13 +10,13 @@ export type StatusReasonCode =
   | "unknown-dead-flags"
   | "unknown-cycle-flags";
 
-export interface StatusReason {
+interface StatusReason {
   code: StatusReasonCode;
   count: number;
   message: string;
 }
 
-export interface FlagCoverage {
+interface FlagCoverage {
   changed: number;
   dead: number;
   inCycle: number;

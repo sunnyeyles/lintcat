@@ -23,7 +23,7 @@ export interface LodOptions {
   groupImports?: number;
 }
 
-export type MapMode = "full" | "lod";
+type MapMode = "full" | "lod";
 
 export interface MapPayload {
   mode: MapMode;
