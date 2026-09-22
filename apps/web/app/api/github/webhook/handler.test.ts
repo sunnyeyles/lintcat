@@ -8,8 +8,10 @@ import {
   repos,
   reviewJobs,
   reviews,
+  saveRepoSettings,
   users,
   type Database,
+  type RepoReviewMode,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import type {
@@ -1162,6 +1164,14 @@ describe("handleGithubWebhook pull_request", () => {
     status: "queued",
   });
 
+  async function setMode(repo: InstallationRepository, mode: RepoReviewMode): Promise<void> {
+    const [row] = await database
+      .select({ id: repos.id })
+      .from(repos)
+      .where(eq(repos.githubRepoId, repo.id));
+    await saveRepoSettings(database, row!.id, { mode, model: null, fixes: false });
+  }
+
   it("queues a review when the ai-review label is added", async () => {
     const response = await deliver(pullRequestEvent("labeled", { label: "ai-review" }));
     expect(response.status).toBe(200);
@@ -1248,5 +1258,41 @@ describe("handleGithubWebhook pull_request", () => {
   it("400s a malformed pull_request payload", async () => {
     const response = await deliver(delivery("pull_request", { action: "labeled" }));
     expect(response.status).toBe(400);
+  });
+
+  describe("mode off", () => {
+    it("enqueues nothing, even with the label", async () => {
+      await setMode(widgets, "off");
+      const response = await deliver(pullRequestEvent("labeled", { label: "ai-review" }));
+      expect(response.status).toBe(204);
+      expect(await jobs()).toEqual([]);
+    });
+  });
+
+  describe("mode every_pr", () => {
+    it("queues opened, synchronize and reopened without the label", async () => {
+      await setMode(widgets, "every_pr");
+      for (const [index, action] of ["opened", "synchronize", "reopened"].entries()) {
+        const response = await deliver(
+          pullRequestEvent(action, { labels: [], headSha: `head-${index}` }),
+        );
+        expect(response.status).toBe(200);
+      }
+      expect(await jobs()).toHaveLength(3);
+    });
+
+    it("still ignores a closed pull request", async () => {
+      await setMode(widgets, "every_pr");
+      const response = await deliver(pullRequestEvent("opened", { labels: [], state: "closed" }));
+      expect(response.status).toBe(204);
+      expect(await jobs()).toEqual([]);
+    });
+
+    it("ignores actions no mode reviews", async () => {
+      await setMode(widgets, "every_pr");
+      const response = await deliver(pullRequestEvent("edited", { labels: [] }));
+      expect(response.status).toBe(204);
+      expect(await jobs()).toEqual([]);
+    });
   });
 });

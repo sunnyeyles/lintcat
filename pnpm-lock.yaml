@@ -186,6 +186,9 @@ importers:
       '@pr-review/reviewer':
         specifier: workspace:*
         version: link:../../packages/reviewer
+      '@pr-review/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
 
   evals:
     dependencies:

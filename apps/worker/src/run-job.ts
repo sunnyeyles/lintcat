@@ -3,15 +3,17 @@
  * review the Action runs, and settle the row.
  */
 import {
-  defaultModelFor,
   isCancellation,
-  ReviewCancelledError,
+  ModelProviderError,
+  resolveModelId,
   resolveModelProvider,
+  ReviewCancelledError,
   type LanguageModelConfig,
   type ReviewModel,
 } from "@pr-review/ai";
 import {
   completeReviewJob,
+  effectiveRepoSettings,
   failReviewJob,
   findReviewJobContext,
   readModelKey,
@@ -30,13 +32,16 @@ import type {
 } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import {
+  dashboardDelivery,
   githubDelivery,
   reviewCorrelation,
   runReview,
+  type PublishFixes,
   type ReviewDelivery,
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
+import { createDatabaseReviewPublisher } from "#src/record-review";
 import { redact, redactingLogger } from "#src/redact";
 
 export type HostedClient = PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
@@ -79,6 +84,15 @@ function failureOutput(attempts: number): CheckRunOutput {
   };
 }
 
+function unknownModelOutput(message: string): CheckRunOutput {
+  return {
+    title: "The chosen model is not recognized",
+    summary:
+      `${message} A repository owner can change the model in the repository's settings, ` +
+      "then push a commit or re-add the `ai-review` label.",
+  };
+}
+
 /** Throws before each publish once the job stops running, so a superseded run writes nothing. */
 function guardedDelivery(to: ReviewDelivery, stillRunning: () => Promise<boolean>): ReviewDelivery {
   const guard = async () => {
@@ -93,6 +107,15 @@ function guardedDelivery(to: ReviewDelivery, stillRunning: () => Promise<boolean
       await guard();
       return to.publishComments(target, rendered);
     },
+    ...(to.publishFixes === undefined
+      ? {}
+      : {
+          publishFixes: (async (target, input) => {
+            await guard();
+            return to.publishFixes!(target, input);
+          }) satisfies PublishFixes,
+        }),
+    ...(to.publishRun === undefined ? {} : { publishRun: to.publishRun }),
   };
 }
 
@@ -168,17 +191,24 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       return "no-key";
     }
 
+    const settings = await effectiveRepoSettings(database, context.repo.id);
     const provider = resolveModelProvider(key.provider);
-    const model = deps.createLanguageModel({
+    const modelId = resolveModelId(provider, settings.model ?? "");
+    const model = deps.createLanguageModel({ provider, apiKey: key.apiKey, modelId });
+    logger.info("review_job.started", {
+      ...correlation,
       provider,
-      apiKey: key.apiKey,
-      modelId: defaultModelFor(provider),
+      model: model.modelId,
+      fixes: settings.fixes,
     });
-    logger.info("review_job.started", { ...correlation, provider, model: model.modelId });
+    const delivery = dashboardDelivery(
+      githubDelivery({ client, logger, commitFixes: settings.fixes }),
+      createDatabaseReviewPublisher(database, organization.id, logger),
+    );
     await runReview({
       client,
       target,
-      delivery: guardedDelivery(githubDelivery({ client, logger }), stillRunning),
+      delivery: guardedDelivery(delivery, stillRunning),
       engine: { model },
       logger,
       signal: controller.signal,
@@ -192,7 +222,14 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       return "superseded";
     }
     const message = redact(errorMessage(error), secrets);
-    const outcome = await failReviewJob(database, job.id, message, retry);
+    // The same settings would fail every retry, so an unknown model gets none.
+    const unknownModel = error instanceof ModelProviderError;
+    const outcome = await failReviewJob(
+      database,
+      job.id,
+      message,
+      unknownModel ? { ...retry, maxAttempts: 0 } : retry,
+    );
     if (outcome === "superseded") return "superseded";
     logger.error(`review_job.${outcome}`, { ...correlation, error: message });
     if (outcome === "failed" && client) {
@@ -202,7 +239,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
           repo: target.repo,
           headSha: target.headSha,
           conclusion: "failure",
-          output: failureOutput(job.attempts),
+          output: unknownModel ? unknownModelOutput(message) : failureOutput(job.attempts),
         })
         .catch((publishError: unknown) =>
           logger.error("review_job.failure_unpublished", {

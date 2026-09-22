@@ -19,6 +19,7 @@
     "@pr-review/db": "workspace:*",
     "@pr-review/github": "workspace:*",
     "@pr-review/logging": "workspace:*",
-    "@pr-review/reviewer": "workspace:*"
+    "@pr-review/reviewer": "workspace:*",
+    "@pr-review/schemas": "workspace:*"
   }
 }

@@ -71,7 +71,7 @@ a 401 and writes nothing.
 | `repository`                | `renamed`                        | Update the repo's owner and name                                               |
 | `repository`                | `privatized`, `publicized`       | Flip `repos.private`; `privatized` also sets `repo_access` from the repo's collaborators |
 | `repository`                | `deleted`, `transferred`         | Set `removed_at` (a transfer within the same account only updates owner/name)  |
-| `pull_request`              | `labeled` with `ai-review`; `synchronize`, `reopened` on a PR carrying it | Queue a hosted review job; see Hosted reviews |
+| `pull_request`              | per the repo's mode: `labeled` with `ai-review` and later pushes, or `opened`, `synchronize`, `reopened` | Queue a hosted review job; see Hosted reviews |
 
 Anything else gets a 204. The slug is the account's lowercased login; a
 personal account becomes an organization of type `user`.
@@ -137,23 +137,42 @@ holds the lookups the webhook and sign-in share.
 
 A `pull_request` delivery only records a row in `review_jobs` and returns, well
 inside GitHub's 10-second window; the review itself runs in
-[`apps/worker`](../worker). A job is queued for `labeled` when the label is
-`ai-review`, and for `synchronize` or `reopened` when the pull request already
-carries it. Every other action, a closed pull request, and a repo that is
-untracked, removed, or in a suspended or uninstalled organization get a 204 and
-write nothing (`review_job.skipped`, with a `reason`).
+[`apps/worker`](../worker). What is queued follows the repo's mode (see
+Repository settings): `label` queues `labeled` with `ai-review`, and
+`synchronize` or `reopened` when the pull request already carries it;
+`every_pr` queues `opened`, `synchronize` and `reopened` with no label; `off`
+queues nothing, so a repo that also runs the Action is not reviewed twice. Every
+other action, a closed pull request, and a repo that is untracked, removed, or
+in a suspended or uninstalled organization get a 204 and write nothing
+(`review_job.skipped`, with a `reason`).
 
 - A redelivery carries the same `X-GitHub-Delivery`, which `review_jobs` keeps
   unique, and a unique index allows one queued or running job per pull request
   head. Either way the repeat is a 200 that writes nothing (`review_job.duplicate`).
 - A new head supersedes the pull request's older queued or running jobs in the
   same transaction; the worker stops a superseded run before it publishes.
+- The worker writes the finished review straight to the database through
+  ingest's write path, so it shows in the review pages with no
+  `dashboard-token`, and a rerun of the same commit replaces its findings.
 - After a successful enqueue, the route pings the worker's Cloud Run endpoint
   (`WORKER_URL`, a bearer `WORKER_PING_SECRET`) so it drains immediately; it
   never awaits or blocks on that call (`lib/worker-ping.ts`, `after()`), and a
   lost or failed ping is not fatal — the worker's own periodic sweep and its
   next ping both drain the same queue. `WORKER_URL` unset (local dev) makes the
   ping a no-op; run the worker's poll loop instead.
+
+### Repository settings
+
+`/o/<slug>/repos/<owner>/<name>/settings` (`Settings` on the repo page) holds a
+repo's `repo_settings` row. Everyone who can read the repo sees it; only a
+repository owner can save it. A repo with no row gets the defaults.
+
+- **Mode**: `off`, `label` (the default) or `every_pr`, as above.
+- **Model**: one of the models offered for the organization key's provider, or
+  the provider default. A model the provider does not offer (say, after the key
+  changed provider) fails the job with no retry and a check run naming it.
+- **Fixes**: on commits verified patches to the head branch, under the same
+  limits the Action applies; off (the default) offers them as suggested changes.
 
 ### Model key
 
@@ -170,9 +189,8 @@ neutral check run asking an owner to add one.
 
 - Permissions: repository **Metadata** (read), **Contents** (read and write),
   **Pull requests** (read and write) and **Checks** (read and write), organization
-  **Members** (read), account **Email addresses** (read). Today the worker only
-  publishes the check run and inline comments; **Contents** write matches the
-  Action's own permission set for a future commit-fix feature.
+  **Members** (read), account **Email addresses** (read). The writes are the
+  hosted review's check run, inline comments and, with fixes on, the fix commit.
 - Webhook URL `https://<app-domain>/api/github/webhook`, secret in
   `GITHUB_APP_WEBHOOK_SECRET`. Subscribe to `installation`,
   `installation_repositories`, `organization`, `member`, `membership`,
@@ -370,7 +388,7 @@ app/
   (apex)/sign-in/       sign-in and its errors, returning to callbackUrl
   o/[slug]/             one organization, guarded by requireOrganization
     page.tsx            overview
-    repos/              repo list, and per-repo review history
+    repos/              repo list, per-repo review history and settings
     reviews/            recent reviews; [id]/ one review
     analytics/          trends over time
     usage/              tokens and spend
@@ -384,13 +402,14 @@ lib/
   data/                 the seam above
   docs.ts               the docs nav, its ordering and active-page rules
   authorize.ts          slug + session -> organization, role, readable repos, or not-found
-  session.ts            session and the requireOrganization guard
+  session.ts            session, and the requireOrganization and requireRepo guards
   sign-in.ts            the sign-in pass: user row, then membership refresh
   membership-sync.ts    GitHub role -> membership, shared by webhook and sign-in
   repo-access-sync.ts   GitHub repo permission -> repo_access, same
   organization.ts       a user's memberships
   github-app.ts         the GitHub App's env and client
   model-key.ts          the model key form: owner check, validation, save and remove
+  repo-settings.ts      the repo settings form: repo-owner check, model allowlist, save
   host.ts               request host -> organization slug, cookie domain
   paths.ts              /o/<slug> paths and callbackUrl checks
   format.ts             number, duration and date formatting

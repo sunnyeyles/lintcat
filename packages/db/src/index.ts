@@ -53,6 +53,14 @@ export {
 } from "./review-jobs";
 export { modelKeyEncryptionKey, openSecret, parseEncryptionKey, sealSecret } from "./secret-box";
 export {
+  DEFAULT_REPO_SETTINGS,
+  effectiveRepoSettings,
+  findRepoSettings,
+  saveRepoSettings,
+  type EffectiveRepoSettings,
+  type RepoSettingsInput,
+} from "./repo-settings";
+export {
   findRepositoryGraph,
   pruneRepositoryGraphs,
   saveRepositoryGraph,

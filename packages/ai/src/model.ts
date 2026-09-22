@@ -80,6 +80,28 @@ export function defaultModelFor(provider: ModelProvider): string {
   return PROVIDERS[provider].defaultModel;
 }
 
+// A hosted repo's model choice, one level below the provider chosen by its key.
+const MODEL_CHOICES: Record<ModelProvider, readonly string[]> = {
+  anthropic: ["claude-haiku-4-5", "claude-sonnet-4-5"],
+  openai: ["gpt-5.6-luna", "gpt-5.6-luna-mini"],
+};
+
+export function modelChoicesFor(provider: ModelProvider): readonly string[] {
+  return MODEL_CHOICES[provider];
+}
+
+/** Empty selects the provider's default; an unoffered id throws rather than passing through unchecked. */
+export function resolveModelId(provider: ModelProvider, selection: string): string {
+  const id = selection.trim();
+  if (id === "") return defaultModelFor(provider);
+  if (!MODEL_CHOICES[provider].includes(id)) {
+    throw new ModelProviderError(
+      `Unknown model: ${id}. Use one of ${MODEL_CHOICES[provider].join(", ")}, or leave empty for the default.`,
+    );
+  }
+  return id;
+}
+
 export function apiKeyEnvFor(provider: ModelProvider): string {
   return PROVIDERS[provider].apiKeyEnv;
 }
