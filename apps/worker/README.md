@@ -103,7 +103,7 @@ The same endpoint serves two callers, both carrying the same bearer token:
 
 Manual, done once per environment; nothing here is idempotent-by-CI.
 
-**GitHub App** (`funnelweb-pr-review`) — see apps/web/README.md's
+**GitHub App** (`LintcatPR`) — see apps/web/README.md's
 "Registering the App" for the full checklist. What's specific to hosted
 reviews:
 
