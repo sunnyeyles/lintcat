@@ -13,3 +13,5 @@ Fourth repush, streaming with --follow this time.
 Fifth repush, verifying the fix after adding WORKER_PING_SECRET and redeploying.
 
 Sixth repush, retrying the review after fixing the Anthropic key scope.
+
+Seventh repush, retrying after raising the Anthropic usage limit.
