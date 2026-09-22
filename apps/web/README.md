@@ -3,8 +3,8 @@
 The public documentation at `/`, and the dashboard behind it: review history,
 trends and token spend. Also
 `POST /api/ingest`, where the action records each review, and
-`POST /api/github/webhook`, where the GitHub App reports installations and
-organization members.
+`POST /api/github/webhook`, where the GitHub App reports installations,
+organization members and the pull requests to review in hosted mode.
 
 The docs need no session; the dashboard starts at `/dashboard`, which every
 page links to from the topbar.
@@ -27,6 +27,7 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `GITHUB_APP_WEBHOOK_SECRET` | Verifies `X-Hub-Signature-256` on each delivery                  |
 | `GITHUB_APP_SLUG`           | The App's URL slug; shows the Install button (optional)          |
 | `APP_DOMAIN`                | Apex domain organizations are subdomains of; default `localhost` |
+| `MODEL_KEY_ENCRYPTION_KEY`  | 32 bytes of base64 sealing model keys; `openssl rand -base64 32` |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
 lists them. Give the GitHub App the callback URL
@@ -68,6 +69,7 @@ a 401 and writes nothing.
 | `repository`                | `renamed`                        | Update the repo's owner and name                                               |
 | `repository`                | `privatized`, `publicized`       | Flip `repos.private`; `privatized` also sets `repo_access` from the repo's collaborators |
 | `repository`                | `deleted`, `transferred`         | Set `removed_at` (a transfer within the same account only updates owner/name)  |
+| `pull_request`              | `labeled` with `ai-review`; `synchronize`, `reopened` on a PR carrying it | Queue a hosted review job; see Hosted reviews |
 
 Anything else gets a 204. The slug is the account's lowercased login; a
 personal account becomes an organization of type `user`.
@@ -129,14 +131,43 @@ holds the lookups the webhook and sign-in share.
   with the user's next sign-in.
 - Logged as `repo_access.granted`, `repo_access.revoked` or `repo_access.skipped`.
 
+### Hosted reviews
+
+A `pull_request` delivery only records a row in `review_jobs` and returns, well
+inside GitHub's 10-second window; the review itself runs in
+[`apps/worker`](../worker). A job is queued for `labeled` when the label is
+`ai-review`, and for `synchronize` or `reopened` when the pull request already
+carries it. Every other action, a closed pull request, and a repo that is
+untracked, removed, or in a suspended or uninstalled organization get a 204 and
+write nothing (`review_job.skipped`, with a `reason`).
+
+- A redelivery carries the same `X-GitHub-Delivery`, which `review_jobs` keeps
+  unique, and a unique index allows one queued or running job per pull request
+  head. Either way the repeat is a 200 that writes nothing (`review_job.duplicate`).
+- A new head supersedes the pull request's older queued or running jobs in the
+  same transaction; the worker stops a superseded run before it publishes.
+
+### Model key
+
+An organization owner saves the provider and API key at `/o/<slug>/settings`
+(`Settings` in the sidebar, shown to owners only; members get a 404). The key is
+sealed with AES-256-GCM under `MODEL_KEY_ENCRYPTION_KEY`, bound to the
+organization, and stored in `model_keys`; the page and the form's responses
+carry only its last four characters. Replacing a key overwrites it, and removing
+it deletes the row. The worker, which holds the same encryption key, is the only
+reader of the plaintext. With no key saved, a labelled pull request gets a
+neutral check run asking an owner to add one.
+
 ### Registering the App
 
-- Permissions, all read-only: repository **Metadata**, organization
-  **Members**, account **Email addresses**.
+- Permissions: repository **Metadata** (read), **Contents** (read),
+  **Pull requests** (read and write) and **Checks** (read and write), organization
+  **Members** (read), account **Email addresses** (read). The writes are the
+  hosted review's check run and inline comments.
 - Webhook URL `https://<app-domain>/api/github/webhook`, secret in
   `GITHUB_APP_WEBHOOK_SECRET`. Subscribe to `installation`,
-  `installation_repositories`, `organization`, `member`, `membership` and
-  `repository`. Repository permissions need nothing beyond **Metadata**: both
+  `installation_repositories`, `organization`, `member`, `membership`,
+  `repository` and `pull_request`. Repository permissions need nothing beyond **Metadata**: both
   collaborator endpoints are listed under it with installation tokens.
 - User authorization: callback URL as under Environment; its client id and
   secret are `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`. There is no separate
@@ -324,6 +355,7 @@ app/
     reviews/            recent reviews; [id]/ one review
     analytics/          trends over time
     usage/              tokens and spend
+    settings/           the organization's model key, owners only
   api/ingest/           the action's endpoint
   api/github/webhook/   the GitHub App's webhook
 components/
@@ -339,6 +371,7 @@ lib/
   repo-access-sync.ts   GitHub repo permission -> repo_access, same
   organization.ts       a user's memberships
   github-app.ts         the GitHub App's env and client
+  model-key.ts          the model key form: owner check, validation, save and remove
   host.ts               request host -> organization slug, cookie domain
   paths.ts              /o/<slug> paths and callbackUrl checks
   format.ts             number, duration and date formatting

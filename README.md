@@ -229,6 +229,8 @@ apps/
   mcp/        Local MCP server: the same pipeline over a working tree,
               plus index lookups and review history, for coding agents
   web/        The documentation site at /, and the dashboard behind it
+  worker/     Hosted reviews: claims the jobs the GitHub App's webhook
+              queues and runs the same pipeline with the org's model key
 packages/
   ai/         Provider selection (model.ts), prompts, and agents/: the
               general agent, its runtime loop and read-only tools
