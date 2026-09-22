@@ -272,7 +272,7 @@ export default async function RepoDetailPage({
         description={
           <>
             {`${formatNumber(repo.reviewCount)} reviews across `}
-            <Suspense fallback={<InlineSkeleton className="h-3 w-28" />}>
+            <Suspense fallback={<InlineSkeleton className="h-4 w-28" />}>
               <PullRequestCount slug={slug} repoId={repo.id} />
             </Suspense>
             {` · last reviewed ${repo.lastReviewedAt ? formatRelative(repo.lastReviewedAt) : "never"}`}
@@ -281,7 +281,7 @@ export default async function RepoDetailPage({
       />
 
       <StatGrid className="mt-8">
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
+        <Suspense fallback={<StatCardsSkeleton count={1} hint={false} sparkline />}>
           <ReviewsStat slug={slug} repo={repo} />
         </Suspense>
         <Suspense fallback={<StatCardsSkeleton count={1} />}>

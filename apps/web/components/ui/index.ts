@@ -2,7 +2,6 @@ export { SeverityBadge } from "./severity-badge";
 export {
   ChartCardSkeleton,
   InlineSkeleton,
-  PageHeaderSkeleton,
   StatCardSkeleton,
   StatCardsSkeleton,
   StatGridSkeleton,

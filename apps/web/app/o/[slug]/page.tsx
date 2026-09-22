@@ -141,7 +141,7 @@ export default async function OverviewPage({
       />
 
       <StatGrid className="mt-8">
-        <Suspense fallback={<StatCardsSkeleton count={4} />}>
+        <Suspense fallback={<StatCardsSkeleton count={4} sparkline />}>
           <TrendStats slug={slug} />
         </Suspense>
         <Suspense fallback={<StatCardsSkeleton count={1} />}>
