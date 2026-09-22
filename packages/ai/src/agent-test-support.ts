@@ -53,7 +53,7 @@ export const changedFiles: ChangedFile[] = [
     status: "modified",
     additions: 3,
     deletions: 0,
-    patch: "@@ -40,2 +40,5 @@",
+    patch: "@@ -40,2 +40,5 @@\n+if ((user.isAdmin = true)) {",
   },
 ];
 

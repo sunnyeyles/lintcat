@@ -156,7 +156,7 @@ describe("the review agent", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it("opens with the PR title, description, changed files, and diff", async () => {
+  it("opens with the PR title, description, changed files, and each file's patch", async () => {
     const { agent, calls } = makeAgent([
       message([textBlock(finalJson)], "end_turn"),
     ]);
@@ -168,6 +168,44 @@ describe("the review agent", () => {
     expect(opening).toContain(pullRequest.body);
     expect(opening).toContain("src/sessions.ts");
     expect(opening).toContain("user.isAdmin = true");
+    expect(opening).not.toContain("Omitted from the diff");
+  });
+
+  it("leaves lockfiles and binaries out of the diff, and says so", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        ...context.changedFiles,
+        { filename: "pnpm-lock.yaml", status: "modified", additions: 900, deletions: 900, patch: "+lockfile churn" },
+        { filename: "docs/logo.png", status: "added", additions: 0, deletions: 0 },
+      ],
+    });
+
+    const opening = openingOf(calls[0]);
+    expect(opening).toContain("user.isAdmin = true");
+    expect(opening).not.toContain("lockfile churn");
+    expect(opening).toContain(
+      "Omitted from the diff below (a patch is still available through get_diff with the path, a file through get_file): pnpm-lock.yaml (generated), docs/logo.png (binary)",
+    );
+  });
+
+  it("caps the description and points at get_pull_request for the rest", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run({
+      ...context,
+      pullRequest: { ...pullRequest, body: "x".repeat(5_000) },
+    });
+
+    const opening = openingOf(calls[0]);
+    expect(opening).toContain("x".repeat(4_000) + "\n[... description truncated; get_pull_request returns it whole]");
+    expect(opening).not.toContain("x".repeat(4_001));
   });
 
   it("says the diff is narrowed, and where the rest of the pull request is", async () => {
@@ -178,6 +216,15 @@ describe("the review agent", () => {
     await agent.run({
       ...context,
       diff: "@@ -2 +2 @@\n+const limit = 0;\n",
+      changedFiles: [
+        {
+          filename: "src/limits.ts",
+          status: "modified",
+          additions: 1,
+          deletions: 1,
+          patch: "@@ -2 +2 @@\n+const limit = 0;",
+        },
+      ],
       incremental: {
         sinceSha: "old111",
         diff: context.diff,

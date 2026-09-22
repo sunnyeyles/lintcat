@@ -181,7 +181,7 @@ describe("review tool execution", () => {
       path: "src/sessions.ts",
     });
 
-    expect(result).toBe("@@ -40,2 +40,5 @@");
+    expect(result).toBe(context.changedFiles[0]?.patch);
   });
 
   it("rejects get_diff for a path the pull request did not change", async () => {

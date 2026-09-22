@@ -26,6 +26,7 @@ import {
   renderRepository,
   renderRepositoryIndex,
 } from "#src/agents/repository-index";
+import { buildOpeningDiff, renderOmitted } from "#src/agents/opening-diff";
 import { createReviewTools, type ReviewToolsClient } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
 import {
@@ -58,22 +59,22 @@ const DEFAULT_MAX_TURNS = 12;
 /** Output budget per model call (response text + tool requests). */
 const MAX_OUTPUT_TOKENS = 16_000;
 
-/** The opening message embeds at most this much of the diff. */
-const MAX_DIFF_CHARS = 80_000;
-
 /** The opening message lists at most this many changed files. */
 const MAX_LISTED_FILES = 300;
+
+/** The opening message carries at most this much of the description. */
+const MAX_DESCRIPTION_CHARS = 4_000;
 
 /** Anthropic honours this on a message and at call level; OpenAI ignores it. */
 const CACHE_BREAKPOINT = {
   anthropic: { cacheControl: { type: "ephemeral" as const } },
 };
 
-function truncateDiff(diff: string): string {
+function truncateDescription(body: string): string {
   return truncateWithMarker(
-    diff,
-    MAX_DIFF_CHARS,
-    "\n[... diff truncated; call get_diff with a path for one file's whole patch]",
+    body,
+    MAX_DESCRIPTION_CHARS,
+    "\n[... description truncated; get_pull_request returns it whole]",
   );
 }
 
@@ -96,7 +97,8 @@ function buildOpeningMessage(
   context: ReviewContext,
   index: RepositoryIndex | undefined,
 ): string {
-  const { pullRequest, changedFiles, diff } = context;
+  const { pullRequest, changedFiles } = context;
+  const opening = buildOpeningDiff(changedFiles);
   const files = changedFiles
     .slice(0, MAX_LISTED_FILES)
     .map(
@@ -116,18 +118,19 @@ function buildOpeningMessage(
     `Author: ${pullRequest.author ?? "unknown"}`,
     `Branches: ${pullRequest.baseRef} <- ${pullRequest.headRef}`,
     "Description:",
-    pullRequest.body ?? "(no description)",
+    truncateDescription(pullRequest.body ?? "(no description)"),
     "</pull_request>",
     "",
     "<changed_files>",
     ...files,
     "</changed_files>",
     "",
+    ...renderOmitted(opening.omitted),
     ...renderRepository(index),
     ...renderRepositoryIndex(index, changedFiles, MAX_LISTED_FILES),
     "",
     "<diff>",
-    truncateDiff(diff),
+    opening.diff,
     "</diff>",
   ].join("\n");
 }

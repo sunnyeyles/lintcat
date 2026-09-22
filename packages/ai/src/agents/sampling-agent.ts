@@ -13,11 +13,13 @@ import {
   renderRepository,
   renderRepositoryIndex,
 } from "#src/agents/repository-index";
+import { buildOpeningDiff, renderOmitted } from "#src/agents/opening-diff";
 import { AgentRunError } from "#src/agents/runtime";
-import { truncateWithMarker } from "#src/agents/truncate";
 
 /** The whole review fits in one request, so the diff is cut harder than the tool loop cuts it. */
 const MAX_DIFF_CHARS = 48_000;
+
+const MAX_FILE_PATCH_CHARS = 12_000;
 
 const MAX_LISTED_FILES = 200;
 
@@ -62,7 +64,11 @@ function buildPrompt(
   context: ReviewContext,
   index: RepositoryIndex | undefined,
 ): string {
-  const { pullRequest, changedFiles, diff } = context;
+  const { pullRequest, changedFiles } = context;
+  const opening = buildOpeningDiff(changedFiles, {
+    maxChars: MAX_DIFF_CHARS,
+    maxFileChars: MAX_FILE_PATCH_CHARS,
+  });
   const files = changedFiles
     .slice(0, MAX_LISTED_FILES)
     .map(
@@ -88,15 +94,12 @@ function buildPrompt(
     ...files,
     "</changed_files>",
     "",
+    ...renderOmitted(opening.omitted),
     ...renderRepository(index),
     ...renderRepositoryIndex(index, changedFiles, MAX_LISTED_FILES),
     "",
     "<diff>",
-    truncateWithMarker(
-      diff,
-      MAX_DIFF_CHARS,
-      "\n[... diff truncated; the rest of it cannot be fetched, so report nothing about it]",
-    ),
+    opening.diff,
     "</diff>",
   ].join("\n");
 }
