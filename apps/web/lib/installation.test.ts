@@ -42,6 +42,9 @@ let repoLookupFails: boolean;
 let log: CapturedLogEvent[];
 
 const github: GithubAppClient = {
+  async createInstallationToken() {
+    throw new Error("installing never mints a token");
+  },
   async getInstallation(installationId) {
     expect(installationId).toBe(INSTALLATION_ID);
     return installation;

@@ -67,6 +67,9 @@ let log: CapturedLogEvent[];
 
 // GitHub's current truth; tests change `members` to simulate edits made on GitHub.
 const github: GithubAppClient = {
+  async createInstallationToken() {
+    throw new Error("the webhook never mints a token");
+  },
   async getInstallation() {
     throw new Error("the webhook never reads the installation");
   },
