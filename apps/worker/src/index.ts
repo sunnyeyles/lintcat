@@ -42,6 +42,7 @@ async function main(): Promise<void> {
     settingsUrl: (slug) => (appDomain ? `https://${slug}.${appDomain}/settings` : undefined),
     lease: { leaseMs: LEASE_MS, heartbeatMs: HEARTBEAT_MS },
     retry: { maxAttempts: MAX_ATTEMPTS, retryDelayMs: RETRY_DELAY_MS },
+    incremental: process.env.REVIEW_INCREMENTAL?.trim().toLowerCase() !== "false",
   };
 
   const stop = new AbortController();

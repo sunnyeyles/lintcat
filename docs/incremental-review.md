@@ -1,7 +1,8 @@
 # Incremental review
 
-*Status: implemented, behind the `incremental` action input, which ships off.
-The eval described at the end is the one part still outstanding.*
+*Status: implemented. The Action has it behind the `incremental` input, which
+ships off; the hosted worker has it on by default, with `REVIEW_INCREMENTAL=false`
+to switch it off. The eval described at the end is the one part still outstanding.*
 
 A review today reads `base...head` every time. A pull request pushed to ten
 times is reviewed ten times over its whole diff, and the ninth run re-reads
@@ -127,9 +128,11 @@ One new Action input:
 | --- | --- | --- |
 | `incremental` | no (default `false`) | Review only the commits added since the last review of this pull request, rather than the whole diff. Falls back to a full review whenever the baseline cannot be established. |
 
-Default off. It changes what the agent is shown, which is a behaviour change
-before it is a cost change, and the evals should carry it before the default
-does.
+Default off in the Action: it changes what the agent is shown, which is a
+behaviour change before it is a cost change, and the evals should carry it
+before that default moves. The hosted worker, which reviews every push of every
+labelled pull request, runs it on by default (`REVIEW_INCREMENTAL=false` turns
+it off), because there the repeated full re-read is the dominant cost.
 
 ## Observability
 

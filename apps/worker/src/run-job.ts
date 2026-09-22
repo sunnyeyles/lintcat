@@ -61,6 +61,8 @@ export interface JobRunnerDeps {
   /** The lease is renewed every `heartbeatMs`, which is also how soon a superseded run stops. */
   lease: { leaseMs: number; heartbeatMs: number };
   retry: RetryPolicy;
+  /** Review only the commits since the last reviewed one; on unless switched off. */
+  incremental?: boolean | undefined;
 }
 
 export type JobOutcome = "succeeded" | "no-key" | "superseded" | "retrying" | "failed";
@@ -210,6 +212,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       target,
       delivery: guardedDelivery(delivery, stillRunning),
       engine: { model },
+      policy: { incremental: deps.incremental ?? true },
       logger,
       signal: controller.signal,
     });

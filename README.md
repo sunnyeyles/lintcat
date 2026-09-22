@@ -361,8 +361,10 @@ collapses to zero, something above a breakpoint started varying between turns.
 
 ### Incremental review
 
-Off by default. Turning it on narrows what the agent reads on a push to a pull
-request they have already reviewed:
+Off by default in the Action; on by default in hosted mode, where the worker
+reviews every push and `REVIEW_INCREMENTAL=false` turns it off. Turning it on
+narrows what the agent reads on a push to a pull request they have already
+reviewed:
 
 ```yaml
         with:

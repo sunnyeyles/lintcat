@@ -4,6 +4,7 @@
  */
 import type {
   ChangedFile,
+  CheckRunSummary,
   FileContentsRequest,
   PullRequestDetails,
   PullRequestReadClient,
@@ -231,7 +232,7 @@ export function makeGithub() {
     listCommitFiles: vi.fn(async () => ["src/sessions.ts", "docs/sessions.md"]),
     listReviewComments: vi.fn(async () => []),
     listPullRequestCommitShas: vi.fn(async () => [headSha]),
-    listCheckRuns: vi.fn(async () => []),
+    listCheckRuns: vi.fn(async (): Promise<CheckRunSummary[]> => []),
     compareCommits: vi.fn(async () => ({ status: "ahead" as const, files: [] })),
     getBranchTip: vi.fn(async () => headSha),
     getCommitMessage: vi.fn(async () => "Rate limit sessions"),

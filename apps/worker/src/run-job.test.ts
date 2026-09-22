@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import type { LanguageModelConfig, ReviewModel } from "@pr-review/ai";
+import { CHECK_RUN_NAME } from "@pr-review/github";
 import {
   finalFindingsJson,
   headSha,
@@ -297,6 +298,32 @@ describe("runReviewJob repo settings", () => {
     expect(createLanguageModel).toHaveBeenCalledWith(
       expect.objectContaining({ modelId: "claude-sonnet-5" }),
     );
+  });
+
+  it("reviews only the commits since the last reviewed one by default", async () => {
+    await withKey();
+    github.listPullRequestCommitShas.mockResolvedValue(["old111", headSha]);
+    github.listCheckRuns.mockResolvedValue([{ name: CHECK_RUN_NAME, status: "completed" }]);
+    const job = await claim();
+    const { deps: d } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.compareCommits).toHaveBeenCalledWith(
+      expect.objectContaining({ base: "old111", head: headSha }),
+    );
+  });
+
+  it("reviews the whole pull request when incremental review is switched off", async () => {
+    await withKey();
+    github.listPullRequestCommitShas.mockResolvedValue(["old111", headSha]);
+    github.listCheckRuns.mockResolvedValue([{ name: CHECK_RUN_NAME, status: "completed" }]);
+    const job = await claim();
+    const { deps: d } = deps({ incremental: false });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.compareCommits).not.toHaveBeenCalled();
   });
 
   it("uses the repo's chosen model id when one is saved", async () => {

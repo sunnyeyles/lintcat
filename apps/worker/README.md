@@ -30,6 +30,7 @@ Run — nothing here changes them.
 | `MODEL_KEY_ENCRYPTION_KEY` | Opening the organization's model key; must match the dashboard's |
 | `APP_DOMAIN` | Optional. Links the "add a model key" check run to `https://<slug>.<APP_DOMAIN>/settings` |
 | `WORKER_POLL_MS` | Optional. How often an idle worker checks for work; 5000 by default |
+| `REVIEW_INCREMENTAL` | Optional. `false` makes every review read the whole pull request; by default a push is reviewed from the last reviewed commit on |
 | `PORT` | Switches to server mode and sets its listen port; set by Cloud Run |
 | `WORKER_PING_SECRET` | Server mode only. Bearer token an inbound request must carry; shared with `apps/web`'s `WORKER_URL`/`WORKER_PING_SECRET` |
 
