@@ -29,7 +29,7 @@ type StatShape = {
 };
 
 // Each bar takes its height from the line box of the type it stands in for (h-lh).
-export function StatCardSkeleton({ hint = true, sparkline = false }: StatShape) {
+function StatCardSkeleton({ hint = true, sparkline = false }: StatShape) {
   return (
     <Card className="gap-0 py-4">
       <CardHeader className="gap-1 px-4">
