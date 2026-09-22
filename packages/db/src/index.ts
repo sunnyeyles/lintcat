@@ -44,6 +44,7 @@ export {
   completeReviewJob,
   enqueueReviewJob,
   failReviewJob,
+  findReviewJobContext,
   renewReviewJobLease,
   supersedeReviewJob,
   type EnqueueResult,

@@ -166,6 +166,24 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  apps/worker:
+    dependencies:
+      '@pr-review/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@pr-review/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@pr-review/github':
+        specifier: workspace:*
+        version: link:../../packages/github
+      '@pr-review/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
+      '@pr-review/reviewer':
+        specifier: workspace:*
+        version: link:../../packages/reviewer
+
   evals:
     dependencies:
       '@pr-review/ai':

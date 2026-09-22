@@ -3,7 +3,14 @@ import { and, asc, eq, inArray, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { PgUpdateSetSource } from "drizzle-orm/pg-core";
 
 import type { Database } from "./client";
-import { reviewJobs, type ReviewJob } from "./schema";
+import {
+  organizations,
+  repos,
+  reviewJobs,
+  type Organization,
+  type Repo,
+  type ReviewJob,
+} from "./schema";
 
 export interface ReviewJobRequest {
   repoId: number;
@@ -42,6 +49,20 @@ export async function enqueueReviewJob(
       .returning({ id: reviewJobs.id });
     return { status: "queued" as const, job, superseded: superseded.length };
   });
+}
+
+/** The repo a job reviews and the organization whose installation and key it uses. */
+export async function findReviewJobContext(
+  database: Database,
+  repoId: number,
+): Promise<{ repo: Repo; organization: Organization } | undefined> {
+  const [row] = await database
+    .select({ repo: repos, organization: organizations })
+    .from(repos)
+    .innerJoin(organizations, eq(organizations.id, repos.organizationId))
+    .where(eq(repos.id, repoId))
+    .limit(1);
+  return row;
 }
 
 /** The next job due: queued and past its retry delay, or running on a lapsed lease. */
