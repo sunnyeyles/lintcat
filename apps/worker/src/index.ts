@@ -7,7 +7,8 @@ import { createGithubAppClient, createTokenClient } from "@pr-review/github";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
 
 import { runReviewJob, type JobRunnerDeps } from "#src/run-job";
-import { runWorker } from "#src/worker";
+import { createDrainer, createHttpServer, listen } from "#src/server";
+import { runWorker, type WorkerDeps } from "#src/worker";
 
 const LEASE_MS = 5 * 60_000;
 const HEARTBEAT_MS = 15_000;
@@ -50,12 +51,32 @@ async function main(): Promise<void> {
       stop.abort();
     });
   }
+
+  const workerDeps: WorkerDeps = {
+    database,
+    logger,
+    leaseMs: LEASE_MS,
+    runJob: (job) => runReviewJob(jobDeps, job),
+  };
+
+  // Cloud Run sets PORT; local dev leaves it unset and keeps the poll loop below.
+  const port = process.env.PORT;
+  if (port) {
+    const drain = createDrainer(() => runWorker(workerDeps, { once: true, pollMs: 0 }));
+    const server = createHttpServer(drain, { secret: required("WORKER_PING_SECRET") }, logger);
+    stop.signal.addEventListener("abort", () => server.close());
+    await listen(server, Number(port));
+    logger.info("worker.listening", { port: Number(port) });
+    return;
+  }
+
   const once = process.argv.includes("--once");
   logger.info("worker.started", { once });
-  const processed = await runWorker(
-    { database, logger, leaseMs: LEASE_MS, runJob: (job) => runReviewJob(jobDeps, job) },
-    { once, pollMs: Number(process.env.WORKER_POLL_MS ?? 5_000), signal: stop.signal },
-  );
+  const processed = await runWorker(workerDeps, {
+    once,
+    pollMs: Number(process.env.WORKER_POLL_MS ?? 5_000),
+    signal: stop.signal,
+  });
   logger.info("worker.stopped", { processed });
 }
 
