@@ -25,7 +25,6 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `GITHUB_APP_ID`             | The GitHub App's id                                              |
 | `GITHUB_APP_PRIVATE_KEY`    | The App's PEM key; newlines may be written as `\n`               |
 | `GITHUB_APP_WEBHOOK_SECRET` | Verifies `X-Hub-Signature-256` on each delivery                  |
-| `GITHUB_APP_SLUG`           | The App's URL slug; shows the Install button (optional)          |
 | `APP_DOMAIN`                | Apex domain organizations are subdomains of; default `localhost` |
 | `MODEL_KEY_ENCRYPTION_KEY`  | 32 bytes of base64 sealing model keys; `openssl rand -base64 32` |
 | `WORKER_URL`                | The worker's Cloud Run URL; unset locally, so the ping is a no-op |
@@ -201,8 +200,7 @@ neutral check run asking an owner to add one.
   OAuth app.
 - Setup URL `https://<app-domain>/dashboard/setup`, with **Redirect on update**
   ticked, so GitHub returns the installer to the dashboard (locally
-  `http://lvh.me:3000/dashboard/setup`). The App's URL slug, from
-  `github.com/apps/<slug>`, goes in `GITHUB_APP_SLUG`.
+  `http://lvh.me:3000/dashboard/setup`).
 - Locally, forward deliveries to the dev server with a service such as smee.io.
 
 ## Sign-in

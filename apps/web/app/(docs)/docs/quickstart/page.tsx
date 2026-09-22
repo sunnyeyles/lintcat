@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
 import type { Heading } from "@/lib/docs";
-import { installAppUrl } from "@/lib/github-app";
+import { INSTALL_APP_URL } from "@/lib/github-app";
 
 export const metadata: Metadata = {
   title: "Quickstart",
@@ -19,7 +19,6 @@ const HEADINGS: Heading[] = [
 ];
 
 export default function QuickstartPage() {
-  const install = installAppUrl();
   return (
     <DocsArticle
       href="/docs/quickstart"
@@ -34,11 +33,9 @@ export default function QuickstartPage() {
           repositories or only some. GitHub then sends you back to the dashboard, signed in,
           with your organization set up.
         </P>
-        {install ? (
-          <Button asChild>
-            <a href={install}>Install the GitHub App</a>
-          </Button>
-        ) : null}
+        <Button asChild>
+          <a href={INSTALL_APP_URL}>Install the GitHub App</a>
+        </Button>
         <Note title="Not an owner?">
           If you aren&rsquo;t an owner of the organization, GitHub sends the install to an
           owner to approve. Once they do, sign in again and the organization shows up.
