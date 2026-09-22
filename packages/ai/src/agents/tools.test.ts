@@ -186,6 +186,18 @@ describe("review tool execution", () => {
     expect(result).not.toContain("user.isAdmin");
   });
 
+  it("renders JSON results compact, with no indentation to pay for", async () => {
+    const tools = createReviewTools(makeGithub(), scope);
+
+    for (const name of ["get_pull_request", "list_changed_files", "search_repository"]) {
+      const result = String(
+        await run(tools, name, name === "search_repository" ? { query: "sessions" } : {}),
+      );
+      expect(result, name).not.toMatch(/\n\s+"/);
+      expect(() => JSON.parse(result), name).not.toThrow();
+    }
+  });
+
   it("returns one file's patch when get_diff names a path", async () => {
     const result = await run(createReviewTools(makeGithub(), scope), "get_diff", {
       path: "src/sessions.ts",

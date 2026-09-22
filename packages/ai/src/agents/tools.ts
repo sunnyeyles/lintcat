@@ -52,8 +52,6 @@ function renderSearchResult(result: CodeSearchResult): string {
         snippets: boundSnippets(match.snippets),
       })),
     },
-    null,
-    2,
   );
 }
 
@@ -214,7 +212,7 @@ export function createReviewTools(
         "Get the pull request's title, description, author, branches, and commit SHAs as JSON.",
       inputSchema: emptyInputSchema,
       async execute() {
-        return truncate(JSON.stringify(context.pullRequest, null, 2));
+        return truncate(JSON.stringify(context.pullRequest));
       },
     }),
     list_changed_files: tool({
@@ -230,7 +228,7 @@ export function createReviewTools(
             deletions,
           }),
         );
-        return truncate(JSON.stringify(listed, null, 2));
+        return truncate(JSON.stringify(listed));
       },
     }),
     get_diff: tool({
@@ -365,8 +363,6 @@ export function createReviewTools(
             commitsSkippedAsSweeps: commits.length - examined.length,
             coChanged,
           },
-          null,
-          2,
         );
       },
     }),
