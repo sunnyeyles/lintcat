@@ -23,6 +23,8 @@ const PRICES: Record<string, readonly [number, number, number, number]> = {
 export interface FixtureUsageRow {
   fixture: string;
   steps: number;
+  /** Agent runs that hit the turn cap and answered on a forced final turn. */
+  salvaged: number;
   durationMs: number;
   usage: TokenUsage;
   /** Absent when the model is not in the price table. */
@@ -37,7 +39,7 @@ export interface UsageReport {
   indexMode: "on" | "off";
   startedAt: string;
   rows: FixtureUsageRow[];
-  totals: Pick<FixtureUsageRow, "steps" | "durationMs" | "usage" | "costUsd" | "passed" | "total">;
+  totals: Omit<FixtureUsageRow, "fixture">;
 }
 
 export function estimateCostUsd(
@@ -72,6 +74,7 @@ export function createUsageCollector(model: string) {
       existing = {
         fixture,
         steps: 0,
+        salvaged: 0,
         durationMs: 0,
         usage: emptyTokenUsage(),
         costUsd: undefined,
@@ -92,6 +95,7 @@ export function createUsageCollector(model: string) {
         return;
       }
       current.steps += report.steps;
+      current.salvaged += report.salvaged ? 1 : 0;
       current.durationMs += report.durationMs;
       current.usage = addTokenUsage(current.usage, report.usage);
       current.costUsd = estimateCostUsd(model, current.usage);
@@ -119,6 +123,7 @@ export function sumRows(
   );
   return {
     steps: rows.reduce((sum, entry) => sum + entry.steps, 0),
+    salvaged: rows.reduce((sum, entry) => sum + entry.salvaged, 0),
     durationMs: rows.reduce((sum, entry) => sum + entry.durationMs, 0),
     usage,
     costUsd: estimateCostUsd(model, usage),

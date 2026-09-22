@@ -39,7 +39,12 @@ import {
 type ScriptedResponse = ReturnType<typeof message>;
 
 /** One provider-level call as the SDK assembled it. */
-type Call = { prompt: unknown[]; tools?: unknown[]; providerOptions?: unknown };
+type Call = {
+  prompt: unknown[];
+  tools?: unknown[];
+  providerOptions?: unknown;
+  toolChoice?: unknown;
+};
 
 const generalAgent = GENERAL_AGENT;
 
@@ -51,17 +56,23 @@ function systemOf(call: Call | undefined): string {
   return String((system as { content?: string } | undefined)?.content ?? "");
 }
 
-/** The opening user text of one recorded call. */
-function openingOf(call: Call | undefined): string {
-  const user = (call?.prompt ?? []).find(
+/** The text of one recorded user message; the first by default. */
+function userTextOf(call: Call | undefined, which: "first" | "last"): string {
+  const users = (call?.prompt ?? []).filter(
     (entry) => (entry as { role?: string }).role === "user",
   );
+  const user = which === "first" ? users[0] : users[users.length - 1];
   const parts = (user as { content?: { type: string; text?: string }[] })
     ?.content;
   return (parts ?? [])
     .filter((part) => part.type === "text")
     .map((part) => part.text ?? "")
     .join("");
+}
+
+/** The opening user text of one recorded call. */
+function openingOf(call: Call | undefined): string {
+  return userTextOf(call, "first");
 }
 
 function toolNamesOf(call: Call | undefined): string[] {
@@ -418,12 +429,55 @@ describe("the review agent", () => {
     await expect(agent.run(context)).resolves.toEqual([finding]);
   });
 
-  it("rejects with AgentRunError when the final message is not valid findings JSON", async () => {
-    const { agent } = makeAgent([
+  it("repairs a final message that is not findings JSON with one tool-free turn", async () => {
+    const { agent, calls, create, entries } = makeAgent([
       message([textBlock("I found several bugs, here they are in prose.")], "end_turn"),
+      message([textBlock(finalJson)], "end_turn"),
     ]);
 
-    await expect(agent.run(context)).rejects.toThrow(AgentRunError);
+    await expect(agent.run(context)).resolves.toEqual([finding]);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(calls[1]?.toolChoice).toEqual({ type: "none" });
+    expect(userTextOf(calls[1], "last")).toMatch(/not valid findings JSON/);
+    expect(openingOf(calls[1])).toBe(openingOf(calls[0]));
+    expect(entries.map((entry) => entry.event)).toEqual([
+      "agent.started",
+      "agent.repaired",
+      "agent.completed",
+    ]);
+  });
+
+  it("rejects with AgentRunError when the repair turn is not findings JSON either", async () => {
+    const { agent, create } = makeAgent([
+      message([textBlock("prose")], "end_turn"),
+      message([textBlock("more prose")], "end_turn"),
+    ]);
+
+    await expect(agent.run(context)).rejects.toThrow(/after one repair turn/);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it("forces a tool-free final turn at the cap and returns its findings", async () => {
+    const { agent, calls, create, entries } = makeAgent(
+      [
+        message([toolUseBlock("toolu_1", "get_diff", {})], "tool_use"),
+        message([textBlock(finalJson)], "end_turn"),
+      ],
+      { maxTurns: 2 },
+    );
+
+    await expect(agent.run(context)).resolves.toEqual([finding]);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(calls[0]?.toolChoice).toEqual({ type: "auto" });
+    expect(calls[1]?.toolChoice).toEqual({ type: "none" });
+    expect(userTextOf(calls[1], "last")).toMatch(/last turn/);
+    expect(entries[entries.length - 1]).toMatchObject({
+      event: "agent.completed",
+      salvaged: true,
+      steps: 2,
+    });
   });
 
   it("rejects with AgentRunError when the max-turns cap is exceeded", async () => {
@@ -543,6 +597,10 @@ describe("lifecycle events (spec §26)", () => {
         inputTokens: 80,
         outputTokens: 8,
       }),
+      message([textBlock("still prose")], "end_turn", {
+        inputTokens: 90,
+        outputTokens: 9,
+      }),
     ]);
 
     await expect(agent.run(context)).rejects.toThrow(AgentRunError);
@@ -557,8 +615,9 @@ describe("lifecycle events (spec §26)", () => {
       event: "agent.failed",
       ...correlation,
       errorName: "AgentRunError",
-      inputTokens: 80,
-      outputTokens: 8,
+      steps: 2,
+      inputTokens: 170,
+      outputTokens: 17,
     });
     expect(failed?.["error"]).toMatch(/invalid findings output/i);
     expect(typeof failed?.["durationMs"]).toBe("number");
@@ -673,6 +732,7 @@ describe("the onUsage callback", () => {
         agent: "general",
         durationMs: expect.any(Number),
         steps: 2,
+        salvaged: false,
         usage: {
           inputTokens: 350,
           cacheCreationInputTokens: 4_000,
@@ -683,11 +743,15 @@ describe("the onUsage callback", () => {
     ]);
   });
 
-  it("reports the usage burned so far when the run fails", async () => {
+  it("reports the usage burned so far when the run fails, repair turn included", async () => {
     const { agent, reports } = makeCollecting([
       message([textBlock("prose, not JSON")], "end_turn", {
         inputTokens: 80,
         outputTokens: 8,
+      }),
+      message([textBlock("still prose")], "end_turn", {
+        inputTokens: 90,
+        outputTokens: 9,
       }),
     ]);
 
@@ -697,12 +761,13 @@ describe("the onUsage callback", () => {
       {
         agent: "general",
         durationMs: expect.any(Number),
-        steps: 1,
+        steps: 2,
+        salvaged: false,
         usage: {
-          inputTokens: 80,
+          inputTokens: 170,
           cacheCreationInputTokens: 0,
           cacheReadInputTokens: 0,
-          outputTokens: 8,
+          outputTokens: 17,
         },
       },
     ]);

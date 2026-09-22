@@ -20,6 +20,7 @@ function report(overrides: Partial<AgentUsageReport> = {}): AgentUsageReport {
     agent: "general",
     durationMs: 1_000,
     steps: 3,
+    salvaged: false,
     usage: {
       inputTokens: 1_000,
       cacheCreationInputTokens: 10_000,
@@ -63,11 +64,12 @@ describe("createUsageCollector", () => {
 
     collector.begin("one");
     collector.onUsage(report({ steps: 2, durationMs: 100 }));
-    collector.onUsage(report({ steps: 3, durationMs: 200 }));
+    collector.onUsage(report({ steps: 3, durationMs: 200, salvaged: true }));
 
     const [row] = collector.rows();
     expect(row).toMatchObject({
       steps: 5,
+      salvaged: 1,
       durationMs: 300,
       usage: { inputTokens: 2_000, outputTokens: 10_000 },
     });
@@ -98,6 +100,7 @@ describe("the rendered table", () => {
     {
       fixture: "clean-pagination",
       steps: 4,
+      salvaged: 0,
       durationMs: 30_000,
       usage: report().usage,
       costUsd: 0.097,
@@ -107,6 +110,7 @@ describe("the rendered table", () => {
     {
       fixture: "performance-n-plus-one",
       steps: 6,
+      salvaged: 1,
       durationMs: 45_000,
       usage: report().usage,
       costUsd: 0.097,
