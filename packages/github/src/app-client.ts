@@ -38,6 +38,8 @@ export interface AppInstallation {
 export interface GithubAppClient {
   /** The installation as GitHub records it; read with the App's JWT, not an installation token. */
   getInstallation(installationId: number): Promise<AppInstallation>;
+  /** A newly minted installation token; the caller holds it in memory for one job only. */
+  createInstallationToken(installationId: number): Promise<string>;
   listInstallationRepositories(
     installationId: number,
   ): Promise<InstallationRepository[]>;
@@ -72,6 +74,7 @@ export interface GithubAppClient {
  * structurally; tests inject a stub so no real network calls happen.
  */
 export interface AppOctokitLike {
+  auth(options: { type: "installation"; refresh?: boolean }): Promise<unknown>;
   paginate(route: unknown, params: Record<string, unknown>): Promise<unknown[]>;
   rest: {
     apps: {
@@ -195,6 +198,14 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
         account: parsed.account,
         suspendedAt: parsed.suspended_at ? new Date(parsed.suspended_at) : null,
       };
+    },
+
+    async createInstallationToken(installationId) {
+      const auth = await installation(installationId).auth({
+        type: "installation",
+        refresh: true,
+      });
+      return z.object({ token: z.string().min(1) }).parse(auth).token;
     },
 
     async listInstallationRepositories(installationId) {

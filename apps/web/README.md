@@ -3,8 +3,8 @@
 The public documentation at `/`, and the dashboard behind it: review history,
 trends and token spend. Also
 `POST /api/ingest`, where the action records each review, and
-`POST /api/github/webhook`, where the GitHub App reports installations and
-organization members.
+`POST /api/github/webhook`, where the GitHub App reports installations,
+organization members and the pull requests to review in hosted mode.
 
 The docs need no session; the dashboard starts at `/dashboard`, which every
 page links to from the topbar.
@@ -27,6 +27,9 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `GITHUB_APP_WEBHOOK_SECRET` | Verifies `X-Hub-Signature-256` on each delivery                  |
 | `GITHUB_APP_SLUG`           | The App's URL slug; shows the Install button (optional)          |
 | `APP_DOMAIN`                | Apex domain organizations are subdomains of; default `localhost` |
+| `MODEL_KEY_ENCRYPTION_KEY`  | 32 bytes of base64 sealing model keys; `openssl rand -base64 32` |
+| `WORKER_URL`                | The worker's Cloud Run URL; unset locally, so the ping is a no-op |
+| `WORKER_PING_SECRET`        | Bearer token the worker checks; shared with `apps/worker`, required once `WORKER_URL` is set |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
 lists them. Give the GitHub App the callback URL
@@ -68,6 +71,7 @@ a 401 and writes nothing.
 | `repository`                | `renamed`                        | Update the repo's owner and name                                               |
 | `repository`                | `privatized`, `publicized`       | Flip `repos.private`; `privatized` also sets `repo_access` from the repo's collaborators |
 | `repository`                | `deleted`, `transferred`         | Set `removed_at` (a transfer within the same account only updates owner/name)  |
+| `pull_request`              | `labeled` with `ai-review`; `synchronize`, `reopened` on a PR carrying it | Queue a hosted review job; see Hosted reviews |
 
 Anything else gets a 204. The slug is the account's lowercased login; a
 personal account becomes an organization of type `user`.
@@ -129,14 +133,50 @@ holds the lookups the webhook and sign-in share.
   with the user's next sign-in.
 - Logged as `repo_access.granted`, `repo_access.revoked` or `repo_access.skipped`.
 
+### Hosted reviews
+
+A `pull_request` delivery only records a row in `review_jobs` and returns, well
+inside GitHub's 10-second window; the review itself runs in
+[`apps/worker`](../worker). A job is queued for `labeled` when the label is
+`ai-review`, and for `synchronize` or `reopened` when the pull request already
+carries it. Every other action, a closed pull request, and a repo that is
+untracked, removed, or in a suspended or uninstalled organization get a 204 and
+write nothing (`review_job.skipped`, with a `reason`).
+
+- A redelivery carries the same `X-GitHub-Delivery`, which `review_jobs` keeps
+  unique, and a unique index allows one queued or running job per pull request
+  head. Either way the repeat is a 200 that writes nothing (`review_job.duplicate`).
+- A new head supersedes the pull request's older queued or running jobs in the
+  same transaction; the worker stops a superseded run before it publishes.
+- After a successful enqueue, the route pings the worker's Cloud Run endpoint
+  (`WORKER_URL`, a bearer `WORKER_PING_SECRET`) so it drains immediately; it
+  never awaits or blocks on that call (`lib/worker-ping.ts`, `after()`), and a
+  lost or failed ping is not fatal — the worker's own periodic sweep and its
+  next ping both drain the same queue. `WORKER_URL` unset (local dev) makes the
+  ping a no-op; run the worker's poll loop instead.
+
+### Model key
+
+An organization owner saves the provider and API key at `/o/<slug>/settings`
+(`Settings` in the sidebar, shown to owners only; members get a 404). The key is
+sealed with AES-256-GCM under `MODEL_KEY_ENCRYPTION_KEY`, bound to the
+organization, and stored in `model_keys`; the page and the form's responses
+carry only its last four characters. Replacing a key overwrites it, and removing
+it deletes the row. The worker, which holds the same encryption key, is the only
+reader of the plaintext. With no key saved, a labelled pull request gets a
+neutral check run asking an owner to add one.
+
 ### Registering the App
 
-- Permissions, all read-only: repository **Metadata**, organization
-  **Members**, account **Email addresses**.
+- Permissions: repository **Metadata** (read), **Contents** (read and write),
+  **Pull requests** (read and write) and **Checks** (read and write), organization
+  **Members** (read), account **Email addresses** (read). Today the worker only
+  publishes the check run and inline comments; **Contents** write matches the
+  Action's own permission set for a future commit-fix feature.
 - Webhook URL `https://<app-domain>/api/github/webhook`, secret in
   `GITHUB_APP_WEBHOOK_SECRET`. Subscribe to `installation`,
-  `installation_repositories`, `organization`, `member`, `membership` and
-  `repository`. Repository permissions need nothing beyond **Metadata**: both
+  `installation_repositories`, `organization`, `member`, `membership`,
+  `repository` and `pull_request`. Repository permissions need nothing beyond **Metadata**: both
   collaborator endpoints are listed under it with installation tokens.
 - User authorization: callback URL as under Environment; its client id and
   secret are `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`. There is no separate
@@ -254,8 +294,13 @@ as before. `main` does not: `git.deploymentEnabled` turns that off, and
 1. **CI** — `ci.yml`, called on the pushed commit.
 2. **Migrate** — `db-migrate.yml` applies pending Drizzle migrations to
    `secrets.DATABASE_URL`; with none pending it is a no-op.
-3. **Deploy** — `vercel deploy --prod` from the repo root, built by Vercel with
-   the project's settings and Production environment variables.
+3. **Deploy web** — `vercel deploy --prod` from the repo root, built by Vercel
+   with the project's settings and Production environment variables.
+4. **Deploy worker** — in parallel with the Vercel deploy, builds
+   [`apps/worker`](../worker)'s image (`apps/worker/Dockerfile`), pushes it to
+   Artifact Registry and deploys it to Cloud Run via Workload Identity
+   Federation. See `apps/worker/README.md`'s Deploy section for the one-time
+   GCP setup this depends on.
 
 A failed step stops the ones after it, so a commit whose CI failed never
 migrates, and production never serves code whose migrations have not applied.
@@ -266,7 +311,7 @@ Migrations still land before the new code serves, so each one must work with
 the code already in production.
 
 Repository secrets the pipeline needs (Settings > Secrets and variables >
-Actions); it stops before CI if any Vercel one is missing:
+Actions); it stops before CI if any of them is missing:
 
 | Secret              | Value                                                        |
 | ------------------- | ------------------------------------------------------------ |
@@ -274,6 +319,11 @@ Actions); it stops before CI if any Vercel one is missing:
 | `VERCEL_ORG_ID`     | `orgId` from `.vercel/project.json` after `vercel link`      |
 | `VERCEL_PROJECT_ID` | `projectId` from the same file                               |
 | `DATABASE_URL`      | The production Neon connection string (already used before)  |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | The WIF provider the worker deploy authenticates through |
+| `GCP_SERVICE_ACCOUNT` | The service account it impersonates |
+| `GCP_PROJECT_ID`, `GCP_REGION` | Where the Artifact Registry repo and Cloud Run service live |
+| `GCP_ARTIFACT_REPOSITORY` | The Artifact Registry repo the worker image is pushed to |
+| `CLOUD_RUN_SERVICE` | The Cloud Run service name to deploy |
 
 To redeploy without a push, run the Production workflow from the Actions tab
 on `main`; `db-migrate.yml` can also still be run by hand on its own.
@@ -324,6 +374,7 @@ app/
     reviews/            recent reviews; [id]/ one review
     analytics/          trends over time
     usage/              tokens and spend
+    settings/           the organization's model key, owners only
   api/ingest/           the action's endpoint
   api/github/webhook/   the GitHub App's webhook
 components/
@@ -339,6 +390,7 @@ lib/
   repo-access-sync.ts   GitHub repo permission -> repo_access, same
   organization.ts       a user's memberships
   github-app.ts         the GitHub App's env and client
+  model-key.ts          the model key form: owner check, validation, save and remove
   host.ts               request host -> organization slug, cookie domain
   paths.ts              /o/<slug> paths and callbackUrl checks
   format.ts             number, duration and date formatting

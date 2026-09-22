@@ -56,21 +56,39 @@ there is one sample per run. The eval README states each gap.
 
 ## Where your code goes
 
-**Nowhere you did not configure.** There is no GitHub App to install and no
-vendor server in the path. The Action is a bundle that runs in your own Actions
-runner; the workflow's own `GITHUB_TOKEN` authenticates the reads and publishes
-the result. Nothing is read from a secrets store at runtime, and this project's
-maintainers operate no service a review touches.
+There are two ways to run a review, and they answer this question differently.
 
-The one place your code does go is **the model provider you configure**. The
-diff, the files the agent reads, and the pull request's own text are sent to
-`openai` or `anthropic` under your `api-key`. Setting
+**The Action** (`.github/workflows`, below) is nowhere you did not configure.
+There is no GitHub App to install and no vendor server in the path: it's a
+bundle that runs in your own Actions runner, and the workflow's own
+`GITHUB_TOKEN` authenticates the reads and publishes the result. Nothing is
+read from a secrets store at runtime, and this project's maintainers operate
+no service a review touches.
+
+**Hosted mode** — installing the GitHub App and labelling a pull request
+`ai-review` — is different. The diff, the files the agent reads, and the pull
+request's own text pass through [`apps/worker`](apps/worker), a service this
+project runs on Google Cloud Run, on their way to **the organization's own
+model provider**, under the API key its owner saved at `/o/<slug>/settings`
+([`packages/db`](packages/db) stores it encrypted; the worker is the only
+reader of the plaintext). The worker mints a short-lived GitHub installation
+token per job, holds it in memory only, and publishes the same check run and
+inline comments the Action would; it writes nothing to disk, and a hosted
+review is not yet stored on the dashboard. In short: the Action keeps
+everything in your own runner, and hosted mode's one extra hop is this
+project's own worker, passing your diff straight through to your provider.
+
+In both modes, the one place your code does go beyond that is **the model
+provider you configure**. The diff, the files the agent reads, and the pull
+request's own text are sent to `openai` or `anthropic` under your `api-key`
+(the Action) or your saved key (hosted mode). For the Action, setting
 [`model-base-url`](#model-providers) points that at a gateway, a proxy, or a
 self-hosted endpoint speaking the provider's API, which closes even that hop —
-no code then leaves infrastructure you control.
+no code then leaves infrastructure you control; hosted mode has no equivalent
+override today.
 
-Two optional integrations send data elsewhere. Both are **off unless you set
-their inputs**:
+Two optional Action inputs send data elsewhere; hosted mode has neither. Both
+are **off unless you set them**:
 
 | Setting | What leaves, and where to | Closing it |
 | --- | --- | --- |
@@ -229,6 +247,8 @@ apps/
   mcp/        Local MCP server: the same pipeline over a working tree,
               plus index lookups and review history, for coding agents
   web/        The documentation site at /, and the dashboard behind it
+  worker/     Hosted reviews: claims the jobs the GitHub App's webhook
+              queues and runs the same pipeline with the org's model key
 packages/
   ai/         Provider selection (model.ts), prompts, and agents/: the
               general agent, its runtime loop and read-only tools

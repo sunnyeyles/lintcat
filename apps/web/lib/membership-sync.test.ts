@@ -26,6 +26,9 @@ let githubMembers: Record<string, OrganizationMember[]>;
 let lookups: string[];
 
 const github: GithubAppClient = {
+  async createInstallationToken() {
+    throw new Error("sign-in never mints a token");
+  },
   async listInstallationRepositories() {
     throw new Error("sign-in never lists repositories");
   },

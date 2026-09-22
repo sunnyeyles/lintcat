@@ -1,8 +1,10 @@
 import type { ReviewRecordChangedFile } from "@pr-review/schemas";
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
   customType,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -22,6 +24,13 @@ const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
 export const severityEnum = pgEnum("severity", ["low", "medium", "high"]);
 export const accountTypeEnum = pgEnum("account_type", ["organization", "user"]);
 export const membershipRoleEnum = pgEnum("membership_role", ["owner", "member"]);
+export const reviewJobStatusEnum = pgEnum("review_job_status", [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "superseded",
+]);
 export const repoPermissionEnum = pgEnum("repo_permission", [
   "admin",
   "maintain",
@@ -185,6 +194,49 @@ export const repositoryGraphs = pgTable(
   ],
 );
 
+// The organization's own model key, sealed by secret-box; only `last4` is ever shown.
+export const modelKeys = pgTable("model_keys", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id")
+    .notNull()
+    .unique()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  sealedKey: bytea("sealed_key").notNull(),
+  last4: text("last4").notNull(),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One hosted review of a pull request at one head; the worker claims queued rows.
+export const reviewJobs = pgTable(
+  "review_jobs",
+  {
+    id: serial("id").primaryKey(),
+    repoId: integer("repo_id")
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+    prNumber: integer("pr_number").notNull(),
+    headSha: text("head_sha").notNull(),
+    // X-GitHub-Delivery: a redelivered webhook carries the same id.
+    deliveryId: text("delivery_id").unique(),
+    status: reviewJobStatusEnum("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    runAfter: timestamp("run_after", { withTimezone: true }).notNull().defaultNow(),
+    // A running job whose lease lapsed belongs to a dead worker and is claimable again.
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("review_jobs_active_head_idx")
+      .on(t.repoId, t.prNumber, t.headSha)
+      .where(sql`${t.status} in ('queued', 'running')`),
+    index("review_jobs_claim_idx").on(t.status, t.runAfter),
+  ],
+);
+
 // Mirrors reviewFindingSchema in @pr-review/schemas; keep the two in step.
 export const findings = pgTable("findings", {
   id: serial("id").primaryKey(),
@@ -217,5 +269,8 @@ export type Review = typeof reviews.$inferSelect;
 export type NewReview = typeof reviews.$inferInsert;
 export type RepositoryGraph = typeof repositoryGraphs.$inferSelect;
 export type NewRepositoryGraph = typeof repositoryGraphs.$inferInsert;
-export type Finding = typeof findings.$inferSelect;
+export type ModelKey = typeof modelKeys.$inferSelect;
+export type ReviewJob = typeof reviewJobs.$inferSelect;
+export type ReviewJobStatus = ReviewJob["status"];
+export type Finding =typeof findings.$inferSelect;
 export type NewFinding = typeof findings.$inferInsert;

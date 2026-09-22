@@ -195,6 +195,34 @@ describe("migrations applied in order to an empty database", () => {
   });
 });
 
+describe("the hosted review migration", () => {
+  it("adds sealed model keys and the review job queue", async () => {
+    expect(await columns("model_keys")).toEqual([
+      "created_at",
+      "id",
+      "last4",
+      "organization_id",
+      "provider",
+      "sealed_key",
+      "updated_at",
+    ]);
+    expect(await columns("review_jobs")).toEqual([
+      "attempts",
+      "created_at",
+      "delivery_id",
+      "finished_at",
+      "head_sha",
+      "id",
+      "last_error",
+      "lease_expires_at",
+      "pr_number",
+      "repo_id",
+      "run_after",
+      "status",
+    ]);
+  });
+});
+
 describe("the single-reviewer migration on a populated database", () => {
   it("sums each review's agent runs into the review before dropping them", async () => {
     const folder = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");

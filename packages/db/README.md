@@ -13,6 +13,8 @@ erDiagram
   repos ||--o{ reviews : "collects"
   repos ||--o{ repository_graphs : "snapshots"
   reviews ||--o{ findings : "holds"
+  organizations ||--o| model_keys : "pays with"
+  repos ||--o{ review_jobs : "queues"
 
   users {
     serial id PK
@@ -79,6 +81,26 @@ erDiagram
     int edge_count
     timestamptz created_at
   }
+  model_keys {
+    serial id PK
+    int organization_id FK,UK
+    text provider
+    bytea sealed_key "AES-256-GCM"
+    text last4
+    timestamptz updated_at
+  }
+  review_jobs {
+    serial id PK
+    int repo_id FK
+    int pr_number
+    text head_sha
+    text delivery_id UK "X-GitHub-Delivery"
+    review_job_status status "queued running succeeded failed superseded"
+    int attempts
+    timestamptz run_after
+    timestamptz lease_expires_at
+    text last_error
+  }
   findings {
     serial id PK
     int review_id FK
@@ -123,6 +145,18 @@ erDiagram
   sets `repos.removed_at`; neither deletes a row, so reviews survive a
   reinstall. A hard delete of an organization still cascades to everything
   under it.
+- `model_keys` holds one organization's own model key, sealed by
+  `src/secret-box.ts` (AES-256-GCM under `MODEL_KEY_ENCRYPTION_KEY`, with the
+  organization id as associated data, so a row copied to another organization
+  will not open). Only `last4` is ever shown; `readModelKey` is the worker's.
+- `review_jobs` is the hosted review queue (`src/review-jobs.ts`). The webhook
+  enqueues; `delivery_id` is unique, and a partial unique index allows one
+  queued or running job per `(repo_id, pr_number, head_sha)`, so a redelivery
+  is a no-op. A new head supersedes the pull request's older active jobs. A
+  worker claims the oldest due job in one `UPDATE … WHERE id IN (SELECT … FOR
+  UPDATE SKIP LOCKED)`, which takes a lease; a running job whose lease lapsed
+  is claimable again. A failure requeues it after a delay until `attempts`
+  reaches the limit, then marks it `failed`.
 
 ## Commands
 

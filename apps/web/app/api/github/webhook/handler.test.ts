@@ -6,6 +6,7 @@ import {
   organizationSlugRedirects,
   organizations,
   repos,
+  reviewJobs,
   reviews,
   users,
   type Database,
@@ -64,9 +65,13 @@ let githubCalls: number;
 // "owner/name" (lowercased) -> who can read it on GitHub; a missing repo makes a listing fail.
 let collaborators: Record<string, RepositoryCollaborator[]>;
 let log: CapturedLogEvent[];
+let pingCalls: number;
 
 // GitHub's current truth; tests change `members` to simulate edits made on GitHub.
 const github: GithubAppClient = {
+  async createInstallationToken() {
+    throw new Error("the webhook never mints a token");
+  },
   async getInstallation() {
     throw new Error("the webhook never reads the installation");
   },
@@ -111,6 +116,7 @@ beforeEach(async () => {
   githubCalls = 0;
   collaborators = {};
   log = [];
+  pingCalls = 0;
 });
 
 function installation(
@@ -164,6 +170,9 @@ function deliver(request: Request): Promise<Response> {
     github,
     logger: capturing.logger,
     webhookSecret: SECRET,
+    pingWorker: () => {
+      pingCalls += 1;
+    },
   });
 }
 
@@ -284,7 +293,13 @@ describe("handleGithubWebhook signature", () => {
       delivery("installation", { action: "created", installation: installation() }, (body) =>
         signature("", body),
       ),
-      { database, github, logger: createCapturingLogger().logger, webhookSecret: "" },
+      {
+        database,
+        github,
+        logger: createCapturingLogger().logger,
+        webhookSecret: "",
+        pingWorker: () => {},
+      },
     );
     expect(response.status).toBe(401);
     expect(await state()).toEqual(empty);
@@ -1080,5 +1095,158 @@ describe("handleGithubWebhook other deliveries", () => {
 
     await expect(deliver(created())).rejects.toThrow();
     expect(await state()).toEqual(empty);
+  });
+});
+
+describe("handleGithubWebhook pull_request", () => {
+  beforeEach(async () => {
+    await deliver(created());
+  });
+
+  let deliveries = 0;
+  function pullRequestEvent(
+    action: string,
+    {
+      labels = ["ai-review"],
+      label,
+      headSha = "head-1",
+      number = 7,
+      state = "open",
+      repo = widgets,
+      deliveryId = `delivery-${++deliveries}`,
+    }: {
+      labels?: string[];
+      label?: string;
+      headSha?: string;
+      number?: number;
+      state?: string;
+      repo?: InstallationRepository;
+      deliveryId?: string;
+    } = {},
+  ): Request {
+    const payload = {
+      action,
+      number,
+      ...(label === undefined ? {} : { label: { name: label } }),
+      pull_request: {
+        number,
+        state,
+        head: { sha: headSha },
+        labels: labels.map((name) => ({ name })),
+      },
+      repository: { id: repo.id, name: repo.name, owner: { login: repo.owner } },
+      installation: { id: INSTALLATION_ID },
+    };
+    const request = delivery("pull_request", payload);
+    request.headers.set("x-github-delivery", deliveryId);
+    return request;
+  }
+
+  async function jobs() {
+    return database
+      .select({
+        githubRepoId: repos.githubRepoId,
+        prNumber: reviewJobs.prNumber,
+        headSha: reviewJobs.headSha,
+        status: reviewJobs.status,
+      })
+      .from(reviewJobs)
+      .innerJoin(repos, eq(repos.id, reviewJobs.repoId))
+      .orderBy(asc(reviewJobs.id));
+  }
+
+  const queued = (headSha: string) => ({
+    githubRepoId: widgets.id,
+    prNumber: 7,
+    headSha,
+    status: "queued",
+  });
+
+  it("queues a review when the ai-review label is added", async () => {
+    const response = await deliver(pullRequestEvent("labeled", { label: "ai-review" }));
+    expect(response.status).toBe(200);
+    expect(await jobs()).toEqual([queued("head-1")]);
+    expect(pingCalls).toBe(1);
+  });
+
+  it("ignores any other label", async () => {
+    const response = await deliver(
+      pullRequestEvent("labeled", { label: "bug", labels: ["bug", "ai-review"] }),
+    );
+    expect(response.status).toBe(204);
+    expect(await jobs()).toEqual([]);
+    expect(pingCalls).toBe(0);
+  });
+
+  it("queues a push or a reopen on a labelled pull request, superseding the older head", async () => {
+    await deliver(pullRequestEvent("labeled", { label: "ai-review" }));
+    expect((await deliver(pullRequestEvent("synchronize", { headSha: "head-2" }))).status).toBe(200);
+    expect((await deliver(pullRequestEvent("reopened", { headSha: "head-3" }))).status).toBe(200);
+    expect(await jobs()).toEqual([
+      { ...queued("head-1"), status: "superseded" },
+      { ...queued("head-2"), status: "superseded" },
+      queued("head-3"),
+    ]);
+    expect(pingCalls).toBe(3);
+  });
+
+  it("ignores a push or a reopen on a pull request without the label", async () => {
+    for (const action of ["synchronize", "reopened"]) {
+      const response = await deliver(pullRequestEvent(action, { labels: [] }));
+      expect(response.status).toBe(204);
+    }
+    expect(await jobs()).toEqual([]);
+  });
+
+  it("ignores every other action, and a closed pull request", async () => {
+    for (const action of ["opened", "edited", "closed", "unlabeled"]) {
+      expect((await deliver(pullRequestEvent(action, { label: "ai-review" }))).status).toBe(204);
+    }
+    const closed = pullRequestEvent("labeled", { label: "ai-review", state: "closed" });
+    expect((await deliver(closed)).status).toBe(204);
+    expect(await jobs()).toEqual([]);
+  });
+
+  it("creates one job for a redelivered webhook", async () => {
+    const first = await deliver(
+      pullRequestEvent("labeled", { label: "ai-review", deliveryId: "same" }),
+    );
+    const again = await deliver(
+      pullRequestEvent("labeled", { label: "ai-review", deliveryId: "same" }),
+    );
+    expect([first.status, again.status]).toEqual([200, 200]);
+    expect(await jobs()).toEqual([queued("head-1")]);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "review_job.duplicate", deliveryId: "same" }),
+    );
+    expect(pingCalls).toBe(1);
+  });
+
+  it("ignores a repository the installation does not cover", async () => {
+    const stranger = { ...widgets, id: 42, name: "stranger" };
+    await deliver(repositoriesChanged("removed", [secrets]));
+    for (const repo of [stranger, secrets]) {
+      const response = await deliver(pullRequestEvent("labeled", { label: "ai-review", repo }));
+      expect(response.status).toBe(204);
+    }
+    expect(await jobs()).toEqual([]);
+  });
+
+  it("ignores a suspended or uninstalled organization", async () => {
+    await deliver(
+      delivery("installation", {
+        action: "suspend",
+        installation: installation("Organization", "Acme", SUSPENDED_AT),
+      }),
+    );
+    expect((await deliver(pullRequestEvent("labeled", { label: "ai-review" }))).status).toBe(204);
+    await deliver(uninstalled());
+    expect((await deliver(pullRequestEvent("labeled", { label: "ai-review" }))).status).toBe(204);
+    expect(await jobs()).toEqual([]);
+  });
+
+  it("400s a malformed pull_request payload", async () => {
+    const response = await deliver(delivery("pull_request", { action: "labeled" }));
+    expect(response.status).toBe(400);
   });
 });

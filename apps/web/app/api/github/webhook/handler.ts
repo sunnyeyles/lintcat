@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
+  enqueueReviewJob,
   findOrganizationByAccountId,
   findOrganizationById,
   findRepoByGithubId,
@@ -34,9 +35,11 @@ import {
   replaceMembers,
 } from "@/lib/membership-sync";
 import { applyRepoAccess, lookupRepoPermission } from "@/lib/repo-access-sync";
+import type { PingWorker } from "@/lib/worker-ping";
 
 export interface GithubWebhookDeps extends InstallationDeps {
   webhookSecret: string;
+  pingWorker: PingWorker;
 }
 
 const installationSchema = z.object({
@@ -108,6 +111,21 @@ const repositoryEventSchema = z.object({
   }),
 });
 
+const pullRequestEventSchema = z.object({
+  action: z.string(),
+  label: z.object({ name: z.string() }).optional(),
+  pull_request: z.object({
+    number: z.number(),
+    state: z.string(),
+    head: z.object({ sha: z.string() }),
+    labels: z.array(z.object({ name: z.string() })),
+  }),
+  repository: z.object({ id: z.number() }),
+});
+
+/** Adding this label to a pull request asks for a hosted review. */
+export const REVIEW_LABEL = "ai-review";
+
 const MEMBER_ACTIONS: Record<string, readonly string[]> = {
   organization: ["member_added", "member_removed"],
   member: ["added", "edited", "removed"],
@@ -131,7 +149,7 @@ export async function handleGithubWebhook(
   }
 
   const event = request.headers.get("x-github-event") ?? "";
-  const run = dispatch(event, deps);
+  const run = dispatch(event, deps, request.headers.get("x-github-delivery"));
   if (!run) return ignored();
 
   let payload: unknown;
@@ -150,6 +168,7 @@ export async function handleGithubWebhook(
 function dispatch(
   event: string,
   deps: GithubWebhookDeps,
+  deliveryId: string | null,
 ): ((payload: unknown) => Promise<boolean | Response>) | undefined {
   switch (event) {
     case "installation":
@@ -185,6 +204,11 @@ function dispatch(
     case "repository":
       return (payload) =>
         withPayload(repositoryEventSchema, payload, (data) => onRepository(deps, data));
+    case "pull_request":
+      return (payload) =>
+        withPayload(pullRequestEventSchema, payload, (data) =>
+          onPullRequest(deps, data, deliveryId),
+        );
     default:
       return undefined;
   }
@@ -355,6 +379,62 @@ async function onMemberChanged(
     const { id: userId } = await upsertAccountUser(tx, account);
     await applyRepoAccess(txDeps, userId, account, { organization, repo, permission }, source);
   });
+  return true;
+}
+
+function wantsReview(payload: z.infer<typeof pullRequestEventSchema>): boolean {
+  if (payload.pull_request.state !== "open") return false;
+  switch (payload.action) {
+    case "labeled":
+      return payload.label?.name === REVIEW_LABEL;
+    case "synchronize":
+    case "reopened":
+      return payload.pull_request.labels.some((label) => label.name === REVIEW_LABEL);
+    default:
+      return false;
+  }
+}
+
+// Only records the job: the review itself runs in the worker, well outside GitHub's 10s window.
+async function onPullRequest(
+  deps: GithubWebhookDeps,
+  payload: z.infer<typeof pullRequestEventSchema>,
+  deliveryId: string | null,
+): Promise<boolean> {
+  if (!wantsReview(payload)) return false;
+  const pullRequest = payload.pull_request;
+  const fields = {
+    source: `pull_request.${payload.action}`,
+    githubRepoId: payload.repository.id,
+    prNumber: pullRequest.number,
+    headSha: pullRequest.head.sha,
+    deliveryId,
+  };
+  const repo = await findRepoByGithubId(deps.database, payload.repository.id);
+  const organization = repo && (await findOrganizationById(deps.database, repo.organizationId));
+  const skip = (reason: string) => {
+    deps.logger.info("review_job.skipped", { ...fields, reason });
+    return false;
+  };
+  if (!repo || repo.removedAt) return skip("repository_not_tracked");
+  if (!organization || !installedAccount(organization)) return skip("organization_not_installed");
+  if (organization.suspendedAt) return skip("installation_suspended");
+  const result = await enqueueReviewJob(deps.database, {
+    repoId: repo.id,
+    prNumber: pullRequest.number,
+    headSha: pullRequest.head.sha,
+    deliveryId,
+  });
+  if (result.status === "duplicate") {
+    deps.logger.info("review_job.duplicate", fields);
+  } else {
+    deps.logger.info("review_job.queued", {
+      ...fields,
+      jobId: result.job.id,
+      superseded: result.superseded,
+    });
+    deps.pingWorker();
+  }
   return true;
 }
 

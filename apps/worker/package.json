@@ -1,0 +1,24 @@
+{
+  "name": "@pr-review/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#src/*": "./src/*.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node ../../scripts/build-bundle.mjs",
+    "start": "node start.mjs"
+  },
+  "dependencies": {
+    "@pr-review/ai": "workspace:*",
+    "@pr-review/db": "workspace:*",
+    "@pr-review/github": "workspace:*",
+    "@pr-review/logging": "workspace:*",
+    "@pr-review/reviewer": "workspace:*"
+  }
+}

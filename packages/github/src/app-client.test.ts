@@ -18,6 +18,7 @@ interface StubRoutes {
   membership?: unknown;
   permissionLevel?: unknown;
   collaborators?: unknown[];
+  token?: string;
 }
 
 function notFound(): Error {
@@ -49,7 +50,12 @@ function stub(routes: StubRoutes) {
     if (routes.installation === undefined) throw notFound();
     return { data: routes.installation };
   });
+  const auth = vi.fn(async (_options: { type: "installation"; refresh?: boolean }) => {
+    if (routes.token === undefined) throw notFound();
+    return { type: "token", tokenType: "installation", token: routes.token };
+  });
   const octokit: AppOctokitLike = {
+    auth,
     paginate,
     rest: {
       apps: { listReposAccessibleToInstallation: listRepos, getInstallation },
@@ -58,7 +64,7 @@ function stub(routes: StubRoutes) {
     },
   };
   const installation = vi.fn(() => octokit);
-  return { client: createAppClient(installation), installation, paginate };
+  return { client: createAppClient(installation), installation, paginate, auth };
 }
 
 function collaborator(
@@ -87,6 +93,20 @@ describe("getInstallation", () => {
   it("rejects a response without an account", async () => {
     const { client } = stub({ installation: { id: installationId } });
     await expect(client.getInstallation(installationId)).rejects.toThrow();
+  });
+});
+
+describe("createInstallationToken", () => {
+  it("mints a fresh token rather than reusing a cached one", async () => {
+    const { client, installation, auth } = stub({ token: "ghs_minted" });
+    await expect(client.createInstallationToken(installationId)).resolves.toBe("ghs_minted");
+    expect(installation).toHaveBeenCalledWith(installationId);
+    expect(auth).toHaveBeenCalledWith({ type: "installation", refresh: true });
+  });
+
+  it("rejects an answer without a token", async () => {
+    const { client } = stub({});
+    await expect(client.createInstallationToken(installationId)).rejects.toThrow();
   });
 });
 
@@ -203,6 +223,7 @@ describe("getOrganizationMembership", () => {
 
   it("rethrows anything that is not a 404", async () => {
     const client = createAppClient(() => ({
+      auth: async () => ({}),
       paginate: async () => [],
       rest: {
         apps: { listReposAccessibleToInstallation: null, getInstallation: async () => ({ data: null }) },
