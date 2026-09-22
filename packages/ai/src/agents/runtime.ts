@@ -72,6 +72,17 @@ const CACHE_BREAKPOINT = {
   anthropic: { cacheControl: { type: "ephemeral" as const } },
 };
 
+/** Call-level options: the Anthropic tail breakpoint, and one OpenAI cache key per review. */
+function callProviderOptions(context: ReviewContext, category: string) {
+  const { owner, repo, pullRequest } = context;
+  return {
+    ...CACHE_BREAKPOINT,
+    openai: {
+      promptCacheKey: `pr-review:${owner}/${repo}:${pullRequest.number}:${pullRequest.headSha.slice(0, 12)}:${category}`,
+    },
+  };
+}
+
 /** Sent on the final allowed turn, with tool use switched off. */
 const FINAL_TURN_NUDGE =
   "This is your last turn and tools are no longer available. Return the findings JSON now, from what you have already read.";
@@ -244,7 +255,7 @@ export function createReviewAgent(
               },
               tools: createReviewTools(deps.github, context, deps.index),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
-              providerOptions: CACHE_BREAKPOINT,
+              providerOptions: callProviderOptions(context, agent.category),
               telemetry: { functionId: `review-agent-${agent.category}` },
               onStepEnd: (step: { usage: Parameters<typeof toTokenUsage>[0] }) => {
                 steps += 1;

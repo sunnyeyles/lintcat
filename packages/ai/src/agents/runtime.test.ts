@@ -810,10 +810,27 @@ describe("prompt caching", () => {
     await agent.run(context);
 
     for (const call of calls) {
-      expect(call.providerOptions).toEqual({
+      expect(call.providerOptions).toMatchObject({
         anthropic: { cacheControl: { type: "ephemeral" } },
       });
     }
+  });
+
+  it("gives OpenAI one prompt cache key per review, the same on every turn", async () => {
+    const { agent, calls } = makeAgent([
+      message([toolUseBlock("toolu_1", "get_diff", {})], "tool_use"),
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run(context);
+
+    const keys = calls.map(
+      (call) => (call.providerOptions as { openai?: { promptCacheKey?: string } }).openai?.promptCacheKey,
+    );
+    expect(keys).toEqual([
+      `pr-review:octo-org/example-service:42:${headSha.slice(0, 12)}:general`,
+      `pr-review:octo-org/example-service:42:${headSha.slice(0, 12)}:general`,
+    ]);
   });
 
   it("sends a byte-identical prefix between turns, so the cache can hit", async () => {

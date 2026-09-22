@@ -325,10 +325,12 @@ speaking its API — OpenAI is bound to Chat Completions rather than the
 Responses API for that reason. Adding a provider is an entry in `PROVIDERS`
 and nothing else.
 
-Prompt caching is requested on `anthropic` only — it is the provider whose API
-takes explicit cache breakpoints (`packages/ai/src/agents/runtime.ts`). On the
-default provider, `openai`, nothing is requested and the two cache counters stay
-at zero; that is expected, not a regression.
+Prompt caching is explicit on `anthropic`, the provider whose API takes cache
+breakpoints (`packages/ai/src/agents/runtime.ts`). On the default provider,
+`openai`, caching is automatic by prefix; every call of one review carries the
+same `prompt_cache_key`, so its turns are routed to the same cache. OpenAI
+reports cache reads but never cache writes, so that counter stays at zero
+there; that is expected, not a regression.
 
 ### What a review costs
 
