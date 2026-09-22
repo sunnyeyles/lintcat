@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { Bullet, Bullets, Code, DocsArticle, Note, P, Section } from "@/components/docs";
 import { DOCS_HOME, DOCS_PAGES, type Heading } from "@/lib/docs";
-import { installAppUrl } from "@/lib/github-app";
+import { INSTALL_APP_URL } from "@/lib/github-app";
 
 export const metadata: Metadata = {
   title: "Introduction",
@@ -47,7 +47,6 @@ const LOOKS_FOR = [
 ] as const;
 
 export default function IntroductionPage() {
-  const install = installAppUrl();
   return (
     <DocsArticle
       href={DOCS_HOME}
@@ -60,11 +59,9 @@ export default function IntroductionPage() {
         <Button asChild>
           <Link href="/docs/quickstart">Quickstart</Link>
         </Button>
-        {install ? (
-          <Button asChild variant="outline">
-            <a href={install}>Install the GitHub App</a>
-          </Button>
-        ) : null}
+        <Button asChild variant="outline">
+          <a href={INSTALL_APP_URL}>Install the GitHub App</a>
+        </Button>
         <Button asChild variant="outline">
           <Link href="/dashboard">Open the dashboard</Link>
         </Button>

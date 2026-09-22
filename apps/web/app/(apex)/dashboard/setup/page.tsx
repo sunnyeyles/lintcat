@@ -16,7 +16,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { PageHeader } from "@/components/shell";
-import { githubApp, installAppUrl } from "@/lib/github-app";
+import { githubApp, INSTALL_APP_URL } from "@/lib/github-app";
 import { appDomain } from "@/lib/host";
 import { completeSetup, setupRequest, type SetupResult } from "@/lib/installation";
 import { DASHBOARD_PATH, organizationPath, signInUrl } from "@/lib/paths";
@@ -53,20 +53,15 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
   }
 
   if (request.kind === "invalid") {
-    const install = installAppUrl();
     return (
       <State
         icon={<Link2Off />}
         title="This link is missing its installation"
         description="GitHub sends you here after installing the App. Start the installation from GitHub, or go back to your organizations."
       >
-        {install ? (
-          <Button asChild>
-            <a href={install}>Install the GitHub App</a>
-          </Button>
-        ) : (
-          dashboard
-        )}
+        <Button asChild>
+          <a href={INSTALL_APP_URL}>Install the GitHub App</a>
+        </Button>
       </State>
     );
   }
