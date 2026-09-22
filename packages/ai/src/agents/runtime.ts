@@ -72,7 +72,7 @@ const CACHE_BREAKPOINT = {
   anthropic: { cacheControl: { type: "ephemeral" as const } },
 };
 
-/** Call-level options: the Anthropic tail breakpoint, and one OpenAI cache key per review. */
+/** Adds an OpenAI-only prompt cache key on top of the shared breakpoint. */
 function callProviderOptions(context: ReviewContext, category: string) {
   const { owner, repo, pullRequest } = context;
   return {

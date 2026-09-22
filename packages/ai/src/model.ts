@@ -22,7 +22,7 @@ interface ProviderEntry {
 
 const PROVIDERS = {
   anthropic: {
-    // Haiku hits the turn cap and returns prose too often; a failed review is the dearest kind.
+    // Haiku hits the turn cap or returns prose too often; a failed review costs the most.
     defaultModel: "claude-sonnet-5",
     apiKeyEnv: "ANTHROPIC_API_KEY",
     create: ({ apiKey, baseUrl, modelId }: ProviderCreateOptions) =>

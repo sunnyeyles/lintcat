@@ -17,10 +17,9 @@ export interface OpeningDiff {
   omitted: OmittedFile[];
 }
 
+/** The whole diff's budget, and the cap on one file's patch within it, in characters. */
 export interface OpeningDiffLimits {
-  /** The whole diff's budget, in characters. */
   maxChars: number;
-  /** One file's patch is cut past this many characters. */
   maxFileChars: number;
 }
 
@@ -51,7 +50,7 @@ function capPatch(patch: string, maxChars: number): string {
   return patch.slice(0, cut > 0 ? cut : maxChars) + FILE_CUT_MARKER;
 }
 
-// The same header lines a unified diff carries, so the shape is familiar.
+// Mirrors renderDiff's header lines; reviewer can't be imported here (circular).
 function renderPatch(file: ChangedFile, patch: string): string {
   return [
     `diff --git a/${file.filename} b/${file.filename}`,
@@ -94,7 +93,7 @@ export function buildOpeningDiff(
   return { diff: rendered.join("\n"), omitted };
 }
 
-/** One line naming what the diff left out, or nothing when it left out nothing. */
+/** Names what the diff left out; empty when nothing was left out. */
 export function renderOmitted(omitted: readonly OmittedFile[]): string[] {
   if (omitted.length === 0) {
     return [];
