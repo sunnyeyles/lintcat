@@ -3,7 +3,7 @@ import type { Severity } from "@pr-review/db/dashboard";
 import type { FindingCounts, FindingHeat } from "@/lib/codebase-map/from-snapshot";
 
 /** How thick the ring is drawn, so the count reads without colour. */
-export const HEAT_BANDS = [1, 3, 6] as const;
+const HEAT_BANDS = [1, 3, 6] as const;
 
 export interface Heat {
   counts: FindingCounts;

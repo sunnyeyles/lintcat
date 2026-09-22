@@ -2,6 +2,9 @@
  * The one esbuild configuration this repository bundles with; `pnpm build` and
  * `pnpm seed-prompts` must not disagree. Nothing is externalised.
  */
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
 import { build } from "esbuild";
 
 /**
@@ -31,4 +34,12 @@ export function bundle({ entryPoint, outfile, logLevel = "info" }) {
     legalComments: "none",
     logLevel,
   });
+}
+
+/** An app's `start.mjs`: bundles its `src/index.ts` and runs the result. */
+export async function bundleAndRun(appUrl) {
+  const appDir = path.dirname(fileURLToPath(appUrl));
+  const outfile = path.join(appDir, "dist", "index.mjs");
+  await bundle({ entryPoint: path.join(appDir, "src", "index.ts"), outfile, logLevel: "error" });
+  await import(pathToFileURL(outfile).href);
 }

@@ -44,7 +44,7 @@ import {
 import { createDatabaseReviewPublisher } from "#src/record-review";
 import { redact, redactingLogger } from "#src/redact";
 
-export type HostedClient = PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
+type HostedClient = PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
 
 export interface JobRunnerDeps {
   /** Single statements only: the worker never needs a transaction. */

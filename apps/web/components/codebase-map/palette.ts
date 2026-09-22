@@ -21,10 +21,10 @@ const TOKENS = [
   "--severity-high",
 ] as const;
 
-export type MapToken = (typeof TOKENS)[number];
+type MapToken = (typeof TOKENS)[number];
 export type MapPalette = Record<MapToken, string>;
 
-export function readPalette(element: Element): MapPalette {
+function readPalette(element: Element): MapPalette {
   const style = getComputedStyle(element);
   const palette = {} as MapPalette;
   for (const token of TOKENS) {

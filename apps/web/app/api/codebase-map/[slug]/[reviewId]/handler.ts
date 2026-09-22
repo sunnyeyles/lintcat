@@ -26,8 +26,6 @@ const requestSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-export type MapRequest = z.infer<typeof requestSchema>;
-
 /** Resolves the review's map source, or undefined when the reader may not have it. */
 export type LoadMapSource = () => Promise<MapSource | undefined>;
 

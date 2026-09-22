@@ -18,7 +18,7 @@ export function emptySeverity(): Record<Severity, number> {
   return { low: 0, medium: 0, high: 0 };
 }
 
-export function zeroTokens(): TokenCounts {
+function zeroTokens(): TokenCounts {
   return {
     inputTokens: 0,
     cacheCreationInputTokens: 0,
@@ -27,7 +27,7 @@ export function zeroTokens(): TokenCounts {
   };
 }
 
-export function addTokens(into: TokenCounts, from: TokenCounts) {
+function addTokens(into: TokenCounts, from: TokenCounts) {
   into.inputTokens += from.inputTokens;
   into.cacheCreationInputTokens += from.cacheCreationInputTokens;
   into.cacheReadInputTokens += from.cacheReadInputTokens;

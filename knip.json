@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": [".agents/**", "docs/**", "evals/fixtures/**"],
+  "workspaces": {
+    "apps/web": {
+      "next": true,
+      "entry": ["components/shell/logo-mark.tsx"]
+    },
+    "apps/mcp": {
+      "entry": ["start.mjs"]
+    },
+    "packages/design": {
+      "entry": ["brand/cli/lintcat-spinner.js"]
+    },
+    "evals": {
+      "entry": ["src/**/*.ts"]
+    }
+  }
+}

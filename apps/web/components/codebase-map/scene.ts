@@ -18,8 +18,8 @@ import type {
   NormalisedGraph,
 } from "@/lib/codebase-map";
 
-export type SceneNodeKind = "file" | "group";
-export type EdgeRelation = "base" | "dependency" | "dependent";
+type SceneNodeKind = "file" | "group";
+type EdgeRelation = "base" | "dependency" | "dependent";
 
 export interface SceneNode {
   id: string;
@@ -37,7 +37,7 @@ export interface SceneNode {
   heat: Heat;
 }
 
-export interface SceneEdge {
+interface SceneEdge {
   a: string;
   b: string;
   ax: number;

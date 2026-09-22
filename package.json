@@ -19,11 +19,13 @@
     "db:push": "pnpm --filter @pr-review/db db:push",
     "db:studio": "pnpm --filter @pr-review/db db:studio",
     "build": "turbo run build",
-    "dev": "turbo run dev"
+    "dev": "turbo run dev",
+    "dead-code": "knip"
   },
   "devDependencies": {
     "@types/node": "^25.9.5",
     "esbuild": "^0.28.1",
+    "knip": "^6.37.0",
     "turbo": "^2.5.8",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"

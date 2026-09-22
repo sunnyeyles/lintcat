@@ -20,13 +20,13 @@ export interface MapHandle {
   getView(): MapView;
   setView(view: MapView): void;
   fit(): void;
-  /** Absent on the spike renderers, which only ever fit the whole graph. */
+  /** Optional: a renderer may only ever fit the whole graph. */
   fitBounds?(bounds: MapBounds): void;
   centreOn(x: number, y: number, scale?: number): void;
 }
 
-export const MIN_SCALE = 0.04;
-export const MAX_SCALE = 8;
+const MIN_SCALE = 0.04;
+const MAX_SCALE = 8;
 
 export function clampScale(scale: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
@@ -51,7 +51,7 @@ export function fitView(
 }
 
 /** Grows a box around the nodes the paths land on, collapsed groups included. */
-export function boundsOfPaths(scene: Scene, paths: Iterable<string>): MapBounds | null {
+function boundsOfPaths(scene: Scene, paths: Iterable<string>): MapBounds | null {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;

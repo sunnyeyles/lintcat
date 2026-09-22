@@ -16,7 +16,7 @@ import type { ReviewOptions } from "#src/options";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
 
 export const EXIT_OK = 0;
-export const EXIT_BLOCKED = 1;
+const EXIT_BLOCKED = 1;
 export const EXIT_ERROR = 2;
 export const EXIT_CANCELLED = 3;
 
@@ -28,10 +28,10 @@ export interface CliDeps {
   signal?: AbortSignal | undefined;
 }
 
-export const CANCELLED_MESSAGE = "pr-review: review cancelled before it finished; no verdict was reached.";
+const CANCELLED_MESSAGE = "pr-review: review cancelled before it finished; no verdict was reached.";
 
 /** Said before any git or model work, so a keyless machine fails in a second. */
-export function missingKeyMessage(): string {
+function missingKeyMessage(): string {
   return (
     `No model API key is set, so there is nothing to run the review with. Set ` +
     `${MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ")} in your environment or in this project's .env.local.`

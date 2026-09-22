@@ -6,8 +6,6 @@ import type {
   MapViewState,
 } from "@/lib/codebase-map/types";
 
-export type { GroupImport };
-
 export interface MapGroup {
   id: string;
   package: string | null;

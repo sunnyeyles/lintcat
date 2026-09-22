@@ -2,7 +2,7 @@ import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 
 export type NeighbourDirection = "dependency" | "dependent" | "both";
 
-export interface Neighbour {
+interface Neighbour {
   path: string;
   depth: number;
   direction: NeighbourDirection;

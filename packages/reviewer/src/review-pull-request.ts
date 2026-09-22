@@ -165,7 +165,7 @@ function noNewChangesNote(sinceSha: string): string {
 }
 
 /** What the review read: the commit it was indexed at and the files it covered. */
-export interface ReviewedTree {
+interface ReviewedTree {
   /** The pull request's base commit, whatever the index did. */
   baseSha: string;
   /** Every file the pull request changed, not just an incremental scope. */

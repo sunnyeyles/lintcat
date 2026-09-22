@@ -1,6 +1,6 @@
 import type { MapFile } from "@/lib/codebase-map/types";
 
-export type SearchMatchKind = "name-prefix" | "segment" | "substring";
+type SearchMatchKind = "name-prefix" | "segment" | "substring";
 
 export interface SearchResult {
   path: string;
@@ -8,7 +8,7 @@ export interface SearchResult {
   rank: number;
 }
 
-export const SEARCH_RANK: Record<SearchMatchKind, number> = {
+const SEARCH_RANK: Record<SearchMatchKind, number> = {
   "name-prefix": 0,
   segment: 1,
   substring: 2,
