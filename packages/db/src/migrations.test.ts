@@ -223,6 +223,20 @@ describe("the hosted review migration", () => {
   });
 });
 
+describe("the repo settings migration", () => {
+  it("adds one row per repo for mode, model and fixes", async () => {
+    expect(await columns("repo_settings")).toEqual([
+      "created_at",
+      "fixes",
+      "id",
+      "mode",
+      "model",
+      "repo_id",
+      "updated_at",
+    ]);
+  });
+});
+
 describe("the single-reviewer migration on a populated database", () => {
   it("sums each review's agent runs into the review before dropping them", async () => {
     const folder = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");

@@ -14,12 +14,14 @@ import {
 import {
   claimReviewJob,
   enqueueReviewJob,
+  findings,
   markUninstalled,
   organizations,
   repos,
   reviewJobs,
   reviews,
   saveModelKey,
+  saveRepoSettings,
   type Database,
   type ReviewJob,
 } from "@pr-review/db";
@@ -143,7 +145,9 @@ describe("runReviewJob", () => {
     );
     expect(github.createReview).toHaveBeenCalledOnce();
     expect(await status(job.id)).toMatchObject({ status: "succeeded", leaseExpiresAt: null });
-    expect(await database.select().from(reviews)).toEqual([]);
+    expect(await database.select().from(reviews)).toMatchObject([
+      { repoId, prNumber: 42, headSha, summary: "1 finding" },
+    ]);
     expectNoSecretsLogged();
   });
 
@@ -189,6 +193,7 @@ describe("runReviewJob", () => {
     expect(await run).toBe("superseded");
     expect(github.createCheckRun).not.toHaveBeenCalled();
     expect(github.createReview).not.toHaveBeenCalled();
+    expect(await database.select().from(reviews)).toEqual([]);
   });
 
   it("publishes nothing when the job is superseded just before publishing", async () => {
@@ -203,6 +208,7 @@ describe("runReviewJob", () => {
     expect(await runReviewJob(deps().deps, job)).toBe("superseded");
     expect(github.createCheckRun).not.toHaveBeenCalled();
     expect(github.createReview).not.toHaveBeenCalled();
+    expect(await database.select().from(reviews)).toEqual([]);
   });
 
   it("supersedes a job whose head GitHub has already moved past", async () => {
@@ -277,5 +283,147 @@ describe("runReviewJob", () => {
     expect(await runReviewJob(d, job)).toBe("failed");
     expect(createInstallationToken).not.toHaveBeenCalled();
     expect(await status(job.id)).toMatchObject({ status: "failed" });
+  });
+});
+
+describe("runReviewJob repo settings", () => {
+  it("calls the org key's default model with no repo override", async () => {
+    await withKey();
+    const job = await claim();
+    const { deps: d, createLanguageModel } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(createLanguageModel).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: "claude-haiku-4-5" }),
+    );
+  });
+
+  it("uses the repo's chosen model id when one is saved", async () => {
+    await withKey();
+    await saveRepoSettings(database, repoId, {
+      mode: "label",
+      model: "claude-sonnet-4-5",
+      fixes: false,
+    });
+    const job = await claim();
+    const { deps: d, createLanguageModel } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(createLanguageModel).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: "claude-sonnet-4-5" }),
+    );
+  });
+
+  it("fails without a retry and with a clear check run message on an unknown model", async () => {
+    await withKey();
+    await saveRepoSettings(database, repoId, {
+      mode: "label",
+      model: "not-a-real-model",
+      fixes: false,
+    });
+    const job = await claim();
+    const { deps: d, createLanguageModel } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(await status(job.id)).toMatchObject({ status: "failed" });
+    expect(github.createCheckRun).toHaveBeenCalledWith(
+      expect.objectContaining({ conclusion: "failure" }),
+    );
+    const [input] = github.createCheckRun.mock.calls[0] as unknown as [
+      { output: { title: string; summary: string } },
+    ];
+    expect(input.output.title).toMatch(/not recognized/i);
+    expect(input.output.summary).toContain("not-a-real-model");
+    expect(await database.select().from(reviews)).toEqual([]);
+  });
+
+  const FILE = Array.from({ length: 41 }, (_, i) =>
+    i === 40 ? "const target = 1;" : `line ${i + 1}`,
+  ).join("\n");
+
+  function answeringWithFix(): ReviewModel {
+    const finding = makeFinding("general", {
+      line: 41,
+      patch: {
+        startLine: 41,
+        endLine: 41,
+        expected: "const target = 1;",
+        replacement: "// patched\nconst target = 1;",
+      },
+    });
+    return makeModel([message([textBlock(finalFindingsJson([finding]))], "end_turn")]).model;
+  }
+
+  it("commits a verified fix to the branch when the repository has fixes on", async () => {
+    await withKey();
+    await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: true });
+    const job = await claim();
+    github.getFileContents.mockResolvedValue(FILE);
+    const { deps: d } = deps({ createLanguageModel: () => answeringWithFix() });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.createCommitOnBranch).toHaveBeenCalledOnce();
+  });
+
+  it("offers a verified fix as a suggestion, not a commit, with fixes off by default", async () => {
+    await withKey();
+    const job = await claim();
+    github.getFileContents.mockResolvedValue(FILE);
+    const { deps: d } = deps({ createLanguageModel: () => answeringWithFix() });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.createCommitOnBranch).not.toHaveBeenCalled();
+    expect(github.createReview).toHaveBeenCalledOnce();
+  });
+});
+
+describe("runReviewJob dashboard recording", () => {
+  it("records findings without the patch's expected or replacement text", async () => {
+    await withKey();
+    const job = await claim();
+    const finding = makeFinding("general", {
+      line: 41,
+      patch: {
+        startLine: 41,
+        endLine: 41,
+        expected: "top secret expected text",
+        replacement: "top secret replacement text",
+      },
+    });
+    github.getFileContents.mockResolvedValue(
+      Array.from({ length: 41 }, (_, i) =>
+        i === 40 ? "top secret expected text" : `line ${i + 1}`,
+      ).join("\n"),
+    );
+    const { deps: d } = deps({
+      createLanguageModel: () =>
+        makeModel([message([textBlock(finalFindingsJson([finding]))], "end_turn")]).model,
+    });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    const stored = await database.select().from(findings);
+    expect(stored).toHaveLength(1);
+    const text = JSON.stringify(stored);
+    expect(text).not.toContain("top secret expected text");
+    expect(text).not.toContain("top secret replacement text");
+  });
+
+  it("does not record anything when the job fails", async () => {
+    await withKey();
+    const job = await claim();
+    const { deps: d } = deps({
+      createLanguageModel: () => makeModel([]).model,
+      retry: { maxAttempts: 1, retryDelayMs: 0 },
+    });
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+    expect(await database.select().from(reviews)).toEqual([]);
   });
 });

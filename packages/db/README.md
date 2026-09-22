@@ -15,6 +15,7 @@ erDiagram
   reviews ||--o{ findings : "holds"
   organizations ||--o| model_keys : "pays with"
   repos ||--o{ review_jobs : "queues"
+  repos ||--o| repo_settings : "configures"
 
   users {
     serial id PK
@@ -113,6 +114,14 @@ erDiagram
     text suggested_fix
     real confidence
   }
+  repo_settings {
+    serial id PK
+    int repo_id FK,UK
+    repo_review_mode mode "off label every_pr"
+    text model "override; null uses the key's default"
+    boolean fixes
+    timestamptz updated_at
+  }
 ```
 
 - An organization is one GitHub account, an organization or a user.
@@ -157,6 +166,11 @@ erDiagram
   UPDATE SKIP LOCKED)`, which takes a lease; a running job whose lease lapsed
   is claimable again. A failure requeues it after a delay until `attempts`
   reaches the limit, then marks it `failed`.
+- `repo_settings` is one repository's hosted review settings (`src/repo-settings.ts`).
+  A repo with no row reviews on the `ai-review` label, calls the organization
+  key's default model, and offers fixes as suggestions rather than committing
+  them — `effectiveRepoSettings` returns those defaults. `model` is a model id
+  in the organization key's own provider, not a provider name.
 
 ## Commands
 

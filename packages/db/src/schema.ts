@@ -38,6 +38,11 @@ export const repoPermissionEnum = pgEnum("repo_permission", [
   "triage",
   "read",
 ]);
+export const repoReviewModeEnum = pgEnum("repo_review_mode", [
+  "off",
+  "label",
+  "every_pr",
+]);
 
 const createdAt = () =>
   timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -237,6 +242,21 @@ export const reviewJobs = pgTable(
   ],
 );
 
+// A repo without a row reviews on the `ai-review` label, on no model override, with fixes off.
+export const repoSettings = pgTable("repo_settings", {
+  id: serial("id").primaryKey(),
+  repoId: integer("repo_id")
+    .notNull()
+    .unique()
+    .references(() => repos.id, { onDelete: "cascade" }),
+  mode: repoReviewModeEnum("mode").notNull().default("label"),
+  // Model id override for the organization's key's provider; null uses the provider's default.
+  model: text("model"),
+  fixes: boolean("fixes").notNull().default(false),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Mirrors reviewFindingSchema in @pr-review/schemas; keep the two in step.
 export const findings = pgTable("findings", {
   id: serial("id").primaryKey(),
@@ -272,5 +292,7 @@ export type NewRepositoryGraph = typeof repositoryGraphs.$inferInsert;
 export type ModelKey = typeof modelKeys.$inferSelect;
 export type ReviewJob = typeof reviewJobs.$inferSelect;
 export type ReviewJobStatus = ReviewJob["status"];
+export type RepoSettings = typeof repoSettings.$inferSelect;
+export type RepoReviewMode = RepoSettings["mode"];
 export type Finding =typeof findings.$inferSelect;
 export type NewFinding = typeof findings.$inferInsert;

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
+  effectiveRepoSettings,
   enqueueReviewJob,
   findOrganizationByAccountId,
   findOrganizationById,
@@ -17,6 +18,7 @@ import {
   type InstallationInput,
   type Organization,
   type RepoPermission,
+  type RepoReviewMode,
 } from "@pr-review/db";
 import { errorMessage } from "@pr-review/logging";
 import { z } from "zod";
@@ -380,8 +382,21 @@ async function onMemberChanged(
   return true;
 }
 
-function wantsReview(payload: z.infer<typeof pullRequestEventSchema>): boolean {
-  if (payload.pull_request.state !== "open") return false;
+// Every mode's actions of interest; anything else is skipped before the repo is even looked up.
+const RELEVANT_ACTIONS = new Set(["opened", "labeled", "synchronize", "reopened"]);
+
+function wantsReview(
+  payload: z.infer<typeof pullRequestEventSchema>,
+  mode: RepoReviewMode,
+): boolean {
+  if (payload.pull_request.state !== "open" || mode === "off") return false;
+  if (mode === "every_pr") {
+    return (
+      payload.action === "opened" ||
+      payload.action === "synchronize" ||
+      payload.action === "reopened"
+    );
+  }
   switch (payload.action) {
     case "labeled":
       return payload.label?.name === REVIEW_LABEL;
@@ -399,7 +414,7 @@ async function onPullRequest(
   payload: z.infer<typeof pullRequestEventSchema>,
   deliveryId: string | null,
 ): Promise<boolean> {
-  if (!wantsReview(payload)) return false;
+  if (!RELEVANT_ACTIONS.has(payload.action)) return false;
   const pullRequest = payload.pull_request;
   const fields = {
     source: `pull_request.${payload.action}`,
@@ -417,6 +432,8 @@ async function onPullRequest(
   if (!repo || repo.removedAt) return skip("repository_not_tracked");
   if (!organization || !installedAccount(organization)) return skip("organization_not_installed");
   if (organization.suspendedAt) return skip("installation_suspended");
+  const settings = await effectiveRepoSettings(deps.database, repo.id);
+  if (!wantsReview(payload, settings.mode)) return skip("review_not_requested");
   const result = await enqueueReviewJob(deps.database, {
     repoId: repo.id,
     prNumber: pullRequest.number,

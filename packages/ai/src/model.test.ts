@@ -8,6 +8,8 @@ import {
   apiKeyEnvFor,
   createLanguageModel,
   defaultModelFor,
+  modelChoicesFor,
+  resolveModelId,
   resolveModelProvider,
 } from "#src/model";
 
@@ -36,6 +38,28 @@ describe("per-provider defaults", () => {
       expect(defaultModelFor(provider)).not.toBe("");
       expect(apiKeyEnvFor(provider)).toMatch(/_API_KEY$/);
     }
+  });
+});
+
+describe("resolveModelId", () => {
+  it("defaults to the provider's default model when none is chosen", () => {
+    for (const provider of MODEL_PROVIDERS) {
+      expect(resolveModelId(provider, "")).toBe(defaultModelFor(provider));
+      expect(resolveModelId(provider, "   ")).toBe(defaultModelFor(provider));
+    }
+  });
+
+  it("accepts any model id offered for the provider", () => {
+    for (const provider of MODEL_PROVIDERS) {
+      for (const id of modelChoicesFor(provider)) {
+        expect(resolveModelId(provider, id)).toBe(id);
+      }
+    }
+  });
+
+  it("throws on a model id the provider does not offer", () => {
+    expect(() => resolveModelId("anthropic", "gpt-5.6-luna")).toThrow(ModelProviderError);
+    expect(() => resolveModelId("anthropic", "gpt-5.6-luna")).toThrow(/Unknown model/);
   });
 });
 
