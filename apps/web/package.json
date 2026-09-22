@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@pr-review/db": "workspace:*",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@pr-review/ai": "workspace:*",
+    "@pr-review/eslint-config": "workspace:*",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "typescript": "^5.9.3"

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
     "test": "vitest run",
     "eval": "vitest run --config evals/vitest.eval.config.ts",
     "seed-prompts": "node scripts/seed-prompts.mjs",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@types/node": "^25.9.5",
     "esbuild": "^0.28.1",
+    "eslint": "^9.39.5",
     "knip": "^6.37.0",
     "turbo": "^2.5.8",
     "typescript": "^5.9.3",

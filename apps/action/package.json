@@ -11,6 +11,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "build": "node ../../scripts/build-bundle.mjs"
   },
   "dependencies": {
@@ -24,5 +25,8 @@
     "@pr-review/schemas": "workspace:*",
     "ai": "^7.0.93",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@pr-review/eslint-config": "workspace:*"
   }
 }

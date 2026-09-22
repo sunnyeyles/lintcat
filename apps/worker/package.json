@@ -11,6 +11,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "build": "node ../../scripts/build-bundle.mjs",
     "start": "node start.mjs"
   },
@@ -21,5 +22,8 @@
     "@pr-review/logging": "workspace:*",
     "@pr-review/reviewer": "workspace:*",
     "@pr-review/schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@pr-review/eslint-config": "workspace:*"
   }
 }
