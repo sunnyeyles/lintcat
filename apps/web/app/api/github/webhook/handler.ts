@@ -35,9 +35,11 @@ import {
   replaceMembers,
 } from "@/lib/membership-sync";
 import { applyRepoAccess, lookupRepoPermission } from "@/lib/repo-access-sync";
+import type { PingWorker } from "@/lib/worker-ping";
 
 export interface GithubWebhookDeps extends InstallationDeps {
   webhookSecret: string;
+  pingWorker: PingWorker;
 }
 
 const installationSchema = z.object({
@@ -431,6 +433,7 @@ async function onPullRequest(
       jobId: result.job.id,
       superseded: result.superseded,
     });
+    deps.pingWorker();
   }
   return true;
 }
