@@ -39,8 +39,8 @@ async function ReposBody({ slug }: { slug: string }) {
       <EmptyHeader>
         <EmptyTitle>No repositories yet</EmptyTitle>
         <EmptyDescription>
-          Install the review workflow on a repository and its first review will
-          appear here.
+          Give the LintCat GitHub App access to a repository in your GitHub
+          settings and it will appear here.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

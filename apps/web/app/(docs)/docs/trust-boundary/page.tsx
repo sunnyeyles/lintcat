@@ -36,7 +36,7 @@ export default function TrustBoundaryPage() {
       href="/docs/trust-boundary"
       eyebrow="How it works"
       title="The trust boundary"
-      description="The core design constraint of the project: model output is untrusted data until deterministic code has validated it. The reviewer never touches GitHub."
+      description="LintCat's core design rule: the model's output is untrusted until deterministic code has checked it. The reviewer itself never touches GitHub."
       headings={HEADINGS}
     >
       <Section id="boundary" title="Where the boundary sits">
@@ -99,8 +99,8 @@ export default function TrustBoundaryPage() {
             re-stamped, so category provenance stays deterministic.
           </Bullet>
           <Bullet>
-            The check run conclusion is <code>neutral</code> whenever findings exist — the app
-            is advisory and never blocks a merge.
+            The check run conclusion is <code>neutral</code> whenever findings exist. LintCat is
+            advisory and never blocks a merge.
           </Bullet>
           <Bullet>
             Fixes are <strong>committed, never forced</strong>. The branch tip must still be the

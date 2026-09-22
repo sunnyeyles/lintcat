@@ -10,12 +10,11 @@ export const metadata: Metadata = {
 
 const HEADINGS: Heading[] = [
   { id: "stages", title: "The stages" },
-  { id: "failure", title: "Failure" },
-  { id: "memory", title: "Review memory" },
   { id: "index", title: "Repository index" },
+  { id: "failure", title: "When a review fails" },
 ];
 
-const STAGES = `reviewer ─► validate ─► END`;
+const STAGES = `reviewer ─► validate ─► publish`;
 
 export default function HowItWorksPage() {
   return (
@@ -23,7 +22,7 @@ export default function HowItWorksPage() {
       href="/docs/how-it-works"
       eyebrow="How it works"
       title="The review pipeline"
-      description="One pipeline runs every review, whether it came from the Action, the MCP server or the command line: the reviewer proposes, and deterministic code decides."
+      description="Every review, from the GitHub App or from the MCP server, runs the same pipeline: the reviewer proposes, and deterministic code decides."
       headings={HEADINGS}
     >
       <Section id="stages" title="The stages">
@@ -31,37 +30,33 @@ export default function HowItWorksPage() {
         <Bullets>
           <Bullet>
             <strong>reviewer</strong> reads the pull request through eight read-only tools and
-            returns raw candidates. Its tool-calling loop is capped at 12 steps.
+            returns candidate findings. It gets at most 12 tool-calling steps.
           </Bullet>
           <Bullet>
-            <strong>validate</strong> is the decision: schema, category, file, line,
-            confidence, duplicates, cap. It is the last place anything is checked before the
-            review is published.
+            <strong>validate</strong> makes the decision: schema, category, file, line,
+            confidence, duplicates, cap. It is the last check before anything is published.
+          </Bullet>
+          <Bullet>
+            <strong>publish</strong> posts the check run and inline comments to GitHub and
+            records the review on your dashboard.
           </Bullet>
         </Bullets>
       </Section>
 
-      <Section id="failure" title="Failure">
-        <P>
-          If the reviewer fails, the pipeline throws, which fails the workflow step so the run
-          can be retried from the Actions UI. Nothing is published for a failed run.
-        </P>
-      </Section>
-
-      <Section id="memory" title="Review memory">
-        <P>
-          With <code>memory-branch</code> set, the reviewer gets deprioritisation hints: shapes
-          of finding this repository has repeatedly left alone. They are evidence, not rules —
-          the prompt still forbids inventing a finding, and a shape with no signal for 90 days
-          is forgotten.
-        </P>
-      </Section>
-
       <Section id="index" title="Repository index">
         <P>
-          Before the reviewer starts, the review builds an index from the pull request&rsquo;s
-          base commit, which is what <code>find_references</code> answers from. Set{" "}
-          <code>index: false</code> to turn it off.
+          Before the reviewer starts, LintCat indexes the repository at the pull
+          request&rsquo;s base commit. That is how the reviewer finds the callers of a function
+          your change touched, even in files the pull request didn&rsquo;t change.
+        </P>
+      </Section>
+
+      <Section id="failure" title="When a review fails">
+        <P>
+          A failed review is retried automatically, up to three attempts in all. If the last
+          one fails too, the pull request gets a <code>failure</code> check run saying the
+          review gave up. Push again, or remove and re-add the <code>ai-review</code> label,
+          to try again.
         </P>
       </Section>
     </DocsArticle>

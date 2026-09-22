@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "pr-review-agents", template: "%s · pr-review-agents" },
+  title: { default: "LintCat", template: "%s · LintCat" },
   description:
     "Documentation for the PR review agents, and the dashboard: reviews, findings by severity and agent, model usage and cost.",
 };

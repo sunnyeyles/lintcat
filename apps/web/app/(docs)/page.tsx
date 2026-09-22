@@ -4,39 +4,39 @@ import Link from "next/link";
 
 import { Bullet, Bullets, Code, DocsArticle, Note, P, Section } from "@/components/docs";
 import { DOCS_HOME, DOCS_PAGES, type Heading } from "@/lib/docs";
+import { installAppUrl } from "@/lib/github-app";
 
 export const metadata: Metadata = {
   title: "Introduction",
   description:
-    "An AI reviewer reads your pull requests and publishes inline comments; deterministic code decides what reaches GitHub.",
+    "LintCat reviews your pull requests and leaves inline comments. Install the GitHub App; there is nothing to add to your CI.",
 };
 
 const HEADINGS: Heading[] = [
   { id: "what-it-does", title: "What it does" },
-  { id: "delivery", title: "Delivery path" },
+  { id: "getting-it", title: "Getting it on your repositories" },
   { id: "pipeline", title: "How a review happens" },
   { id: "reviewer", title: "What the reviewer looks for" },
   { id: "keep-reading", title: "Keep reading" },
 ];
 
-const PIPELINE = `GitHub PR event (opened / synchronize / reopened)
+const PIPELINE = `Pull request opened, pushed to, or labelled ai-review
    │
    ▼
-GitHub Action
+LintCat GitHub App
    │
-   ├── authenticate with the workflow token
-   ├── load PR, changed files, diff
-   ├── build the repository index at the base commit
-   │
-   ▼
-Review pipeline
-   │
-   ├─ reviewer
-   ├─ validate
+   ├── read the pull request, changed files, diff
+   ├── index the repository at the base commit
    │
    ▼
-                    GitHub Check Run + inline comments
-                      (or job summary, on a fork PR)`;
+Review
+   │
+   ├─ reviewer   (your model key)
+   ├─ validate   (no model here)
+   │
+   ▼
+AI PR Review check run + inline comments
+           + the review on your dashboard`;
 
 const LOOKS_FOR = [
   ["Correctness", "Logic errors, wrong bounds, unhandled null, broken error handling"],
@@ -47,18 +47,24 @@ const LOOKS_FOR = [
 ] as const;
 
 export default function IntroductionPage() {
+  const install = installAppUrl();
   return (
     <DocsArticle
       href={DOCS_HOME}
       eyebrow="Documentation"
-      title="pr-review-agents"
-      description="An AI reviewer reads a pull request and publishes the result as inline review comments, alongside an AI PR Review check run carrying the full summary. The reviewer never touches GitHub — deterministic code decides what gets published."
+      title="LintCat"
+      description="An AI reviewer that reads your pull requests and leaves inline review comments, plus an AI PR Review check run with the full summary. Install the GitHub App and add a model key. Nothing goes in your CI."
       headings={HEADINGS}
     >
       <div className="flex flex-wrap gap-3">
         <Button asChild>
           <Link href="/docs/quickstart">Quickstart</Link>
         </Button>
+        {install ? (
+          <Button asChild variant="outline">
+            <a href={install}>Install the GitHub App</a>
+          </Button>
+        ) : null}
         <Button asChild variant="outline">
           <Link href="/dashboard">Open the dashboard</Link>
         </Button>
@@ -66,31 +72,33 @@ export default function IntroductionPage() {
 
       <Section id="what-it-does" title="What it does">
         <P>
-          One reviewer reads every pull request for correctness, security, performance, test
-          and documentation problems in a single pass. No configuration is needed to get that.
+          One reviewer reads each pull request in a single pass, looking for correctness,
+          security, performance, test and documentation problems. You don&rsquo;t need to
+          configure anything to get that.
         </P>
         <P>
-          A finding may carry a <strong>patch</strong>: a replacement for a range of lines,
-          quoted alongside the exact text it expects to replace. Application code checks that
-          quote against the file at the head commit character for character before the patch
-          goes anywhere.
+          A finding can include a <strong>suggested fix</strong>. LintCat checks the fix
+          against the file at the pull request&rsquo;s latest commit before offering it, so a
+          suggestion never lands on the wrong lines. Apply it with one click, or have LintCat
+          commit it for you.
         </P>
       </Section>
 
-      <Section id="delivery" title="Delivery path">
+      <Section id="getting-it" title="Getting it on your repositories">
         <P>
-          A GitHub Action, run in your repository&rsquo;s own Actions runner. There is no
-          infrastructure to stand up and no GitHub App to register for the review itself —
-          the workflow&rsquo;s own token authenticates the reads and publishes the check run.
-          The dashboard is the one part that installs an App, to read your organization.
+          Install the LintCat GitHub App on your organization or personal account, and pick
+          the repositories it may review. An organization owner saves one Anthropic or OpenAI
+          API key on the dashboard; reviews run on that key, so model usage is billed to
+          your provider account.
         </P>
-        <Code caption=".github/workflows/ai-review.yml">{`- uses: sunnyeyles/pr-review-action@v3
-  with:
-    api-key: \${{ secrets.OPENAI_API_KEY }}`}</Code>
-        <Note title="Fork pull requests">
-          A fork&rsquo;s <code>GITHUB_TOKEN</code> is read-only and cannot create a check run.
-          The Action detects that, writes the review into the job summary instead, and still
-          exits 0.
+        <P>
+          By default a repository is reviewed when a pull request gets the{" "}
+          <code>ai-review</code> label, and again on every push after that. Switch a
+          repository to review every pull request, or turn it off, from its settings page.
+        </P>
+        <Note title="No workflow file, no secrets in GitHub">
+          Reviews run on LintCat&rsquo;s side. Your repository gets no workflow, and your
+          Actions minutes go untouched.
         </Note>
       </Section>
 
@@ -98,8 +106,8 @@ export default function IntroductionPage() {
         <Code>{PIPELINE}</Code>
         <P>
           The reviewer reads the pull request through read-only tools and proposes findings.
-          Validation then decides which of them are published. If the reviewer fails, the
-          workflow step fails and the run can be retried from the Actions UI.
+          Deterministic code then decides which of them are published. A new push replaces a
+          review still in progress, so you only ever see comments on the latest commit.
         </P>
       </Section>
 
