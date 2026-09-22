@@ -1,5 +1,6 @@
 import {
   Badge,
+  Button,
   Card,
   cn,
   Empty,
@@ -14,6 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@pr-review/design";
+import { Settings } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 
@@ -277,6 +280,14 @@ export default async function RepoDetailPage({
             </Suspense>
             {` · last reviewed ${repo.lastReviewedAt ? formatRelative(repo.lastReviewedAt) : "never"}`}
           </>
+        }
+        actions={
+          <Button asChild variant="outline">
+            <Link href={organizationPath(slug, `/repos/${repo.owner}/${repo.name}/settings`)}>
+              <Settings aria-hidden />
+              Settings
+            </Link>
+          </Button>
         }
       />
 
