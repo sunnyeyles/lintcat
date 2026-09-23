@@ -51,6 +51,12 @@ export {
   type RetryPolicy,
   type ReviewJobRequest,
 } from "./review-jobs";
+export {
+  consumeRateLimit,
+  pruneRateLimits,
+  type RateLimitResult,
+  type RateLimitRule,
+} from "./rate-limits";
 export { modelKeyEncryptionKey, openSecret, parseEncryptionKey, sealSecret } from "./secret-box";
 export {
   DEFAULT_REPO_SETTINGS,

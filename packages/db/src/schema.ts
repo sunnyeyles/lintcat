@@ -9,6 +9,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   real,
   serial,
   text,
@@ -257,6 +258,20 @@ export const repoSettings = pgTable("repo_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Requests per key per fixed window; the key is a hash, never a raw address.
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.key, t.windowStart] }),
+    index("rate_limits_window_start_idx").on(t.windowStart),
+  ],
+);
+
 // Mirrors reviewFindingSchema in @pr-review/schemas; keep the two in step.
 export const findings = pgTable("findings", {
   id: serial("id").primaryKey(),
@@ -294,5 +309,6 @@ export type ReviewJob = typeof reviewJobs.$inferSelect;
 export type ReviewJobStatus = ReviewJob["status"];
 export type RepoSettings = typeof repoSettings.$inferSelect;
 export type RepoReviewMode = RepoSettings["mode"];
+export type RateLimit = typeof rateLimits.$inferSelect;
 export type Finding =typeof findings.$inferSelect;
 export type NewFinding = typeof findings.$inferInsert;

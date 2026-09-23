@@ -4,7 +4,8 @@ The public documentation at `/`, and the dashboard behind it: review history,
 trends and token spend. Also
 `POST /api/ingest`, where the action records each review, and
 `POST /api/github/webhook`, where the GitHub App reports installations,
-organization members and the pull requests to review in hosted mode.
+organization members and the pull requests to review in hosted mode, and
+`POST /api/docs-chat`, behind the docs' Ask AI panel.
 
 The docs need no session; the dashboard starts at `/dashboard`, which every
 page links to from the topbar.
@@ -18,7 +19,7 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | Variable                    | Used for                                                         |
 | --------------------------- | ---------------------------------------------------------------- |
 | `DATABASE_URL`              | Postgres, see [`packages/db`](../../packages/db)                 |
-| `AUTH_SECRET`               | Signs the session cookie; `pnpm dlx auth secret`                 |
+| `AUTH_SECRET`               | Signs the session cookie, and keys the docs chat's rate-limit hash; `pnpm dlx auth secret` |
 | `AUTH_GITHUB_ID`            | The GitHub App's client id (user sign-in)                        |
 | `AUTH_GITHUB_SECRET`        | The GitHub App's client secret                                   |
 | `AUTH_TRUST_HOST`           | `true` for `next start` outside Vercel                           |
@@ -29,6 +30,7 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `MODEL_KEY_ENCRYPTION_KEY`  | 32 bytes of base64 sealing model keys; `openssl rand -base64 32` |
 | `WORKER_URL`                | The worker's Cloud Run URL; unset locally, so the ping is a no-op |
 | `WORKER_PING_SECRET`        | Bearer token the worker checks; shared with `apps/worker`, required once `WORKER_URL` is set |
+| `ANTHROPIC_API_KEY`         | The platform's own key for the docs' Ask AI; unset, the route answers 503 |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
 lists them. Give the GitHub App the callback URL
@@ -370,6 +372,27 @@ const reviews = await (await data(slug)).listReviews({ repoId, limit: 20 });
 Trends and usage are computed by the same functions in `packages/db/src/dashboard/aggregate.ts`
 from the database rows.
 
+## Docs chat
+
+The docs topbar's **Ask AI** opens a sheet that posts the conversation to
+`POST /api/docs-chat` and streams back plain text. The handler
+(`app/api/docs-chat/handler.ts`) answers with Claude Haiku 4.5 on
+`ANTHROPIC_API_KEY`, the platform's key rather than any organization's, with
+every docs page in the system prompt; there is no retrieval step.
+
+- **Corpus.** `lib/docs-chat/corpus.ts` is generated: `corpus.test.ts` renders
+  each docs page and fails when the file is stale. After editing a docs page,
+  refresh it with `pnpm vitest run lib/docs-chat -u` from `apps/web`. A page
+  added to `DOCS_NAV` must also be added to that test's page map.
+- **Limits** (`lib/docs-chat/limits.ts`). 20 questions an hour per client and
+  1,000 a day in total, counted in the `rate_limits` table; a client is an
+  HMAC of its address under `AUTH_SECRET`, an IPv6 one by its /64. Requests
+  must be same-origin JSON; conversations are capped at 12 turns and answers
+  at 1,024 output tokens.
+- **Logs.** `docs_chat.completed` (tokens, cache reads, duration),
+  `docs_chat.rate_limited` and `docs_chat.failed`. None carries the question or
+  the address; `ipSource` shows which header the address came from.
+
 ## Cost figures
 
 `packages/db/src/dashboard/aggregate.ts` holds a fixed per-million-token price table and derives
@@ -394,12 +417,15 @@ app/
     settings/           the organization's model key, owners only
   api/ingest/           the action's endpoint
   api/github/webhook/   the GitHub App's webhook
+  api/docs-chat/        the docs' Ask AI
 components/
   ui/ shell/ charts/ overview/ review/ config/
   docs/                 the docs shell: nav, table of contents, prose
+  docs-chat/            the Ask AI button, panel and streaming hook
 lib/
   data/                 the seam above
   docs.ts               the docs nav, its ordering and active-page rules
+  docs-chat/            the docs corpus, system prompt, limits and answer parser
   authorize.ts          slug + session -> organization, role, readable repos, or not-found
   session.ts            session, and the requireOrganization and requireRepo guards
   sign-in.ts            the sign-in pass: user row, then membership refresh
