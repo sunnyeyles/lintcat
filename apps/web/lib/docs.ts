@@ -2,7 +2,7 @@ export type Heading = { id: string; title: string };
 export type DocsPage = { href: string; title: string; summary: string };
 export type DocsSection = { title: string; pages: DocsPage[] };
 
-export const DOCS_HOME = "/";
+export const DOCS_HOME = "/docs";
 
 export const DOCS_NAV: DocsSection[] = [
   {
@@ -51,6 +51,14 @@ export const DOCS_NAV: DocsSection[] = [
     ],
   },
 ];
+
+export const LOOKS_FOR = [
+  ["Correctness", "Logic errors, wrong bounds, unhandled null, broken error handling"],
+  ["Security", "Auth, cross-tenant access, injection, secret leakage, privilege"],
+  ["Performance", "N+1 queries, unbounded reads, quadratic scans, blocking I/O"],
+  ["Tests", "Branches this change adds or changes and leaves untested"],
+  ["Documentation", "Documentation this change made wrong"],
+] as const;
 
 export const DOCS_PAGES: DocsPage[] = DOCS_NAV.flatMap((section) => section.pages);
 

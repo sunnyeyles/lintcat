@@ -13,12 +13,14 @@ export async function Topbar({ isOwner = false, className }: { isOwner?: boolean
   const { host, protocol, path } = await requestLocation();
   const domain = appDomain();
   const signInHref = topbarSignInHref(path, domain);
+  const home = apexUrl("/", host, protocol, domain);
   const docs = apexUrl(DOCS_HOME, host, protocol, domain);
   const dashboard = apexUrl(DASHBOARD_PATH, host, protocol, domain);
 
   return (
     <TopbarFrame
       className={className}
+      homeHref={home}
       docsHref={docs}
       left={<SidebarDrawer isOwner={isOwner} />}
       right={
