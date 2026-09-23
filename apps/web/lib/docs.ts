@@ -30,8 +30,8 @@ export const DOCS_NAV: DocsSection[] = [
     pages: [
       {
         href: "/docs/how-it-works",
-        title: "The review pipeline",
-        summary: "The reviewer proposes, deterministic code decides.",
+        title: "How LintCat works",
+        summary: "What it looks for, and how it differs.",
       },
       {
         href: "/docs/trust-boundary",
