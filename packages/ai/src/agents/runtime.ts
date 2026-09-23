@@ -3,7 +3,7 @@
  * AgentDefinition supplies role, focus and category; the rest is identical.
  */
 import { startActiveObservation } from "@langfuse/tracing";
-import type { RepositoryIndex } from "@pr-review/index";
+import type { HeadImport, RepositoryIndex } from "@pr-review/index";
 import {
   createConsoleLogger,
   errorMessage,
@@ -26,6 +26,7 @@ import {
   renderRepository,
   renderRepositoryIndex,
 } from "#src/agents/repository-index";
+import { loadHeadImports, renderHeadImports } from "#src/agents/head-imports";
 import { buildOpeningDiff, renderOmitted } from "#src/agents/opening-diff";
 import { createReviewTools, type ReviewToolsClient } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
@@ -114,6 +115,7 @@ function scopeNote(context: ReviewContext): string[] {
 function buildOpeningMessage(
   context: ReviewContext,
   index: RepositoryIndex | undefined,
+  headImports: ReadonlyMap<string, readonly HeadImport[]> | undefined,
 ): string {
   const { pullRequest, changedFiles } = context;
   const opening = buildOpeningDiff(changedFiles);
@@ -147,6 +149,7 @@ function buildOpeningMessage(
     ...renderRepository(index),
     ...renderRepositoryIndex(index, changedFiles, MAX_LISTED_FILES),
     "",
+    ...renderHeadImports(headImports),
     "<diff>",
     opening.diff,
     "</diff>",
@@ -260,7 +263,11 @@ export function createReviewAgent(
             };
             const opening: ModelMessage = {
               role: "user",
-              content: buildOpeningMessage(context, deps.index),
+              content: buildOpeningMessage(
+                context,
+                deps.index,
+                await loadHeadImports(deps.github, context, deps.index),
+              ),
             };
 
             const result = await generateText({

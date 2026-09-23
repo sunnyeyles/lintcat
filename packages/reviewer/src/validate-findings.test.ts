@@ -173,6 +173,27 @@ describe("validateFindings", () => {
     ]);
   });
 
+  it("drops a finding whose explanation admits it never checked the claim", () => {
+    const unverified = finding({
+      explanation:
+        "The link assumes a '#permissions' anchor exists, which cannot be verified from the changes provided.",
+    });
+    const couldNot = finding({
+      line: 11,
+      title: "Import target missing",
+      explanation: "I could not confirm that src/cn.ts exists.",
+    });
+    const verified = finding({
+      line: 12,
+      title: "Stale anchor",
+      explanation: "configuration/page.tsx has no section with id 'permissions'.",
+    });
+
+    expect(
+      validateFindings([unverified, couldNot, verified], changedFiles, CATEGORIES),
+    ).toEqual([verified]);
+  });
+
   it("truncates more than 10 surviving findings to the strongest 10", () => {
     expect(MAX_FINDINGS).toBe(10);
     // 11 distinct findings; the weakest is a low-severity one despite
