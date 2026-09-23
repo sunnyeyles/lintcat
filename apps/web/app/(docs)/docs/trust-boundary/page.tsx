@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { Bullet, Bullets, Code, DocsArticle, Note, P, Section } from "@/components/docs";
+import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
 import type { Heading } from "@/lib/docs";
 
 export const metadata: Metadata = {
@@ -15,21 +15,6 @@ const HEADINGS: Heading[] = [
   { id: "rules", title: "Reinforcing rules" },
 ];
 
-const BOUNDARY = `Reviewer ──► raw candidates (unknown[])
-              │
-              ▼
-   ┌──────────────────────────────────────┐
-   │ validateFindings()  — no model here  │
-   └──────────────────────────────────────┘
-              │
-              ▼
-   ┌──────────────────────────────────────┐
-   │ verifyPatches()     — no model here  │
-   └──────────────────────────────────────┘
-              │
-              ▼
-        GitHub API (application code only)`;
-
 export default function TrustBoundaryPage() {
   return (
     <DocsArticle
@@ -40,7 +25,12 @@ export default function TrustBoundaryPage() {
       headings={HEADINGS}
     >
       <Section id="boundary" title="Where the boundary sits">
-        <Code>{BOUNDARY}</Code>
+        <P>
+          The reviewer only proposes. What it returns is treated as raw, untyped candidates, and
+          two steps with no model in them decide what survives: <code>validateFindings()</code>{" "}
+          checks each finding, then <code>verifyPatches()</code> checks each proposed fix. Only
+          application code calls the GitHub API.
+        </P>
       </Section>
 
       <Section id="validation" title="The validation chain">
