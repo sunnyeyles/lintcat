@@ -20,7 +20,7 @@ export function htmlToCorpusText(html: string): string {
   if (article === undefined) throw new Error("no <article> in the rendered page");
 
   const blocks: string[] = [];
-  const hold = (block: string) => `\u0000${blocks.push(block) - 1}\u0000`;
+  const hold = (block: string) => `\uE000${blocks.push(block) - 1}\uE000`;
 
   const text = article
     .replace(/<nav aria-label="Pagination"[\s\S]*?<\/nav>/g, "")
@@ -54,7 +54,7 @@ export function htmlToCorpusText(html: string): string {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/\n\n(?=[-|] )/g, "\n")
-    .replace(/\u0000(\d+)\u0000/g, (_, index: string) => blocks[Number(index)] ?? "")
+    .replace(/\uE000(\d+)\uE000/g, (_, index: string) => blocks[Number(index)] ?? "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
