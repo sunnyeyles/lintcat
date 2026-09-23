@@ -9,13 +9,15 @@ import {
   EmptyTitle,
 } from "@pr-review/design";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
-import { Clock, Link2Off, MailCheck, ShieldOff } from "lucide-react";
+import { Clock, Link2Off, MailCheck, ShieldOff, UserX } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { signOutOfDashboard } from "@/app/auth-actions";
 import { PageHeader } from "@/components/shell";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { githubApp, INSTALL_APP_URL } from "@/lib/github-app";
 import { appDomain } from "@/lib/host";
 import { completeSetup, setupRequest, type SetupResult } from "@/lib/installation";
@@ -81,7 +83,28 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
   }
 
   if (result?.status === "member") redirect(organizationPath(result.slug));
-  if (result?.status === "not_member") redirect(DASHBOARD_PATH);
+  if (result?.status === "not_member") {
+    logger.info("setup.not_member", {
+      installationId: request.installationId,
+      organization: result.slug,
+      githubUserId: session.githubId,
+      login: session.login,
+    });
+    return (
+      <State
+        icon={<UserX />}
+        title={`You are not a member of ${result.slug}`}
+        description={`The App is installed on ${result.slug}, but GitHub does not list ${session.login} as a member of it. To use another account, sign out here and switch accounts on GitHub before signing back in, or ask an owner of ${result.slug} to add you.`}
+      >
+        <div className="flex gap-2">
+          <form action={signOutOfDashboard}>
+            <SubmitButton pendingLabel="Signing out">Sign out</SubmitButton>
+          </form>
+          {dashboard}
+        </div>
+      </State>
+    );
+  }
 
   if (result?.status === "unsupported") {
     return (

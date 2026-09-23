@@ -227,8 +227,9 @@ opens GitHub's install page. GitHub returns to
 the installation with the App's JWT and runs the same install path as the
 webhook (`installOrganization` in `lib/installation.ts`), so it works before
 the delivery arrives, and both paths converge whichever runs first. The user is
-then forwarded to the organization, or to the picker if GitHub does not list
-them as a member. `setup_action=request` (a non-admin asking an owner to
+then forwarded to the organization or, if GitHub does not list them as a
+member, told which account the App is on and offered sign-out, since the install
+may have run under a different GitHub login. `setup_action=request` (a non-admin asking an owner to
 install) renders a note; a missing or malformed `installation_id` renders the
 Install button again.
 

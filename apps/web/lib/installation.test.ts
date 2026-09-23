@@ -167,12 +167,12 @@ describe("completeSetup", () => {
     expect(await counts()).toEqual(before);
   });
 
-  it("sends a signed-in user GitHub does not list back to the picker", async () => {
+  it("names the installed account for a signed-in user GitHub does not list", async () => {
     members = [octocat];
 
     const result = await completeSetup(deps(), INSTALLATION_ID, account(hubot));
 
-    expect(result).toEqual({ status: "not_member" });
+    expect(result).toEqual({ status: "not_member", slug: "acme" });
     expect(await counts()).toEqual({ organizations: 1, repos: 1, memberships: 1 });
   });
 
