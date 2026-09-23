@@ -30,6 +30,11 @@ export {
   type UnknownReferences,
 } from "#src/find-references";
 export {
+  resolveHeadImports,
+  type HeadImport,
+  type HeadTree,
+} from "#src/head-imports";
+export {
   parseImports,
   type ImportedName,
   type ImportKind,

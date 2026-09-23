@@ -1,6 +1,6 @@
 /**
  * The validation chain, in order: schema, category, changed file, added line,
- * confidence, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
+ * confidence, unverified, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
  */
 import type { ChangedFile } from "@pr-review/github";
 import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
@@ -9,6 +9,10 @@ import { buildChangedLineIndex } from "#src/diff-lines";
 
 /** Findings with confidence below this threshold are dropped. */
 export const CONFIDENCE_THRESHOLD = 0.7;
+
+/** An explanation that admits it never checked the claim it makes. */
+const UNVERIFIED_CLAIM =
+  /\b(cannot|could not|can ?not be|unable to|not able to) (be )?(verif|confirm)\w*|\bwithout (verifying|checking)\b/i;
 
 /** At most this many findings are published per review. */
 export const MAX_FINDINGS = 10;
@@ -77,9 +81,11 @@ export function validateFindings(
     return finding.line === undefined || lines.has(finding.line);
   });
 
-  // 5. Confidence threshold.
+  // 5. Confidence threshold, and no claim the agent admits it never checked.
   const confident = anchored.filter(
-    (finding) => finding.confidence >= CONFIDENCE_THRESHOLD,
+    (finding) =>
+      finding.confidence >= CONFIDENCE_THRESHOLD &&
+      !UNVERIFIED_CLAIM.test(finding.explanation),
   );
 
   // 6. Duplicate removal. Sorted first, so the strongest of each group

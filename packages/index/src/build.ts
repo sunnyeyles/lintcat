@@ -66,6 +66,8 @@ export interface RepositoryIndex {
   readonly edges: readonly ImportEdge[];
   /** Resolved target path to the edges pointing at it. */
   readonly importers: ReadonlyMap<string, readonly ImportEdge[]>;
+  /** Manifests and aliases, kept so imports written at HEAD resolve alike. */
+  readonly workspace: WorkspaceModel;
 }
 
 export interface RepositoryIndexInput {
@@ -235,5 +237,6 @@ export function buildRepositoryIndex(
     ),
     edges,
     importers,
+    workspace,
   };
 }
