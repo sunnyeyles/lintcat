@@ -237,6 +237,12 @@ describe("the repo settings migration", () => {
   });
 });
 
+describe("the docs chat rate limit migration", () => {
+  it("adds one counter per key and window", async () => {
+    expect(await columns("rate_limits")).toEqual(["count", "key", "window_start"]);
+  });
+});
+
 describe("the single-reviewer migration on a populated database", () => {
   it("sums each review's agent runs into the review before dropping them", async () => {
     const folder = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");

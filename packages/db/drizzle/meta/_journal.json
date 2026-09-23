@@ -92,6 +92,13 @@
       "when": 1790040393822,
       "tag": "0012_complex_sersi",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790157473094,
+      "tag": "0013_docs_chat_rate_limits",
+      "breakpoints": true
     }
   ]
 }

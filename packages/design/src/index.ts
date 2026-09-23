@@ -47,6 +47,7 @@ export {
   EmptyTitle,
 } from "#src/components/empty";
 export { Input } from "#src/components/input";
+export { Textarea } from "#src/components/textarea";
 export { Label } from "#src/components/label";
 export { Progress } from "#src/components/progress";
 export {

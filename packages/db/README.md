@@ -122,6 +122,11 @@ erDiagram
     boolean fixes
     timestamptz updated_at
   }
+  rate_limits {
+    text key PK
+    timestamptz window_start PK
+    int count
+  }
 ```
 
 - An organization is one GitHub account, an organization or a user.
@@ -171,6 +176,11 @@ erDiagram
   key's default model, and offers fixes as suggestions rather than committing
   them — `effectiveRepoSettings` returns those defaults. `model` is a model id
   in the organization key's own provider, not a provider name.
+- `rate_limits` counts requests per `(key, window_start)` fixed window
+  (`src/rate-limits.ts`); the docs chat keys it on an HMAC of the client
+  address, never the address. `consumeRateLimit` is one upsert that increments
+  and returns the count, and `pruneRateLimits` drops windows past their use.
+  It stands alone, with no foreign keys.
 
 ## Commands
 
