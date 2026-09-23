@@ -17,6 +17,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { Answer } from "@/components/docs-chat/answer";
 import type { ChatError, DocsChat } from "@/components/docs-chat/use-docs-chat";
+import { LogoMark } from "@/components/shell/logo-mark";
 import { MAX_USER_CHARS } from "@/lib/docs-chat/limits";
 
 const SUGGESTIONS = [
@@ -25,6 +26,30 @@ const SUGGESTIONS = [
   "What can the GitHub App access?",
   "How do I review changes before I push?",
 ];
+
+const WAITING_LINES = [
+  "Chasing down the answer…",
+  "Stalking the right page…",
+  "Batting an idea around…",
+  "Circling a few times first…",
+  "Knocking a few things off the table…",
+];
+
+// Decorative, so hidden from screen readers; the live region already says "Answering…".
+function Waiting() {
+  const [line, setLine] = useState(() => Math.floor(Math.random() * WAITING_LINES.length));
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = setInterval(() => setLine((i) => (i + 1) % WAITING_LINES.length), 1500);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <li className="flex items-center gap-2 text-muted-foreground" aria-hidden>
+      <LogoMark animate="always" />
+      {WAITING_LINES[line]}
+    </li>
+  );
+}
 
 function waitFor(seconds: number): string {
   const minutes = Math.ceil(seconds / 60);
@@ -125,11 +150,7 @@ export function ChatPanel({
                 </li>
               ),
             )}
-            {waiting ? (
-              <li className="animate-pulse text-muted-foreground" aria-hidden>
-                Reading the docs…
-              </li>
-            ) : null}
+            {waiting ? <Waiting /> : null}
           </ol>
         )}
         {error ? (
