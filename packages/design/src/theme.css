@@ -112,6 +112,25 @@
     transform: translateX(var(--spotlight-to));
   }
 }
+@keyframes meteor {
+  from {
+    transform: rotate(215deg) translateX(0);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: rotate(215deg) translateX(-500px);
+    opacity: 0;
+  }
+}
+@keyframes word-in {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
 
 @theme inline {
   --font-sans:
@@ -233,6 +252,22 @@
 @utility animate-spotlight-drift {
   animation: spotlight-drift var(--spotlight-duration, 3.5s) ease-in-out infinite alternate;
   /* Stopped outright: the global 0.01ms duration would flicker an infinite loop. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-meteor {
+  animation: meteor var(--meteor-duration, 5s) linear var(--meteor-delay, 0s) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    display: none;
+  }
+}
+
+@utility animate-word-in {
+  animation: word-in var(--word-in-duration, 0.5s) ease-out var(--word-in-delay, 0s) both;
+  /* The global override shortens duration but not delay, so later words would stay hidden. */
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }

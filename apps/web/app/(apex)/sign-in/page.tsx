@@ -7,6 +7,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Meteors,
+  TextGenerateEffect,
 } from "@pr-review/design";
 import { LogIn } from "lucide-react";
 import type { Metadata } from "next";
@@ -51,12 +53,15 @@ export default async function SignInPage({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      <Empty>
+      <Empty className="relative isolate overflow-hidden">
+        <Meteors number={12} className="-z-10" />
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <LogIn />
           </EmptyMedia>
-          <EmptyTitle>Reviews your agents wrote</EmptyTitle>
+          <EmptyTitle>
+            <TextGenerateEffect words="Reviews your agents wrote" />
+          </EmptyTitle>
           <EmptyDescription>
             Sign in with GitHub to see your organizations' repositories, reviews and
             findings.

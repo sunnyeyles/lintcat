@@ -48,6 +48,7 @@ export {
 } from "#src/components/empty";
 export { Input } from "#src/components/input";
 export { Label } from "#src/components/label";
+export { Meteors } from "#src/components/meteors";
 export { Progress } from "#src/components/progress";
 export {
   Select,
@@ -92,6 +93,7 @@ export {
   tabsListVariants,
   TabsTrigger,
 } from "#src/components/tabs";
+export { TextGenerateEffect } from "#src/components/text-generate-effect";
 export { Toggle, toggleVariants } from "#src/components/toggle";
 export { ToggleGroup, ToggleGroupItem } from "#src/components/toggle-group";
 export { Toolbar, ToolbarGroup } from "#src/components/toolbar";
