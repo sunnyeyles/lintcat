@@ -22,7 +22,7 @@ interface ProviderEntry {
 
 const PROVIDERS = {
   anthropic: {
-    defaultModel: "claude-haiku-4-5",
+    defaultModel: "claude-sonnet-5",
     apiKeyEnv: "ANTHROPIC_API_KEY",
     create: ({ apiKey, baseUrl, modelId }: ProviderCreateOptions) =>
       createAnthropic({
@@ -82,7 +82,7 @@ export function defaultModelFor(provider: ModelProvider): string {
 
 // A hosted repo's model choice, one level below the provider chosen by its key.
 const MODEL_CHOICES: Record<ModelProvider, readonly string[]> = {
-  anthropic: ["claude-haiku-4-5", "claude-sonnet-4-5"],
+  anthropic: ["claude-sonnet-5", "claude-haiku-4-5", "claude-sonnet-4-5"],
   openai: ["gpt-5.6-luna", "gpt-5.6-luna-mini"],
 };
 

@@ -85,6 +85,11 @@ SCIP, no second language.
 The on arm cost 1.5k input, 28k cache-write, 199k cache-read and 8.8k output
 tokens on the cross-file fixture alone.
 
+Every run now ends with a token-spend table — steps, the four token counters,
+an estimated cost and the assertion tally per fixture — and writes the same
+numbers to `evals/results/<time>-<provider>-<model>.json`. Commit the file
+when a run is meant as evidence, so a cost change has a before and an after.
+
 Until the control arm runs to completion, the on arm's pass is one sample and
 proves nothing on its own: the gate needs both halves.
 
@@ -92,11 +97,12 @@ proves nothing on its own: the gate needs both halves.
 
 - **No fixture requires a patch.** `patches-verify` catches a wrong patch but
   cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
-- **The Anthropic default model does not clear the suite.** On
-  `claude-haiku-4-5` the reviewer hits the turn cap or returns unparseable
-  JSON. Run Anthropic with `MODEL_ID=claude-sonnet-5`. Sonnet is not immune:
-  unparseable JSON on a fixture fails the whole fixture without saying anything
-  about recall.
+- **`claude-haiku-4-5` does not clear the suite**, which is why the Anthropic
+  default is now `claude-sonnet-5`. On Haiku the reviewer hits the turn cap or
+  returns prose; the forced final turn and the one repair turn soften both, but
+  neither has been measured on Haiku. Sonnet is not immune: a run that still
+  fails the repair turn fails the whole fixture without saying anything about
+  recall.
 - **One sample per arm.** A fixture is one non-deterministic review, so a
   single on-versus-off pair is a signal, not a measurement. Read the gate with
   that in mind, and repeat the pair before concluding the index does nothing.
@@ -119,6 +125,7 @@ fixture-client.ts      the reads a fixture can serve; publishing is undeclared,
 *.conformance.test.ts  the shared adapter suite, @pr-review/github/conformance
 unified-diff.ts        synthesises patches from the two trees
 run-fixture-review.ts  drives the real pipeline; only client and publish differ
+usage-report.ts        the token-spend table and results/ JSON every run writes
 model-access.ts        credentials, and the fail-fast before any spend
 *.test.ts              the harness's own unit tests, run by pnpm test
 ```

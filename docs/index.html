@@ -572,7 +572,7 @@ html { scroll-behavior: smooth; }
           <code>createLanguageModel</code> is the only place a provider is
           chosen. <code>packages/ai/src/model.ts</code> holds the registry —
           <code>openai</code> (the default, <code>gpt-5.6-luna</code>) and
-          <code>anthropic</code> (<code>claude-haiku-4-5</code>) — and every
+          <code>anthropic</code> (<code>claude-sonnet-5</code>) — and every
           model call in the run goes through
           <code>generateText</code> from the AI SDK against whichever it built.
         </p>
@@ -806,7 +806,7 @@ html { scroll-behavior: smooth; }
           <tbody>
             <tr><td><code>get_pull_request</code></td><td>Title, description, author, branches, SHAs</td></tr>
             <tr><td><code>list_changed_files</code></td><td>The changed-file list</td></tr>
-            <tr><td><code>get_diff</code></td><td>One changed file's patch by path, or the whole unified diff</td></tr>
+            <tr><td><code>get_diff</code></td><td>One changed file's patch by path; with no path, the changed-file list with patch sizes</td></tr>
             <tr><td><code>get_file</code></td><td>One file at the <strong>head</strong> SHA — the proposed state</td></tr>
             <tr><td><code>get_base_file</code></td><td>One file at the <strong>base</strong> SHA — before this PR</td></tr>
             <tr><td><code>search_repository</code></td><td>Code search with matching snippets and the repository-wide total, always scoped to this repository</td></tr>

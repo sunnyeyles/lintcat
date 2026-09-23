@@ -294,7 +294,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agent authenticates with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. With neither set, the step skips the review with a notice and succeeds. |
 | `model-provider` | no (default `openai`) | Which provider the agent calls: `openai` or `anthropic`. An unknown name fails the step before any model call. |
 | `github-token` | no (default `${{ github.token }}`) | Token for the eight read-only repository tools and for publishing the check run. |
-| `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-haiku-4-5`) | Model id, as the provider spells it. |
+| `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-sonnet-5`) | Model id, as the provider spells it. |
 | `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
 | `index` | no (default `true`) | Whether the review builds a [repository index](#repository-index) from the pull request's base commit before the agent starts. `false` turns it off. |
@@ -325,10 +325,12 @@ speaking its API — OpenAI is bound to Chat Completions rather than the
 Responses API for that reason. Adding a provider is an entry in `PROVIDERS`
 and nothing else.
 
-Prompt caching is requested on `anthropic` only — it is the provider whose API
-takes explicit cache breakpoints (`packages/ai/src/agents/runtime.ts`). On the
-default provider, `openai`, nothing is requested and the two cache counters stay
-at zero; that is expected, not a regression.
+Prompt caching is explicit on `anthropic`, the provider whose API takes cache
+breakpoints (`packages/ai/src/agents/runtime.ts`). On the default provider,
+`openai`, caching is automatic by prefix; every call of one review carries the
+same `prompt_cache_key`, so its turns are routed to the same cache. OpenAI
+reports cache reads but never cache writes, so that counter stays at zero
+there; that is expected, not a regression.
 
 ### What a review costs
 
@@ -359,8 +361,10 @@ collapses to zero, something above a breakpoint started varying between turns.
 
 ### Incremental review
 
-Off by default. Turning it on narrows what the agent reads on a push to a pull
-request they have already reviewed:
+Off by default in the Action; on by default in hosted mode, where the worker
+reviews every push and `REVIEW_INCREMENTAL=false` turns it off. Turning it on
+narrows what the agent reads on a push to a pull request they have already
+reviewed:
 
 ```yaml
         with:

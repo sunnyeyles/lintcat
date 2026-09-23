@@ -46,7 +46,7 @@ inputs:
   model:
     description: >-
       Model id, as the selected provider spells it. Leave empty for the provider's default
-      (gpt-5.6-luna on openai, claude-haiku-4-5 on anthropic).
+      (gpt-5.6-luna on openai, claude-sonnet-5 on anthropic).
     required: false
     default: ""
   model-base-url:

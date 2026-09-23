@@ -10,7 +10,7 @@ import {
   errorName,
   type StructuredLogger,
 } from "@pr-review/logging";
-import { generateText, isStepCount } from "ai";
+import { generateText, isStepCount, type ModelMessage } from "ai";
 
 import {
   buildReviewSystemPrompt,
@@ -26,6 +26,7 @@ import {
   renderRepository,
   renderRepositoryIndex,
 } from "#src/agents/repository-index";
+import { buildOpeningDiff, renderOmitted } from "#src/agents/opening-diff";
 import { createReviewTools, type ReviewToolsClient } from "#src/agents/tools";
 import { truncateWithMarker } from "#src/agents/truncate";
 import {
@@ -39,6 +40,8 @@ import {
 export interface AgentUsageReport {
   agent: string;
   durationMs: number;
+  steps: number;
+  salvaged: boolean;
   usage: TokenUsage;
 }
 
@@ -56,22 +59,40 @@ const DEFAULT_MAX_TURNS = 12;
 /** Output budget per model call (response text + tool requests). */
 const MAX_OUTPUT_TOKENS = 16_000;
 
-/** The opening message embeds at most this much of the diff. */
-const MAX_DIFF_CHARS = 80_000;
-
 /** The opening message lists at most this many changed files. */
 const MAX_LISTED_FILES = 300;
+
+/** The opening message carries at most this much of the description. */
+const MAX_DESCRIPTION_CHARS = 4_000;
 
 /** Anthropic honours this on a message and at call level; OpenAI ignores it. */
 const CACHE_BREAKPOINT = {
   anthropic: { cacheControl: { type: "ephemeral" as const } },
 };
 
-function truncateDiff(diff: string): string {
+function callProviderOptions(context: ReviewContext, category: string) {
+  const { owner, repo, pullRequest } = context;
+  return {
+    ...CACHE_BREAKPOINT,
+    openai: {
+      promptCacheKey: `pr-review:${owner}/${repo}:${pullRequest.number}:${pullRequest.headSha.slice(0, 12)}:${category}`,
+    },
+  };
+}
+
+/** Sent on the final allowed turn, with tool use switched off. */
+const FINAL_TURN_NUDGE =
+  "This is your last turn and tools are no longer available. Return the findings JSON now, from what you have already read.";
+
+function repairNudge(error: string): string {
+  return `Your last message was not valid findings JSON (${error}). Reply with only the JSON object described under Output.`;
+}
+
+function truncateDescription(body: string): string {
   return truncateWithMarker(
-    diff,
-    MAX_DIFF_CHARS,
-    "\n[... diff truncated; call get_diff with a path for one file's whole patch]",
+    body,
+    MAX_DESCRIPTION_CHARS,
+    "\n[... description truncated; get_pull_request returns it whole]",
   );
 }
 
@@ -94,7 +115,8 @@ function buildOpeningMessage(
   context: ReviewContext,
   index: RepositoryIndex | undefined,
 ): string {
-  const { pullRequest, changedFiles, diff } = context;
+  const { pullRequest, changedFiles } = context;
+  const opening = buildOpeningDiff(changedFiles);
   const files = changedFiles
     .slice(0, MAX_LISTED_FILES)
     .map(
@@ -114,18 +136,19 @@ function buildOpeningMessage(
     `Author: ${pullRequest.author ?? "unknown"}`,
     `Branches: ${pullRequest.baseRef} <- ${pullRequest.headRef}`,
     "Description:",
-    pullRequest.body ?? "(no description)",
+    truncateDescription(pullRequest.body ?? "(no description)"),
     "</pull_request>",
     "",
     "<changed_files>",
     ...files,
     "</changed_files>",
     "",
+    ...renderOmitted(opening.omitted),
     ...renderRepository(index),
     ...renderRepositoryIndex(index, changedFiles, MAX_LISTED_FILES),
     "",
     "<diff>",
-    truncateDiff(diff),
+    opening.diff,
     "</diff>",
   ].join("\n");
 }
@@ -186,6 +209,15 @@ export function createReviewAgent(
       const startedAt = Date.now();
       // Outside the try: a mid-loop API error still reports its spend.
       let usage = emptyTokenUsage();
+      let steps = 0;
+      let salvaged = false;
+      const report = (durationMs: number): AgentUsageReport => ({
+        agent: agent.category,
+        durationMs,
+        steps,
+        salvaged,
+        usage,
+      });
 
       // Active, not detached: the SDK's model spans nest under this one, so
       // their cost lands on the agent trace instead of a trace of its own.
@@ -207,29 +239,43 @@ export function createReviewAgent(
           });
 
           try {
-            const result = await generateText({
+            const call = {
               model,
               abortSignal: context.signal,
               // The system breakpoint pins the shared prefix, tools included;
               // the call-level one below follows the growing tail.
               instructions: {
-                role: "system",
+                role: "system" as const,
                 content: systemPrompt,
                 providerOptions: CACHE_BREAKPOINT,
               },
-              messages: [
-                {
-                  role: "user",
-                  content: buildOpeningMessage(context, deps.index),
-                },
-              ],
               tools: createReviewTools(deps.github, context, deps.index),
-              stopWhen: isStepCount(maxTurns),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
-              providerOptions: CACHE_BREAKPOINT,
+              providerOptions: callProviderOptions(context, agent.category),
               telemetry: { functionId: `review-agent-${agent.category}` },
-              onStepEnd: (step) => {
+              onStepEnd: (step: { usage: Parameters<typeof toTokenUsage>[0] }) => {
+                steps += 1;
                 usage = addTokenUsage(usage, toTokenUsage(step.usage));
+              },
+            };
+            const opening: ModelMessage = {
+              role: "user",
+              content: buildOpeningMessage(context, deps.index),
+            };
+
+            const result = await generateText({
+              ...call,
+              messages: [opening],
+              stopWhen: isStepCount(maxTurns),
+              prepareStep: ({ stepNumber, messages }) => {
+                if (stepNumber !== maxTurns - 1) {
+                  return undefined;
+                }
+                salvaged = true;
+                return {
+                  toolChoice: "none" as const,
+                  messages: [...messages, { role: "user", content: FINAL_TURN_NUDGE }],
+                };
               },
             });
 
@@ -240,12 +286,26 @@ export function createReviewAgent(
               );
             }
 
-            const output = extractAgentOutput(result.text);
+            let output = extractAgentOutput(result.text);
             if (!output.ok) {
-              throw new AgentRunError(
-                `${agent.category} agent produced invalid findings output ` +
-                  `(stop reason: ${result.rawFinishReason ?? "unknown"}): ${output.error}`,
-              );
+              const repaired = await generateText({
+                ...call,
+                messages: [
+                  opening,
+                  ...result.response.messages,
+                  { role: "user", content: repairNudge(output.error) },
+                ],
+                toolChoice: "none",
+                stopWhen: isStepCount(1),
+              });
+              output = extractAgentOutput(repaired.text);
+              if (!output.ok) {
+                throw new AgentRunError(
+                  `${agent.category} agent produced invalid findings output after one repair turn ` +
+                    `(stop reason: ${repaired.rawFinishReason ?? "unknown"}): ${output.error}`,
+                );
+              }
+              logger.info("agent.repaired", eventFields);
             }
             // Cross-category findings are dropped, never re-stamped.
             const findings = output.findings.filter(
@@ -256,13 +316,17 @@ export function createReviewAgent(
             logger.info("agent.completed", {
               ...eventFields,
               durationMs,
+              steps,
+              salvaged,
               ...usage,
               findingCount: findings.length,
             });
-            deps.onUsage?.({ agent: agent.category, durationMs, usage });
+            deps.onUsage?.(report(durationMs));
             agentObservation.update({
               output: { findingCount: findings.length },
               metadata: {
+                steps,
+                salvaged,
                 ...usage,
               },
             });
@@ -272,6 +336,8 @@ export function createReviewAgent(
             const fields = {
               ...eventFields,
               durationMs,
+              steps,
+              salvaged,
               ...usage,
               error: errorMessage(error),
               errorName: errorName(error),
@@ -281,11 +347,13 @@ export function createReviewAgent(
             } else {
               logger.error("agent.failed", fields);
             }
-            deps.onUsage?.({ agent: agent.category, durationMs, usage });
+            deps.onUsage?.(report(durationMs));
             agentObservation.update({
               level: "ERROR",
               statusMessage: errorMessage(error),
               metadata: {
+                steps,
+                salvaged,
                 ...usage,
               },
             });

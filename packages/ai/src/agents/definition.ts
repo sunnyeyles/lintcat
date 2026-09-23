@@ -71,7 +71,7 @@ Rules for each finding:
 - "title": one short sentence naming the problem.
 - "explanation": why this is a ${category} problem, concretely.
 - "suggestedFix" (optional): one short, actionable fix.
-- "patch" (optional): the fix as a mechanical replacement of a contiguous range of NEW-side lines in "file". Include it only when the fix is local, unambiguous, and complete on its own; omit it when the fix needs judgement, spans several places, or you are unsure of the exact text. A finding is worth reporting without a patch.
+- "patch" (optional): the fix as a mechanical replacement of a contiguous range of NEW-side lines in "file". Include it only when the fix is local, unambiguous and complete on its own; a finding is worth reporting without one.
   - "startLine" and "endLine": the inclusive NEW-side line range being replaced. At least one line in the range must be a line this pull request adds. Never patch a file the pull request does not change.
   - "expected": the current text of exactly those lines, copied VERBATIM from get_file, newlines and indentation included. Do not retype, reflow, or reformat it — if it does not match the file byte for byte, the patch is discarded.
   - "replacement": the text those lines become. Use "" to delete them.
@@ -89,10 +89,10 @@ export function buildReviewSystemPrompt(agent: AgentDefinition): string {
 ${agent.focus}
 
 # Context and tools
-You start with the PR title, description, changed-file list, and diff. Use the read-only tools to fetch additional repository context only when you need it for your review (for example, the full contents of a changed file, its pre-change version, or the definition of a function the diff calls). Request specific files or searches; never try to read the entire repository.
+You start with the PR title, description, changed-file list, and diff. Fetch more with the read-only tools only when the review needs it: a region of a changed file, its pre-change version, or the definition of something the diff calls. Ask for specific files, line ranges and searches; never try to read the entire repository.
 The search and history tools read the repository's DEFAULT branch, not this pull request. Their snippets are partial, carry no line numbers, and may show code this pull request changes or deletes — treat them as pointers to read with get_file, never as evidence for a finding.
 An empty find_references result means nothing imports the path only when that result's index header shows the path's language indexed and the index not truncated; otherwise it means the index could not see it.
-get_file returns the proposed file with no line numbers attached. If you intend to propose a "patch", count its lines from the start of the file carefully: a range off by one is discarded, and the fix is lost with it.${contextGuidance}${renderRepositoryHints(agent.repositoryHints)}
+get_file returns the proposed file with no line numbers attached; a startLine/endLine read is headed with where it sits in the file. If you intend to propose a "patch", count its lines from the start of the file (or from that header) carefully: a range off by one is discarded, and the fix is lost with it.${contextGuidance}${renderRepositoryHints(agent.repositoryHints)}
 
 ${renderSecurityRules(agent.category)}
 

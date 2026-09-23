@@ -12,7 +12,7 @@ export const REPO_REVIEW_MODES: Record<RepoReviewMode, string> = {
 
 /** The models a repo may choose per provider; a test keeps this in step with @pr-review/ai. */
 export const REPO_MODEL_CHOICES: Record<ModelKeyProvider, readonly string[]> = {
-  anthropic: ["claude-haiku-4-5", "claude-sonnet-4-5"],
+  anthropic: ["claude-sonnet-5", "claude-haiku-4-5", "claude-sonnet-4-5"],
   openai: ["gpt-5.6-luna", "gpt-5.6-luna-mini"],
 };
 

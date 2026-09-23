@@ -39,7 +39,12 @@ import {
 type ScriptedResponse = ReturnType<typeof message>;
 
 /** One provider-level call as the SDK assembled it. */
-type Call = { prompt: unknown[]; tools?: unknown[]; providerOptions?: unknown };
+type Call = {
+  prompt: unknown[];
+  tools?: unknown[];
+  providerOptions?: unknown;
+  toolChoice?: unknown;
+};
 
 const generalAgent = GENERAL_AGENT;
 
@@ -51,17 +56,22 @@ function systemOf(call: Call | undefined): string {
   return String((system as { content?: string } | undefined)?.content ?? "");
 }
 
-/** The opening user text of one recorded call. */
-function openingOf(call: Call | undefined): string {
-  const user = (call?.prompt ?? []).find(
+function userTextOf(call: Call | undefined, which: "first" | "last"): string {
+  const users = (call?.prompt ?? []).filter(
     (entry) => (entry as { role?: string }).role === "user",
   );
+  const user = which === "first" ? users[0] : users[users.length - 1];
   const parts = (user as { content?: { type: string; text?: string }[] })
     ?.content;
   return (parts ?? [])
     .filter((part) => part.type === "text")
     .map((part) => part.text ?? "")
     .join("");
+}
+
+/** The opening user text of one recorded call. */
+function openingOf(call: Call | undefined): string {
+  return userTextOf(call, "first");
 }
 
 function toolNamesOf(call: Call | undefined): string[] {
@@ -156,7 +166,7 @@ describe("the review agent", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 
-  it("opens with the PR title, description, changed files, and diff", async () => {
+  it("opens with the PR title, description, changed files, and each file's patch", async () => {
     const { agent, calls } = makeAgent([
       message([textBlock(finalJson)], "end_turn"),
     ]);
@@ -168,6 +178,44 @@ describe("the review agent", () => {
     expect(opening).toContain(pullRequest.body);
     expect(opening).toContain("src/sessions.ts");
     expect(opening).toContain("user.isAdmin = true");
+    expect(opening).not.toContain("Omitted from the diff");
+  });
+
+  it("leaves lockfiles and binaries out of the diff, and says so", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run({
+      ...context,
+      changedFiles: [
+        ...context.changedFiles,
+        { filename: "pnpm-lock.yaml", status: "modified", additions: 900, deletions: 900, patch: "+lockfile churn" },
+        { filename: "docs/logo.png", status: "added", additions: 0, deletions: 0 },
+      ],
+    });
+
+    const opening = openingOf(calls[0]);
+    expect(opening).toContain("user.isAdmin = true");
+    expect(opening).not.toContain("lockfile churn");
+    expect(opening).toContain(
+      "Omitted from the diff below (a patch is still available through get_diff with the path, a file through get_file): pnpm-lock.yaml (generated), docs/logo.png (binary)",
+    );
+  });
+
+  it("caps the description and points at get_pull_request for the rest", async () => {
+    const { agent, calls } = makeAgent([
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run({
+      ...context,
+      pullRequest: { ...pullRequest, body: "x".repeat(5_000) },
+    });
+
+    const opening = openingOf(calls[0]);
+    expect(opening).toContain("x".repeat(4_000) + "\n[... description truncated; get_pull_request returns it whole]");
+    expect(opening).not.toContain("x".repeat(4_001));
   });
 
   it("says the diff is narrowed, and where the rest of the pull request is", async () => {
@@ -178,6 +226,15 @@ describe("the review agent", () => {
     await agent.run({
       ...context,
       diff: "@@ -2 +2 @@\n+const limit = 0;\n",
+      changedFiles: [
+        {
+          filename: "src/limits.ts",
+          status: "modified",
+          additions: 1,
+          deletions: 1,
+          patch: "@@ -2 +2 @@\n+const limit = 0;",
+        },
+      ],
       incremental: {
         sinceSha: "old111",
         diff: context.diff,
@@ -371,12 +428,55 @@ describe("the review agent", () => {
     await expect(agent.run(context)).resolves.toEqual([finding]);
   });
 
-  it("rejects with AgentRunError when the final message is not valid findings JSON", async () => {
-    const { agent } = makeAgent([
+  it("repairs a final message that is not findings JSON with one tool-free turn", async () => {
+    const { agent, calls, create, entries } = makeAgent([
       message([textBlock("I found several bugs, here they are in prose.")], "end_turn"),
+      message([textBlock(finalJson)], "end_turn"),
     ]);
 
-    await expect(agent.run(context)).rejects.toThrow(AgentRunError);
+    await expect(agent.run(context)).resolves.toEqual([finding]);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(calls[1]?.toolChoice).toEqual({ type: "none" });
+    expect(userTextOf(calls[1], "last")).toMatch(/not valid findings JSON/);
+    expect(openingOf(calls[1])).toBe(openingOf(calls[0]));
+    expect(entries.map((entry) => entry.event)).toEqual([
+      "agent.started",
+      "agent.repaired",
+      "agent.completed",
+    ]);
+  });
+
+  it("rejects with AgentRunError when the repair turn is not findings JSON either", async () => {
+    const { agent, create } = makeAgent([
+      message([textBlock("prose")], "end_turn"),
+      message([textBlock("more prose")], "end_turn"),
+    ]);
+
+    await expect(agent.run(context)).rejects.toThrow(/after one repair turn/);
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it("forces a tool-free final turn at the cap and returns its findings", async () => {
+    const { agent, calls, create, entries } = makeAgent(
+      [
+        message([toolUseBlock("toolu_1", "get_diff", {})], "tool_use"),
+        message([textBlock(finalJson)], "end_turn"),
+      ],
+      { maxTurns: 2 },
+    );
+
+    await expect(agent.run(context)).resolves.toEqual([finding]);
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(calls[0]?.toolChoice).toEqual({ type: "auto" });
+    expect(calls[1]?.toolChoice).toEqual({ type: "none" });
+    expect(userTextOf(calls[1], "last")).toMatch(/last turn/);
+    expect(entries[entries.length - 1]).toMatchObject({
+      event: "agent.completed",
+      salvaged: true,
+      steps: 2,
+    });
   });
 
   it("rejects with AgentRunError when the max-turns cap is exceeded", async () => {
@@ -482,6 +582,7 @@ describe("lifecycle events (spec §26)", () => {
       level: "info",
       event: "agent.completed",
       ...correlation,
+      steps: 2,
       inputTokens: 350,
       outputTokens: 35,
       findingCount: 1,
@@ -494,6 +595,10 @@ describe("lifecycle events (spec §26)", () => {
       message([textBlock("prose, not JSON")], "end_turn", {
         inputTokens: 80,
         outputTokens: 8,
+      }),
+      message([textBlock("still prose")], "end_turn", {
+        inputTokens: 90,
+        outputTokens: 9,
       }),
     ]);
 
@@ -509,8 +614,9 @@ describe("lifecycle events (spec §26)", () => {
       event: "agent.failed",
       ...correlation,
       errorName: "AgentRunError",
-      inputTokens: 80,
-      outputTokens: 8,
+      steps: 2,
+      inputTokens: 170,
+      outputTokens: 17,
     });
     expect(failed?.["error"]).toMatch(/invalid findings output/i);
     expect(typeof failed?.["durationMs"]).toBe("number");
@@ -583,6 +689,7 @@ describe("lifecycle events (spec §26)", () => {
       event: "agent.failed",
       ...correlation,
       errorName: "AgentRunError",
+      steps: 2,
       inputTokens: 80,
       outputTokens: 8,
     });
@@ -623,6 +730,8 @@ describe("the onUsage callback", () => {
       {
         agent: "general",
         durationMs: expect.any(Number),
+        steps: 2,
+        salvaged: false,
         usage: {
           inputTokens: 350,
           cacheCreationInputTokens: 4_000,
@@ -633,11 +742,15 @@ describe("the onUsage callback", () => {
     ]);
   });
 
-  it("reports the usage burned so far when the run fails", async () => {
+  it("reports the usage burned so far when the run fails, repair turn included", async () => {
     const { agent, reports } = makeCollecting([
       message([textBlock("prose, not JSON")], "end_turn", {
         inputTokens: 80,
         outputTokens: 8,
+      }),
+      message([textBlock("still prose")], "end_turn", {
+        inputTokens: 90,
+        outputTokens: 9,
       }),
     ]);
 
@@ -647,11 +760,13 @@ describe("the onUsage callback", () => {
       {
         agent: "general",
         durationMs: expect.any(Number),
+        steps: 2,
+        salvaged: false,
         usage: {
-          inputTokens: 80,
+          inputTokens: 170,
           cacheCreationInputTokens: 0,
           cacheReadInputTokens: 0,
-          outputTokens: 8,
+          outputTokens: 17,
         },
       },
     ]);
@@ -664,6 +779,7 @@ describe("the onUsage callback", () => {
     await expect(agent.run(context)).rejects.toThrow("529 overloaded");
 
     expect(reports.map((report) => report.usage)).toEqual([emptyTokenUsage()]);
+    expect(reports.map((report) => report.steps)).toEqual([0]);
   });
 });
 
@@ -693,10 +809,27 @@ describe("prompt caching", () => {
     await agent.run(context);
 
     for (const call of calls) {
-      expect(call.providerOptions).toEqual({
+      expect(call.providerOptions).toMatchObject({
         anthropic: { cacheControl: { type: "ephemeral" } },
       });
     }
+  });
+
+  it("gives OpenAI one prompt cache key per review, the same on every turn", async () => {
+    const { agent, calls } = makeAgent([
+      message([toolUseBlock("toolu_1", "get_diff", {})], "tool_use"),
+      message([textBlock(finalJson)], "end_turn"),
+    ]);
+
+    await agent.run(context);
+
+    const keys = calls.map(
+      (call) => (call.providerOptions as { openai?: { promptCacheKey?: string } }).openai?.promptCacheKey,
+    );
+    expect(keys).toEqual([
+      `pr-review:octo-org/example-service:42:${headSha.slice(0, 12)}:general`,
+      `pr-review:octo-org/example-service:42:${headSha.slice(0, 12)}:general`,
+    ]);
   });
 
   it("sends a byte-identical prefix between turns, so the cache can hit", async () => {

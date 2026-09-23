@@ -19,6 +19,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
 import type { ReviewContext } from "#src/agent-contract";
+import { sliceLines } from "#src/agents/file-slice";
 import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
 import { truncateWithMarker } from "#src/agents/truncate";
 
@@ -28,12 +29,13 @@ export type ReviewToolsClient = PullRequestReadClient &
   Partial<Pick<RepositoryHistoryClient, "listCommitFiles">>;
 
 /** Tool results larger than this are truncated to bound token usage. */
-const MAX_TOOL_RESULT_CHARS = 50_000;
+const MAX_TOOL_RESULT_CHARS = 32_000;
 
 // Bounded by the search module's caps, not by truncate(): truncation would cut the JSON mid-string.
 export const MAX_SEARCH_MATCHES = SEARCH_LIMITS.maxMatches;
 
-const TRUNCATION_MARKER = "\n[... truncated: result exceeded the size limit]";
+const TRUNCATION_MARKER =
+  "\n[... truncated: result exceeded the size limit; read the rest with startLine and endLine]";
 
 function truncate(content: string): string {
   return truncateWithMarker(content, MAX_TOOL_RESULT_CHARS, TRUNCATION_MARKER);
@@ -50,8 +52,6 @@ function renderSearchResult(result: CodeSearchResult): string {
         snippets: boundSnippets(match.snippets),
       })),
     },
-    null,
-    2,
   );
 }
 
@@ -124,6 +124,42 @@ function tallyCoChanges(
 
 const emptyInputSchema = z.strictObject({});
 
+const lineNumberSchema = z.number().int().min(1);
+
+/** A file read: whole, or one 1-based inclusive line range of it. */
+const fileReadSchema = z
+  .strictObject({
+    path: repositoryPathSchema,
+    startLine: lineNumberSchema
+      .optional()
+      .describe("First line to return, 1-based; omit with endLine for the whole file."),
+    endLine: lineNumberSchema
+      .optional()
+      .describe("Last line to return, inclusive; omit for everything from startLine on."),
+  })
+  .refine(
+    ({ startLine, endLine }) =>
+      startLine === undefined || endLine === undefined || endLine >= startLine,
+    { message: "endLine must not be before startLine" },
+  );
+
+const RANGE_HINT =
+  " Pass startLine and endLine to read one region: the result is headed " +
+  "[lines a-b of n], and the lines keep their file numbering.";
+
+/** One line per changed file, sized, in place of a diff the model already has. */
+function renderPatchIndex(changedFiles: readonly ChangedFile[]): string {
+  const lines = changedFiles.map(
+    (file) =>
+      `${file.filename}  ${file.status}  +${file.additions} -${file.deletions}  ` +
+      (file.patch === undefined ? "no patch" : `patch: ${file.patch.length} chars`),
+  );
+  return [
+    `${changedFiles.length} changed file(s); call get_diff with a path for one patch.`,
+    ...lines,
+  ].join("\n");
+}
+
 /** One changed file's patch; a file outside the PR, or without one, is an error. */
 function patchFor(changedFiles: readonly ChangedFile[], path: string): string {
   const file = changedFiles.find((entry) => entry.filename === path);
@@ -176,7 +212,7 @@ export function createReviewTools(
         "Get the pull request's title, description, author, branches, and commit SHAs as JSON.",
       inputSchema: emptyInputSchema,
       async execute() {
-        return truncate(JSON.stringify(context.pullRequest, null, 2));
+        return truncate(JSON.stringify(context.pullRequest));
       },
     }),
     list_changed_files: tool({
@@ -192,54 +228,64 @@ export function createReviewTools(
             deletions,
           }),
         );
-        return truncate(JSON.stringify(listed, null, 2));
+        return truncate(JSON.stringify(listed));
       },
     }),
     get_diff: tool({
       description:
-        "Get one changed file's whole patch by path, or the full unified diff with no path. " +
-        "Prefer a path: the full diff was truncated in the opening message only if it is long, " +
-        "and a single patch is never cut short.",
+        "Get one changed file's whole patch by path, never cut short. With no path it lists " +
+        "every changed file with its patch size instead: the opening message already carried " +
+        "the diff, so it is not sent again.",
       inputSchema: z.strictObject({
         path: repositoryPathSchema
           .optional()
-          .describe("A changed file's path for its patch alone; omit for the whole diff."),
+          .describe("A changed file's path for its patch; omit to list the changed files."),
       }),
       async execute({ path }) {
         return truncate(
-          path === undefined ? whole.diff : patchFor(whole.changedFiles, path),
+          path === undefined
+            ? renderPatchIndex(whole.changedFiles)
+            : patchFor(whole.changedFiles, path),
         );
       },
     }),
     get_file: tool({
       description:
         "Read one file's contents at the pull request's HEAD commit (the proposed state). " +
-        'The path is relative to the repository root, e.g. "src/index.ts".',
-      inputSchema: z.strictObject({ path: repositoryPathSchema }),
-      async execute({ path }) {
+        'The path is relative to the repository root, e.g. "src/index.ts".' +
+        RANGE_HINT,
+      inputSchema: fileReadSchema,
+      async execute({ path, startLine, endLine }) {
         return truncate(
-          await github.getFileContents({
-            owner,
-            repo,
-            path,
-            ref: context.pullRequest.headSha,
-          }),
+          sliceLines(
+            await github.getFileContents({
+              owner,
+              repo,
+              path,
+              ref: context.pullRequest.headSha,
+            }),
+            { startLine, endLine },
+          ),
         );
       },
     }),
     get_base_file: tool({
       description:
         "Read one file's contents at the pull request's BASE commit (the state before this PR). " +
-        'The path is relative to the repository root, e.g. "src/index.ts".',
-      inputSchema: z.strictObject({ path: repositoryPathSchema }),
-      async execute({ path }) {
+        'The path is relative to the repository root, e.g. "src/index.ts".' +
+        RANGE_HINT,
+      inputSchema: fileReadSchema,
+      async execute({ path, startLine, endLine }) {
         return truncate(
-          await github.getFileContents({
-            owner,
-            repo,
-            path,
-            ref: context.pullRequest.baseSha,
-          }),
+          sliceLines(
+            await github.getFileContents({
+              owner,
+              repo,
+              path,
+              ref: context.pullRequest.baseSha,
+            }),
+            { startLine, endLine },
+          ),
         );
       },
     }),
@@ -317,8 +363,6 @@ export function createReviewTools(
             commitsSkippedAsSweeps: commits.length - examined.length,
             coChanged,
           },
-          null,
-          2,
         );
       },
     }),
