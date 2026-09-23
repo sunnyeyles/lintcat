@@ -17,7 +17,7 @@ describe("docsNeighbours", () => {
   });
 
   it("reads across sections", () => {
-    const { previous, next } = docsNeighbours("/docs/trust-boundary");
+    const { previous, next } = docsNeighbours("/docs/security");
     expect(previous?.href).toBe("/docs/how-it-works");
     expect(next?.href).toBe("/docs/mcp-server");
   });

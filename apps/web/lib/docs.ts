@@ -34,9 +34,9 @@ export const DOCS_NAV: DocsSection[] = [
         summary: "What it looks for, and how it differs.",
       },
       {
-        href: "/docs/trust-boundary",
-        title: "The trust boundary",
-        summary: "Model output is untrusted data until validation has passed it.",
+        href: "/docs/security",
+        title: "Security",
+        summary: "What LintCat can access, and what it never does.",
       },
     ],
   },
