@@ -31,8 +31,10 @@ decides what actually gets published.
 
 **What it deliberately stays silent about.** The agent is told not to report
 style, formatting, naming, micro-optimisations, missing documentation for new
-work, or architectural preferences — those categories are discarded rather
-than ranked down. It is told to report a problem only after reading the code,
+work, or design opinions it cannot tie to a caller, an existing helper or a
+documented rule — those categories are discarded rather than ranked down. It
+does report dead files and exports, duplicated helpers, and imports that cross
+a documented layer boundary. It is told to report a problem only after reading the code,
 and to prefer a few serious findings over many small ones.
 
 **What the code enforces, with no model in the path**

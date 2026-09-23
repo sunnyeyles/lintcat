@@ -5,29 +5,38 @@
 
 The harness itself is not model-backed, and `pnpm test` covers it: the
 `*.test.ts` files beside the sources below run in the fast suite, so a bug in
-diff construction or fixture loading fails there rather than showing up as a
-quality regression in the paid run. `vitest.config.ts` is that project;
-`vitest.eval.config.ts` still matches only `*.eval.ts`.
+diff construction, fixture loading or an anchor fails there rather than
+showing up as a quality regression in the paid run. `vitest.config.ts` is that
+project; `vitest.eval.config.ts` still matches only `*.eval.ts`.
 
 ## What is evaluated
 
-Seven fixtures, nine assertions. Six are recall signals, one per planted
-problem; the rest are precision signals.
+Codebase architecture: dead code, duplication and layering. Five fixtures,
+seven assertions. Four are recall signals, one per planted problem; the rest
+are precision signals.
 
-| Fixture | Assertion | Signal |
-| --- | --- | --- |
-| `security-tenant-scope` | a finding lands on `findCustomerById` or `getCustomer` | recall |
-| `security-tenant-scope` | every proposed patch matches the file at head | precision |
-| `correctness-admin-check` | a finding lands on `getAuditEvents` | recall |
-| `correctness-cross-file-caller` | a finding lands on `ShippingQuote` or `quoteShipment` | recall |
-| `test-coverage-untested-branch` | a finding lands on `BULK_PARCEL_RATE` or `applyDiscount` | recall |
-| `performance-n-plus-one` | a finding lands on `buildOrderSummary` | recall |
-| `docs-drift-retry-budget` | a finding lands on `RETRY_BUDGET_ENV` or `withRetryBudget` | recall |
-| `clean-pagination` | zero findings | precision |
-| `clean-pagination` | every proposed patch matches the file at head | precision |
+Every fixture is the same small billing API (`ledgerly/billing-api`): routes,
+services, data and db layers, with the boundaries written down in its
+`ARCHITECTURE.md`. Each pull request adds one architecture problem to it.
+
+| Fixture | Planted problem | Assertion | Signal |
+| --- | --- | --- | --- |
+| `architecture-dead-module` | the route switches to a new PDF renderer and `src/pdf/legacy-template.ts` is left with no importer | a finding lands on the new import in `invoice-pdf.ts` or the head of `render-invoice.ts` | recall |
+| `architecture-duplicate-helper` | a new reminder email builds its own `formatAmount`, a copy of `formatMoney` in `src/lib/money.ts` | a finding lands on `formatAmount` | recall |
+| `architecture-duplicate-helper` | | every proposed patch matches the file at head | precision |
+| `architecture-layer-bypass` | a new CSV route imports `db` directly, past the service layer, and so drops its voided-invoice rule | a finding lands on the import or the query | recall |
+| `architecture-dead-export` | the last caller of `daysOverdue` moves to a new `agingBucket` that repeats the same arithmetic, and the export stays | a finding lands on `src/lib/dates.ts` or the new import in `collections.ts` | recall |
+| `clean-shared-money-format` | none: two drifted formatters become one shared helper that imports from a file outside the diff | zero findings | precision |
+| `clean-shared-money-format` | | every proposed patch matches the file at head | precision |
 
 A review whose agent fails throws, so a crashed run fails the whole fixture
 rather than reading as a quality result.
+
+Three of the four recall fixtures cannot be solved from the diff alone. The
+dead module and the dead export are only dead if nothing else imports them,
+and `formatMoney` is only a duplicate once the reviewer has found it. The
+reviewer has to use `find_references` and `search_repository` to see any of
+the three.
 
 `patches-verify` is precision only: proposing no patch passes it. What fails is
 a patch whose quoted `expected` lines do not match the file, which is the one
@@ -35,84 +44,73 @@ thing about a fix a unit test cannot check — whether the model counted lines
 correctly against a real tree.
 
 The clean fixture is what makes the other assertions mean anything. A reviewer
-that reports nothing passes `clean-pagination` and fails every recall
-assertion; one that reports everything passes every recall assertion and fails
-`clean-pagination`. Only both halves together constrain recall and precision.
+that reports nothing passes it and fails every recall assertion; one that
+reports everything passes every recall assertion and fails it. It is built
+around the false positive the reviewer has actually produced: calling an
+import missing because the module it names sits outside the diff.
+`src/lib/money.ts` imports `minorUnits` from `src/lib/currency.ts`, which the
+pull request never touches.
 
 Assertions match on location, never wording — see `expectations.ts`. Anchors
-must match exactly one line of a changed file, so a fixture edit that moves the
-planted bug fails loudly instead of silently passing. The one reviewer stamps
-`general` on every finding, so category is not judged.
+must match exactly one line of a changed file, and `cases.test.ts` resolves
+every one of them in `pnpm test`. A fixture edit that moves a planted problem
+therefore fails there, not in a paid run. Validation drops a finding whose line
+is not an added line, so a finding on unchanged code in an anchored file only
+counts when it is file-level. The one reviewer stamps `general` on every
+finding, so category is not judged.
 
 ## The repository-index gate
 
 The index is kept only if it is measured to help, and this is where that is
 decided.
 
-**The fixture.** `correctness-cross-file-caller` plants a bug no reader of the
-diff can see. The pull request changes `ShippingQuote.total` in
-`src/pricing/quote.ts` from a formatted string to a `Money` value and edits an
-unrelated second file, `src/http/access-log.ts`. The bug is in a third file the
-pull request never touches: `src/notifications/quote-email.ts` passes
-`quote.total` straight into a template renderer that stringifies whatever it is
-given, so the customer's email reads `SwiftPost can take your parcel for
-[object Object].` `tsc` is clean on both trees — the renderer takes
-`Record<string, unknown>` — so nothing but reading the untouched caller finds
-it. Every import in the fixture is relative, so the fixture does not depend on
-alias resolution.
+**The fixture.** `architecture-dead-module`. The pull request swaps the import
+in `src/routes/invoice-pdf.ts` from `../pdf/legacy-template.js` to a new
+`../pdf/render-invoice.js`. Whether the old module is now dead depends on every
+other file in the repository, and the diff shows none of them. Every import in
+the fixture is relative, so the fixture does not depend on alias resolution.
 
 **The control switch.** `EVAL_INDEX=off` makes the fixture client report the
 archive unavailable. `buildReviewIndex` then logs `index.failed` and returns
-undefined, so the reviewer gets the absent one-liner and fall back to the other
-tools. The identical suite runs on one changed variable.
+undefined, so the reviewer gets the absent one-liner and falls back to the
+other tools. The identical suite runs on one changed variable.
 
 ```bash
 MODEL_PROVIDER=anthropic MODEL_ID=claude-sonnet-5 pnpm eval                 # index on
 MODEL_PROVIDER=anthropic MODEL_ID=claude-sonnet-5 EVAL_INDEX=off pnpm eval  # control
 ```
 
-**The gate.** Recall on `correctness-cross-file-caller` with the index on
-versus off. If it does not move, the feature stops here: no persistence, no
-SCIP, no second language.
+**The gate.** Recall on `architecture-dead-module` with the index on versus
+off. If it does not move, the feature stops here: no persistence, no SCIP, no
+second language.
 
-**The numbers so far — the gate is not yet decided.**
+**No numbers yet.** The earlier runs were on a suite of correctness, security
+and performance fixtures that has since been replaced. Their results do not
+carry over, so both arms of the gate still have to run on this suite.
 
-| Run | Result |
-| --- | --- |
-| Index on, 2026-09-19, `claude-sonnet-5` | 13 of 14 assertions passed in 282s. `index.built` over 7 files in 2ms. The `correctness` recall assertion on the cross-file fixture **passed**: one finding, landed on the changed function. All twelve pre-existing assertions passed, `clean-pagination` still at zero findings. The one failure was the cross-file fixture's health check — the `security` agent returned unparseable JSON, which is the flake the model notes below describe, not a recall result. |
-| Index off, 2026-09-19, `claude-sonnet-5` | **Incomplete.** `security-tenant-scope` and `correctness-admin-check` passed all five of their assertions, and `index.failed` was logged for every fixture, so the absent path is exercised end to end. The run then died 107s in: the Anthropic account hit `You have reached your specified API usage limits. You will regain access on 2026-10-01 at 00:00 UTC.` Every agent on the cross-file fixture failed with that error, so **there is no control number for the gate's own fixture**. |
-
-The on arm cost 1.5k input, 28k cache-write, 199k cache-read and 8.8k output
-tokens on the cross-file fixture alone.
-
-Every run now ends with a token-spend table — steps, the four token counters,
-an estimated cost and the assertion tally per fixture — and writes the same
+Every run ends with a token-spend table — steps, the four token counters, an
+estimated cost and the assertion tally per fixture — and writes the same
 numbers to `evals/results/<time>-<provider>-<model>.json`. Commit the file
 when a run is meant as evidence, so a cost change has a before and an after.
 
-Until the control arm runs to completion, the on arm's pass is one sample and
-proves nothing on its own: the gate needs both halves.
-
 ## Known gaps
 
+- **No fixture has reached a model.** The five fixtures load, diff and resolve
+  their anchors in `pnpm test`, but none has been reviewed by a model yet, so
+  whether each planted problem is findable is unproven.
+- **Only architecture is measured.** Correctness, security, performance, test
+  coverage and docs drift are still in the reviewer's prompt, but no fixture
+  checks them any more.
 - **No fixture requires a patch.** `patches-verify` catches a wrong patch but
   cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
 - **`claude-haiku-4-5` does not clear the suite**, which is why the Anthropic
-  default is now `claude-sonnet-5`. On Haiku the reviewer hits the turn cap or
-  returns prose; the forced final turn and the one repair turn soften both, but
-  neither has been measured on Haiku. Sonnet is not immune: a run that still
-  fails the repair turn fails the whole fixture without saying anything about
-  recall.
+  default is `claude-sonnet-5`.
 - **One sample per arm.** A fixture is one non-deterministic review, so a
-  single on-versus-off pair is a signal, not a measurement. Read the gate with
-  that in mind, and repeat the pair before concluding the index does nothing.
-- **`docs-drift-retry-budget` has never reached a model.** It loads, diffs and
-  runs the pipeline, but on 2026-09-21 the Anthropic account was over its usage
-  limit, so no review of it has been judged. Its anchors are unproven.
-- **Drift is reported on the code, not on the stale page.** A finding must name
-  a changed file, and the documents this fixture makes wrong are untouched — so
-  the recall assertion anchors the changed source, and a reviewer that names
-  `README.md` instead is dropped by validation before the judge sees it.
+  single on-versus-off pair is a signal, not a measurement. Repeat the pair
+  before concluding anything.
+- **The dead code itself cannot be anchored.** A finding must name a changed
+  file, so `legacy-template.ts` and the unchanged `daysOverdue` lines cannot
+  carry one. The recall assertions anchor the change that orphaned them instead.
 
 ## Layout
 

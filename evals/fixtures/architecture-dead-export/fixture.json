@@ -1,0 +1,26 @@
+{
+  "name": "architecture-dead-export",
+  "title": "Architecture — the last caller of daysOverdue moves to a new helper that repeats its arithmetic",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "aec592bf8ffdf540121fa4248ee426423f82b729",
+  "headSha": "8d1021a05ea27d653993e671f5b725dbd3408b29",
+  "pullRequest": {
+    "number": 231,
+    "title": "Group the collections queue by aging band",
+    "body": "Collections work the queue in the standard 1-30 / 31-60 / 61-90 / 90+ bands, not by exact day count. The dashboard change that reads `bucket` has already shipped behind a flag.",
+    "author": "sam-whitaker",
+    "baseRef": "main",
+    "headRef": "feature/aging-buckets"
+  },
+  "changedFiles": [
+    {
+      "path": "src/lib/dates.ts",
+      "status": "modified"
+    },
+    {
+      "path": "src/services/collections.ts",
+      "status": "modified"
+    }
+  ]
+}

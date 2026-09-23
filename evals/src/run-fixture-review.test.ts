@@ -52,7 +52,7 @@ describe("runFixtureReview", () => {
     const { deps } = scriptedDeps();
 
     const review = await runFixtureReview(
-      loadFixture("correctness-admin-check"),
+      loadFixture("architecture-layer-bypass"),
       deps,
     );
 
@@ -63,7 +63,7 @@ describe("runFixtureReview", () => {
   it("hands the agent the hints the repository's memory earned", async () => {
     const { deps, built } = scriptedDeps();
 
-    await runFixtureReview(loadFixture("correctness-admin-check"), {
+    await runFixtureReview(loadFixture("architecture-layer-bypass"), {
       ...deps,
       memory: { store: readOnlyStore(memoryFile()), now: () => NOW },
     });
@@ -76,7 +76,7 @@ describe("runFixtureReview", () => {
   it("runs the agent unhinted when the fixture has no memory", async () => {
     const { deps, built } = scriptedDeps();
 
-    await runFixtureReview(loadFixture("correctness-admin-check"), deps);
+    await runFixtureReview(loadFixture("architecture-layer-bypass"), deps);
 
     expect(built[0]?.repositoryHints).toBeUndefined();
   });
