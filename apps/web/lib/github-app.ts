@@ -10,7 +10,7 @@ export function githubWebhookSecret(): string {
   return required("GITHUB_APP_WEBHOOK_SECRET");
 }
 
-export const INSTALL_APP_URL = "https://github.com/apps/lintcatpr/installations/new";
+export const INSTALL_APP_URL = "https://github.com/apps/LintcatPR/installations/new";
 
 let cached: GithubAppClient | undefined;
 
