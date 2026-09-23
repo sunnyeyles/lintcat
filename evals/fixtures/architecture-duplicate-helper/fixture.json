@@ -1,0 +1,30 @@
+{
+  "name": "architecture-duplicate-helper",
+  "title": "Architecture — a new private helper re-implements formatMoney from src/lib",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "176d88b4069b9cfc8a99aedd9306b20e9271be09",
+  "headSha": "c8e109b82be0d84176526a96bc58e23744002993",
+  "pullRequest": {
+    "number": 219,
+    "title": "Preview the overdue-invoice reminder email",
+    "body": "Support wants to see exactly what a customer will receive before we switch reminders on. This adds the reminder email builder and a preview endpoint.\n\nSending is a follow-up.",
+    "author": "dana-okafor",
+    "baseRef": "main",
+    "headRef": "feature/reminder-preview"
+  },
+  "changedFiles": [
+    {
+      "path": "src/services/reminders.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/invoices.ts",
+      "status": "modified"
+    },
+    {
+      "path": "src/routes/index.ts",
+      "status": "modified"
+    }
+  ]
+}

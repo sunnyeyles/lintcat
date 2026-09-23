@@ -1,0 +1,26 @@
+{
+  "name": "architecture-dead-module",
+  "title": "Architecture — a replaced renderer leaves its old module with no importer",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "96d2431471370f7f9758de8c052d80758fae97cc",
+  "headSha": "09be36739dad3fdb6df8e87790eef1f804b98f21",
+  "pullRequest": {
+    "number": 212,
+    "title": "Render invoice PDFs with pdfkit",
+    "body": "The HTML template rendered fonts differently on every machine and needed headless Chrome in the container. This lays the invoice out with pdfkit instead.\n\nFinance has signed off on the new layout.",
+    "author": "priya-raman",
+    "baseRef": "main",
+    "headRef": "feature/pdfkit-invoices"
+  },
+  "changedFiles": [
+    {
+      "path": "src/pdf/render-invoice.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/invoice-pdf.ts",
+      "status": "modified"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "architecture-layer-bypass",
+  "title": "Architecture — a route queries the database directly and skips the service's voided-invoice rule",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "41912b66be80e18401c8f8d7929a41868f348b91",
+  "headSha": "52c3fd3819a18e57dc5cd40e8deb8922efc87b64",
+  "pullRequest": {
+    "number": 224,
+    "title": "Let customers download their invoices as CSV",
+    "body": "Customers keep asking for their invoice history in a spreadsheet. This adds a CSV download next to the existing JSON history endpoint.",
+    "author": "marco-bianchi",
+    "baseRef": "main",
+    "headRef": "feature/invoice-csv"
+  },
+  "changedFiles": [
+    {
+      "path": "src/routes/invoice-export.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/index.ts",
+      "status": "modified"
+    }
+  ]
+}

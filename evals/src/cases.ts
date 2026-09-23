@@ -19,126 +19,90 @@ const patchesVerify: FixtureExpectation = {
 
 export const evalCases: EvalCase[] = [
   {
-    fixture: "security-tenant-scope",
+    fixture: "architecture-dead-module",
+    expectations: [
+      {
+        kind: "finding",
+        description:
+          "reports that the old PDF template module is left with no importer once the route switches to the new renderer",
+        anchors: [
+          {
+            file: "src/routes/invoice-pdf.ts",
+            startMarker: "import { renderInvoicePdf }",
+            endMarker: "const pdf = await renderInvoicePdf",
+          },
+          {
+            file: "src/pdf/render-invoice.ts",
+            startMarker: "replacing the HTML template",
+            endMarker: "export function renderInvoicePdf",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    fixture: "architecture-duplicate-helper",
     expectations: [
       patchesVerify,
       {
         kind: "finding",
         description:
-          "reports a finding on the customer query that never validates the tenant",
+          "reports that the reminder's private formatAmount re-implements formatMoney from src/lib/money.ts",
         anchors: [
           {
-            file: "src/data/customers.ts",
-            startMarker: "export async function findCustomerById",
-          },
-          {
-            file: "src/routes/customer-detail.ts",
-            startMarker: "export async function getCustomer",
+            file: "src/services/reminders.ts",
+            startMarker: "function formatAmount",
+            endMarker: "const amount = formatAmount",
           },
         ],
       },
     ],
   },
   {
-    fixture: "correctness-admin-check",
+    fixture: "architecture-layer-bypass",
     expectations: [
       {
         kind: "finding",
         description:
-          "reports a finding on the since filter, which keeps the events before the timestamp instead of the events after it",
+          "reports that the CSV route queries the database directly, past the service layer and its voided-invoice rule",
         anchors: [
           {
-            file: "src/routes/admin-audit.ts",
-            startMarker: "export async function getAuditEvents",
+            file: "src/routes/invoice-export.ts",
+            startMarker: 'import { db } from "../db/pool.js";',
+            endMarker: "const lines =",
           },
         ],
       },
     ],
   },
   {
-    fixture: "correctness-cross-file-caller",
+    fixture: "architecture-dead-export",
     expectations: [
       {
         kind: "finding",
         description:
-          "reports a finding on the quote whose total changed from a formatted string to a Money value, which an untouched caller still renders straight into an email",
+          "reports that daysOverdue loses its last caller while agingBucket repeats its arithmetic",
         anchors: [
           {
-            file: "src/pricing/quote.ts",
-            startMarker: "export interface ShippingQuote",
-            endMarker: "export async function quoteShipment",
+            file: "src/lib/dates.ts",
+            startMarker: "export function daysOverdue",
           },
           {
-            file: "src/pricing/quote.ts",
-            startMarker: "export async function quoteShipment",
+            file: "src/services/collections.ts",
+            startMarker: "import { agingBucket",
           },
         ],
       },
     ],
   },
   {
-    fixture: "test-coverage-untested-branch",
-    expectations: [
-      {
-        kind: "finding",
-        description:
-          "reports a finding on the new bulk tier branch the untouched discount test never exercises",
-        anchors: [
-          {
-            file: "src/pricing/discount.ts",
-            startMarker: "export const BULK_PARCEL_RATE",
-          },
-          {
-            file: "src/pricing/discount.ts",
-            startMarker: "export function applyDiscount",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    fixture: "performance-n-plus-one",
-    expectations: [
-      {
-        kind: "finding",
-        description:
-          "reports a finding on the summary loop that queries one product per order line",
-        anchors: [
-          {
-            file: "src/services/order-summary.ts",
-            startMarker: "export async function buildOrderSummary",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    fixture: "docs-drift-retry-budget",
-    expectations: [
-      {
-        kind: "finding",
-        description:
-          "reports a finding on the retry budget that replaced the attempt count the README and the runbook still document",
-        anchors: [
-          {
-            file: "src/config.ts",
-            startMarker: "export const RETRY_BUDGET_ENV",
-          },
-          {
-            file: "src/delivery/retry.ts",
-            startMarker: "export async function withRetryBudget",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    fixture: "clean-pagination",
+    fixture: "clean-shared-money-format",
     expectations: [
       patchesVerify,
       {
         kind: "no-findings",
-        description: "reports no findings at all on correct, idiomatic code",
+        description:
+          "reports no findings on a correct extraction that imports from files outside the diff",
       },
     ],
   },
