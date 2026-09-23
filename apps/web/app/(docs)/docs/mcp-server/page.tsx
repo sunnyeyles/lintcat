@@ -71,17 +71,17 @@ export default function McpServerPage() {
             </TableBody>
           </Table>
         </Card>
-        <Note title="Cancelling is honoured">
-          Ctrl-C in the client, or any <code>notifications/cancelled</code>, aborts the
-          reviewer&rsquo;s model calls — and a cancelled run publishes nothing.
+        <Note title="You can cancel">
+          Cancelling in your client stops the review straight away, and a cancelled review
+          posts nothing.
         </Note>
       </Section>
 
       <Section id="same-path" title="The same review as the App">
         <P>
-          A local review runs the same pipeline as the GitHub App but reads your git checkout
-          instead of GitHub, so the trust boundary is unchanged: only validated findings come
-          back. It runs on your machine with your own key, not the organization&rsquo;s.
+          A local review is the same review the GitHub App runs, with the same checks on every
+          finding and fix. It reads your local checkout instead of GitHub, and runs on your
+          machine with your own key, not the organization&rsquo;s.
         </P>
       </Section>
     </DocsArticle>

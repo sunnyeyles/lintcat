@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["@pr-review/design", "lucide-react", "recharts"],
   },
+  async redirects() {
+    return [{ source: "/docs/trust-boundary", destination: "/docs/security", permanent: true }];
+  },
 };
 
 export default nextConfig;

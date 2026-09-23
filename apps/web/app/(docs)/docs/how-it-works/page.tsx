@@ -37,9 +37,9 @@ export default function HowItWorksPage() {
             and, where it can, a fix.
           </Bullet>
           <Bullet>
-            <strong>Check.</strong> Plain code, with no model involved, throws out anything that
-            doesn&rsquo;t point at a real added line, isn&rsquo;t confident enough or repeats
-            another finding. Fixes are checked against the current file.
+            <strong>Check.</strong> LintCat drops anything that doesn&rsquo;t point at a line you
+            changed, isn&rsquo;t confident enough or repeats another finding, and checks every fix
+            against the current file.
           </Bullet>
           <Bullet>
             <strong>Post.</strong> What survives becomes inline comments, the AI PR Review check
@@ -105,22 +105,21 @@ export default function HowItWorksPage() {
       <Section id="different" title="How it's different">
         <Bullets>
           <Bullet>
-            <strong>The model proposes; code decides.</strong> Nothing the model writes reaches
-            your pull request until deterministic checks have passed it. See{" "}
-            <Link href="/docs/trust-boundary">the trust boundary</Link>.
+            <strong>Nothing unchecked reaches your pull request.</strong> Every finding and fix
+            is checked before it posts. See <Link href="/docs/security">Security</Link>.
           </Bullet>
           <Bullet>
-            <strong>It can&rsquo;t touch your repository.</strong> The reviewer has read-only
-            tools and nothing else. Commenting and committing are done by application code.
+            <strong>It can&rsquo;t change your repository.</strong> The AI reviewer can only
+            read. Comments, and fixes if you turn them on, are posted by LintCat after the checks.
           </Bullet>
           <Bullet>
             <strong>Fixes are proven, not guessed.</strong> A fix is only offered when the lines
             it replaces match the file exactly, so a suggestion never lands on the wrong code.
           </Bullet>
           <Bullet>
-            <strong>The branch can&rsquo;t mislead it.</strong> The repository map is built from
-            the base commit, not the pull request, so a change can&rsquo;t rewrite what the
-            reviewer believes about the rest of the code.
+            <strong>The branch can&rsquo;t mislead it.</strong> LintCat maps your repository as it
+            was before the pull request, so a change can&rsquo;t misrepresent the rest of your
+            code.
           </Bullet>
           <Bullet>
             <strong>It never blocks a merge.</strong> The check run is advisory.

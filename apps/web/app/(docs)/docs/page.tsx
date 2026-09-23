@@ -2,7 +2,7 @@ import { Button, Card } from "@pr-review/design";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Bullet, Bullets, Code, DocsArticle, Note, P, Section } from "@/components/docs";
+import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
 import { DOCS_HOME, DOCS_PAGES, type Heading, LOOKS_FOR } from "@/lib/docs";
 import { INSTALL_APP_URL } from "@/lib/github-app";
 
@@ -15,28 +15,9 @@ export const metadata: Metadata = {
 const HEADINGS: Heading[] = [
   { id: "what-it-does", title: "What it does" },
   { id: "getting-it", title: "Getting it on your repositories" },
-  { id: "pipeline", title: "How a review happens" },
   { id: "reviewer", title: "What the reviewer looks for" },
   { id: "keep-reading", title: "Keep reading" },
 ];
-
-const PIPELINE = `Pull request opened, pushed to, or labelled ai-review
-   │
-   ▼
-LintCat GitHub App
-   │
-   ├── read the pull request, changed files, diff
-   ├── index the repository at the base commit
-   │
-   ▼
-Review
-   │
-   ├─ reviewer   (your model key)
-   ├─ validate   (no model here)
-   │
-   ▼
-AI PR Review check run + inline comments
-           + the review on your dashboard`;
 
 export default function IntroductionPage() {
   return (
@@ -83,21 +64,14 @@ export default function IntroductionPage() {
         <P>
           By default a repository is reviewed when a pull request gets the{" "}
           <code>ai-review</code> label, and again on every push after that. Switch a
-          repository to review every pull request, or turn it off, from its settings page.
+          repository to review every pull request, or turn it off, from its settings page. A
+          new push replaces a review still in progress, so comments are always on the latest
+          commit.
         </P>
         <Note title="No workflow file, no secrets in GitHub">
           Reviews run on LintCat&rsquo;s side. Your repository gets no workflow, and your
           Actions minutes go untouched.
         </Note>
-      </Section>
-
-      <Section id="pipeline" title="How a review happens">
-        <Code>{PIPELINE}</Code>
-        <P>
-          The reviewer reads the pull request through read-only tools and proposes findings.
-          Deterministic code then decides which of them are published. A new push replaces a
-          review still in progress, so you only ever see comments on the latest commit.
-        </P>
       </Section>
 
       <Section id="reviewer" title="What the reviewer looks for">
