@@ -29,7 +29,7 @@ describe("docsNeighbours", () => {
 
 describe("isDocsPageActive", () => {
   it("matches the home entry only on the home page", () => {
-    expect(isDocsPageActive("/", DOCS_HOME)).toBe(true);
+    expect(isDocsPageActive("/docs", DOCS_HOME)).toBe(true);
     expect(isDocsPageActive("/docs/quickstart", DOCS_HOME)).toBe(false);
   });
 

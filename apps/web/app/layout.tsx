@@ -7,7 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "LintCat", template: "%s · LintCat" },
   description:
-    "Documentation for the PR review agents, and the dashboard: reviews, findings by severity and agent, model usage and cost.",
+    "AI code review for people and coding agents: pull request reviews from a GitHub App, the same reviewer over MCP, and a dashboard of findings and cost.",
 };
 
 // Runs before paint so a saved light/dark choice never flashes the system theme first.

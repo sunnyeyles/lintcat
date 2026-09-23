@@ -8,11 +8,13 @@ import { Wordmark } from "@/components/shell/logo-mark";
 /** The topbar's chrome, with no request-bound data, so a static page can render it. */
 export function TopbarFrame({
   className,
+  homeHref = "/",
   docsHref,
   left,
   right,
 }: {
   className?: string;
+  homeHref?: string;
   docsHref: string;
   left?: ReactNode;
   right: ReactNode;
@@ -27,7 +29,7 @@ export function TopbarFrame({
       <div className="flex h-16 items-center gap-3 px-6 sm:px-8">
         {left}
         <Link
-          href={docsHref}
+          href={homeHref}
           data-animate-on-hover
           className="flex min-w-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >

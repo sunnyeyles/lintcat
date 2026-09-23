@@ -73,6 +73,7 @@ export {
   SheetTrigger,
 } from "#src/components/sheet";
 export { Skeleton } from "#src/components/skeleton";
+export { Spotlight, type SpotlightProps } from "#src/components/spotlight";
 export { Switch } from "#src/components/switch";
 export {
   Table,
