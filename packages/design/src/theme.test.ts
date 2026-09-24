@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const primer = (theme: "light" | "dark") =>
   readFileSync(require.resolve(`@primer/primitives/dist/css/functional/themes/${theme}.css`), "utf8");
 const brand = readFileSync(new URL("./brand.css", import.meta.url), "utf8");
+const semantic = readFileSync(new URL("./theme.css", import.meta.url), "utf8");
 
 type Tokens = Record<string, string>;
 
@@ -30,7 +31,8 @@ function theme(name: "light" | "dark"): (token: string) => string {
     name === "light" ? /\[data-light-theme="light"\] \{([^}]*)\}/ : /\[data-dark-theme="dark"\] \{([^}]*)\}/
   ).exec(brand)?.[1];
   if (block === undefined) throw new Error(`no ${name} block in brand.css`);
-  const tokens = { ...parse(primer(name).split("@media")[0] ?? ""), ...parse(block) };
+  const aliases = parse(/:root \{([^}]*)\}/.exec(semantic)?.[1] ?? "");
+  const tokens = { ...aliases, ...parse(primer(name).split("@media")[0] ?? ""), ...parse(block) };
   return (token) => resolve(tokens, token);
 }
 
@@ -83,5 +85,14 @@ describe.each(["light", "dark"] as const)("%s theme contrast", (name) => {
   // Primer's own light border sits at 1.42:1; hold the brand to the same bar.
   it("borders stay visible on the canvas", () => {
     expect(contrast(get("borderColor-default"), get("bgColor-default"))).toBeGreaterThanOrEqual(1.4);
+  });
+
+  it("draws impacted map files apart from changed ones, both visible on the canvas", () => {
+    const changed = get("map-module-changed");
+    const impacted = get("map-module-impacted");
+    expect(impacted).not.toBe(changed);
+    for (const mark of [changed, impacted]) {
+      expect(contrast(mark, get("bgColor-default"))).toBeGreaterThanOrEqual(3);
+    }
   });
 });

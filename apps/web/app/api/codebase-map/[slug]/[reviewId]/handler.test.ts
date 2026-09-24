@@ -135,6 +135,35 @@ describe("handleCodebaseMap expand", () => {
   });
 });
 
+describe("handleCodebaseMap expand with a blast radius", () => {
+  it("carries the impacted flag on the files it sends", async () => {
+    const target = held.find((summary) => summary.fileCount > 3)!;
+    const hit = new Set(
+      normalised.files
+        .filter((f) => groupIdFor(f) === target.id && f.changed !== true)
+        .slice(0, 2)
+        .map((f) => f.path),
+    );
+    const impacted: MapSource = {
+      ...source,
+      graph: {
+        ...graph,
+        files: graph.files.map((f) => (hit.has(f.path) ? { ...f, impacted: true } : f)),
+      },
+    };
+
+    const response = await handleCodebaseMap(
+      { action: "expand", groupId: target.id, loadedGroups: openGroupIds },
+      async () => impacted,
+    );
+    const slice = await json<GroupSlice>(response);
+    const flagged = slice.graph.files.filter((f) => f.impacted === true).map((f) => f.path);
+
+    expect(hit.size).toBe(2);
+    expect(flagged.sort()).toEqual([...hit].sort());
+  });
+});
+
 describe("handleCodebaseMap search", () => {
   it("finds a file the first payload left out, and names the group to open", async () => {
     const sent = new Set(payload.graph.files.map((f) => f.path));

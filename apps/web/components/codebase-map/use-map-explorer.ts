@@ -24,6 +24,7 @@ export function useMapExplorer(
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
+  const [showImpacted, setShowImpacted] = useState(true);
   const [hover, setHover] = useState<MapHover | null>(null);
   const handleRef = useRef<MapHandle | null>(null);
 
@@ -34,10 +35,16 @@ export function useMapExplorer(
   );
 
   const view = useMemo(
-    () => ({ focusedPath, query, expandedGroups }),
-    [focusedPath, query, expandedGroups],
+    () => ({ focusedPath, query, expandedGroups, hideImpacted: !showImpacted }),
+    [focusedPath, query, expandedGroups, showImpacted],
   );
   const scene = useMemo(() => buildScene(graph, view, 1, heat), [graph, view, heat]);
+
+  // Clustering counts ignore the overlay, so hiding it keeps the switch on screen.
+  const hasImpacted = useMemo(
+    () => scene.clustering.groups.some((group) => group.impactedCount > 0),
+    [scene],
+  );
 
   useEffect(() => {
     if (focusedPath === null) return;
@@ -172,6 +179,9 @@ export function useMapExplorer(
     query,
     setQuery,
     setExpandedGroups,
+    showImpacted,
+    setShowImpacted,
+    hasImpacted,
     toggleGroup,
     focusFile,
     onNodeSelect,

@@ -170,3 +170,85 @@ describe("buildScene with summaries", () => {
     expect(ids).not.toContain("pkg::pkg/a->pkg::pkg/b");
   });
 });
+
+describe("buildScene with impacted files", () => {
+  // two.ts and four.ts depend on the change; one.ts is in the list too but changed.
+  const impacted = normaliseGraph({
+    ...GRAPH,
+    files: [
+      { path: "pkg/a/one.ts", package: "pkg", changed: true, impacted: true },
+      { path: "pkg/a/two.ts", package: "pkg", impacted: true },
+      { path: "pkg/b/three.ts", package: "pkg" },
+      { path: "pkg/b/four.ts", package: "pkg", impacted: true },
+    ],
+  });
+
+  it("marks an impacted file with its own level, marker and count", () => {
+    const node = buildScene(impacted, view()).byId.get("pkg/a/two.ts")!;
+
+    expect(node.level).toBe("impacted");
+    expect(node.marker).toBe(EMPHASIS_MARKERS.impacted);
+    expect(node.marker).not.toBe(EMPHASIS_MARKERS.changed);
+    expect(node.impactedCount).toBe(1);
+  });
+
+  it("keeps a file that is both changed and impacted changed", () => {
+    const node = buildScene(impacted, view()).byId.get("pkg/a/one.ts")!;
+
+    expect(node.level).toBe("changed");
+    expect(node.changedCount).toBe(1);
+    expect(node.impactedCount).toBe(0);
+  });
+
+  it("counts impacted files onto a collapsed group and ranks it impacted", () => {
+    const group = buildScene(impacted, view()).byId.get("pkg::pkg/b")!;
+
+    expect(group.kind).toBe("group");
+    expect(group.level).toBe("impacted");
+    expect(group.impactedCount).toBe(1);
+  });
+
+  it("ranks a summary changed over impacted, and impacted over context", () => {
+    const summarised = normaliseGraph({
+      ...GRAPH,
+      summaries: [
+        { id: "far::far/both", fileCount: 10, changedCount: 1, impactedCount: 4 },
+        { id: "far::far/hit", fileCount: 10, changedCount: 0, impactedCount: 3 },
+        { id: "far::far/calm", fileCount: 10, changedCount: 0 },
+      ],
+    });
+    const scene = buildScene(summarised, view());
+
+    expect(scene.byId.get("far::far/both")).toMatchObject({ level: "changed", impactedCount: 4 });
+    expect(scene.byId.get("far::far/hit")).toMatchObject({ level: "impacted", impactedCount: 3 });
+    expect(scene.byId.get("far::far/calm")).toMatchObject({ level: "context", impactedCount: 0 });
+  });
+
+  it("lets the focus neighbourhood outrank impact", () => {
+    const expandedGroups = new Set(impacted.files.map(groupIdFor));
+    const scene = buildScene(impacted, view({ focusedPath: "pkg/a/one.ts", expandedGroups }));
+
+    expect(scene.byId.get("pkg/b/four.ts")?.level).toBe("neighbour");
+    expect(scene.byId.get("pkg/a/two.ts")?.level).toBe("impacted");
+  });
+
+  it("hides every trace of impact when the overlay is off", () => {
+    const scene = buildScene(impacted, view({ hideImpacted: true }));
+
+    expect(scene.nodes.some((node) => node.level === "impacted")).toBe(false);
+    expect(scene.nodes.every((node) => node.impactedCount === 0)).toBe(true);
+    expect(scene.byId.get("pkg/a/two.ts")?.level).toBe("context");
+    expect(scene.byId.get("pkg::pkg/b")?.level).toBe("context");
+    expect(scene.clustering.groups.find((g) => g.id === "pkg::pkg/b")?.impactedCount).toBe(1);
+  });
+
+  it("draws a map with no risk at all exactly as the hidden overlay does", () => {
+    const shape = (scene: ReturnType<typeof buildScene>) =>
+      scene.nodes.map((n) => [n.id, n.level, n.marker, n.x, n.y, n.impactedCount]);
+    const plain = buildScene(graph, view());
+
+    expect(plain.nodes.some((node) => node.level === "impacted")).toBe(false);
+    expect(plain.clustering.groups.every((group) => group.impactedCount === 0)).toBe(true);
+    expect(shape(plain)).toEqual(shape(buildScene(impacted, view({ hideImpacted: true }))));
+  });
+});

@@ -1,7 +1,7 @@
 import { groupIdFor } from "@/lib/codebase-map/clustering";
 import type { MapFile, MapGraph } from "@/lib/codebase-map/types";
 
-const FLAG_KEYS = ["role", "package", "changed", "dead", "inCycle"] as const;
+const FLAG_KEYS = ["role", "package", "changed", "impacted", "dead", "inCycle"] as const;
 
 // A file already in the map keeps its flags; the arrival may only fill blanks.
 function fill(held: MapFile, arriving: MapFile): MapFile {

@@ -98,3 +98,45 @@ describe("emphasise", () => {
     expect(levels(view({ focusedPath: "ghost.ts" }))["src/elsewhere.ts"]).toBe("context");
   });
 });
+
+describe("emphasise with impacted files", () => {
+  const hit = normaliseGraph({
+    files: [
+      { path: "src/focus.ts", impacted: true },
+      { path: "src/uses-focus.ts", impacted: true },
+      { path: "src/far.ts", changed: true, impacted: true },
+      { path: "src/elsewhere.ts", impacted: true },
+      { path: "src/quiet.ts" },
+    ],
+    imports: [{ from: "src/uses-focus.ts", to: "src/focus.ts" }],
+  });
+  const levelsOf = (v: MapViewState) =>
+    Object.fromEntries([...emphasise(hit, v)].map(([path, e]) => [path, e.level]));
+
+  it("ranks impact under changed and the neighbourhood, and keeps it through a focus", () => {
+    expect(levelsOf(view())).toEqual({
+      "src/focus.ts": "impacted",
+      "src/uses-focus.ts": "impacted",
+      "src/far.ts": "changed",
+      "src/elsewhere.ts": "impacted",
+      "src/quiet.ts": "context",
+    });
+    expect(levelsOf(view({ focusedPath: "src/focus.ts" }))).toEqual({
+      "src/focus.ts": "focus",
+      "src/uses-focus.ts": "neighbour",
+      "src/far.ts": "changed",
+      "src/elsewhere.ts": "impacted",
+      "src/quiet.ts": "dimmed",
+    });
+  });
+
+  it("reads impacted files as the rest of the map when the overlay is off", () => {
+    expect(levelsOf(view({ hideImpacted: true }))).toEqual({
+      "src/focus.ts": "context",
+      "src/uses-focus.ts": "context",
+      "src/far.ts": "changed",
+      "src/elsewhere.ts": "context",
+      "src/quiet.ts": "context",
+    });
+  });
+});

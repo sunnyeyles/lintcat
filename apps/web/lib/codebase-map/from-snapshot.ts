@@ -71,6 +71,7 @@ export function mapFromSnapshot(
   snapshot: RepositoryGraphSnapshot | undefined,
   changedFiles: readonly ReviewRecordChangedFile[],
   findings: readonly MapSourceFinding[],
+  dependents: readonly string[] = [],
 ): MapSource {
   const heat = findingHeat(findings);
   if (!snapshot) return { graph: undefined, heat, changedPaths: [] };
@@ -84,12 +85,19 @@ export function mapFromSnapshot(
   // An empty list is "nobody recorded it", so no file may be called unchanged.
   const listed = changedStatus.size > 0;
 
+  const impacted = new Set<string>();
+  for (const path of dependents ?? []) {
+    const trimmed = typeof path === "string" ? path.trim() : "";
+    if (trimmed) impacted.add(trimmed);
+  }
+
   const files: MapFile[] = [];
   const known = new Set<string>();
   for (const file of snapshot.files ?? []) {
     known.add(file.path);
     const next: MapFile = { path: file.path };
     if (listed) next.changed = changedStatus.has(file.path);
+    if (impacted.has(file.path) && next.changed !== true) next.impacted = true;
     if (file.role !== undefined) next.role = file.role;
     if (file.package !== undefined) next.package = file.package;
     const dead = boolish(file.dead);

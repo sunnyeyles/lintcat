@@ -132,6 +132,23 @@ describe("clusterGraph with summaries", () => {
     expect(group.heatCounts?.total).toBe(4);
   });
 
+  it("counts impacted files beside changed ones, and takes a summary's count", () => {
+    const hit = normaliseGraph({
+      files: [
+        { path: "lib/a.ts", changed: true, impacted: true },
+        { path: "lib/b.ts", impacted: true },
+        { path: "lib/c.ts" },
+      ],
+      imports: [],
+      summaries: [{ id: "db::src", fileCount: 9, changedCount: 0, impactedCount: 5 }],
+    });
+    const groups = clusterGraph(hit, view()).groups;
+
+    expect(groups.find((g) => g.id === "-::lib")).toMatchObject({ changedCount: 1, impactedCount: 1 });
+    expect(groups.find((g) => g.id === "db::src")?.impactedCount).toBe(5);
+    expect(clusterGraph(repo, view()).groups.every((g) => g.impactedCount === 0)).toBe(true);
+  });
+
   it("reads the package and directory back out of the id", () => {
     expect(groupIdParts("db::packages/db/src")).toEqual({
       package: "db",

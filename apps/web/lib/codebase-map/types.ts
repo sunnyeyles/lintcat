@@ -4,6 +4,8 @@ export interface MapFile {
   role?: string;
   package?: string;
   changed?: boolean;
+  /** Depends on the change; only ever set true, since the stored list is capped. */
+  impacted?: boolean;
   dead?: boolean;
   inCycle?: boolean;
 }
@@ -32,6 +34,7 @@ export interface GroupSummary {
   id: string;
   fileCount: number;
   changedCount: number;
+  impactedCount?: number;
   heat?: FindingCounts;
 }
 
@@ -51,4 +54,6 @@ export interface MapViewState {
   focusedPath: string | null;
   query: string;
   expandedGroups: ReadonlySet<string>;
+  /** Turns the impacted overlay off; absent means it is shown. */
+  hideImpacted?: boolean;
 }

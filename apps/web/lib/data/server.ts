@@ -70,5 +70,5 @@ export async function getMapSource(
     cachedGraph(`${slug}\u0000${reviewId}`, () => source.getRepositoryGraph(reviewId)),
     source.getChangedFiles(reviewId),
   ]);
-  return mapFromSnapshot(snapshot, changedFiles, review.findings);
+  return mapFromSnapshot(snapshot, changedFiles, review.findings, review.risk?.dependents);
 }

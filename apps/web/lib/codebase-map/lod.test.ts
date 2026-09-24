@@ -144,6 +144,46 @@ describe("the 50k payload", () => {
   });
 });
 
+describe("lodGraph with impacted files", () => {
+  const plain = sourceOf(3000);
+  const graph = normaliseGraph({
+    ...plain.graph,
+    files: plain.graph.files.map((file, i) =>
+      i % 9 === 0 && file.changed !== true ? { ...file, impacted: true } : file,
+    ),
+  });
+  const lod = lodGraph(graph, plain.changedPaths, plain.heat, { openFiles: 400 });
+
+  it("gives each summary the group's impacted count", () => {
+    const all = clusterGraph(graph, SHUT);
+
+    expect(lod.summaries!.some((s) => (s.impactedCount ?? 0) > 0)).toBe(true);
+    for (const summary of lod.summaries!) {
+      const group = all.groups.find((g) => g.id === summary.id)!;
+      expect(summary.impactedCount ?? 0).toBe(group.impactedCount);
+    }
+  });
+
+  it("keeps the flag on the files it sends and on a group fetched later", () => {
+    const held = new Set(lod.files.map((file) => file.path));
+    const target = lod.summaries!.find((s) => (s.impactedCount ?? 0) > 0)!;
+    const slice = groupSlice(graph, plain.heat, target.id, held);
+
+    expect(lod.files.some((file) => file.impacted === true)).toBe(true);
+    expect(slice.graph.files.filter((f) => f.impacted === true)).toHaveLength(
+      target.impactedCount!,
+    );
+  });
+
+  it("adds no impacted count to the payload of a review without a blast radius", () => {
+    const bare = lodGraph(normaliseGraph(plain.graph), plain.changedPaths, plain.heat, {
+      openFiles: 400,
+    });
+
+    expect(bare.summaries!.every((s) => !("impactedCount" in s))).toBe(true);
+  });
+});
+
 describe("groupSlice", () => {
   const source = sourceOf(3000);
   const graph = normaliseGraph(source.graph);

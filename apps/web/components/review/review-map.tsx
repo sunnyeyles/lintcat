@@ -131,7 +131,14 @@ export function ReviewMap({ graph: input, heat: inputHeat, changedPaths, endpoin
             onShowFindings={showFile}
           />
           <GroupList clustering={scene.clustering} onToggle={toggleGroup} />
-          <MapLegend heat />
+          <MapLegend
+            heat
+            impacted={
+              map.hasImpacted
+                ? { shown: map.showImpacted, onShownChange: map.setShowImpacted }
+                : undefined
+            }
+          />
         </aside>
       </div>
     </div>

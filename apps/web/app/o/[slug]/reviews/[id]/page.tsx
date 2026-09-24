@@ -102,7 +102,12 @@ export default async function ReviewDetailPage({ params }: PageProps) {
 
       <FindingsFocusProvider>
         <Suspense fallback={<ReviewMapSkeleton />}>
-          <ReviewMapSection slug={slug} reviewId={review.id} findings={review.findings} />
+          <ReviewMapSection
+            slug={slug}
+            reviewId={review.id}
+            findings={review.findings}
+            dependents={review.risk?.dependents}
+          />
         </Suspense>
 
         {review.findings.length === 0 ? (
