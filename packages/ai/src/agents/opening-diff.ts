@@ -5,7 +5,7 @@
 import type { ChangedFile } from "@pr-review/github";
 import { classifyFileRole } from "@pr-review/index";
 
-export type OmissionReason = "vendored" | "generated" | "binary" | "over budget";
+type OmissionReason = "vendored" | "generated" | "binary" | "over budget";
 
 export interface OmittedFile {
   filename: string;
@@ -23,7 +23,7 @@ export interface OpeningDiffLimits {
   maxFileChars: number;
 }
 
-export const DEFAULT_OPENING_DIFF_LIMITS: OpeningDiffLimits = {
+const DEFAULT_OPENING_DIFF_LIMITS: OpeningDiffLimits = {
   maxChars: 80_000,
   maxFileChars: 20_000,
 };
