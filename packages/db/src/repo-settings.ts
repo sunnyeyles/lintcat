@@ -3,9 +3,9 @@ import { eq, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { repoSettings, type RepoReviewMode, type RepoSettings } from "./schema";
 
-/** What a repo without a row gets: reviewed on the `ai-review` label, no model override, no fixes. */
+/** What a repo without a row gets: every pull request reviewed, no model override, no fixes. */
 export const DEFAULT_REPO_SETTINGS: EffectiveRepoSettings = {
-  mode: "label",
+  mode: "every_pr",
   model: null,
   fixes: false,
 };
@@ -34,7 +34,7 @@ export async function findRepoSettings(
   return row;
 }
 
-/** A repo with no row gets the defaults, matching #176's label-triggered behaviour. */
+/** A repo with no row gets the defaults. */
 export async function effectiveRepoSettings(
   database: Database,
   repoId: number,

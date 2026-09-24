@@ -243,14 +243,14 @@ export const reviewJobs = pgTable(
   ],
 );
 
-// A repo without a row reviews on the `ai-review` label, on no model override, with fixes off.
+// A repo without a row reviews every pull request, on no model override, with fixes off.
 export const repoSettings = pgTable("repo_settings", {
   id: serial("id").primaryKey(),
   repoId: integer("repo_id")
     .notNull()
     .unique()
     .references(() => repos.id, { onDelete: "cascade" }),
-  mode: repoReviewModeEnum("mode").notNull().default("label"),
+  mode: repoReviewModeEnum("mode").notNull().default("every_pr"),
   // Model id override for the organization's key's provider; null uses the provider's default.
   model: text("model"),
   fixes: boolean("fixes").notNull().default(false),

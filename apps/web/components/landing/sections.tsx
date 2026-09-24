@@ -135,12 +135,7 @@ export function Findings() {
 const STEPS = [
   ["Install the GitHub App", "Pick the repositories LintCat may review. Nothing goes in your CI."],
   ["Add a model key", "An owner saves an Anthropic or OpenAI key. Reviews bill to your provider."],
-  [
-    "Label a pull request",
-    <>
-      Add <code className="font-mono">ai-review</code>. Every later push is reviewed again.
-    </>,
-  ],
+  ["Open a pull request", "It is reviewed, and every later push is reviewed again."],
 ] as const satisfies readonly (readonly [string, ReactNode])[];
 
 export function Steps() {

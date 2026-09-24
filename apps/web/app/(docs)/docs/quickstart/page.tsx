@@ -57,14 +57,14 @@ export default function QuickstartPage() {
 
       <Section id="review" title="3. Review a pull request">
         <P>
-          Add the <code>ai-review</code> label to any open pull request on an installed
-          repository. The review runs in the background and posts when it finishes. Every
-          later push to that pull request is reviewed again. If the repository has no{" "}
-          <code>ai-review</code> label yet, create one under <strong>Issues → Labels</strong>.
+          Open a pull request on an installed repository. The review runs in the background
+          and posts when it finishes, and every later push to that pull request is reviewed
+          again.
         </P>
         <P>
-          To review every pull request without a label, change the repository&rsquo;s mode on
-          its settings page. See <Link href="/docs/configuration">Configuration</Link>.
+          To review only the pull requests you pick, switch the repository to the{" "}
+          <code>ai-review</code> label on its settings page. See{" "}
+          <Link href="/docs/configuration">Configuration</Link>.
         </P>
       </Section>
 

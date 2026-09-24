@@ -27,10 +27,10 @@ beforeEach(async () => {
 });
 
 describe("effectiveRepoSettings", () => {
-  it("defaults to label mode, no model override, and fixes off with no row", async () => {
+  it("defaults to every pull request, no model override, and fixes off with no row", async () => {
     expect(await findRepoSettings(database, repoId)).toBeUndefined();
     expect(await effectiveRepoSettings(database, repoId)).toEqual({
-      mode: "label",
+      mode: "every_pr",
       model: null,
       fixes: false,
     });
@@ -38,12 +38,12 @@ describe("effectiveRepoSettings", () => {
 
   it("reflects a saved row once one exists", async () => {
     await saveRepoSettings(database, repoId, {
-      mode: "every_pr",
+      mode: "label",
       model: "claude-sonnet-4-5",
       fixes: true,
     });
     expect(await effectiveRepoSettings(database, repoId)).toEqual({
-      mode: "every_pr",
+      mode: "label",
       model: "claude-sonnet-4-5",
       fixes: true,
     });

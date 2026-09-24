@@ -62,9 +62,9 @@ export default function IntroductionPage() {
           your provider account.
         </P>
         <P>
-          By default a repository is reviewed when a pull request gets the{" "}
-          <code>ai-review</code> label, and again on every push after that. Switch a
-          repository to review every pull request, or turn it off, from its settings page. A
+          By default every pull request is reviewed when it is opened, and again on every
+          push. Switch a repository to review only pull requests with the{" "}
+          <code>ai-review</code> label, or turn it off, from its settings page. A
           new push replaces a review still in progress, so comments are always on the latest
           commit.
         </P>

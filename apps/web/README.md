@@ -168,7 +168,8 @@ in a suspended or uninstalled organization get a 204 and write nothing
 repo's `repo_settings` row. Everyone who can read the repo sees it; only a
 repository owner can save it. A repo with no row gets the defaults.
 
-- **Mode**: `off`, `label` (the default) or `every_pr`, as above.
+- **Mode**: `off`, `label` or `every_pr` (the default), as above. Repos that
+  existed before migration `0014` were given a `label` row, so they keep it.
 - **Model**: one of the models offered for the organization key's provider, or
   the provider default. A model the provider does not offer (say, after the key
   changed provider) fails the job with no retry and a check run naming it.

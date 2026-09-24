@@ -28,8 +28,8 @@ const HEADINGS: Heading[] = [
 ];
 
 const MODES = [
-  ["On the ai-review label", "Default. A pull request is reviewed when it gets the label, and on every push while it carries it."],
-  ["Every pull request", "Every pull request is reviewed when it is opened or reopened, and on every push."],
+  ["Every pull request", "Default. Every pull request is reviewed when it is opened or reopened, and on every push."],
+  ["On the ai-review label", "A pull request is reviewed when it gets the label, and on every push while it carries it."],
   ["Off", "Nothing is reviewed. The repository's past reviews stay on the dashboard."],
 ] as const;
 
