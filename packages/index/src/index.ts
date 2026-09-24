@@ -9,6 +9,12 @@ export {
   type RepositoryIndex,
   type RepositoryIndexInput,
 } from "#src/build";
+export {
+  findCodeowners,
+  ownersOf,
+  parseCodeowners,
+  type CodeownersRule,
+} from "#src/codeowners";
 export { nodesInCycles } from "#src/cycles";
 export {
   collectEntryPoints,
