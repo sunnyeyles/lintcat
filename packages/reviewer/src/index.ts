@@ -71,6 +71,7 @@ export {
   type ReviewIndex,
   type ReviewIndexRequest,
 } from "#src/build-index";
+export { assessBlastRadius } from "#src/blast-radius";
 export {
   addSuppression,
   computeHints,

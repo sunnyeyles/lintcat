@@ -64,12 +64,22 @@ describe("scoreRisk", () => {
     );
 
     expect(risk.band).toBe("high");
-    expect(risk.score).toBe(72);
+    expect(risk.score).toBe(80);
     expect(risk.factors).toEqual([
-      { label: "41 files depend on this change", points: 31 },
-      { label: "crosses 3 packages", points: 16 },
-      { label: "reaches 3 entry points", points: 15 },
+      { label: "41 files depend on this change", points: 45 },
+      { label: "crosses 3 packages", points: 15 },
+      { label: "reaches 3 entry points", points: 10 },
       { label: "2 changed source files have no tests", points: 10 },
+    ]);
+  });
+
+  it("rates 64 dependents across 3 packages high with nothing else", () => {
+    const risk = scoreRisk(impactOf({ transitive: 64 }, ["a", "b", "c"]));
+
+    expect(risk.band).toBe("high");
+    expect(risk.factors).toEqual([
+      { label: "64 files depend on this change", points: 50 },
+      { label: "crosses 3 packages", points: 15 },
     ]);
   });
 
@@ -112,7 +122,7 @@ describe("scoreRisk", () => {
       impactOf({ transitive: 1, brokenImporters: 2, inCycle: 1 }),
     );
 
-    expect(risk.factors.map((factor) => factor.points)).toEqual([10, 6, 5]);
+    expect(risk.factors.map((factor) => factor.points)).toEqual([10, 8, 5]);
     expect(risk.factors.map((factor) => factor.label)).toEqual([
       "breaks 2 imports",
       "1 file depends on this change",
@@ -140,21 +150,13 @@ describe("scoreRisk", () => {
     expect(sumOf(risk)).toBe(100);
   });
 
-  it("puts the band edges at 35 and 70", () => {
-    const fourPackages = ["a", "b", "c", "d"];
+  it("puts the band edges at 25 and 60", () => {
+    const threePackages = ["a", "b", "c"];
     const cases = [
-      [impactOf({ transitive: 9, entryPoints: 3 }), 34, "low"],
-      [impactOf({ transitive: 10, entryPoints: 3 }), 35, "medium"],
-      [
-        impactOf({ transitive: 9, entryPoints: 3, untested: 3 }, fourPackages),
-        69,
-        "medium",
-      ],
-      [
-        impactOf({ transitive: 10, entryPoints: 3, untested: 3 }, fourPackages),
-        70,
-        "high",
-      ],
+      [impactOf({ transitive: 4, untested: 1 }), 24, "low"],
+      [impactOf({ transitive: 7 }), 25, "medium"],
+      [impactOf({ transitive: 40 }, threePackages), 59, "medium"],
+      [impactOf({ transitive: 41 }, threePackages), 60, "high"],
     ] as const;
 
     for (const [impact, score, band] of cases) {
