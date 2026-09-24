@@ -249,7 +249,7 @@ export function MapExplorer() {
               <Skeleton className="h-24 w-full" />
             </div>
           )}
-          <MapLegend heat />
+          <MapLegend />
         </aside>
       </div>
     </div>

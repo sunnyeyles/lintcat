@@ -15,7 +15,7 @@ export type FindingCategory = z.infer<typeof findingCategorySchema>;
  * A mechanical replacement of new-side lines `startLine`..`endLine`.
  * `expected` is that range's exact current text; a mismatch discards the patch.
  */
-export const findingPatchSchema = z
+const findingPatchSchema = z
   .object({
     startLine: z.number().int().positive(),
     endLine: z.number().int().positive(),

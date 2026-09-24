@@ -5,7 +5,7 @@ import { findingCategorySchema } from "#src/review-finding";
 const count = z.number().int().nonnegative();
 
 /** One (category, title shape) pair and how the repository has treated it. */
-export const memoryShapeSchema = z
+const memoryShapeSchema = z
   .object({
     category: findingCategorySchema,
     shape: z.string().min(1).max(200),
@@ -19,7 +19,7 @@ export const memoryShapeSchema = z
 export type MemoryShape = z.infer<typeof memoryShapeSchema>;
 
 /** A shape a human marked as noise; it is never counted, only excluded. */
-export const suppressionSchema = z
+const suppressionSchema = z
   .object({
     category: findingCategorySchema,
     shape: z.string().min(1).max(200),

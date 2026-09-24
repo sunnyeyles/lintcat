@@ -10,7 +10,7 @@ import { packageOf } from "#src/workspace";
 export const MAX_IMPACT_FILES = 200;
 
 /** Importer hops followed from a changed file; 1 is its direct importers. */
-export const MAX_IMPACT_DEPTH = 3;
+const MAX_IMPACT_DEPTH = 3;
 
 const MAX_HUBS = 3;
 

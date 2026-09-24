@@ -131,7 +131,7 @@ export function ReviewMap({ graph: input, heat: inputHeat, changedPaths, endpoin
             onShowFindings={showFile}
           />
           <GroupList clustering={scene.clustering} onToggle={toggleGroup} />
-          <MapLegend heat />
+          <MapLegend />
         </aside>
       </div>
     </div>

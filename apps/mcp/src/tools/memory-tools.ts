@@ -11,8 +11,9 @@ import { z } from "zod";
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
-import { git } from "#src/git";
+import { repositoryRoot } from "#src/local-git-client";
 import { openLocalMemoryStore } from "#src/local-memory-store";
+import { repoPathSchema } from "#src/tools/shared";
 
 /** No base branch is resolved here: suppressing needs the checkout, not a diff. */
 async function checkoutRoot(
@@ -21,7 +22,7 @@ async function checkoutRoot(
   repoPath: string | undefined,
 ): Promise<string> {
   const from = await resolveCheckoutPath(environment, client, repoPath);
-  return (await git(from, ["rev-parse", "--show-toplevel"])).trim();
+  return repositoryRoot(from);
 }
 
 export function registerMemoryTools(
@@ -39,10 +40,7 @@ export function registerMemoryTools(
         "and title shape, so the same finding in another file is suppressed too. review_local_changes " +
         "then excludes those findings and reports how many it hid. Writes one local file; no network.",
       inputSchema: {
-        repoPath: z
-          .string()
-          .optional()
-          .describe("Path to the git checkout; defaults to the server's working directory."),
+        repoPath: repoPathSchema,
         category: z
           .string()
           .min(1)

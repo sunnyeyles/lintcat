@@ -16,7 +16,7 @@ export interface AgentDefinition {
 }
 
 /** The "# Repository history" block, or "" when there is nothing to say. */
-export function renderRepositoryHints(
+function renderRepositoryHints(
   hints: readonly string[] | undefined,
 ): string {
   if (hints === undefined || hints.length === 0) {

@@ -1,6 +1,6 @@
 /** Postgres (Neon) access via Drizzle: the `db()` client and the table schema. */
 export { db, withWriteDatabase, type Database } from "./client";
-export { findLocalEnvFile } from "./env";
+export { findLocalEnvFile, requiredEnv } from "./env";
 export {
   ingestReviewRecord,
   type IngestFailure,
@@ -57,7 +57,6 @@ export {
 } from "./rate-limits";
 export { modelKeyEncryptionKey, openSecret, parseEncryptionKey, sealSecret } from "./secret-box";
 export {
-  DEFAULT_REPO_SETTINGS,
   effectiveRepoSettings,
   findRepoSettings,
   saveRepoSettings,
@@ -80,8 +79,6 @@ export {
   type ReadableRepo,
 } from "./repo-access";
 export {
-  claimSlug,
-  findSlugRedirect,
   renameOrganization,
   type OrganizationRename,
 } from "./slugs";

@@ -36,7 +36,6 @@ export {
 } from "#src/head-imports";
 export {
   computeImpact,
-  MAX_IMPACT_DEPTH,
   MAX_IMPACT_FILES,
   type BrokenImport,
   type Impact,
@@ -53,13 +52,11 @@ export {
 export {
   INDEXED_LANGUAGES,
   languageOf,
-  summariseLanguages,
   type ImportResolution,
   type LanguageCoverage,
 } from "#src/languages";
 export {
   parseWorkspaceYamlPackages,
-  readPathAliases,
   type PackageManifest,
   type PathAlias,
 } from "#src/manifests";
@@ -77,15 +74,10 @@ export {
   type SnapshotEdge,
 } from "#src/snapshot";
 export {
-  createImportResolver,
-  isRelativeSpecifier,
-  moduleCandidates,
-  resolveRelativeImport,
   type ResolvedImport,
 } from "#src/resolve";
 export { classifyFileRole, ROLE_PRECEDENCE, type FileRole } from "#src/roles";
 export {
-  packageOf,
   readWorkspace,
   type WorkspaceModel,
   type WorkspacePackage,

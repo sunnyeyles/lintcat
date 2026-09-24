@@ -9,8 +9,6 @@ import type {
   MapImport,
 } from "@/lib/codebase-map/types";
 
-export const SEVERITIES = ["high", "medium", "low"] as const;
-
 export type { FindingCounts };
 
 /** Counts per path, plain so it crosses the server boundary unchanged. */

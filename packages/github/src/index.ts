@@ -24,7 +24,6 @@ export { httpStatus, isPermissionError } from "#src/errors";
 export {
   SEARCH_LIMITS,
   boundSnippets,
-  buildMatch,
   formatSearchQuery,
   matchesTerms,
   parseSearchQuery,
