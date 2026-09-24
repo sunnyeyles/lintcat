@@ -1,6 +1,6 @@
 /**
  * Reads GitHub's repository tarball into a path -> text map. Dependency-light
- * on purpose: gunzip from node:zlib and a ustar reader, so the action stays small.
+ * on purpose: gunzip from node:zlib and a ustar reader, so the bundles stay small.
  */
 import { gunzipSync } from "node:zlib";
 

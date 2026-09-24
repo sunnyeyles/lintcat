@@ -102,7 +102,7 @@ export async function applyFixes(
     const reason =
       status === UNPROCESSABLE
         ? "the branch moved during the review"
-        : "the workflow token cannot write to this branch";
+        : "the token cannot write to this branch";
     deps.logger.info("review.fixes.degraded", { ...fields, reason, status });
     return { status: "unavailable", reason };
   }

@@ -6,11 +6,9 @@ import {
   decodeRepositoryGraph,
   snapshotRepositoryIndex,
 } from "@pr-review/index";
-import { createCapturingLogger } from "@pr-review/logging";
 import { reviewRecordSchema, type ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
-import { createDashboardPublisher } from "#src/publish-dashboard";
 import {
   dashboardDelivery,
   dashboardReview,
@@ -135,23 +133,21 @@ describe("dashboardReview", () => {
 });
 
 describe("dashboardDelivery", () => {
-  it("sends no patch source text in the ingest body", async () => {
+  it("sends no patch source text in the dashboard record", async () => {
     const bodies: string[] = [];
-    const fetch = async (_url: string | URL | Request, init?: RequestInit) => {
-      bodies.push(String(init?.body));
-      return Response.json({ reviewId: 1 });
-    };
     const { delivery, recorded } = recordingDelivery();
 
-    await dashboardDelivery(
-      delivery,
-      createDashboardPublisher({
-        baseUrl: "https://dash.example.app",
-        token: "t",
-        fetch,
-        logger: createCapturingLogger().logger,
-      }),
-    ).publishRun?.(target, patchedRun);
+    await dashboardDelivery(delivery, async (published, review) => {
+      bodies.push(
+        JSON.stringify({
+          owner: published.owner,
+          repo: published.repo,
+          prNumber: published.pullRequestNumber,
+          headSha: published.headSha,
+          ...review,
+        }),
+      );
+    }).publishRun?.(target, patchedRun);
 
     expect(bodies).toHaveLength(1);
     const body = bodies[0]!;

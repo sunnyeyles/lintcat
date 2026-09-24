@@ -331,7 +331,7 @@ html { scroll-behavior: smooth; }
   <nav class="rail" aria-label="Pipeline stages">
     <div class="rail-title">Stages</div>
     <ol>
-      <li><a href="#s1"><span class="n">01</span><span>Inspect event</span></a></li>
+      <li><a href="#s1"><span class="n">01</span><span>Webhook</span></a></li>
       <li><a href="#s2"><span class="n">02</span><span>Boot</span></a></li>
       <li><a href="#s3"><span class="n">03</span><span>Load</span></a></li>
       <li><a href="#s4"><span class="n">04</span><span>The pipeline</span></a></li>
@@ -414,20 +414,20 @@ html { scroll-behavior: smooth; }
           <g class="edge-g k-ok" data-step="16"><path id="ps2" class="edge" d="M360 512V532H500V552" marker-end="url(#arr-k-ok)"/><circle class="pk" r="3.5"><animateMotion dur="1.8s" begin="indefinite" repeatCount="indefinite"><mpath href="#ps2"/></animateMotion></circle></g>
 
           <!-- nodes -->
-          <g class="n k-term k-boot" transform="translate(210 20)" data-step="1" data-caption="A pull_request event lands on the runner.">
+          <g class="n k-term k-boot" transform="translate(210 20)" data-step="1" data-caption="A signed pull_request webhook reaches the GitHub App.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-bolt" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="165" y="19">pull_request event</text><text class="sub" x="165" y="33">GITHUB_EVENT_PATH</text>
+            <text class="name" x="165" y="19">pull_request webhook</text><text class="sub" x="165" y="33">signature-checked · x-hub-signature-256</text>
           </g>
-          <g class="n k-boot" transform="translate(210 84)" data-step="3" data-caption="Is this a reviewable action? Anything else exits cleanly.">
+          <g class="n k-boot" transform="translate(210 84)" data-step="3" data-caption="Does the repository's mode want a review? If so, queue one job for this head; anything else is a 204.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-search" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="165" y="19">inspectEvent</text><text class="sub" x="165" y="33">reviewable? otherwise a clean no-op</text>
+            <text class="name" x="165" y="19">enqueueReviewJob</text><text class="sub" x="165" y="33">review mode · one job per head · ping</text>
           </g>
-          <g class="n k-boot" transform="translate(210 148)" data-step="5" data-caption="Wire up the client, the model, tracing and prompts.">
+          <g class="n k-boot" transform="translate(210 148)" data-step="5" data-caption="The worker claims the job, mints an installation token and opens the model key.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-play" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="165" y="19">runAction</text><text class="sub" x="165" y="33">client · model · tracing · prompts</text>
+            <text class="name" x="165" y="19">runReviewJob</text><text class="sub" x="165" y="33">lease · installation token · model key</text>
           </g>
           <g class="n k-boot" transform="translate(210 212)" data-step="7" data-caption="Load the pull request, its changed files and the diff.">
             <rect class="ring" width="300" height="44" rx="4"/><rect class="box" width="300" height="44" rx="4"/>
@@ -454,15 +454,15 @@ html { scroll-behavior: smooth; }
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-file" x="15" y="13" width="18" height="18"/>
             <text class="name" x="165" y="19">render</text><text class="sub" x="165" y="33">pure · no I/O</text>
           </g>
-          <g class="n k-ok" transform="translate(100 552)" data-step="17" data-caption="Review comments and a check run, or the job summary when a fork denies write access.">
+          <g class="n k-ok" transform="translate(100 552)" data-step="17" data-caption="Fixes and review comments first, then a check run that annotates whatever no comment carries.">
             <rect class="ring" width="240" height="44" rx="4"/><rect class="box" width="240" height="44" rx="4"/>
             <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-comment" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="135" y="19">review comments</text><text class="sub" x="135" y="33">then a check run</text>
+            <text class="name" x="135" y="19">review comments</text><text class="sub" x="135" y="33">fixes first · inline on the head SHA</text>
           </g>
           <g class="n k-ok" transform="translate(380 552)" data-step="17">
             <rect class="ring" width="240" height="44" rx="4"/><rect class="box" width="240" height="44" rx="4"/>
-            <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-list" x="15" y="13" width="18" height="18"/>
-            <text class="name" x="135" y="19">job summary</text><text class="sub" x="135" y="33">fork fallback · 403/404</text>
+            <circle class="av" cx="24" cy="22" r="13"/><use class="ico" href="#i-check" x="15" y="13" width="18" height="18"/>
+            <text class="name" x="135" y="19">check run</text><text class="sub" x="135" y="33">annotates if comments get 403/404</text>
           </g>
         </svg>
 
@@ -475,28 +475,40 @@ html { scroll-behavior: smooth; }
       </div>
     </section>
 
-    <!-- ========== 1 · EVENT ========== -->
+    <!-- ========== 1 · WEBHOOK ========== -->
     <section class="stage" id="s1">
       <div class="stage-head">
         <span class="stage-num">01</span>
         <h2>Is this even a review?</h2>
       </div>
       <div class="paths">
-        <span class="chip">apps/action/src/<b>event.ts</b> · inspectEvent</span>
-        <span class="chip">packages/schemas/src/<b>pull-request-event.ts</b> · the trigger list</span>
+        <span class="chip">apps/web/app/api/github/webhook/<b>handler.ts</b> · handleGithubWebhook</span>
+        <span class="chip">packages/db/src/<b>review-jobs.ts</b> · enqueueReviewJob</span>
       </div>
       <div class="prose">
         <p>
-          This runs before any client and any model — it is
-          the first thing <code>runAction</code> does after parsing
-          <code>GITHUB_EVENT_PATH</code>. An event that will not be reviewed
-          has nothing to load, so asking the question first is what lets the
-          answer "no" cost nothing.
+          The review runs as a GitHub App. Every <code>pull_request</code>
+          webhook lands on the web app, which checks the
+          <code>x-hub-signature-256</code> HMAC before it parses a byte. It
+          never reviews anything itself: GitHub gives a webhook ten seconds,
+          so the handler only decides whether a review is wanted and, if so,
+          records one.
         </p>
         <p>
-          Two outcomes, and the difference between them is the whole point of
-          this file.
+          The answer comes from the repository's review mode. The route
+          reads it from the database, so it can change without a redeploy.
         </p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mode</th><th>Reviews on</th></tr></thead>
+          <tbody>
+            <tr><td><code>every_pr</code> (default)</td><td><code>opened</code>, <code>synchronize</code>, <code>reopened</code></td></tr>
+            <tr><td><code>label</code></td><td><code>labeled</code> with <code>ai-review</code>, then each push or reopen while the label stays</td></tr>
+            <tr><td><code>off</code></td><td>Nothing</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="table-wrap">
@@ -504,27 +516,35 @@ html { scroll-behavior: smooth; }
           <thead><tr><th>Outcome</th><th>When</th><th>Result</th></tr></thead>
           <tbody>
             <tr>
+              <td>Rejected</td>
+              <td>The signature does not match the webhook secret</td>
+              <td><span class="badge stop">401</span>, nothing parsed</td>
+            </tr>
+            <tr>
               <td>Not a review</td>
-              <td>Wrong event name, or an ignored action like <code>labeled</code></td>
-              <td>Logs <code>review.skipped</code>, step <span class="badge ok">succeeds</span></td>
+              <td>Another action, a closed pull request, the mode says no, or the repository is not installed</td>
+              <td><span class="badge ok">204</span>; past the action filter, <code>review_job.skipped</code> logs why</td>
             </tr>
             <tr>
               <td>Malformed</td>
-              <td>Claims to be a supported <code>pull_request</code> event but fails the schema</td>
-              <td>Throws — <span class="badge stop">fails</span> the workflow</td>
+              <td>A <code>pull_request</code> payload that fails the schema</td>
+              <td><span class="badge stop">400</span>, with the Zod issues</td>
+            </tr>
+            <tr>
+              <td>Queued</td>
+              <td>The mode wants this head reviewed</td>
+              <td>A <code>review_jobs</code> row, <code>review_job.queued</code>, and a ping to the worker</td>
             </tr>
           </tbody>
         </table>
       </div>
       <div class="prose">
         <p>
-          Most workflow triggers are not reviews, so ignoring one quietly has to
-          be a success. A payload that <em>should</em> have parsed and didn't is
-          a bug worth failing over.
-        </p>
-        <p>
-          A reviewable event yields the target, the base SHA, and whether the
-          pull request came from a fork. Only now does boot begin.
+          Queueing is idempotent. The delivery id and a unique index on the
+          active head make a redelivered webhook a no-op
+          (<code>review_job.duplicate</code>), and a new head supersedes every
+          queued or running job for an older one in the same transaction — so
+          a burst of pushes costs one review, of the latest commit.
         </p>
       </div>
     </section>
@@ -533,40 +553,44 @@ html { scroll-behavior: smooth; }
     <section class="stage" id="s2">
       <div class="stage-head">
         <span class="stage-num">02</span>
-        <h2>Boot — the Action entrypoint</h2>
+        <h2>Boot — the worker job</h2>
       </div>
       <div class="paths">
-        <span class="chip">apps/action/src/<b>index.ts</b></span>
+        <span class="chip">apps/worker/src/<b>run-job.ts</b> · runReviewJob</span>
       </div>
       <div class="prose">
         <p>
-          <code>runEntrypoint()</code> runs at import time, but returns
-          immediately unless <code>GITHUB_ACTIONS === "true"</code> — so
-          importing the module in a test does no work and needs no
-          configuration.
+          The worker claims the next due job under a lease, and a heartbeat
+          renews it while the review runs. A lapsed lease makes the job
+          claimable again; a renewal that finds the job no longer running —
+          a newer push superseded it — aborts the run, and every publish
+          checks first, so a superseded review writes nothing.
         </p>
         <p>
-          <code>runAction</code> then builds each dependency in a deliberate
-          order: the GitHub client first, then the model client, so a missing
-          token or key fails the step before any review work begins.
+          <code>runReviewJob</code> then builds each dependency in order,
+          cheapest refusal first, so nothing reaches a model until the job is
+          known to be worth running.
         </p>
       </div>
 
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Step</th><th>Function</th><th>Fails the run?</th></tr></thead>
+          <thead><tr><th>Step</th><th>Function</th><th>If it says no</th></tr></thead>
           <tbody>
-            <tr><td>GitHub client</td><td><code>createTokenClient</code></td><td><span class="badge stop">Yes</span> missing token</td></tr>
-            <tr><td>Model client</td><td><code>createLanguageModel</code></td><td><span class="badge stop">Yes</span> unknown provider or missing key</td></tr>
-            <tr><td>Langfuse tracing</td><td><code>createLangfuseRuntime</code></td><td><span class="badge ok">No</span> optional</td></tr>
-            <tr><td>Managed prompts</td><td><code>loadManagedPrompts</code></td><td><span class="badge ok">No</span> falls back per prompt</td></tr>
+            <tr><td>GitHub client</td><td><code>createInstallationToken</code></td><td>A short-lived installation token, then <code>createTokenClient</code> over it</td></tr>
+            <tr><td>Head check</td><td><code>getPullRequest</code></td><td><span class="badge ok">Superseded</span> the head moved; nothing published</td></tr>
+            <tr><td>Model key</td><td><code>readModelKey</code></td><td><span class="badge warn">Neutral</span> check run asking an owner to add one; no model call</td></tr>
+            <tr><td>Model client</td><td><code>createLanguageModel</code></td><td><span class="badge stop">Failure</span> check run for an unknown model, never retried</td></tr>
+            <tr><td>Fix guard</td><td><code>isFixCommit</code></td><td><span class="badge ok">No</span> fixes when the head is our own fix commit</td></tr>
           </tbody>
         </table>
       </div>
       <div class="prose">
         <p>
-          Tracing starts before the prompt fetch, so the fetch's own spans are
-          captured; prompts resolve before anything that consumes them is built.
+          The model key is the organization's own, stored encrypted and
+          opened only here; it and the token are redacted from every log line
+          and error. The repository's settings choose the model and whether
+          verified fixes are committed.
         </p>
         <p>
           <code>createLanguageModel</code> is the only place a provider is
@@ -575,6 +599,12 @@ html { scroll-behavior: smooth; }
           <code>anthropic</code> (<code>claude-sonnet-5</code>) — and every
           model call in the run goes through
           <code>generateText</code> from the AI SDK against whichever it built.
+        </p>
+        <p>
+          Then <code>runReview</code>, with <code>githubDelivery</code> for
+          the pull request and a publisher that records the run for the
+          dashboard. A failure retries, up to three attempts; the last one
+          publishes a <span class="badge stop">failure</span> check run.
         </p>
       </div>
 
@@ -991,7 +1021,6 @@ html { scroll-behavior: smooth; }
       </div>
       <div class="paths">
         <span class="chip">packages/reviewer/src/<b>publish-review.ts</b> · deliverReview</span>
-        <span class="chip">apps/action/src/<b>summary.ts</b> · createFallbackPublisher</span>
       </div>
       <div class="prose">
         <p>
@@ -1000,9 +1029,12 @@ html { scroll-behavior: smooth; }
           already left. Annotations are the fallback surface, not a duplicate.
         </p>
         <p>
-          Then the check run. On a <strong>403 or 404</strong>, write the same
-          rendered review to the workflow job summary and exit cleanly — that is
-          the fork case, where GitHub hands the workflow a read-only token.
+          Then the check run, always. Posting comments is the only write that
+          degrades: on a <strong>403 or 404</strong> it reports
+          <code>"unavailable"</code> and the check run annotates every finding
+          instead. The installation token can write to the repository, so
+          there is no second fallback — a check run that fails to post fails
+          the job, which retries.
         </p>
       </div>
       <div class="table-wrap">
@@ -1011,7 +1043,7 @@ html { scroll-behavior: smooth; }
           <tbody>
             <tr><td><code>"posted"</code></td><td>Fresh comments landed on this commit</td><td>No</td></tr>
             <tr><td><code>"already-posted"</code></td><td>Every finding was commented on an earlier commit</td><td>No</td></tr>
-            <tr><td><code>"unavailable"</code></td><td>The token cannot post comments (fork)</td><td>Yes</td></tr>
+            <tr><td><code>"unavailable"</code></td><td>The token cannot post comments (403/404)</td><td>Yes</td></tr>
             <tr><td><code>"nothing-to-post"</code></td><td>No findings</td><td>N/A</td></tr>
           </tbody>
         </table>
@@ -1027,7 +1059,7 @@ html { scroll-behavior: smooth; }
 
       <div class="prose">
         <p>
-          Everything else propagates and fails the step: <code>401</code> is a
+          Everything else propagates and fails the job: <code>401</code> is a
           bad token, <code>429</code> is rate limiting, <code>5xx</code> is an
           outage, and an error with no status at all is a network failure. None
           of those may masquerade as a delivered review.
@@ -1035,8 +1067,8 @@ html { scroll-behavior: smooth; }
         <p>
           The cost of being wrong is asymmetric in both directions, which is why
           the rule is this narrow. Too permissive, and a real GitHub outage
-          renders as a clean review nobody investigates. Too strict, and every
-          fork pull request fails CI.
+          renders as a clean review nobody investigates. Too strict, and a
+          repository that withholds comment access never gets a review.
         </p>
       </div>
     </section>
@@ -1051,15 +1083,15 @@ html { scroll-behavior: smooth; }
         <table>
           <thead><tr><th>Event</th><th>Result</th></tr></thead>
           <tbody>
-            <tr><td>Missing API key or token</td><td><span class="badge stop">Fails</span></td></tr>
-            <tr><td>Malformed <code>pull_request</code> payload</td><td><span class="badge stop">Fails</span></td></tr>
-            <tr><td>The agent fails</td><td><span class="badge stop">Fails</span> — re-runnable from the Actions UI</td></tr>
+            <tr><td>Bad webhook signature</td><td><span class="badge stop">401</span> — nothing queued</td></tr>
+            <tr><td>Malformed <code>pull_request</code> payload</td><td><span class="badge stop">400</span> — nothing queued</td></tr>
+            <tr><td>No model key saved</td><td><span class="badge warn">Neutral</span> check run asking for one — no model call</td></tr>
+            <tr><td>A newer push, or the head moved</td><td><span class="badge ok">Superseded</span> — nothing published for the old head</td></tr>
+            <tr><td>The agent fails</td><td><span class="badge stop">Fails</span> — retried, up to three attempts, then a failure check run</td></tr>
             <tr><td>The agent hits the 12-turn cap</td><td><span class="badge stop">Fails</span> — silence is not "found nothing"</td></tr>
-            <tr><td>Unsupported event or ignored action</td><td><span class="badge ok">Clean no-op</span></td></tr>
+            <tr><td>Unsupported event, ignored action, or mode says no</td><td><span class="badge ok">Clean no-op</span> — 204</td></tr>
             <tr><td>A tool call fails</td><td><span class="badge warn">Continues</span> — reported to the model</td></tr>
-            <tr><td>Langfuse unreachable</td><td><span class="badge warn">Continues</span> — in-code prompts, no traces</td></tr>
-            <tr><td>Check run forbidden (fork)</td><td><span class="badge warn">Degrades</span> — job summary instead</td></tr>
-            <tr><td>Comments forbidden (fork)</td><td><span class="badge warn">Degrades</span> — the check run annotates instead</td></tr>
+            <tr><td>Comments forbidden (403/404)</td><td><span class="badge warn">Degrades</span> — the check run annotates instead</td></tr>
             <tr><td>Every finding already commented on an earlier commit</td><td>No review posted and no annotations; the check run summary still lists them</td></tr>
           </tbody>
         </table>
@@ -1075,21 +1107,24 @@ html { scroll-behavior: smooth; }
       <div class="prose">
         <p>
           Every event of one review carries <code>repository</code>,
-          <code>pullRequestNumber</code>, and <code>headSha</code> — so an
+          <code>pullRequestNumber</code>, and <code>headSha</code>, and the
+          worker's events add <code>jobId</code> and <code>attempt</code> — so an
           operator can answer "what happened to the review for PR&nbsp;N?" from
           the logs alone.
         </p>
       </div>
       <div class="log mono">
-review.model_selected<br>
-review.started<br>
-&nbsp;&nbsp;→ review.loaded<br>
-&nbsp;&nbsp;&nbsp;&nbsp;→ agent.started&nbsp;&nbsp;→ agent.completed <span class="dim">/</span> agent.failed<br>
-&nbsp;&nbsp;&nbsp;&nbsp;→ findings.validated<br>
-&nbsp;&nbsp;&nbsp;&nbsp;→ patches.verified<br>
-&nbsp;&nbsp;→ review.fixes.applied <span class="dim">/</span> .degraded <span class="dim">/</span> .disabled<br>
-&nbsp;&nbsp;→ review.comments.published <span class="dim">/</span> .degraded <span class="dim">/</span> .list_failed<br>
-&nbsp;&nbsp;→ review.published <span class="dim">/</span> review.published.degraded <span class="dim">/</span> review.failed
+review_job.queued <span class="dim">/</span> .duplicate <span class="dim">/</span> .skipped<br>
+review_job.started<br>
+&nbsp;&nbsp;→ review.started<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ review.loaded<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ agent.started&nbsp;&nbsp;→ agent.completed <span class="dim">/</span> agent.failed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ findings.validated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ patches.verified<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ review.fixes.applied <span class="dim">/</span> .degraded <span class="dim">/</span> .disabled<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ review.comments.published <span class="dim">/</span> .degraded <span class="dim">/</span> .list_failed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;→ review.published <span class="dim">/</span> review.failed<br>
+&nbsp;&nbsp;→ review_job.succeeded <span class="dim">/</span> .superseded <span class="dim">/</span> .no_model_key <span class="dim">/</span> .retrying <span class="dim">/</span> .failed
       </div>
       <div class="prose">
         <p>
@@ -1111,19 +1146,18 @@ review.started<br>
           <thead><tr><th>Path</th><th>Owns</th></tr></thead>
           <tbody>
             <tr><th colspan="2">Packaging</th></tr>
-            <tr><td><code>apps/action/action.yml</code></td><td>The Action manifest: every input, and the bundle it runs</td></tr>
-            <tr><td><code>scripts/build-bundle.mjs</code></td><td>esbuild → one self-contained <code>dist/index.mjs</code></td></tr>
+            <tr><td><code>scripts/build-bundle.mjs</code></td><td>esbuild → one self-contained <code>dist/index.mjs</code> for the worker, CLI and MCP server</td></tr>
             <tr><th colspan="2" style="padding-top:1.5rem">01 · Is this even a review?</th></tr>
-            <tr><td><code>apps/action/src/event.ts</code></td><td>Actions event parsing, and the ignore-quietly rule</td></tr>
-            <tr><td><code>packages/schemas/src/pull-request-event.ts</code></td><td>Which <code>pull_request</code> actions trigger a review</td></tr>
+            <tr><td><code>apps/web/app/api/github/webhook/handler.ts</code></td><td>Signature check, the review mode, and which <code>pull_request</code> actions queue a review</td></tr>
+            <tr><td><code>packages/db/src/review-jobs.ts</code></td><td>The job queue: dedup, supersede, lease, retry</td></tr>
+            <tr><td><code>apps/web/lib/worker-ping.ts</code></td><td>Waking the worker once a job is queued</td></tr>
             <tr><th colspan="2" style="padding-top:1.5rem">02 · Boot</th></tr>
-            <tr><td><code>apps/action/src/index.ts</code></td><td>Inputs, client construction, wiring — every dependency is built here</td></tr>
-            <tr><td><code>packages/github/src/token.ts</code></td><td>The Octokit client, from the workflow token</td></tr>
+            <tr><td><code>apps/worker/src/run-job.ts</code></td><td>One job end to end: token, head check, model key, wiring, retry</td></tr>
+            <tr><td><code>packages/github/src/app-client.ts</code></td><td>The App's JWT, and minting an installation token</td></tr>
+            <tr><td><code>packages/github/src/token.ts</code></td><td>The Octokit client over an installation token</td></tr>
             <tr><td><code>packages/ai/src/model.ts</code></td><td>Provider registry: <code>anthropic</code> or <code>openai</code>, and the default model</td></tr>
             <tr><td><code>packages/ai/src/agents/definition.ts</code></td><td>What the agent is, and its system prompt</td></tr>
             <tr><td><code>packages/ai/src/agents/general-agent.ts</code></td><td>The one review agent's role and focus</td></tr>
-            <tr><td><code>packages/ai/src/prompts.ts</code></td><td>Managed prompts and their fallback</td></tr>
-            <tr><td><code>apps/action/src/langfuse.ts</code></td><td>Span export for one run</td></tr>
             <tr><th colspan="2" style="padding-top:1.5rem">03 · Load</th></tr>
             <tr><td><code>packages/reviewer/src/review-target.ts</code></td><td>The target triple every log event carries</td></tr>
             <tr><td><code>packages/reviewer/src/review-pull-request.ts</code></td><td>One review, end to end; the side-effect boundary</td></tr>
@@ -1146,7 +1180,6 @@ review.started<br>
             <tr><td><code>packages/reviewer/src/publish-review.ts</code></td><td>Fixes, then comments, then check run; which surface carries what</td></tr>
             <tr><td><code>packages/reviewer/src/apply-fixes.ts</code></td><td>Committing verified fixes, and every reason not to</td></tr>
             <tr><td><code>packages/github/src/errors.ts</code></td><td>What a 403/404 means for a write</td></tr>
-            <tr><td><code>apps/action/src/summary.ts</code></td><td>Fork fallback to the job summary</td></tr>
             <tr><td><code>packages/logging/src/index.ts</code></td><td>One JSON line per lifecycle event</td></tr>
             <tr><th colspan="2" style="padding-top:1.5rem">Proving it</th></tr>
             <tr><td><code>evals/fixtures/</code></td><td>Fixture repositories, each a pull request with a known answer</td></tr>

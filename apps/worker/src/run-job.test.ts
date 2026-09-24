@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import type { LanguageModelConfig, ReviewModel } from "@pr-review/ai";
 import { CHECK_RUN_NAME } from "@pr-review/github";
+import { FIX_COMMIT_MARKER } from "@pr-review/reviewer";
 import {
   finalFindingsJson,
   headSha,
@@ -395,6 +396,33 @@ describe("runReviewJob repo settings", () => {
     expect(await runReviewJob(d, job)).toBe("succeeded");
 
     expect(github.createCommitOnBranch).toHaveBeenCalledOnce();
+  });
+
+  it("never commits a fix on top of its own fix commit", async () => {
+    await withKey();
+    await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: true });
+    const job = await claim();
+    github.getFileContents.mockResolvedValue(FILE);
+    github.getCommitMessage.mockResolvedValue(`Apply fixes\n\n${FIX_COMMIT_MARKER}`);
+    const { deps: d } = deps({ createLanguageModel: () => answeringWithFix() });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.createCommitOnBranch).not.toHaveBeenCalled();
+    expect(github.createReview).toHaveBeenCalledOnce();
+  });
+
+  it("commits no fix when the head commit cannot be read", async () => {
+    await withKey();
+    await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: true });
+    const job = await claim();
+    github.getFileContents.mockResolvedValue(FILE);
+    github.getCommitMessage.mockRejectedValue(new Error("boom"));
+    const { deps: d } = deps({ createLanguageModel: () => answeringWithFix() });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.createCommitOnBranch).not.toHaveBeenCalled();
   });
 
   it("offers a verified fix as a suggestion, not a commit, with fixes off by default", async () => {

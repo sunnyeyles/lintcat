@@ -29,7 +29,7 @@ export interface ReviewRequest {
 
 export interface ReviewResult {
   outcome: ReviewOutcome;
-  /** The check-run text the Action would have published. */
+  /** The check-run text the App would have published. */
   summary: string;
   /** The reduced review ran: one sampling request instead of the tool loop. */
   singleShot: boolean;

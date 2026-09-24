@@ -1,7 +1,4 @@
-/**
- * Token-authenticated GitHub client. Permissions come from the workflow's
- * `permissions:` block, which a fork's read-only token cannot satisfy.
- */
+/** Token-authenticated GitHub client; permissions are whatever the token was granted. */
 import { Octokit } from "@octokit/rest";
 
 import { createInstallationClient, type OctokitLike } from "#src/app";
@@ -12,7 +9,7 @@ import type {
 } from "#src/client";
 
 export interface GithubTokenConfig {
-  /** A GitHub token — in Actions, `${{ github.token }}`. */
+  /** An installation token, or a user's token for the MCP server. */
   token: string;
   /** Injectable Octokit factory; defaults to a real token-authenticated Octokit. */
   createOctokit?: ((token: string) => OctokitLike) | undefined;

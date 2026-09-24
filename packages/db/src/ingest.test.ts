@@ -14,8 +14,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Database } from "./client";
 import {
-  findOrganizationByIngestToken,
-  hashIngestToken,
   ingestReviewRecord,
 } from "./ingest";
 import {
@@ -76,35 +74,9 @@ beforeEach(async () => {
       accountType: "organization",
       slug: "acme",
       name: "Acme",
-      ingestToken: hashIngestToken("secret-token"),
     })
     .returning({ id: organizations.id });
   organizationId = inserted[0]!.id;
-});
-
-describe("hashIngestToken", () => {
-  it("is a stable sha-256 hex digest, not the secret", () => {
-    const hash = hashIngestToken("secret-token");
-    expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(hash).not.toContain("secret-token");
-    expect(hashIngestToken("secret-token")).toBe(hash);
-    expect(hashIngestToken("other-token")).not.toBe(hash);
-  });
-});
-
-describe("findOrganizationByIngestToken", () => {
-  it("finds the organization whose stored hash matches the secret", async () => {
-    const organization = await findOrganizationByIngestToken(
-      database,
-      "secret-token",
-    );
-    expect(organization?.id).toBe(organizationId);
-  });
-
-  it("returns undefined for an unknown or empty token", async () => {
-    expect(await findOrganizationByIngestToken(database, "nope")).toBeUndefined();
-    expect(await findOrganizationByIngestToken(database, "")).toBeUndefined();
-  });
 });
 
 describe("ingestReviewRecord", () => {
@@ -235,12 +207,11 @@ describe("ingestReviewRecord", () => {
     expect(result).toEqual({ ok: false, reason: "organization-not-found" });
   });
 
-  it("treats an uninstalled organization as unknown, by id and by token", async () => {
+  it("treats an uninstalled organization as unknown", async () => {
     await database
       .update(organizations)
       .set({ uninstalledAt: new Date() })
       .where(eq(organizations.id, organizationId));
-    expect(await findOrganizationByIngestToken(database, "secret-token")).toBeUndefined();
     expect(await ingestReviewRecord(database, organizationId, record)).toEqual({
       ok: false,
       reason: "organization-not-found",

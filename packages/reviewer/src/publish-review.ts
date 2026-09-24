@@ -93,8 +93,8 @@ export function createCheckRunPublisher(
 }
 
 /**
- * One advisory review on the head SHA. A fork's token lacks
- * `pull-requests: write`, so a permission failure must not stop the check run.
+ * One advisory review on the head SHA. A token may lack `pull-requests: write`,
+ * so a permission failure must not stop the check run.
  */
 export function createReviewCommentPublisher(
   client: ReviewPublishClient,
@@ -118,7 +118,7 @@ export function createReviewCommentPublisher(
       }
       logger.info("review.comments.degraded", {
         ...reviewCorrelation(target),
-        reason: "workflow token cannot post review comments",
+        reason: "the token cannot post review comments",
         status: httpStatus(error),
       });
       return "unavailable";

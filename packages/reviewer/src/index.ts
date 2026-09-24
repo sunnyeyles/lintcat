@@ -23,8 +23,6 @@ export {
   type PublishReviewComments,
 } from "#src/publish-review";
 export {
-  createDashboardPublisher,
-  type DashboardPublisherConfig,
   type DashboardReview,
   type PublishToDashboard,
 } from "#src/publish-dashboard";
@@ -70,13 +68,8 @@ export {
 } from "#src/review-run";
 export { buildReviewIndex, type ReviewIndexRequest } from "#src/build-index";
 export {
-  learnFromMergedPullRequest,
-  type LearnFromMergeDeps,
-} from "#src/learn-from-merge";
-export {
   addSuppression,
   computeHints,
-  createBranchMemoryStore,
   emptyMemory,
   isSuppressed,
   MEMORY_FILE_PATH,

@@ -42,11 +42,6 @@ export function withRepositoryHints(
   return { ...agent, repositoryHints: hints };
 }
 
-/** The Langfuse prompt name for an agent. */
-export function agentPromptKey(id: string): string {
-  return `${id.replace(/-/g, "_")}_system`;
-}
-
 /** The rules no agent may bend, whatever it can read and however it is run. */
 export function renderSecurityRules(category: FindingCategory): string {
   return `# Security rules (non-negotiable)

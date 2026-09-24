@@ -5,7 +5,7 @@ repository.
 
 The App's `pull_request` webhook (`apps/web/app/api/github/webhook`) records a
 row in `review_jobs` and returns. This worker claims those rows and runs the
-same review the Action and the MCP server run, publishing the `AI PR Review`
+same review the MCP server runs, publishing the `AI PR Review`
 check run and inline comments through the App's installation.
 
 ## Run it
@@ -51,7 +51,7 @@ Run — nothing here changes them.
    with no retry, and a `failure` check run naming it.
 6. Runs `runReview` from `@pr-review/reviewer` with the GitHub delivery. With
    the repo's fixes on, verified patches are committed to the head branch under
-   the Action's limits; otherwise they arrive as suggested changes.
+   the same limits, unless the head commit is our own fix; otherwise they arrive as suggested changes.
 7. Writes the review straight to the database through ingest's write path, so a
    rerun of the same commit replaces its findings. A failure here is logged and
    never fails a review already on GitHub.
