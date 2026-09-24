@@ -20,6 +20,7 @@ export {
   type RepositoryCollaborator,
   type RepositoryPermission,
 } from "#src/app-client";
+export { parseBlamePorcelain } from "#src/blame";
 export { httpStatus, isPermissionError } from "#src/errors";
 export {
   SEARCH_LIMITS,
@@ -36,6 +37,8 @@ export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
   CHECK_RUN_NAME,
   type AnnotationLevel,
+  type BlameRange,
+  type BlameRequest,
   type BranchTipRequest,
   type ChangedFile,
   type CheckRun,

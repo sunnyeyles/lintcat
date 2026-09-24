@@ -333,6 +333,9 @@ function makeOctokit(options: StubOptions = {}) {
         if (page === undefined) {
           throw new Error("stub ran out of scripted GraphQL pages");
         }
+        if (page instanceof Error) {
+          throw page;
+        }
         return page;
       },
     ),
@@ -1192,6 +1195,140 @@ describe("listReviewThreads", () => {
     const { client } = makeClient({ graphqlPages: [{ repository: null }] });
 
     await expect(client.listReviewThreads(ref)).rejects.toThrow();
+  });
+});
+
+const blameRequest = {
+  owner: "octo-org",
+  repo: "example-service",
+  ref: headSha,
+  path: "src/sessions.ts",
+};
+
+const adaCommit = {
+  oid: "aaa111",
+  committedDate: "2026-09-01T12:00:00+10:00",
+  author: { name: "Ada Lovelace", email: "ada@example.com", user: { login: "ada" } },
+};
+
+const unlinkedCommit = {
+  oid: "bbb222",
+  committedDate: "2026-09-02T00:00:00Z",
+  author: { name: null, email: "bot@example.com", user: null },
+};
+
+function blamePage(ranges: { lines: [number, number]; commit: unknown }[]) {
+  return {
+    repository: {
+      object: {
+        blame: {
+          ranges: ranges.map(({ lines: [startingLine, endingLine], commit }) => ({
+            startingLine,
+            endingLine,
+            commit,
+          })),
+        },
+      },
+    },
+  };
+}
+
+/** What Octokit throws when a GraphQL response carries errors. */
+function graphqlError(errors: { type: string; path: string[] }[]): Error {
+  const error = new Error(errors.map((entry) => entry.type).join(", "));
+  error.name = "GraphqlResponseError";
+  return Object.assign(error, { errors, data: { repository: { object: null } } });
+}
+
+describe("blame", () => {
+  it("blames the path at the ref in one query and maps each range", async () => {
+    const { octokit, client } = makeClient({
+      graphqlPages: [
+        blamePage([
+          { lines: [1, 3], commit: adaCommit },
+          { lines: [4, 4], commit: unlinkedCommit },
+          { lines: [5, 6], commit: adaCommit },
+        ]),
+      ],
+    });
+
+    const ranges = await client.blame(blameRequest);
+
+    expect(octokit.graphql).toHaveBeenCalledTimes(1);
+    expect(octokit.graphql.mock.calls[0]?.[0]).toContain("blame(path: $path)");
+    expect(octokit.graphql.mock.calls[0]?.[1]).toEqual({
+      owner: "octo-org",
+      name: "example-service",
+      ref: headSha,
+      path: "src/sessions.ts",
+    });
+    expect(ranges).toEqual([
+      {
+        startLine: 1,
+        endLine: 3,
+        login: "ada",
+        author: "Ada Lovelace",
+        committedAt: "2026-09-01T02:00:00.000Z",
+      },
+      {
+        startLine: 4,
+        endLine: 4,
+        login: null,
+        author: "bot@example.com",
+        committedAt: "2026-09-02T00:00:00.000Z",
+      },
+      {
+        startLine: 5,
+        endLine: 6,
+        login: "ada",
+        author: "Ada Lovelace",
+        committedAt: "2026-09-01T02:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("joins touching ranges one commit wrote", async () => {
+    const { client } = makeClient({
+      graphqlPages: [
+        blamePage([
+          { lines: [3, 5], commit: adaCommit },
+          { lines: [1, 2], commit: adaCommit },
+        ]),
+      ],
+    });
+
+    const ranges = await client.blame(blameRequest);
+
+    expect(ranges.map(({ startLine, endLine }) => [startLine, endLine])).toEqual([[1, 5]]);
+  });
+
+  it.each([
+    ["a path the commit lacks", blamePage([])],
+    ["a ref GitHub cannot resolve", { repository: { object: null } }],
+    ["a ref that is not a commit", { repository: { object: {} } }],
+    [
+      "a path reported as NOT_FOUND",
+      graphqlError([{ type: "NOT_FOUND", path: ["repository", "object", "blame"] }]),
+    ],
+  ])("returns nothing for %s", async (_case, page) => {
+    const { client } = makeClient({ graphqlPages: [page] });
+
+    await expect(client.blame(blameRequest)).resolves.toEqual([]);
+  });
+
+  it("rethrows any other GraphQL error, such as a repository it cannot see", async () => {
+    const error = graphqlError([{ type: "NOT_FOUND", path: ["repository"] }]);
+    const { client } = makeClient({ graphqlPages: [error] });
+
+    await expect(client.blame(blameRequest)).rejects.toBe(error);
+  });
+
+  it("rejects a malformed GraphQL response", async () => {
+    const { client } = makeClient({
+      graphqlPages: [blamePage([{ lines: [1, 1], commit: { oid: "aaa111" } }])],
+    });
+
+    await expect(client.blame(blameRequest)).rejects.toThrow();
   });
 });
 

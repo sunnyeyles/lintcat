@@ -1,6 +1,7 @@
 import { ReviewCancelledError, type AgentDefinition } from "@pr-review/ai";
 import { ArchiveTooLargeError } from "@pr-review/github";
 import type {
+  BlameRange,
   ChangedFile,
   CheckRunSummary,
   CheckRunsRequest,
@@ -120,6 +121,7 @@ function makeClient() {
     ),
     getBranchTip: vi.fn(async () => target.headSha),
     getCommitMessage: vi.fn(async () => "Rate limit sessions"),
+    blame: vi.fn(async (): Promise<BlameRange[]> => []),
     listReviewThreads: vi.fn(async (): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async (_input: CreateCheckRunInput) => ({ id: 987 })),
     createReview: vi.fn(async (_input: CreateReviewInput) => ({ id: 654 })),

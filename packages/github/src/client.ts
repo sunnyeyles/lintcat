@@ -103,6 +103,30 @@ export interface CommitHistoryRequest {
   limit: number;
 }
 
+/** A request for who last wrote each line of one file at a commit. */
+export interface BlameRequest {
+  owner: string;
+  repo: string;
+  /** Commit SHA (or ref) to blame the file at. */
+  ref: string;
+  /** Repository-relative path. */
+  path: string;
+}
+
+/** A run of lines one commit last wrote; adjacent runs come from different commits. */
+export interface BlameRange {
+  /** 1-based, inclusive. */
+  startLine: number;
+  /** 1-based, inclusive. */
+  endLine: number;
+  /** The author's GitHub login; null when the adapter cannot tell. */
+  login: string | null;
+  /** The author's name, or their email when the name is empty. */
+  author: string;
+  /** When the commit was committed, as UTC ISO 8601. */
+  committedAt: string;
+}
+
 /** A request for the files one commit changed. */
 export interface CommitFilesRequest {
   owner: string;
@@ -306,6 +330,8 @@ export interface RepositoryHistoryClient {
   getBranchTip(request: BranchTipRequest): Promise<string>;
   /** One commit's message, used to recognise this system's own commits. */
   getCommitMessage(request: CommitMessageRequest): Promise<string>;
+  /** Every line of one file at a commit, in order; a path or ref it lacks has none. */
+  blame(request: BlameRequest): Promise<BlameRange[]>;
 }
 
 /**

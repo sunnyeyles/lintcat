@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type {
+  BlameRange,
   PullRequestReadClient,
   PullRequestRef,
   RepositoryHistoryClient,
@@ -34,6 +35,7 @@ const HISTORY_METHOD_SET: Record<keyof RepositoryHistoryClient, true> = {
   compareCommits: true,
   getBranchTip: true,
   getCommitMessage: true,
+  blame: true,
 };
 
 const PUBLISH_METHOD_SET: Record<keyof ReviewPublishClient, true> = {
@@ -115,6 +117,7 @@ export const ADAPTER_PROFILES = {
       "listCommitFiles",
       "compareCommits",
       "getCommitMessage",
+      "blame",
       "createCheckRun",
       "createReview",
       "createCommitOnBranch",
@@ -166,6 +169,42 @@ function baseName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
+/** Neither absent nor rejected, so the suite can hold the adapter to its answers. */
+function honours(profile: AdapterProfile, method: ClientMethod): boolean {
+  return !profile.absent.includes(method) && !(method in profile.unsupported);
+}
+
+/** A trailing newline ends the last line rather than starting another. */
+function lineCount(contents: string): number {
+  return contents === "" ? 0 : contents.replace(/\n$/, "").split("\n").length;
+}
+
+/** Every line once, in order, each with an author and a UTC ISO 8601 time. */
+function expectWholeFileBlame(ranges: readonly BlameRange[], lines: number): void {
+  let next = 1;
+  for (const range of ranges) {
+    expect(range.startLine).toBe(next);
+    expect(range.endLine).toBeGreaterThanOrEqual(range.startLine);
+    expect(range.author.trim()).not.toBe("");
+    expect(range.login === null || range.login !== "").toBe(true);
+    expect(new Date(range.committedAt).toISOString()).toBe(range.committedAt);
+    next = range.endLine + 1;
+  }
+  expect(next - 1).toBe(lines);
+}
+
+function blamePath(
+  client: ConformanceClient,
+  ref: PullRequestRef,
+  commit: string,
+  path: string,
+): Promise<BlameRange[]> {
+  return (
+    client.blame?.({ owner: ref.owner, repo: ref.repo, ref: commit, path }) ??
+    Promise.reject(new Error("blame is absent from this adapter"))
+  );
+}
+
 /** The one snippet shape: trimmed, non-empty, unique, and within both caps. */
 function expectBoundedSnippets(snippets: readonly string[]): void {
   expect(snippets.length).toBeLessThanOrEqual(SEARCH_LIMITS.maxSnippetsPerMatch);
@@ -191,6 +230,11 @@ function callUnsupported(
       return client.listCommitFiles?.({ owner, repo, sha: SAMPLE_SHA }) ?? undeclared();
     case "getCommitMessage":
       return client.getCommitMessage?.({ owner, repo, sha: SAMPLE_SHA }) ?? undeclared();
+    case "blame":
+      return (
+        client.blame?.({ owner, repo, ref: SAMPLE_SHA, path: "conformance.txt" }) ??
+        undeclared()
+      );
     case "compareCommits":
       return (
         client.compareCommits?.({ owner, repo, base: SAMPLE_SHA, head: SAMPLE_SHA }) ??
@@ -404,6 +448,31 @@ export function runClientConformance(
       expectBoundedSnippets(match?.snippets ?? []);
       expect(match?.snippets).toHaveLength(search.repeated.snippets);
     });
+
+    if (honours(profile, "blame")) {
+      it("blames every line of a file once, in order", async () => {
+        const { client, ref, file } = await open();
+
+        const ranges = await blamePath(client, ref, file.ref, file.path);
+        expectWholeFileBlame(ranges, lineCount(file.contents));
+      });
+
+      it(
+        profile.missingFileError === null
+          ? "blames an absent path as it blames any other"
+          : "blames an absent path as no lines at all",
+        async () => {
+          const { client, ref, file, missingPath } = await open();
+
+          const ranges = await blamePath(client, ref, file.ref, missingPath);
+          expect(ranges).toEqual(
+            profile.missingFileError === null
+              ? await blamePath(client, ref, file.ref, file.path)
+              : [],
+          );
+        },
+      );
+    }
 
     it("keeps as many matches as the agent tool does", () => {
       expect(SEARCH_LIMITS.maxMatches).toBe(AGENT_TOOL_SEARCH_MATCHES);

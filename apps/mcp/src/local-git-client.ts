@@ -5,6 +5,7 @@ import {
   collectRepositoryFiles,
   DEFAULT_ARCHIVE_LIMITS,
   matchesTerms,
+  parseBlamePorcelain,
   parseSearchQuery,
   readRepositoryTarball,
   searchMatchedPaths,
@@ -383,6 +384,19 @@ function createLocalGitClient(
     }
   };
 
+  // git blame fails outright on a path its commit lacks, and on a ref that is only a tree.
+  const blamable = async (ref: string, file: string): Promise<boolean> => {
+    if (ref === WORKING_TREE) {
+      try {
+        if (!statSync(resolveInside(root, file)).isFile()) return false;
+      } catch {
+        return false;
+      }
+    }
+    const commit = ref === WORKING_TREE ? "HEAD" : assertRef(ref);
+    return (await tryGit(root, ["cat-file", "-t", `${commit}^{commit}:${file}`])) === "blob";
+  };
+
   return {
     async getPullRequest(): Promise<PullRequestDetails> {
       const subjects =
@@ -460,6 +474,13 @@ function createLocalGitClient(
     },
     async getCommitMessage({ sha }) {
       return git(root, ["log", "-1", "--format=%B", assertRef(sha)]);
+    },
+    async blame({ ref, path: file }) {
+      if (!(await blamable(ref, file))) {
+        return [];
+      }
+      const revision = ref === WORKING_TREE ? [] : [ref];
+      return parseBlamePorcelain(await git(root, ["blame", "--porcelain", ...revision, "--", file]));
     },
   };
 }

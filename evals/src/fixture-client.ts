@@ -33,11 +33,11 @@ interface FixtureCall {
   detail: string;
 }
 
-/** No publishing, and no commit objects to read files, messages or comparisons out of. */
+/** No publishing, and no commit objects to read files, messages, comparisons or blame out of. */
 type FixtureGithubClient = PullRequestReadClient &
   Omit<
     RepositoryHistoryClient,
-    "listCommitFiles" | "compareCommits" | "getCommitMessage"
+    "listCommitFiles" | "compareCommits" | "getCommitMessage" | "blame"
   >;
 
 interface FixtureClient {

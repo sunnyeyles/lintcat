@@ -684,12 +684,13 @@ one names the intersection it needs, so no type says "everything" any more:
 | Interface | What it covers | Who declines part of it |
 | --- | --- | --- |
 | `PullRequestReadClient` | the pull request, its diff, its existing review state, and repository contents, search and archive at a ref | nobody — all four adapters serve every method |
-| `RepositoryHistoryClient` | commits: which exist, what they touched, what they say, what a branch points at, how two compare | the local checkout (`compareCommits`), the eval fixture (`compareCommits`, `listCommitFiles`, `getCommitMessage`) |
+| `RepositoryHistoryClient` | commits: which exist, what they touched, what they say, what a branch points at, how two compare, who last wrote each line of a file | the local checkout (`compareCommits`), the eval fixture (`compareCommits`, `listCommitFiles`, `getCommitMessage`, `blame`) |
 | `ReviewPublishClient` | the check run, the review, a commit on a branch, a file written to a branch | the local checkout and the eval fixture, all four methods |
 
 The two repository-only adapters declare only what they honour — the local
 checkout `PullRequestReadClient & Omit<RepositoryHistoryClient, "compareCommits">`,
-the eval fixture that minus `listCommitFiles` and `getCommitMessage` — so what
+the eval fixture that minus `listCommitFiles`, `getCommitMessage` and
+`blame` — so what
 they decline is a compile error at the call, not a throw. A review run takes
 that narrow `ReviewClient` and writes only through its `ReviewDelivery`, so
 publishing is unreachable from a checkout or a fixture twice over: the client

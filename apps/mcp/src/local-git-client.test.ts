@@ -255,6 +255,50 @@ describe("the local client", () => {
   });
 });
 
+describe("blame", () => {
+  const committed = (ref: string) =>
+    new Date(repo.git("log", "-1", "--format=%cI", ref).trim()).toISOString();
+
+  it("joins the lines each commit last wrote, even across a deletion", async () => {
+    repo.write("src/letters.txt", "a\nb\nc\nd\ne\n");
+    repo.commit("letters");
+    repo.write("src/letters.txt", "a\nB\nc\ne\n");
+    repo.commit("rewrite b and drop d");
+    const { client, owner, repo: name } = await openLocalRepository(repo.root, "main");
+    const head = repo.git("rev-parse", "HEAD").trim();
+
+    const ranges = await client.blame({ owner, repo: name, ref: head, path: "src/letters.txt" });
+
+    const author = { login: null, author: "Test Author" };
+    expect(ranges).toEqual([
+      { startLine: 1, endLine: 1, ...author, committedAt: committed("HEAD^") },
+      { startLine: 2, endLine: 2, ...author, committedAt: committed("HEAD") },
+      { startLine: 3, endLine: 4, ...author, committedAt: committed("HEAD^") },
+    ]);
+  });
+
+  it("blames the working tree, where an edit is not committed yet", async () => {
+    const { client, owner, repo: name } = await openLocalRepository(repo.root, "main");
+
+    const ranges = await client.blame({ owner, repo: name, ref: WORKING_TREE, path: "src/sessions.ts" });
+
+    expect(ranges).toMatchObject([{ startLine: 1, endLine: 1, login: null, author: "Not Committed Yet" }]);
+  });
+
+  it("blames nothing where the path or the ref has no history", async () => {
+    repo.git("add", "src/sessions.ts");
+    const { client, owner, repo: name, baseSha } = await openLocalRepository(repo.root, "main");
+    const staged = await openLocalRepository(repo.root, undefined, { kind: "staged" });
+    const blame = (ref: string, file: string) => client.blame({ owner, repo: name, ref, path: file });
+
+    await expect(blame(WORKING_TREE, "src/draft.ts")).resolves.toEqual([]);
+    await expect(blame(baseSha, "src/absent.ts")).resolves.toEqual([]);
+    await expect(blame(baseSha, "src")).resolves.toEqual([]);
+    await expect(blame("no-such-branch", "src/api.ts")).resolves.toEqual([]);
+    await expect(blame(staged.scope.headRef, "src/sessions.ts")).resolves.toEqual([]);
+  });
+});
+
 describe("searchWorkingTree", () => {
   beforeEach(() => {
     repo.write(
