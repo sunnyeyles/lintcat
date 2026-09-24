@@ -1,4 +1,8 @@
+import { db, findModelKeySummary } from "@pr-review/db";
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Button,
   Card,
   Empty,
@@ -6,6 +10,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@pr-review/design";
+import { KeyRound } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -16,6 +21,7 @@ import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
+import { requireOrganization } from "@/lib/session";
 
 async function TrendStats({ slug }: { slug: string }) {
   const trends = await (await data(slug)).getTrends("30d");
@@ -70,6 +76,24 @@ async function SpendStat({ slug }: { slug: string }) {
   );
 }
 
+async function ModelKeyNudge({ slug }: { slug: string }) {
+  const { organization, role } = await requireOrganization(slug);
+  if (role !== "owner" || (await findModelKeySummary(db(), organization.id))) return null;
+  return (
+    <Alert className="mt-8">
+      <KeyRound />
+      <AlertTitle>Add a model key to start reviews</AlertTitle>
+      <AlertDescription>
+        <p>
+          Reviews run on your own Anthropic or OpenAI key. Until one is saved, pull requests
+          get a check asking for it and nothing is reviewed.{" "}
+          <Link href={organizationPath(slug, "/settings")}>Add a model key</Link>
+        </p>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 async function RecentReviews({ slug }: { slug: string }) {
   const reviews = await (await data(slug)).listReviews({ limit: 8 });
   return (
@@ -85,7 +109,7 @@ async function RecentReviews({ slug }: { slug: string }) {
           <EmptyHeader>
             <EmptyTitle>No reviews yet</EmptyTitle>
             <EmptyDescription>
-              Once the action runs on a pull request, the review lands here.
+              Open a pull request on a connected repository and its review lands here.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -139,6 +163,10 @@ export default async function OverviewPage({
           </Button>
         }
       />
+
+      <Suspense fallback={null}>
+        <ModelKeyNudge slug={slug} />
+      </Suspense>
 
       <StatGrid className="mt-8">
         <Suspense fallback={<StatCardsSkeleton count={4} sparkline />}>

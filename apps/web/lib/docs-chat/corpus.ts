@@ -21,7 +21,7 @@ A finding can include a **suggested fix**. LintCat checks the fix against the fi
 
 Install the LintCat GitHub App on your organization or personal account, and pick the repositories it may review. An organization owner saves one Anthropic or OpenAI API key on the dashboard; reviews run on that key, so model usage is billed to your provider account.
 
-By default a repository is reviewed when a pull request gets the \`ai-review\` label, and again on every push after that. Switch a repository to review every pull request, or turn it off, from its settings page. A new push replaces a review still in progress, so comments are always on the latest commit.
+By default every pull request is reviewed when it is opened, and again on every push. Switch a repository to review only pull requests with the \`ai-review\` label, or turn it off, from its settings page. A new push replaces a review still in progress, so comments are always on the latest commit.
 
 **Note: No workflow file, no secrets in GitHub** Reviews run on LintCat’s side. Your repository gets no workflow, and your Actions minutes go untouched.
 
@@ -69,9 +69,9 @@ Until a key is saved, a pull request that would be reviewed gets a neutral check
 
 ## 3. Review a pull request {#review}
 
-Add the \`ai-review\` label to any open pull request on an installed repository. The review runs in the background and posts when it finishes. Every later push to that pull request is reviewed again. If the repository has no \`ai-review\` label yet, create one under **Issues → Labels**.
+Open a pull request on an installed repository. The review runs in the background and posts when it finishes, and every later push to that pull request is reviewed again.
 
-To review every pull request without a label, change the repository’s mode on its settings page. See [Configuration](/docs/configuration).
+To review only the pull requests you pick, switch the repository to the \`ai-review\` label on its settings page. See [Configuration](/docs/configuration).
 
 ## What lands on the pull request {#result}
 - Inline review comments on the lines the findings point at, one per finding.
@@ -98,8 +98,8 @@ The key is stored encrypted and only the review service ever reads it back. The 
 
 Each repository has a **Settings** page, linked from the repository on the dashboard. Anyone who can see the repository can view it; organization owners and people with admin or maintain access to the repository can change it.
 | When reviews run | What happens |
-| On the ai-review label | Default. A pull request is reviewed when it gets the label, and on every push while it carries it. |
-| Every pull request | Every pull request is reviewed when it is opened or reopened, and on every push. |
+| Every pull request | Default. Every pull request is reviewed when it is opened or reopened, and on every push. |
+| On the ai-review label | A pull request is reviewed when it gets the label, and on every push while it carries it. |
 | Off | Nothing is reviewed. The repository's past reviews stay on the dashboard. |
 
 **Note: A push replaces a review in progress** If a pull request gets a new commit while it is being reviewed, the older review is dropped before it posts anything and the new commit is reviewed instead.

@@ -55,7 +55,9 @@ export default async function OrganizationsPage() {
             <EmptyDescription>
               <code>{session.login}</code> is signed in but belongs to no organization, so
               there is nothing to show.{" "}
-              Install the GitHub App on your organization, or ask an owner to add you.
+              Install the GitHub App on your GitHub organization or personal account. A
+              repository owned by an organization needs the App on that organization, or ask
+              one of its owners to install it.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

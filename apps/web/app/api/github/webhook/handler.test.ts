@@ -5,6 +5,7 @@ import {
   memberships,
   organizationSlugRedirects,
   organizations,
+  repoSettings,
   repos,
   reviewJobs,
   reviews,
@@ -79,8 +80,7 @@ const github: GithubAppClient = {
   },
   async listInstallationRepositories(installationId) {
     listCalls += 1;
-    expect(installationId).toBe(INSTALLATION_ID);
-    return listed;
+    return installationId === INSTALLATION_ID ? listed : [];
   },
   async listOrganizationMembers(installationId, org) {
     githubCalls += 1;
@@ -535,12 +535,34 @@ describe("handleGithubWebhook installation_repositories", () => {
     expect(await state()).toEqual(once);
   });
 
-  it("creates the organization when an add arrives before the install", async () => {
+  it("sets up the whole organization, members included, when an add arrives before the install", async () => {
     database = await createTestDatabase();
+    listed = [widgets, secrets];
     await deliver(repositoriesChanged("added", [secrets]));
-    const { organizations: orgs, repos: repoRows } = await state();
-    expect(orgs).toMatchObject([{ slug: "acme", installationId: INSTALLATION_ID }]);
-    expect(repoRows).toEqual([repoRow(secrets)]);
+    expect(await state()).toMatchObject({
+      organizations: [{ slug: "acme", installationId: INSTALLATION_ID }],
+      repos: [repoRow(widgets), repoRow(secrets)],
+      memberships: [
+        { githubId: octocat.id, login: "octocat", role: "owner" },
+        { githubId: hubot.id, login: "hubot", role: "member" },
+      ],
+    });
+  });
+
+  it("makes a personal account's owner its owner when an add arrives before the install", async () => {
+    database = await createTestDatabase();
+    listed = [{ ...widgets, owner: "Mona" }];
+    await deliver(
+      delivery("installation_repositories", {
+        action: "added",
+        installation: installation("User", "Mona"),
+        repositories_added: [payloadRepo({ ...widgets, owner: "Mona" })],
+        repositories_removed: [],
+      }),
+    );
+    expect((await state()).memberships).toEqual([
+      { githubId: ACCOUNT_ID, login: "Mona", role: "owner" },
+    ]);
   });
 });
 
@@ -1103,6 +1125,7 @@ describe("handleGithubWebhook other deliveries", () => {
 describe("handleGithubWebhook pull_request", () => {
   beforeEach(async () => {
     await deliver(created());
+    await setMode(widgets, "label");
   });
 
   let deliveries = 0;
@@ -1270,6 +1293,13 @@ describe("handleGithubWebhook pull_request", () => {
   });
 
   describe("mode every_pr", () => {
+    it("is what a repository with no saved settings gets", async () => {
+      await database.delete(repoSettings);
+      const response = await deliver(pullRequestEvent("opened", { labels: [] }));
+      expect(response.status).toBe(200);
+      expect(await jobs()).toEqual([queued("head-1")]);
+    });
+
     it("queues opened, synchronize and reopened without the label", async () => {
       await setMode(widgets, "every_pr");
       for (const [index, action] of ["opened", "synchronize", "reopened"].entries()) {

@@ -290,8 +290,14 @@ async function onInstallationRepositories(
   // Only `created` brings an uninstalled organization back, so a late delivery cannot.
   const existing = await findOrganizationByAccountId(database, installation.accountId);
   if (existing?.uninstalledAt) return false;
+  const source = `installation_repositories.${payload.action}`;
+  // A missed `created` leaves no organization; set it up whole so it has an owner.
+  if (!existing) {
+    await installOrganization(deps, installation, source);
+    return true;
+  }
   await database.transaction(async (tx) => {
-    await followRename(deps, tx, installation, `installation_repositories.${payload.action}`);
+    await followRename(deps, tx, installation, source);
     const organization = await upsertInstallation(tx, installation);
     await upsertRepositories(
       tx,

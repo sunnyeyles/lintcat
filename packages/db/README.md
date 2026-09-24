@@ -172,7 +172,7 @@ erDiagram
   is claimable again. A failure requeues it after a delay until `attempts`
   reaches the limit, then marks it `failed`.
 - `repo_settings` is one repository's hosted review settings (`src/repo-settings.ts`).
-  A repo with no row reviews on the `ai-review` label, calls the organization
+  A repo with no row reviews every pull request, calls the organization
   key's default model, and offers fixes as suggestions rather than committing
   them — `effectiveRepoSettings` returns those defaults. `model` is a model id
   in the organization key's own provider, not a provider name.

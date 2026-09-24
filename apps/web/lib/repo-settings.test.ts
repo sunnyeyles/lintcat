@@ -112,7 +112,7 @@ describe("saveRepoSettingsForm", () => {
     );
     expect(state.status).toBe("error");
     expect(await effectiveRepoSettings(database, repo.id)).toEqual({
-      mode: "label",
+      mode: "every_pr",
       model: null,
       fixes: false,
     });

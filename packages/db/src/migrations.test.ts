@@ -243,21 +243,52 @@ describe("the docs chat rate limit migration", () => {
   });
 });
 
+/** A database migrated up to, not including, the migration whose tag starts with `prefix`. */
+async function migratedUpTo(prefix: string) {
+  const folder = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
+  const journal = JSON.parse(readFileSync(join(folder, "meta/_journal.json"), "utf8")) as {
+    entries: { tag: string }[];
+  };
+  const target = journal.entries.findIndex((entry) => entry.tag.startsWith(prefix));
+  const pg = new PGlite();
+  const apply = async (tag: string) => {
+    const sqlText = readFileSync(join(folder, `${tag}.sql`), "utf8");
+    for (const statement of sqlText.split("--> statement-breakpoint")) {
+      await pg.exec(statement);
+    }
+  };
+  for (const entry of journal.entries.slice(0, target)) await apply(entry.tag);
+  return { pg, applyTarget: () => apply(journal.entries[target]!.tag) };
+}
+
+describe("the every-PR default migration on a populated database", () => {
+  it("pins repos that already exist to label mode, leaving their saved settings alone", async () => {
+    const { pg, applyTarget } = await migratedUpTo("0014_");
+    await pg.exec(`
+      insert into organizations (github_account_id, account_type, slug, name) values (1, 'user', 'acme', 'acme');
+      insert into repos (organization_id, owner, name) values (1, 'acme', 'widgets'), (1, 'acme', 'gadgets');
+      insert into repo_settings (repo_id, mode) values (2, 'off');
+    `);
+    await applyTarget();
+    await pg.exec(`
+      insert into repos (organization_id, owner, name) values (1, 'acme', 'later');
+      insert into repo_settings (repo_id) values (3);
+    `);
+
+    const result = await pg.query<{ repo_id: number; mode: string }>(
+      "select repo_id, mode from repo_settings order by repo_id",
+    );
+    expect(result.rows).toEqual([
+      { repo_id: 1, mode: "label" },
+      { repo_id: 2, mode: "off" },
+      { repo_id: 3, mode: "every_pr" },
+    ]);
+  });
+});
+
 describe("the single-reviewer migration on a populated database", () => {
   it("sums each review's agent runs into the review before dropping them", async () => {
-    const folder = join(dirname(fileURLToPath(import.meta.url)), "..", "drizzle");
-    const journal = JSON.parse(readFileSync(join(folder, "meta/_journal.json"), "utf8")) as {
-      entries: { tag: string }[];
-    };
-    const target = journal.entries.findIndex((entry) => entry.tag.startsWith("0009_"));
-    const pg = new PGlite();
-    const apply = async (tag: string) => {
-      const sqlText = readFileSync(join(folder, `${tag}.sql`), "utf8");
-      for (const statement of sqlText.split("--> statement-breakpoint")) {
-        await pg.exec(statement);
-      }
-    };
-    for (const entry of journal.entries.slice(0, target)) await apply(entry.tag);
+    const { pg, applyTarget } = await migratedUpTo("0009_");
 
     await pg.exec(`
       insert into organizations (github_account_id, account_type, slug, name) values (1, 'user', 'acme', 'acme');
@@ -267,7 +298,7 @@ describe("the single-reviewer migration on a populated database", () => {
         (1, 'security', 1, 0, 100, 10, 1, 5),
         (1, 'performance', 1, 0, 200, 20, 2, 7);
     `);
-    await apply(journal.entries[target]!.tag);
+    await applyTarget();
 
     const result = await pg.query<{
       pr_number: number;
