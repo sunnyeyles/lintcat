@@ -87,10 +87,18 @@ function ownerAndRepo(remoteUrl: string | undefined, root: string): { owner: str
   return match ? { owner: match[1]!, repo: match[2]! } : { owner: "local", repo: path.basename(root) };
 }
 
+function unknownCommit(ref: string): GitError {
+  return new GitError(`unknown commit ${JSON.stringify(ref)} in this checkout`, 404);
+}
+
+async function tryResolveCommit(root: string, ref: string): Promise<string | undefined> {
+  return tryGit(root, ["rev-parse", "--verify", "--quiet", `${assertRef(ref)}^{commit}`]);
+}
+
 async function resolveCommit(root: string, ref: string): Promise<string> {
-  const sha = await tryGit(root, ["rev-parse", "--verify", "--quiet", `${assertRef(ref)}^{commit}`]);
+  const sha = await tryResolveCommit(root, ref);
   if (sha === undefined) {
-    throw new GitError(`unknown commit ${JSON.stringify(ref)} in this checkout`, 404);
+    throw unknownCommit(ref);
   }
   return sha;
 }
@@ -247,7 +255,7 @@ export interface WorkingTreeFile {
 
 /** One file's text as it is on disk now; a directory or an escape is a 404. */
 export async function readWorkingTreeFile(repoPath: string, file: string): Promise<WorkingTreeFile> {
-  const root = realpathSync((await git(repoPath, ["rev-parse", "--show-toplevel"])).trim());
+  const root = await repositoryRoot(repoPath);
   const absolute = resolveInside(root, file);
   if (!statSync(absolute).isFile()) {
     throw new GitError(`${file} is not a file in the working tree`, 404);
@@ -320,13 +328,13 @@ function untrackedContent(root: string, file: string): Uint8Array {
 
 /** A commit if the ref names one, else the bare object: the staged tree is not a commit. */
 async function resolveTreeish(root: string, ref: string): Promise<string> {
-  const commit = await tryGit(root, ["rev-parse", "--verify", "--quiet", `${assertRef(ref)}^{commit}`]);
+  const commit = await tryResolveCommit(root, ref);
   if (commit !== undefined) {
     return commit;
   }
   const object = await tryGit(root, ["rev-parse", "--verify", "--quiet", `${ref}^{tree}`]);
   if (object === undefined) {
-    throw new GitError(`unknown commit ${JSON.stringify(ref)} in this checkout`, 404);
+    throw unknownCommit(ref);
   }
   return object;
 }

@@ -12,6 +12,7 @@ import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
 import { repositoryRoot, resolveInside } from "#src/local-git-client";
+import { repoPathSchema } from "#src/tools/shared";
 
 type FindingPatch = Parameters<typeof applyVerifiedPatches>[1][number];
 
@@ -154,10 +155,7 @@ export function registerFixTools(
           .array(patchSchema)
           .min(1)
           .describe("The `patch` of one or more findings a review returned, each with its finding's `file`."),
-        repoPath: z
-          .string()
-          .optional()
-          .describe("Path to the git checkout; defaults to the server's working directory."),
+        repoPath: repoPathSchema,
       },
       annotations: {
         readOnlyHint: false,

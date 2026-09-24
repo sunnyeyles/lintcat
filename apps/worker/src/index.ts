@@ -2,7 +2,7 @@
 import process from "node:process";
 
 import { createLanguageModel } from "@pr-review/ai";
-import { db, findLocalEnvFile, modelKeyEncryptionKey } from "@pr-review/db";
+import { db, findLocalEnvFile, modelKeyEncryptionKey, requiredEnv } from "@pr-review/db";
 import { createGithubAppClient, createTokenClient } from "@pr-review/github";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
 
@@ -15,12 +15,6 @@ const HEARTBEAT_MS = 15_000;
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 60_000;
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set; add it to .env.local`);
-  return value;
-}
-
 async function main(): Promise<void> {
   const envFile = findLocalEnvFile();
   if (envFile) process.loadEnvFile(envFile);
@@ -32,8 +26,8 @@ async function main(): Promise<void> {
     database,
     // Single-line env values carry the PEM's newlines as literal `\n`.
     github: createGithubAppClient({
-      appId: required("GITHUB_APP_ID"),
-      privateKey: required("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n"),
+      appId: requiredEnv("GITHUB_APP_ID"),
+      privateKey: requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n"),
     }),
     createClient: (token) => createTokenClient({ token }),
     createLanguageModel,
@@ -64,7 +58,7 @@ async function main(): Promise<void> {
   const port = process.env.PORT;
   if (port) {
     const drain = createDrainer(() => runWorker(workerDeps, { once: true, pollMs: 0 }));
-    const server = createHttpServer(drain, { secret: required("WORKER_PING_SECRET") }, logger);
+    const server = createHttpServer(drain, { secret: requiredEnv("WORKER_PING_SECRET") }, logger);
     stop.signal.addEventListener("abort", () => server.close());
     await listen(server, Number(port));
     logger.info("worker.listening", { port: Number(port) });

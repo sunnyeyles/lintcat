@@ -19,13 +19,13 @@ export interface FindingSignal {
 }
 
 /** A shape needs this many ignores, and no resolve, before it earns a hint. */
-export const HINT_IGNORED_THRESHOLD = 5;
+const HINT_IGNORED_THRESHOLD = 5;
 
 /** At most this many hints reach the prompt. */
 export const HINT_CAP = 10;
 
 /** A shape with no fresh signal for this long is forgotten. */
-export const MEMORY_TTL_DAYS = 90;
+const MEMORY_TTL_DAYS = 90;
 
 const MAX_SHAPE_LENGTH = 200;
 const DAY_MS = 24 * 60 * 60 * 1000;

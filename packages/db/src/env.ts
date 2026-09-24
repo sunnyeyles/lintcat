@@ -20,11 +20,13 @@ export function loadLocalEnv(): void {
   if (file) process.loadEnvFile(file);
 }
 
+export function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set; add it to .env.local`);
+  return value;
+}
+
 export function databaseUrl(): string {
   loadLocalEnv();
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL is not set; add it to .env.local");
-  }
-  return url;
+  return requiredEnv("DATABASE_URL");
 }

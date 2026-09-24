@@ -79,7 +79,7 @@ const HEAT: { colour: string; label: string }[] = [
   { colour: "var(--severity-low)", label: "Worst finding is low" },
 ];
 
-export function MapLegend({ heat = false }: { heat?: boolean }) {
+export function MapLegend() {
   return (
     <div>
       <h3 className="text-xs font-semibold tracking-wide uppercase">Legend</h3>
@@ -113,22 +113,20 @@ export function MapLegend({ heat = false }: { heat?: boolean }) {
           <span className="text-muted-foreground text-xs">Dashed edge: dependent → focus</span>
         </li>
       </ul>
-      {heat ? (
-        <ul className="mt-3 space-y-1.5">
-          {HEAT.map((entry, i) => (
-            <li key={entry.label} className="flex items-center gap-2">
-              <svg viewBox="-12 -12 24 24" className="size-5 shrink-0" aria-hidden="true">
-                <circle r="9" fill="none" stroke={entry.colour} strokeWidth={2.5 - i * 0.75} />
-                <circle r="3" fill="var(--map-module)" />
-              </svg>
-              <span className="text-muted-foreground text-xs">{entry.label}</span>
-            </li>
-          ))}
-          <li className="text-muted-foreground text-xs">
-            The ring thickens and the number beside it grows with the finding count.
+      <ul className="mt-3 space-y-1.5">
+        {HEAT.map((entry, i) => (
+          <li key={entry.label} className="flex items-center gap-2">
+            <svg viewBox="-12 -12 24 24" className="size-5 shrink-0" aria-hidden="true">
+              <circle r="9" fill="none" stroke={entry.colour} strokeWidth={2.5 - i * 0.75} />
+              <circle r="3" fill="var(--map-module)" />
+            </svg>
+            <span className="text-muted-foreground text-xs">{entry.label}</span>
           </li>
-        </ul>
-      ) : null}
+        ))}
+        <li className="text-muted-foreground text-xs">
+          The ring thickens and the number beside it grows with the finding count.
+        </li>
+      </ul>
     </div>
   );
 }

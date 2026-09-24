@@ -7,7 +7,6 @@ export {
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
 export {
-  createPipelineRunner,
   type PipelineRunnerDeps,
   type ReviewClient,
   type ReviewPipelineRun,
@@ -17,7 +16,6 @@ export { validateFindings } from "#src/validate-findings";
 export type { RenderedCheckRun } from "#src/render-check-run";
 export {
   createCheckRunPublisher,
-  createFixPublisher,
   type PublishFixes,
   type PublishReview,
   type PublishReviewComments,
@@ -66,7 +64,7 @@ export {
   type ReviewPolicy,
   type ReviewRunSpec,
 } from "#src/review-run";
-export { buildReviewIndex, type ReviewIndexRequest } from "#src/build-index";
+export type { ReviewIndexRequest } from "#src/build-index";
 export {
   addSuppression,
   computeHints,
@@ -79,8 +77,6 @@ export {
   titleShape,
   writeMemory,
   HINT_CAP,
-  HINT_IGNORED_THRESHOLD,
-  MEMORY_TTL_DAYS,
   type FindingOutcome,
   type FindingSignal,
   type MemoryStore,

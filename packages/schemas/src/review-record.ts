@@ -10,7 +10,7 @@ const reviewRecordFindingSchema = reviewFindingSchema
   .extend({ hasPatch: z.boolean().optional() });
 
 /** One file the pull request touched, with its line counts. */
-export const reviewRecordChangedFileSchema = z.object({
+const reviewRecordChangedFileSchema = z.object({
   path: z.string().min(1),
   status: z.enum(["added", "modified", "removed", "renamed"]),
   additions: count,
@@ -28,7 +28,7 @@ export const MAX_REPOSITORY_GRAPH_BASE64 = 8_000_000;
  * The repository index at `baseSha`, as base64 of gzipped JSON: the payload
  * never mirrors the index's fields, so a new one needs no schema change.
  */
-export const reviewRecordGraphSchema = z.object({
+const reviewRecordGraphSchema = z.object({
   gzip: z.string().min(1).max(MAX_REPOSITORY_GRAPH_BASE64),
   fileCount: count,
   edgeCount: count,

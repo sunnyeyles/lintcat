@@ -1,10 +1,10 @@
 import { clusterGraph, groupIdFor, type MapGroup } from "@/lib/codebase-map/clustering";
 import type { FindingHeat, MapSource } from "@/lib/codebase-map/from-snapshot";
+import { sumHeat } from "@/lib/codebase-map/heat";
 import { neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
 import { normaliseGraph, type NormalisedGraph } from "@/lib/codebase-map/normalise";
 import { searchFiles, type SearchResult } from "@/lib/codebase-map/search";
 import type {
-  FindingCounts,
   GroupImport,
   GroupSummary,
   MapGraph,
@@ -43,23 +43,6 @@ export function resolveLodThreshold(raw: string | undefined, override?: number):
 }
 
 const SHUT: MapViewState = { focusedPath: null, query: "", expandedGroups: new Set() };
-
-function emptyCounts(): FindingCounts {
-  return { total: 0, high: 0, medium: 0, low: 0 };
-}
-
-function sumHeat(heat: FindingHeat, paths: readonly string[]): FindingCounts {
-  const counts = emptyCounts();
-  for (const path of paths) {
-    const one = heat[path];
-    if (!one) continue;
-    counts.total += one.total;
-    counts.high += one.high;
-    counts.medium += one.medium;
-    counts.low += one.low;
-  }
-  return counts;
-}
 
 /**
  * Groups worth sending whole: the ones holding a changed file first, then the

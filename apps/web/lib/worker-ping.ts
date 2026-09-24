@@ -1,3 +1,4 @@
+import { requiredEnv } from "@pr-review/db";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { after } from "next/server";
 
@@ -28,12 +29,6 @@ export function createWorkerPinger({
   };
 }
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set; add it to .env.local`);
-  return value;
-}
-
 /** `() => void` so a caller cannot accidentally await it and slow its own response. */
 export type PingWorker = () => void;
 
@@ -41,6 +36,6 @@ export type PingWorker = () => void;
 export function hostedWorkerPinger(logger: StructuredLogger): PingWorker {
   const url = process.env.WORKER_URL?.trim();
   if (!url) return () => {};
-  const ping = createWorkerPinger({ url, secret: required("WORKER_PING_SECRET"), logger });
+  const ping = createWorkerPinger({ url, secret: requiredEnv("WORKER_PING_SECRET"), logger });
   return () => after(ping());
 }

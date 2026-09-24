@@ -1,5 +1,6 @@
 import {
   authorize,
+  type Authorization,
   db,
   type MembershipRole,
   type Organization,
@@ -47,20 +48,28 @@ export type OrganizationAccess = {
   readableRepos: ReadableRepo[];
 };
 
+async function guard(
+  slug: string,
+  repo?: { owner: string; name: string },
+): Promise<{ session: AppSession; access: Extract<Authorization, { status: "allowed" }> }> {
+  const session = await currentSession();
+  if (!session) {
+    const requested = (await headers()).get(REQUEST_PATH_HEADER);
+    redirect(signInUrl(requested ?? organizationPath(slug), appDomain()));
+  }
+  const access = await authorize(db(), session, slug, repo);
+  if (access.status === "redirect") {
+    const requested = (await headers()).get(REQUEST_PATH_HEADER);
+    redirect(renamedOrganizationUrl(requested, access.slug, appDomain()));
+  }
+  if (access.status !== "allowed") notFound();
+  return { session, access };
+}
+
 /** Every organization page's guard: signed out goes to sign-in, a retired slug to the current one, else 404. */
 export const requireOrganization = cache(
   async (slug: string): Promise<OrganizationAccess> => {
-    const session = await currentSession();
-    if (!session) {
-      const requested = (await headers()).get(REQUEST_PATH_HEADER);
-      redirect(signInUrl(requested ?? organizationPath(slug), appDomain()));
-    }
-    const access = await authorize(db(), session, slug);
-    if (access.status === "redirect") {
-      const requested = (await headers()).get(REQUEST_PATH_HEADER);
-      redirect(renamedOrganizationUrl(requested, access.slug, appDomain()));
-    }
-    if (access.status !== "allowed") notFound();
+    const { session, access } = await guard(slug);
     const { organization, role, readableRepos } = access;
     return { session, organization, role, readableRepos };
   },
@@ -76,17 +85,8 @@ export type RepoAccess = {
 /** A repository page's guard: same as `requireOrganization`, narrowed to one readable repo. */
 export const requireRepo = cache(
   async (slug: string, owner: string, name: string): Promise<RepoAccess> => {
-    const session = await currentSession();
-    if (!session) {
-      const requested = (await headers()).get(REQUEST_PATH_HEADER);
-      redirect(signInUrl(requested ?? organizationPath(slug), appDomain()));
-    }
-    const access = await authorize(db(), session, slug, { owner, name });
-    if (access.status === "redirect") {
-      const requested = (await headers()).get(REQUEST_PATH_HEADER);
-      redirect(renamedOrganizationUrl(requested, access.slug, appDomain()));
-    }
-    if (access.status !== "allowed" || !access.repo) notFound();
+    const { session, access } = await guard(slug, { owner, name });
+    if (!access.repo) notFound();
     const { organization, role, repo } = access;
     return { session, organization, role, repo };
   },

@@ -15,20 +15,12 @@ import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
 import type { LocalIndex } from "#src/local-index";
-
-const repoPathSchema = z
-  .string()
-  .optional()
-  .describe("Path to the git checkout; defaults to the server's working directory.");
+import { json, repoPathSchema } from "#src/tools/shared";
 
 const filePathSchema = z
   .string()
   .min(1)
   .describe('Repository-relative path, e.g. "packages/index/src/references.ts".');
-
-function json(value: unknown): CallToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
-}
 
 function unknown(index: RepositoryIndex, file: string): CallToolResult {
   return json(unknownPath(index, file));

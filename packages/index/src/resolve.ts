@@ -47,7 +47,7 @@ export function moduleCandidates(base: string): string[] {
 }
 
 /** True for the only specifiers the relative resolver claims to understand. */
-export function isRelativeSpecifier(specifier: string): boolean {
+function isRelativeSpecifier(specifier: string): boolean {
   return specifier.startsWith(".");
 }
 
@@ -58,7 +58,7 @@ function namesSource(specifier: string): boolean {
 }
 
 /** The file `specifier` names, or undefined when nothing in the tree matches. */
-export function resolveRelativeImport(
+function resolveRelativeImport(
   fromPath: string,
   specifier: string,
   exists: (path: string) => boolean,
