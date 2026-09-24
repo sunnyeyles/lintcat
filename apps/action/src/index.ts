@@ -438,8 +438,9 @@ export async function runAction(
       },
       policy: {
         incremental: getInput(env, "incremental") === "true",
-        // On unless it is switched off, which is the opposite of the others.
+        // These two are on unless switched off, the opposite of the others.
         index: getInput(env, "index") !== "false",
+        suggestReviewers: getInput(env, "suggest-reviewers") !== "false",
       },
       ...(memoryBranch === ""
         ? {}

@@ -165,6 +165,7 @@ GitHub Action (apps/action)
    ├── load PR, changed files, diff
    ├── build the repository index at the base commit
    ├── score the change's blast radius from that index
+   ├── suggest reviewers from blame at the base commit and CODEOWNERS, beside the agent
    │
    ▼
 Review pipeline
@@ -301,6 +302,7 @@ Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action
 | `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
 | `index` | no (default `true`) | Whether the review builds a [repository index](#repository-index) from the pull request's base commit before the agent starts. `false` turns it off. |
+| `suggest-reviewers` | no (default `true`) | Whether the check run names up to three suggested reviewers, under the blast radius: who last wrote the lines the pull request changes (blame at the base commit, recent lines weighing more), then CODEOWNERS owners when `index` is on. The author and bots are never named, and no review is ever requested. `false` turns it off. |
 | `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
 | `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agent. Needs `contents: write` and `closed` in the workflow's `types`. |
 | `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompt from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
@@ -756,6 +758,7 @@ under event names, grouped by what they trace:
 | Review | `review.skipped`, `review.started`, `review.model_selected`, `review.loaded`, `review.cancelled`, `review.failed` |
 | Scope | `review.scope_resolved`, `review.scope_unreadable`, `review.incremental.no_changes`, `review.carried_forward.unreadable` |
 | Index | `index.built`, `index.skipped`, `index.failed` |
+| Reviewers | `reviewers.suggested`, `reviewers.skipped`, `reviewers.blame_failed`, `reviewers.failed` |
 | Agent | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
 | Langfuse | `langfuse.disabled_incomplete_credentials`, `langfuse.prompts.loaded`, `langfuse.prompts.unavailable`, `langfuse.prompts.fallback_used`, `tracing.flush_failed` |

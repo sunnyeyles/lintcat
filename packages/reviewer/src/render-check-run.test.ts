@@ -7,6 +7,7 @@ import {
   MAX_ANNOTATIONS_PER_REQUEST,
   renderCheckRun,
 } from "#src/render-check-run";
+import type { SuggestedReviewer } from "#src/suggest-reviewers";
 
 function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   return {
@@ -348,5 +349,94 @@ describe("renderCheckRun with a blast radius", () => {
     const { output } = renderCheckRun([finding()], { annotate: false });
 
     expect(output.summary).not.toContain("Blast radius");
+  });
+});
+
+describe("renderCheckRun with suggested reviewers", () => {
+  const suggestedReviewers: SuggestedReviewer[] = [
+    { handle: "alice", source: "blame", percent: 62 },
+    { handle: "bob", source: "blame", percent: 24 },
+    { handle: "org/api-team", source: "codeowners" },
+  ];
+  const line =
+    "**Suggested reviewers:** @alice (62% of changed lines) · @bob (24%) · @org/api-team (CODEOWNERS)";
+  const blastRadius: BlastRadius = {
+    impact: {
+      direct: [],
+      transitive: [],
+      packages: [],
+      entryPoints: [],
+      untested: [],
+      inCycle: [],
+      brokenImporters: [],
+      partial: false,
+      hubs: [],
+      counts: {
+        direct: 0,
+        transitive: 0,
+        entryPoints: 0,
+        untested: 0,
+        inCycle: 0,
+        brokenImporters: 0,
+      },
+    },
+    risk: { score: 0, band: "low", factors: [], partial: false },
+  };
+
+  it("sits directly under the blast radius", () => {
+    const { output } = renderCheckRun([finding()], {
+      annotate: false,
+      blastRadius,
+      suggestedReviewers,
+    });
+
+    expect(output.summary).toContain(
+      `<sub>Static imports only.</sub>\n\n${line}\n\n**1 finding**`,
+    );
+  });
+
+  it("leads the summary when there is no blast radius", () => {
+    const { output } = renderCheckRun([], {
+      annotate: false,
+      suggestedReviewers,
+    });
+
+    expect(output.summary.split("\n\n")[0]).toBe(line);
+    expect(output.summary).not.toContain("Blast radius");
+  });
+
+  it("marks a share under one percent as such", () => {
+    const { output } = renderCheckRun([], {
+      annotate: false,
+      suggestedReviewers: [
+        { handle: "alice", source: "blame", percent: 0 },
+        { handle: "org/api-team", source: "codeowners" },
+      ],
+    });
+
+    expect(output.summary).toContain(
+      "**Suggested reviewers:** @alice (<1% of changed lines) · @org/api-team (CODEOWNERS)",
+    );
+  });
+
+  it("names a CODEOWNERS-only suggestion as such", () => {
+    const { output } = renderCheckRun([], {
+      annotate: false,
+      suggestedReviewers: [{ handle: "org/api-team", source: "codeowners" }],
+    });
+
+    expect(output.summary).toContain(
+      "**Suggested reviewers:** @org/api-team (CODEOWNERS)",
+    );
+  });
+
+  it("is absent when nobody was suggested", () => {
+    const { output } = renderCheckRun([], {
+      annotate: false,
+      blastRadius,
+      suggestedReviewers: [],
+    });
+
+    expect(output.summary).not.toContain("Suggested reviewers");
   });
 });

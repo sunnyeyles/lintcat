@@ -82,6 +82,17 @@ inputs:
       is logged and the review runs exactly as it would without it.
     required: false
     default: "true"
+  suggest-reviewers:
+    description: >-
+      Whether the check run suggests up to three reviewers. On by default; set
+      to `false` to turn it off. They are ranked by who last wrote the lines
+      this pull request changes, from git blame at the base commit with recent
+      lines weighing more, and then filled from CODEOWNERS when `index` is on.
+      The author and bots are never suggested, and no review is ever
+      requested, so no permission beyond contents: read is needed. Any failure
+      is logged and the section is left out.
+    required: false
+    default: "true"
   memory-branch:
     description: >-
       Branch this action stores its review memory on — one JSON file recording

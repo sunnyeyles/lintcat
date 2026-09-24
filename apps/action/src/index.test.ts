@@ -1140,6 +1140,25 @@ describe("the review policy", () => {
 
     expect(policy(specs)?.index).toBe(false);
   });
+
+  it("suggests reviewers when the suggest-reviewers input is absent", async () => {
+    const { environment, specs } = harness({ ...reviewEnv });
+
+    await runAction(environment);
+
+    expect(policy(specs)?.suggestReviewers).toBe(true);
+  });
+
+  it("stops suggesting reviewers only for an explicit false", async () => {
+    const { environment, specs } = harness({
+      ...reviewEnv,
+      "INPUT_SUGGEST-REVIEWERS": "false",
+    });
+
+    await runAction(environment);
+
+    expect(policy(specs)?.suggestReviewers).toBe(false);
+  });
 });
 
 describe("the fix input", () => {

@@ -329,6 +329,39 @@ describe("runReview: policy", () => {
     expect(client.getRepositoryArchive).not.toHaveBeenCalled();
   });
 
+  it("blames nothing when the policy switches reviewer suggestions off", async () => {
+    const client = makeClient();
+    const { engine } = scriptedEngine();
+
+    await runReview({
+      client,
+      target,
+      delivery: recordingDelivery().delivery,
+      engine,
+      policy: { suggestReviewers: false },
+      logger,
+    });
+
+    expect(client.blame).not.toHaveBeenCalled();
+  });
+
+  it("suggests reviewers unless the policy says otherwise", async () => {
+    const client = makeClient();
+    const { engine } = scriptedEngine();
+
+    await runReview({
+      client,
+      target,
+      delivery: recordingDelivery().delivery,
+      engine,
+      logger,
+    });
+
+    expect(client.blame).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: baseSha, path: "src/sessions.ts" }),
+    );
+  });
+
   it("narrows the review to the commits since the last one", async () => {
     const client = makeClient();
     client.listPullRequestCommitShas.mockResolvedValue(["older", target.headSha]);

@@ -162,6 +162,7 @@ interface DepsOptions {
   now?: () => Date;
   incremental?: boolean;
   index?: boolean;
+  suggestReviewers?: boolean;
 }
 
 function makeDeps(
@@ -312,6 +313,7 @@ describe("reviewWithDelivery", () => {
       "review.loaded",
       "index.built",
       "risk.scored",
+      "reviewers.suggested",
       "findings.validated",
       "patches.verified",
       "review.comments.published",
@@ -938,6 +940,92 @@ describe("the repository index", () => {
     const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
     expect(summary).not.toContain("Blast radius");
     expect(entry(entries, "risk.scored")).toBeUndefined();
+  });
+});
+
+describe("suggested reviewers", () => {
+  const blamed: BlameRange[] = [
+    {
+      startLine: 1,
+      endLine: 1,
+      login: "alice",
+      author: "Alice",
+      committedAt: "2026-09-01T10:00:00.000Z",
+    },
+  ];
+
+  function withCodeowners(client: ReturnType<typeof makeDeps>["client"]) {
+    client.getRepositoryArchive.mockResolvedValue({
+      sha: pullRequest.baseSha,
+      files: new Map([...baseFiles, [".github/CODEOWNERS", "* @org/api-team @octocat"]]),
+      truncated: false,
+    });
+  }
+
+  it("names them on the check run, under the blast radius", async () => {
+    const { deps, client, entries } = makeDeps(
+      reviewResult({ candidates: [finding] }),
+    );
+    client.blame.mockResolvedValue(blamed);
+    withCodeowners(client);
+
+    await reviewWithDelivery(target, deps);
+
+    expect(client.blame).toHaveBeenCalledExactlyOnceWith({
+      owner: target.owner,
+      repo: target.repo,
+      ref: pullRequest.baseSha,
+      path: "src/sessions.ts",
+    });
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(summary).toMatch(/^\*\*Blast radius: /);
+    expect(summary).toContain(
+      "<sub>Static imports only.</sub>\n\n" +
+        "**Suggested reviewers:** @alice (100% of changed lines) · @org/api-team (CODEOWNERS)" +
+        "\n\n**1 finding**",
+    );
+    expect(
+      entries.find((entry) => entry["event"] === "reviewers.suggested"),
+    ).toMatchObject({ count: 2, durationMs: expect.any(Number) });
+  });
+
+  it("still suggests from blame with the index off", async () => {
+    const { deps, client } = makeDeps(reviewResult(), { index: false });
+    client.blame.mockResolvedValue(blamed);
+
+    await reviewWithDelivery(target, deps);
+
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(summary).toMatch(
+      /^\*\*Suggested reviewers:\*\* @alice \(100% of changed lines\)\n\n/,
+    );
+  });
+
+  it("blames nothing and names nobody when switched off", async () => {
+    const { deps, client } = makeDeps(reviewResult(), {
+      suggestReviewers: false,
+    });
+    client.blame.mockResolvedValue(blamed);
+    withCodeowners(client);
+
+    await reviewWithDelivery(target, deps);
+
+    expect(client.blame).not.toHaveBeenCalled();
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(summary).not.toContain("Suggested reviewers");
+  });
+
+  it("publishes the review when blame fails", async () => {
+    const { deps, client, entries } = makeDeps(reviewResult());
+    client.blame.mockRejectedValue(new Error("GraphQL is down"));
+
+    await reviewWithDelivery(target, deps);
+
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(summary).not.toContain("Suggested reviewers");
+    expect(
+      entries.find((entry) => entry["event"] === "reviewers.blame_failed"),
+    ).toMatchObject({ reason: "GraphQL is down" });
   });
 });
 

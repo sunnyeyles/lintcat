@@ -50,6 +50,7 @@ review is never executed.
 | `model` | no | the provider's own | Default model id, as the provider spells it: `gpt-5.6-luna` on `openai`, `claude-sonnet-5` on `anthropic`. |
 | `model-base-url` | no | the provider's own host | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
 | `index` | no | `true` | Whether the review builds a repository index from the pull request's base commit before the reviewer starts. One archive request, `contents: read` only, held in memory and discarded. Any failure is logged and the review runs without it. `false` turns it off. |
+| `suggest-reviewers` | no | `true` | Whether the check run names up to three suggested reviewers: who last wrote the lines this pull request changes, from blame at the base commit with recent lines weighing more, then CODEOWNERS owners when `index` is on. The author and bots are never named, and no review is ever requested, so `contents: read` is enough. Any failure is logged and the section is left out. `false` turns it off. |
 | `incremental` | no | `false` | `true` reviews only the commits added since the last completed `AI PR Review` check run on this pull request, falling back to the whole pull request when there is no usable baseline. |
 | `fix` | no | `false` | Whether verified fixes are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. Off, or when the commit cannot be made, the same fixes are offered as suggested changes on the review comments. |
 | `memory-branch` | no | — | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding, so repeatedly ignored shapes are deprioritised in later reviews. Empty turns the feature off. Needs `contents: write` and `closed` in the workflow's `types`. |
@@ -72,8 +73,9 @@ Workflows pinned to `@v2` keep working; `v2` is not moved.
 | `agent-config` | Delete it, and `.github/pr-review-agents.yml` with it; nothing reads that file now. |
 
 New inputs, all optional and off or unchanged by default: `fix`,
-`incremental`, `index` (on by default), `memory-branch`, `langfuse-record-io`,
-`dashboard-token` and `dashboard-url`. See [Inputs](#inputs).
+`incremental`, `index` and `suggest-reviewers` (both on by default),
+`memory-branch`, `langfuse-record-io`, `dashboard-token` and `dashboard-url`.
+See [Inputs](#inputs).
 
 One behaviour change: with no key for the selected provider, neither as
 `api-key` nor through its environment variable, `v3` skips the review with a

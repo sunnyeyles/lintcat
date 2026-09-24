@@ -1,7 +1,11 @@
 import type { ChangedFile } from "@pr-review/github";
 import { describe, expect, it } from "vitest";
 
-import { buildChangedLineIndex, changedLinesFromPatch } from "#src/diff-lines";
+import {
+  baseRangesFromPatch,
+  buildChangedLineIndex,
+  changedLinesFromPatch,
+} from "#src/diff-lines";
 
 describe("changedLinesFromPatch", () => {
   it("returns the new-side line numbers of added lines in a single hunk", () => {
@@ -111,5 +115,40 @@ describe("buildChangedLineIndex", () => {
 
   it("returns an empty index for no changed files", () => {
     expect(buildChangedLineIndex([]).size).toBe(0);
+  });
+});
+
+describe("baseRangesFromPatch", () => {
+  it("spans each hunk's base side, context lines included", () => {
+    const patch = [
+      "@@ -10,6 +10,7 @@ export function session() {",
+      " context",
+      "+added",
+      "@@ -40,3 +41,2 @@",
+      "-removed",
+    ].join("\n");
+
+    expect(baseRangesFromPatch(patch)).toEqual([
+      { startLine: 10, endLine: 15 },
+      { startLine: 40, endLine: 42 },
+    ]);
+  });
+
+  it("reads an omitted count as one line", () => {
+    expect(baseRangesFromPatch("@@ -7 +7,2 @@\n line\n+added")).toEqual([
+      { startLine: 7, endLine: 7 },
+    ]);
+  });
+
+  it("skips a hunk with no base lines", () => {
+    expect(
+      baseRangesFromPatch("@@ -0,0 +1,3 @@\n+a\n+b\n+c\n@@ -12,0 +16,1 @@\n+d"),
+    ).toEqual([]);
+  });
+
+  it("ignores body lines that only look like a header", () => {
+    expect(baseRangesFromPatch("@@ -3,2 +3,2 @@\n-@@ -90,9 +90,9 @@\n+x")).toEqual([
+      { startLine: 3, endLine: 4 },
+    ]);
   });
 });

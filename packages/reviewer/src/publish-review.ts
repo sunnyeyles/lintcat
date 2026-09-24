@@ -25,6 +25,7 @@ import {
   type ReviewNotes,
 } from "#src/render-review";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { SuggestedReviewer } from "#src/suggest-reviewers";
 
 /** What the comment publisher itself can report. */
 type CommentsPublished = "posted" | "unavailable";
@@ -67,6 +68,7 @@ interface ReviewDeliveryInput
   carriedForward?: readonly PostedFinding[] | undefined;
   scopeNote?: string | undefined;
   blastRadius?: BlastRadius | undefined;
+  suggestedReviewers?: readonly SuggestedReviewer[] | undefined;
 }
 
 interface ReviewDeliveryDeps {
@@ -194,6 +196,7 @@ export async function deliverReview(
       carriedForward: input.carriedForward,
       scopeNote: input.scopeNote,
       blastRadius: input.blastRadius,
+      suggestedReviewers: input.suggestedReviewers,
     }),
   );
 

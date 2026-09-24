@@ -13,6 +13,7 @@ import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
 import type { BlastRadius } from "#src/blast-radius";
 import { countLabel, summarise } from "#src/finding-format";
 import type { PostedFinding } from "#src/render-review";
+import type { SuggestedReviewer } from "#src/suggest-reviewers";
 import { compareFindingStrength } from "#src/validate-findings";
 
 /** The GitHub checks API accepts at most 50 annotations per request. */
@@ -30,6 +31,8 @@ interface RenderCheckRunOptions {
   scopeNote?: string | undefined;
   /** Leads the summary; absent without an index. */
   blastRadius?: BlastRadius | undefined;
+  /** Follows the blast radius; none omits the section. */
+  suggestedReviewers?: readonly SuggestedReviewer[] | undefined;
 }
 
 const annotationLevelBySeverity: Record<
@@ -117,16 +120,36 @@ function renderBlastRadius({ impact, risk }: BlastRadius): string {
   return lines.join("\n");
 }
 
+function reviewerLabel(reviewer: SuggestedReviewer, first: boolean): string {
+  if (reviewer.source === "codeowners") {
+    return "CODEOWNERS";
+  }
+  const percent = reviewer.percent === 0 ? "<1%" : `${reviewer.percent}%`;
+  return first ? `${percent} of changed lines` : percent;
+}
+
+function renderSuggestedReviewers(
+  reviewers: readonly SuggestedReviewer[],
+): string {
+  const named = reviewers.map(
+    (reviewer, at) => `@${reviewer.handle} (${reviewerLabel(reviewer, at === 0)})`,
+  );
+  return `**Suggested reviewers:** ${named.join(" · ")}`;
+}
+
 /** Findings render strongest first; line-anchored ones also become annotations. */
 export function renderCheckRun(
   findings: readonly ReviewFinding[],
   options: RenderCheckRunOptions,
 ): RenderedCheckRun {
   const carried = options.carriedForward ?? [];
-  const lead =
-    options.blastRadius === undefined
+  const reviewers = options.suggestedReviewers ?? [];
+  const lead = [
+    ...(options.blastRadius === undefined
       ? []
-      : [renderBlastRadius(options.blastRadius)];
+      : [renderBlastRadius(options.blastRadius)]),
+    ...(reviewers.length === 0 ? [] : [renderSuggestedReviewers(reviewers)]),
+  ];
   const notes = [
     ...carriedNotes(carried),
     ...(options.scopeNote === undefined ? [] : [options.scopeNote]),

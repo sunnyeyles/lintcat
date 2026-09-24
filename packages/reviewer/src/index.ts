@@ -68,7 +68,11 @@ export {
   type ReviewPolicy,
   type ReviewRunSpec,
 } from "#src/review-run";
-export { buildReviewIndex, type ReviewIndexRequest } from "#src/build-index";
+export {
+  buildReviewIndex,
+  type ReviewIndex,
+  type ReviewIndexRequest,
+} from "#src/build-index";
 export {
   learnFromMergedPullRequest,
   type LearnFromMergeDeps,
