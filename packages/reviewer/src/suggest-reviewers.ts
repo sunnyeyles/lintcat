@@ -219,7 +219,7 @@ export async function suggestReviewers({
   if (!enabled) {
     logger.info("reviewers.skipped", {
       ...fields,
-      reason: "the suggest-reviewers input is off",
+      reason: "reviewer suggestions are off",
     });
     return [];
   }

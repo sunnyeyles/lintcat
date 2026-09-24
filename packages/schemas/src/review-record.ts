@@ -36,7 +36,7 @@ export const reviewRecordGraphSchema = z.object({
 
 export type ReviewRecordGraph = z.infer<typeof reviewRecordGraphSchema>;
 
-/** The `POST /api/ingest` body; a rerun of the same `headSha` replaces it. */
+/** One review as the dashboard stores it; a rerun of the same `headSha` replaces it. */
 export const reviewRecordSchema = z
   .object({
     owner: z.string().min(1).max(100),

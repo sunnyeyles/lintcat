@@ -7,7 +7,6 @@ import {
   emptyTokenUsage,
   GENERAL_AGENT,
   type AgentDefinition,
-  type ManagedPrompts,
   type ReviewAgent,
   type ReviewModel,
   type TokenUsage,
@@ -53,7 +52,6 @@ export type CreateReviewAgent = (request: ReviewAgentRequest) => ReviewAgent;
 export type ReviewEngine =
   | {
       model: ReviewModel;
-      systemPrompts?: ManagedPrompts | undefined;
       maxTurns?: number | undefined;
     }
   | { createAgent: CreateReviewAgent };
@@ -93,9 +91,6 @@ function pipelineRunner(
     model: engine.model,
     logger,
     onUsage: (report) => onUsage(report.usage),
-    ...(engine.systemPrompts === undefined
-      ? {}
-      : { systemPrompts: engine.systemPrompts }),
     ...(engine.maxTurns === undefined ? {} : { maxTurns: engine.maxTurns }),
   });
 }

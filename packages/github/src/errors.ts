@@ -14,7 +14,7 @@ export function httpStatus(error: unknown): number | undefined {
 
 /**
  * Whether a failed write means the token lacks the permission. Too permissive
- * hides a GitHub outage; too strict fails every fork pull request.
+ * hides a GitHub outage; too strict fails a review over a missing permission.
  */
 export function isPermissionError(error: unknown): boolean {
   // Status alone: GitHub's message wording is not part of any API contract.

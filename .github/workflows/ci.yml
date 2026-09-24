@@ -1,16 +1,11 @@
 name: CI
 
 on:
-  # Branches only: a tag runs this through release-action.yml, main through production.yml.
+  # Branches only: main runs this through production.yml.
   push:
     branches-ignore: [main]
   workflow_dispatch:
   workflow_call:
-    inputs:
-      upload-action-bundle:
-        description: Upload the smoke-tested action bundle as the `action-dist` artifact.
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -42,20 +37,8 @@ jobs:
 
       # tsc and vitest never read the bundles; a bundling regression fails here, not at release.
       - name: Build bundles
-        run: pnpm turbo run build --filter=@pr-review/action --filter=@pr-review/cli --filter=@pr-review/mcp --filter=@pr-review/worker
-
-      # Must import under the declared Node major and stay inert without GITHUB_ACTIONS.
-      - name: Smoke-test action bundle
-        run: node scripts/smoke-bundle.mjs
+        run: pnpm turbo run build --filter=@pr-review/cli --filter=@pr-review/mcp --filter=@pr-review/worker
 
       - name: Smoke-test cli and mcp bundles
         run: node scripts/smoke-cli-mcp.mjs
 
-      - name: Upload action bundle
-        if: inputs.upload-action-bundle
-        uses: actions/upload-artifact@v7
-        with:
-          name: action-dist
-          path: apps/action/dist/index.mjs
-          if-no-files-found: error
-          retention-days: 1

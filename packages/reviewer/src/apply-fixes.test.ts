@@ -128,7 +128,7 @@ describe("applyFixes", () => {
 
     expect(outcome).toEqual({
       status: "unavailable",
-      reason: "the workflow token cannot write to this branch",
+      reason: "the token cannot write to this branch",
     });
     expect(entries.map((entry) => entry["event"])).toContain(
       "review.fixes.degraded",

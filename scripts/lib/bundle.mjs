@@ -1,6 +1,6 @@
 /**
- * The one esbuild configuration this repository bundles with; `pnpm build` and
- * `pnpm seed-prompts` must not disagree. Nothing is externalised.
+ * The one esbuild configuration this repository bundles with. Nothing is
+ * externalised.
  */
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

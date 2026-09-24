@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { ReviewRecord } from "@pr-review/schemas";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "./client";
@@ -11,30 +10,6 @@ import {
   type Organization,
 } from "./schema";
 
-/** What `organizations.ingestToken` stores; the secret itself is never persisted. */
-export function hashIngestToken(token: string): string {
-  return createHash("sha256").update(token, "utf8").digest("hex");
-}
-
-export async function findOrganizationByIngestToken(
-  database: Database,
-  token: string,
-): Promise<Organization | undefined> {
-  if (!token) return undefined;
-  const rows = await database
-    .select()
-    .from(organizations)
-    .where(
-      and(
-        eq(organizations.ingestToken, hashIngestToken(token)),
-        isNull(organizations.uninstalledAt),
-      ),
-    )
-    .limit(1);
-  return rows[0];
-}
-
-/** Each is a 404: the organization is gone, or the repo is another account's or was removed. */
 export type IngestFailure = "organization-not-found" | "owner-mismatch" | "repo-removed";
 
 export type IngestResult =

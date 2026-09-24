@@ -2,9 +2,8 @@
 
 The public documentation at `/`, and the dashboard behind it: review history,
 trends and token spend. Also
-`POST /api/ingest`, where the action records each review, and
 `POST /api/github/webhook`, where the GitHub App reports installations,
-organization members and the pull requests to review in hosted mode, and
+organization members and the pull requests to review, and
 `POST /api/docs-chat`, behind the docs' Ask AI panel.
 
 The docs need no session; the dashboard starts at `/dashboard`, which every
@@ -38,15 +37,11 @@ lists them. Give the GitHub App the callback URL
 `next build` needs none of them: every page reads the session, so nothing is
 prerendered.
 
-## Ingest
+## Review records
 
-`POST /api/ingest` takes a `reviewRecordSchema` body (`@pr-review/schemas`)
-with `Authorization: Bearer <organization ingest secret>`. The organization's
-row stores only the secret's SHA-256 (`hashIngestToken`). The record's owner
-must be the organization's login, and the repo must not have been removed from
-the installation, or it is a 404. A missing or unknown token, or an uninstalled
-organization's, is a 401 and writes nothing; a rerun of the same commit replaces that review's
-findings.
+The worker stores each review through `ingestReviewRecord` (`packages/db`), a
+`reviewRecordSchema` body (`@pr-review/schemas`); a rerun of the same commit
+replaces that review's findings.
 
 The record may also carry the pull request's `baseSha`, its `changedFiles` and
 a `graph`: the repository index serialised by `@pr-review/index`, gzipped and
@@ -142,7 +137,7 @@ inside GitHub's 10-second window; the review itself runs in
 Repository settings): `label` queues `labeled` with `ai-review`, and
 `synchronize` or `reopened` when the pull request already carries it;
 `every_pr` queues `opened`, `synchronize` and `reopened` with no label; `off`
-queues nothing, so a repo that also runs the Action is not reviewed twice. Every
+queues nothing. Every
 other action, a closed pull request, and a repo that is untracked, removed, or
 in a suspended or uninstalled organization get a 204 and write nothing
 (`review_job.skipped`, with a `reason`).
@@ -153,8 +148,7 @@ in a suspended or uninstalled organization get a 204 and write nothing
 - A new head supersedes the pull request's older queued or running jobs in the
   same transaction; the worker stops a superseded run before it publishes.
 - The worker writes the finished review straight to the database through
-  ingest's write path, so it shows in the review pages with no
-  `dashboard-token`, and a rerun of the same commit replaces its findings.
+  `ingestReviewRecord`, so a rerun of the same commit replaces its findings.
 - After a successful enqueue, the route pings the worker's Cloud Run endpoint
   (`WORKER_URL`, a bearer `WORKER_PING_SECRET`) so it drains immediately; it
   never awaits or blocks on that call (`lib/worker-ping.ts`, `after()`), and a
@@ -174,7 +168,7 @@ repository owner can save it. A repo with no row gets the defaults.
   the provider default. A model the provider does not offer (say, after the key
   changed provider) fails the job with no retry and a check run naming it.
 - **Fixes**: on commits verified patches to the head branch, under the same
-  limits the Action applies; off (the default) offers them as suggested changes.
+  limits the reviewer applies; off (the default) offers them as suggested changes.
 
 ### Model key
 
@@ -302,7 +296,7 @@ and use `http://lvh.me:3000` and `http://acme.lvh.me:3000`; register
 The project's root directory is `apps/web`, so `apps/web/vercel.json` is the
 one Vercel reads. Its `ignoreCommand` runs `turbo-ignore` for previews, which
 skips the build when a push changed nothing this app depends on — most pushes
-here touch the reviewer, the CLI or the action, and each one otherwise costs a
+here touch the reviewer, the CLI or the worker, and each one otherwise costs a
 full deployment. Production builds always run.
 
 ### Deploys
@@ -416,7 +410,6 @@ app/
     analytics/          trends over time
     usage/              tokens and spend
     settings/           the organization's model key, owners only
-  api/ingest/           the action's endpoint
   api/github/webhook/   the GitHub App's webhook
   api/docs-chat/        the docs' Ask AI
 components/

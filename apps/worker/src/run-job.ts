@@ -1,6 +1,6 @@
 /**
- * One claimed review job, end to end: mint a token, open the key, run the same
- * review the Action runs, and settle the row.
+ * One claimed review job, end to end: mint a token, open the key, run the
+ * review, and settle the row.
  */
 import {
   isCancellation,
@@ -34,6 +34,7 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import {
   dashboardDelivery,
   githubDelivery,
+  isFixCommit,
   reviewCorrelation,
   runReview,
   type PublishFixes,
@@ -121,6 +122,32 @@ function guardedDelivery(to: ReviewDelivery, stillRunning: () => Promise<boolean
   };
 }
 
+// Fixing our own fix commit would loop, so an unreadable head disables fixes.
+async function fixesAllowed(
+  client: HostedClient,
+  target: ReviewTarget,
+  logger: StructuredLogger,
+): Promise<boolean> {
+  try {
+    const message = await client.getCommitMessage({
+      owner: target.owner,
+      repo: target.repo,
+      sha: target.headSha,
+    });
+    if (!isFixCommit(message)) return true;
+    logger.info("review.fixes.disabled", {
+      ...reviewCorrelation(target),
+      reason: "the head commit is this app's own fix",
+    });
+  } catch (error: unknown) {
+    logger.error("review.fixes.disabled", {
+      ...reviewCorrelation(target),
+      reason: errorMessage(error),
+    });
+  }
+  return false;
+}
+
 /** Runs one claimed job and settles its row; never throws for a review failure. */
 export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise<JobOutcome> {
   const { database, lease, retry } = deps;
@@ -203,8 +230,9 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       model: model.modelId,
       fixes: settings.fixes,
     });
+    const commitFixes = settings.fixes && (await fixesAllowed(client, target, logger));
     const delivery = dashboardDelivery(
-      githubDelivery({ client, logger, commitFixes: settings.fixes }),
+      githubDelivery({ client, logger, commitFixes }),
       createDatabaseReviewPublisher(database, organization.id, logger),
     );
     await runReview({

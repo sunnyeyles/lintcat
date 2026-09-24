@@ -35,7 +35,7 @@ Things an agent can attach to its context instead of calling a tool for.
 | `pr-review://file/{path}` | One repository-relative file of that checkout, read from the working tree. A path that escapes the checkout is refused. |
 
 There is no agent configuration. A local review assembles the same
-`runReview` spec the Action does, with a git-backed client in place of GitHub's
+`runReview` spec the hosted worker does, with a git-backed client in place of GitHub's
 and the recording delivery adapter in place of the publishing one, so a dry run
 has nothing to write through — and the git-backed client declares no publish
 method to write through either. The index tools read the working tree and cache
@@ -43,7 +43,7 @@ the index until it changes.
 
 `apply_fix` is the one tool that writes. It takes the `patch` a review already
 verified and replays it onto the file with `applyVerifiedPatches`, the same
-deterministic replacement the Action commits — but onto the working tree, so
+deterministic replacement the App commits — but onto the working tree, so
 the change lands where `git diff` shows it and you decide what to do with it.
 Because the patch is proved against the file a second time, a file edited
 between the review and the call is refused rather than mangled.
