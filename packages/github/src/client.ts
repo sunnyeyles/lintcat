@@ -114,6 +114,8 @@ export interface CommitFilesRequest {
 export interface ChangedFile {
   filename: string;
   status: string;
+  /** The base path of a renamed file. */
+  previous_filename?: string | undefined;
   additions: number;
   deletions: number;
   patch?: string | undefined;

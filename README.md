@@ -164,6 +164,7 @@ GitHub Action (apps/action)
    ├── authenticate with the workflow token
    ├── load PR, changed files, diff
    ├── build the repository index at the base commit
+   ├── score the change's blast radius from that index
    │
    ▼
 Review pipeline

@@ -309,6 +309,7 @@ describe("reviewWithDelivery", () => {
     expect(entries.map((entry) => entry["event"])).toEqual([
       "review.loaded",
       "index.built",
+      "risk.scored",
       "findings.validated",
       "patches.verified",
       "review.comments.published",
@@ -912,6 +913,29 @@ describe("the repository index", () => {
 
     expect(indexPassedTo(runReviewPipeline)?.truncated).toBe(true);
     expect(entry(entries, "index.built")).toMatchObject({ truncated: true });
+  });
+
+  it("leads the check run with the blast radius it scored", async () => {
+    const { deps, client, entries } = makeDeps();
+
+    await reviewWithDelivery(target, deps);
+
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(summary).toMatch(/^\*\*Blast radius: Low \(\d+\)\*\*/);
+    expect(entry(entries, "risk.scored")).toMatchObject({
+      band: "low",
+      durationMs: expect.any(Number),
+    });
+  });
+
+  it("publishes no blast radius when the index is off", async () => {
+    const { deps, client, entries } = makeDeps(reviewResult(), { index: false });
+
+    await reviewWithDelivery(target, deps);
+
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(summary).not.toContain("Blast radius");
+    expect(entry(entries, "risk.scored")).toBeUndefined();
   });
 });
 

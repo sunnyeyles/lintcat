@@ -1,6 +1,8 @@
+import type { Impact } from "@pr-review/index";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
+import type { BlastRadius } from "#src/blast-radius";
 import {
   MAX_ANNOTATIONS_PER_REQUEST,
   renderCheckRun,
@@ -240,5 +242,111 @@ describe("renderCheckRun with findings carried from earlier commits", () => {
     });
 
     expect(rendered.output.summary).toContain("since `abc1234`");
+  });
+});
+
+describe("renderCheckRun with a blast radius", () => {
+  const impact: Impact = {
+    direct: [],
+    transitive: [],
+    packages: ["@app/api", "@app/core", "@app/web"],
+    entryPoints: [],
+    untested: [],
+    inCycle: [],
+    brokenImporters: [],
+    partial: false,
+    hubs: [
+      { path: "packages/core/src/db.ts", dependents: 30 },
+      { path: "packages/core/src/auth.ts", dependents: 1 },
+    ],
+    counts: {
+      direct: 12,
+      transitive: 41,
+      entryPoints: 2,
+      untested: 0,
+      inCycle: 0,
+      brokenImporters: 0,
+    },
+  };
+  const blastRadius: BlastRadius = {
+    impact,
+    risk: {
+      score: 78,
+      band: "high",
+      factors: [
+        { label: "41 files depend on this change", points: 31 },
+        { label: "crosses 3 packages", points: 16 },
+      ],
+      partial: false,
+    },
+  };
+
+  it("leads the summary with the band, score and reach", () => {
+    const { output } = renderCheckRun([finding()], {
+      annotate: false,
+      blastRadius,
+    });
+
+    expect(output.summary.split("\n")[0]).toBe(
+      "**Blast radius: High (78)** · 41 files in 3 packages depend on this change",
+    );
+    expect(output.summary).toContain(
+      "`packages/core/src/db.ts` — 30 dependents",
+    );
+    expect(output.summary).toContain(
+      "`packages/core/src/auth.ts` — 1 dependent",
+    );
+    expect(output.summary).toMatch(
+      /<details><summary>[^<]+<\/summary>\n\n- 41 files depend on this change \(\+31\)/,
+    );
+    expect(output.summary).toContain("<sub>Static imports only.</sub>");
+  });
+
+  it("never changes the conclusion", () => {
+    expect(
+      renderCheckRun([], { annotate: false, blastRadius }).conclusion,
+    ).toBe("success");
+    expect(
+      renderCheckRun([finding()], { annotate: false, blastRadius }).conclusion,
+    ).toBe("neutral");
+  });
+
+  it("says so when nothing depends on the change", () => {
+    const { output } = renderCheckRun([], {
+      annotate: false,
+      blastRadius: {
+        impact: {
+          ...impact,
+          hubs: [],
+          counts: { ...impact.counts, direct: 0, transitive: 0 },
+        },
+        risk: { score: 0, band: "low", factors: [], partial: false },
+      },
+    });
+
+    expect(output.summary).toContain(
+      "**Blast radius: Low (0)** · no indexed files depend on this change",
+    );
+    expect(output.summary).not.toContain("<details>");
+  });
+
+  it("flags a partial graph in the footnote", () => {
+    const { output } = renderCheckRun([], {
+      annotate: false,
+      blastRadius: {
+        ...blastRadius,
+        risk: { ...blastRadius.risk, partial: true },
+      },
+    });
+
+    expect(output.summary).toContain(
+      "Static imports only. Partial: archive truncated or unindexed language.",
+    );
+  });
+
+  it("is absent without an index", () => {
+    const { output } = renderCheckRun([finding()], { annotate: false });
+
+    expect(output.summary).not.toContain("Blast radius");
   });
 });

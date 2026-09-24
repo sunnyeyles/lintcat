@@ -12,11 +12,9 @@ import {
   type RepositoryGraphSnapshot,
 } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
-import type {
-  ReviewRecordChangedFile,
-  ReviewRecordGraph,
-} from "@pr-review/schemas";
+import type { ReviewRecordGraph } from "@pr-review/schemas";
 
+import { changeStatus } from "#src/blast-radius";
 import type { DashboardReview, PublishToDashboard } from "#src/publish-dashboard";
 import {
   createCheckRunPublisher,
@@ -119,15 +117,6 @@ export function recordingDelivery(): RecordingDelivery {
   };
 }
 
-const RECORDED_STATUSES = new Set(["added", "modified", "removed", "renamed"]);
-
-// GitHub's copied, changed and unchanged have no status of their own here.
-function recordedStatus(status: string): ReviewRecordChangedFile["status"] {
-  return RECORDED_STATUSES.has(status)
-    ? (status as ReviewRecordChangedFile["status"])
-    : "modified";
-}
-
 /** The snapshot as the ingest payload carries it: base64 of gzipped JSON. */
 function graphPayload(snapshot: RepositoryGraphSnapshot): ReviewRecordGraph {
   return {
@@ -150,7 +139,7 @@ export function dashboardReview({
     baseSha: outcome.baseSha,
     changedFiles: outcome.changedFiles.map((file) => ({
       path: file.filename,
-      status: recordedStatus(file.status),
+      status: changeStatus(file.status),
       additions: file.additions,
       deletions: file.deletions,
     })),

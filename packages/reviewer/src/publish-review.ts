@@ -12,6 +12,7 @@ import type { StructuredLogger } from "@pr-review/logging";
 import type { ReviewFinding } from "@pr-review/schemas";
 
 import { applyFixes, type FixInput, type FixOutcome } from "#src/apply-fixes";
+import type { BlastRadius } from "#src/blast-radius";
 import { fixCount } from "#src/finding-format";
 import {
   renderCheckRun,
@@ -65,6 +66,7 @@ interface ReviewDeliveryInput
   patches?: FixInput | undefined;
   carriedForward?: readonly PostedFinding[] | undefined;
   scopeNote?: string | undefined;
+  blastRadius?: BlastRadius | undefined;
 }
 
 interface ReviewDeliveryDeps {
@@ -191,6 +193,7 @@ export async function deliverReview(
       annotate: annotated,
       carriedForward: input.carriedForward,
       scopeNote: input.scopeNote,
+      blastRadius: input.blastRadius,
     }),
   );
 
