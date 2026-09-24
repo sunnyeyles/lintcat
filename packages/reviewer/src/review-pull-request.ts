@@ -24,6 +24,7 @@ import {
 } from "@pr-review/logging";
 import type { ReviewFinding, ReviewMemory } from "@pr-review/schemas";
 
+import { assessBlastRadius } from "#src/blast-radius";
 import { buildReviewIndex } from "#src/build-index";
 import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
@@ -285,6 +286,12 @@ export async function reviewWithDelivery(
     enabled: index,
     logger,
   });
+  const blastRadius = assessBlastRadius({
+    index: repositoryIndex,
+    changedFiles,
+    target,
+    logger,
+  });
 
   // The AI boundary: only the validate step's output reaches GitHub.
   const review = await runReviewPipeline({
@@ -362,6 +369,7 @@ export async function reviewWithDelivery(
         scope.kind === "incremental"
           ? incrementalNote(scope.sinceSha, scope.changedFiles.length)
           : undefined,
+      blastRadius,
     },
     {
       publishCheckRun: publish,

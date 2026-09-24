@@ -485,6 +485,22 @@ describe("listChangedFiles", () => {
     expect(files[0]?.patch).toBeUndefined();
   });
 
+  it("keeps a renamed file's base path", async () => {
+    const renamed = {
+      ...makeFile(1),
+      status: "renamed",
+      previous_filename: "src/old-name.ts",
+    };
+    const { client } = makeClient({ filePages: [[renamed]] });
+
+    const files = await client.listChangedFiles(ref);
+
+    expect(files[0]).toMatchObject({
+      status: "renamed",
+      previous_filename: "src/old-name.ts",
+    });
+  });
+
   it("rejects a malformed file listing", async () => {
     const { client } = makeClient({
       filePages: [[{ filename: 42 }]],

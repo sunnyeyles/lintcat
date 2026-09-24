@@ -220,6 +220,7 @@ const changedFilesSchema = z.array(
   z.object({
     filename: z.string(),
     status: z.string(),
+    previous_filename: z.string().optional(),
     additions: z.number(),
     deletions: z.number(),
     patch: z.string().optional(),

@@ -35,6 +35,16 @@ export {
   type HeadTree,
 } from "#src/head-imports";
 export {
+  computeImpact,
+  MAX_IMPACT_DEPTH,
+  MAX_IMPACT_FILES,
+  type BrokenImport,
+  type Impact,
+  type ImpactChange,
+  type ImpactCounts,
+  type ImpactHub,
+} from "#src/impact";
+export {
   parseImports,
   type ImportedName,
   type ImportKind,
