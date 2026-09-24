@@ -29,6 +29,7 @@ import {
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging";
+import { reviewRecordRiskSchema } from "@pr-review/schemas";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runReviewJob, type JobRunnerDeps } from "#src/run-job";
@@ -486,6 +487,27 @@ describe("runReviewJob dashboard recording", () => {
     expect(await database.select().from(findings)).toMatchObject([
       { reviewId: stored[0]!.id, title: "Only problem left" },
     ]);
+  });
+
+  it("records the blast radius it scored, as paths and numbers the ingest schema accepts", async () => {
+    await withKey();
+    const { deps: d } = deps();
+
+    expect(await runReviewJob(d, await claim())).toBe("succeeded");
+
+    const [stored] = await database.select().from(reviews);
+    expect(stored?.risk).toMatchObject({
+      band: expect.stringMatching(/^(low|medium|high)$/),
+      partial: false,
+      hubs: [{ path: "src/sessions.ts", dependents: 3 }],
+      counts: expect.objectContaining({ direct: 3, transitive: 3 }),
+      packages: 0,
+      dependents: ["src/admin.ts", "src/api.ts", "src/boot.ts"],
+    });
+    expect(reviewRecordRiskSchema.safeParse(stored?.risk).success).toBe(true);
+    const text = JSON.stringify(stored?.risk);
+    expect(text).not.toContain("createSession");
+    expect(text).not.toContain("export const");
   });
 
   it("does not record anything when the job fails", async () => {

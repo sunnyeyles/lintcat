@@ -12,9 +12,13 @@ import {
   type RepositoryGraphSnapshot,
 } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
-import type { ReviewRecordGraph } from "@pr-review/schemas";
+import {
+  MAX_RISK_DEPENDENTS,
+  type ReviewRecordGraph,
+  type ReviewRecordRisk,
+} from "@pr-review/schemas";
 
-import { changeStatus } from "#src/blast-radius";
+import { changeStatus, type BlastRadius } from "#src/blast-radius";
 import type { DashboardReview, PublishToDashboard } from "#src/publish-dashboard";
 import {
   createCheckRunPublisher,
@@ -126,6 +130,28 @@ function graphPayload(snapshot: RepositoryGraphSnapshot): ReviewRecordGraph {
   };
 }
 
+// Field by field, so nothing the impact grows later leaves without a decision.
+function riskPayload({ impact, risk }: BlastRadius): ReviewRecordRisk {
+  const { counts } = impact;
+  return {
+    score: risk.score,
+    band: risk.band,
+    partial: risk.partial,
+    factors: risk.factors.map(({ label, points }) => ({ label, points })),
+    hubs: impact.hubs.map(({ path, dependents }) => ({ path, dependents })),
+    counts: {
+      direct: counts.direct,
+      transitive: counts.transitive,
+      entryPoints: counts.entryPoints,
+      untested: counts.untested,
+      inCycle: counts.inCycle,
+      brokenImporters: counts.brokenImporters,
+    },
+    packages: impact.packages.length,
+    dependents: impact.transitive.slice(0, MAX_RISK_DEPENDENTS),
+  };
+}
+
 /** What one finished run contributes to the dashboard. */
 export function dashboardReview({
   outcome,
@@ -144,6 +170,9 @@ export function dashboardReview({
       deletions: file.deletions,
     })),
     ...(outcome.graph === undefined ? {} : { graph: graphPayload(outcome.graph) }),
+    ...(outcome.blastRadius === undefined
+      ? {}
+      : { risk: riskPayload(outcome.blastRadius) }),
     ...usage,
     // The patch is verbatim source, so the dashboard learns only that one survived.
     findings: outcome.findings.map(({ patch, ...finding }) => ({

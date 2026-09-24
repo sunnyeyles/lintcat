@@ -94,7 +94,11 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         }
       />
 
-      <ReviewSummaryPanel summary={review.summary} bySeverity={review.bySeverity} />
+      <ReviewSummaryPanel
+        summary={review.summary}
+        bySeverity={review.bySeverity}
+        risk={review.risk}
+      />
 
       <FindingsFocusProvider>
         <Suspense fallback={<ReviewMapSkeleton />}>

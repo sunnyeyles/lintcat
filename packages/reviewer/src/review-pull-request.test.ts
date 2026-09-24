@@ -277,6 +277,10 @@ describe("reviewWithDelivery", () => {
       graph: snapshotRepositoryIndex(
         buildRepositoryIndex({ sha: pullRequest.baseSha, files: baseFiles }),
       ),
+      blastRadius: {
+        impact: expect.any(Object),
+        risk: expect.objectContaining({ band: "low" }),
+      },
     });
   });
 
@@ -288,6 +292,7 @@ describe("reviewWithDelivery", () => {
     expect(outcome.baseSha).toBe(pullRequest.baseSha);
     expect(outcome.changedFiles).toEqual(changedFiles);
     expect(outcome.graph).toBeUndefined();
+    expect(outcome.blastRadius).toBeUndefined();
   });
 
   it("serialises the index it built onto the outcome", async () => {
@@ -930,6 +935,18 @@ describe("the repository index", () => {
       band: "low",
       durationMs: expect.any(Number),
     });
+  });
+
+  it("carries the blast radius it published onto the outcome", async () => {
+    const { deps, client } = makeDeps();
+
+    const { blastRadius } = await reviewWithDelivery(target, deps);
+
+    const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
+    expect(blastRadius?.risk.band).toBe("low");
+    expect(summary).toContain(`Blast radius: Low (${blastRadius?.risk.score})`);
+    // Only a test imports the changed file, and tests are not dependents.
+    expect(blastRadius?.impact.counts.transitive).toBe(0);
   });
 
   it("publishes no blast radius when the index is off", async () => {

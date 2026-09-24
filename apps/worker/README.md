@@ -53,8 +53,9 @@ Run — nothing here changes them.
    the repo's fixes on, verified patches are committed to the head branch under
    the same limits, unless the head commit is our own fix; otherwise they arrive as suggested changes.
 7. Writes the review straight to the database through ingest's write path, so a
-   rerun of the same commit replaces its findings. A failure here is logged and
-   never fails a review already on GitHub.
+   rerun of the same commit replaces its findings and its blast radius (risk
+   score and band, factors, and dependent file paths and counts; never source
+   text). A failure here is logged and never fails a review already on GitHub.
 
 ## Superseding
 

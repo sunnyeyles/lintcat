@@ -19,7 +19,12 @@ import { cache, Suspense } from "react";
 
 import { SEVERITIES } from "@/components/review";
 import { PageHeader } from "@/components/shell";
-import { InlineSkeleton, SeverityBadge, TableCardSkeleton } from "@/components/ui";
+import {
+  InlineSkeleton,
+  RiskBadge,
+  SeverityBadge,
+  TableCardSkeleton,
+} from "@/components/ui";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
@@ -53,11 +58,12 @@ async function ReviewsBody({ slug }: { slug: string }) {
     </Empty>
   ) : (
     <Card className="py-0">
-      <Table className="min-w-[48rem]">
+      <Table className="min-w-[54rem]">
         <TableHeader>
           <TableRow>
             <TableHead>Pull request</TableHead>
             <TableHead>Head</TableHead>
+            <TableHead className="w-[7rem]">Blast radius</TableHead>
             <TableHead>Findings</TableHead>
             <TableHead className="w-[6rem]">Duration</TableHead>
             <TableHead className="w-[5.5rem]">Cost</TableHead>
@@ -77,6 +83,16 @@ async function ReviewsBody({ slug }: { slug: string }) {
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {shortSha(review.headSha)}
+              </TableCell>
+              <TableCell>
+                {review.risk ? (
+                  <RiskBadge band={review.risk.band} score={review.risk.score} />
+                ) : (
+                  <span className="text-muted-foreground">
+                    <span aria-hidden>—</span>
+                    <span className="sr-only">not scored</span>
+                  </span>
+                )}
               </TableCell>
               <TableCell>
                 {review.findingCount === 0 ? (
@@ -125,7 +141,7 @@ export default async function ReviewsIndexPage({
         }
       />
 
-      <Suspense fallback={<TableCardSkeleton rows={10} columns={6} />}>
+      <Suspense fallback={<TableCardSkeleton rows={10} columns={7} />}>
         <ReviewsBody slug={slug} />
       </Suspense>
     </div>

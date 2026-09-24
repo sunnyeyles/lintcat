@@ -24,7 +24,7 @@ import {
 } from "@pr-review/logging";
 import type { ReviewFinding, ReviewMemory } from "@pr-review/schemas";
 
-import { assessBlastRadius } from "#src/blast-radius";
+import { assessBlastRadius, type BlastRadius } from "#src/blast-radius";
 import { buildReviewIndex } from "#src/build-index";
 import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
@@ -176,6 +176,8 @@ interface ReviewedTree {
   changedFiles: readonly ChangedFile[];
   /** The index, serialised; absent when the index was off or failed. */
   graph?: RepositoryGraphSnapshot | undefined;
+  /** Absent when the index was off or failed, or scoring failed. */
+  blastRadius?: BlastRadius | undefined;
 }
 
 /** One review's outcome, plus how the patches its agents proposed fared. */
@@ -409,5 +411,6 @@ export async function reviewWithDelivery(
     ...(repositoryIndex === undefined
       ? {}
       : { graph: snapshotRepositoryIndex(repositoryIndex) }),
+    ...(blastRadius === undefined ? {} : { blastRadius }),
   };
 }

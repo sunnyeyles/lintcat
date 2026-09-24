@@ -19,10 +19,14 @@ export {
 } from "#src/review-memory";
 export {
   MAX_REPOSITORY_GRAPH_BASE64,
+  MAX_RISK_DEPENDENTS,
   reviewRecordChangedFileSchema,
   reviewRecordGraphSchema,
+  reviewRecordRiskSchema,
   reviewRecordSchema,
   type ReviewRecord,
   type ReviewRecordChangedFile,
   type ReviewRecordGraph,
+  type ReviewRecordRisk,
+  type RiskBand,
 } from "#src/review-record";

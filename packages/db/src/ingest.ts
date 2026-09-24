@@ -114,6 +114,7 @@ async function upsertReview(
     cacheCreationInputTokens: record.cacheCreationInputTokens,
     cacheReadInputTokens: record.cacheReadInputTokens,
     outputTokens: record.outputTokens,
+    risk: record.risk ?? null,
   };
   const rows = await database
     .insert(reviews)
