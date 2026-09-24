@@ -2,8 +2,6 @@
 export { db, withWriteDatabase, type Database } from "./client";
 export { findLocalEnvFile } from "./env";
 export {
-  findOrganizationByIngestToken,
-  hashIngestToken,
   ingestReviewRecord,
   type IngestFailure,
   type IngestResult,

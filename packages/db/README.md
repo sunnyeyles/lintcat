@@ -34,7 +34,6 @@ erDiagram
     bigint installation_id UK
     timestamptz suspended_at
     timestamptz uninstalled_at
-    text ingest_token UK "sha-256 hex"
   }
   memberships {
     serial id PK
@@ -134,8 +133,6 @@ erDiagram
   subdomain: `acme` → `acme.<app-domain>`.
 - `reviews` carries the run's four token counters, the same ones the logging
   events emit. `ingestReviewRecord` writes them from the record.
-- `organizations.ingest_token` holds the SHA-256 hex of the ingest secret, never
-  the secret. `hashIngestToken` in `src/ingest.ts` computes it.
 - `reviews (repo_id, pr_number, head_sha)` is unique: the ingest upsert's
   conflict target, so a rerun of one commit replaces its runs and findings.
 - `findings.category` is the finding's own classification.

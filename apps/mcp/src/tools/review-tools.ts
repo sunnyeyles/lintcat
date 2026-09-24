@@ -114,7 +114,7 @@ export function registerReviewTools(
         "Run the AI review over a local checkout: by default commits since the merge-base with the " +
         "base branch plus uncommitted and untracked files, or only the staged changes, or an explicit " +
         "commit range. Returns only findings that passed the same " +
-        "deterministic validation the GitHub Action applies. Findings suppressed with suppress_finding are " +
+        "deterministic validation the GitHub App applies. Findings suppressed with suppress_finding are " +
         "excluded and counted. Calls the configured model provider and takes " +
         "a minute or more; nothing is written anywhere. With no provider key set, it asks you to run the " +
         "model instead (MCP sampling), which gives a reduced single-shot review the result declares.",
@@ -164,7 +164,7 @@ export function registerReviewTools(
         "Run the AI review over a GitHub pull request at its current head. By default this is a dry " +
         "run that returns the validated findings and writes nothing. With publish: true it posts the " +
         "\"AI PR Review\" check run and inline review comments to the pull request, exactly as the GitHub " +
-        "Action does (fix commits are never made). Needs GITHUB_TOKEN or a logged-in gh CLI.",
+        "App does (fix commits are never made). Needs GITHUB_TOKEN or a logged-in gh CLI.",
       inputSchema: {
         owner: z.string().min(1).describe("Repository owner, e.g. \"sunnyeyles\"."),
         repo: z.string().min(1).describe("Repository name, e.g. \"pr-review-agents\"."),

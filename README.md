@@ -1,7 +1,7 @@
 # pr-review-agents
 
-An AI pull request reviewer that runs as a GitHub Action in your own runner,
-against your own model key. It publishes inline review comments and an
+An AI pull request reviewer that runs as a GitHub App, against your
+organization's own model key. It publishes inline review comments and an
 `AI PR Review` check run carrying the full summary.
 
 ## What it finds
@@ -20,7 +20,7 @@ a careful senior reviewer would block a merge on:
 | **Documentation** | README, docs, or code comments this change made wrong |
 
 A finding may carry a **patch**: a replacement for a range of lines, quoted
-alongside the exact text it expects to replace. With [`fix: true`](#fixes) the
+alongside the exact text it expects to replace. With [fixes](#fixes) on, the
 surviving patches are committed to the pull request branch in one commit;
 otherwise — and whenever the commit cannot be made — they arrive as one-click
 suggested changes on the review comments. The agent never writes anything
@@ -58,110 +58,34 @@ there is one sample per run. The eval README states each gap.
 
 ## Where your code goes
 
-There are two ways to run a review, and they answer this question differently.
+Installing the GitHub App is the only setup. The diff, the files the agent
+reads, and the pull request's own text pass through [`apps/worker`](apps/worker),
+a service this project runs on Google Cloud Run, on their way to **the
+organization's own model provider** (`openai` or `anthropic`), under the API key
+its owner saved at `/o/<slug>/settings` ([`packages/db`](packages/db) stores it
+encrypted; the worker is the only reader of the plaintext). The worker mints a
+short-lived GitHub installation token per job, holds it in memory only, and
+publishes the check run and inline comments; it writes nothing to disk.
 
-**The Action** (`.github/workflows`, below) is nowhere you did not configure.
-There is no GitHub App to install and no vendor server in the path: it's a
-bundle that runs in your own Actions runner, and the workflow's own
-`GITHUB_TOKEN` authenticates the reads and publishes the result. Nothing is
-read from a secrets store at runtime, and this project's maintainers operate
-no service a review touches.
+The review is recorded on the dashboard ([`apps/web`](apps/web)): owner, repo,
+PR number, head SHA, timings, token counts, and every published finding. The
+patch itself — its `expected` and `replacement` text, verbatim lines of your
+source — is never stored; it goes to GitHub only.
 
-**Hosted mode** — installing the GitHub App and labelling a pull request
-`ai-review` — is different. The diff, the files the agent reads, and the pull
-request's own text pass through [`apps/worker`](apps/worker), a service this
-project runs on Google Cloud Run, on their way to **the organization's own
-model provider**, under the API key its owner saved at `/o/<slug>/settings`
-([`packages/db`](packages/db) stores it encrypted; the worker is the only
-reader of the plaintext). The worker mints a short-lived GitHub installation
-token per job, holds it in memory only, and publishes the same check run and
-inline comments the Action would; it writes nothing to disk, and a hosted
-review is not yet stored on the dashboard. In short: the Action keeps
-everything in your own runner, and hosted mode's one extra hop is this
-project's own worker, passing your diff straight through to your provider.
-
-In both modes, the one place your code does go beyond that is **the model
-provider you configure**. The diff, the files the agent reads, and the pull
-request's own text are sent to `openai` or `anthropic` under your `api-key`
-(the Action) or your saved key (hosted mode). For the Action, setting
-[`model-base-url`](#model-providers) points that at a gateway, a proxy, or a
-self-hosted endpoint speaking the provider's API, which closes even that hop —
-no code then leaves infrastructure you control; hosted mode has no equivalent
-override today.
-
-Two optional Action inputs send data elsewhere; hosted mode has neither. Both
-are **off unless you set them**:
-
-| Setting | What leaves, and where to | Closing it |
-| --- | --- | --- |
-| [`langfuse-public-key`](#configuration) + `langfuse-secret-key` | Traces of the model calls, to `langfuse-base-url` (`https://cloud.langfuse.com` by default): span timings, token counts, agent and tool names, finding counts and outcomes. No prompt text, completions or tool results — so no diff and no file contents — unless `langfuse-record-io` is `true`, which exports all of them. | Leave both keys unset, the default; leave `langfuse-record-io` off, also the default; or point `langfuse-base-url` at your own instance. |
-| [`dashboard-token`](#configuration) + `dashboard-url` | One `POST` to `<dashboard-url>/api/ingest` per review ([`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)): owner, repo, PR number, head SHA, timings, token counts, and every published finding — file path, line, title, explanation, suggested fix, and whether a patch survived. The patch itself — its `expected` and `replacement` text, verbatim lines of your source — is never sent; it goes to GitHub only. | Leave both unset, the default; or point `dashboard-url` at your own deployment of [`apps/web`](apps/web). |
-
-Within GitHub, the Action asks for no more than it needs: `contents: read`,
-`pull-requests: write` and `checks: write`, each of which
-[degrades rather than fails](#token-permissions) when withheld, plus
-`contents: write` only for [`fix: true`](#fixes). It never merges and never
-approves.
-
----
-
-## Delivery path
-
-A GitHub Action, run in the repository's own Actions runner. There's no
-separate infrastructure to stand up and no GitHub App to register — the
-workflow's own token authenticates the reads and publishes the check run.
-
-```yaml
-name: AI PR Review
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-
-permissions:
-  contents: write      # read is enough; write only for `memory-branch`
-  pull-requests: write
-  checks: write        # omit and reviews still land, in the job summary
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: sunnyeyles/pr-review-action@v3
-        with:
-          api-key: ${{ secrets.OPENAI_API_KEY }}
-```
-
-The `closed` trigger and `contents: write` are needed only for
-[`memory-branch`](#configuration); without it, drop both back to
-`types: [opened, synchronize, reopened]` and `contents: read`.
-
-Source lives in [`apps/action`](apps/action); `release-action.yml` publishes the
-bundle to the public action repository. `v3` removed the `agents` and
-`agent-config` inputs and skips, rather than fails, when the provider key is
-missing; the [action README](apps/action/README.md#moving-from-v2) has the
-migration.
-
-Three names for the same thing, deliberately: this source repo is
-`pr-review-agents`, the published action repo is `pr-review-action` and is
-listed on the Marketplace as **LintCat PR Review** (the `name:` in
-`action.yml`), and the check run it writes is `AI PR Review`
-(`CHECK_RUN_NAME` in `packages/github/src/client.ts`).
-
-On a fork PR, `GITHUB_TOKEN` is read-only and can't create a check run — the
-Action detects that permission error, degrades to writing the review into the
-job summary instead, and still exits 0.
+The App asks for no more than it needs (see [App permissions](#app-permissions)).
+It never merges and never approves.
 
 ---
 
 ## How a review happens
 
 ```text
-GitHub PR event (pull_request: opened/synchronize/reopened)
+GitHub PR event (pull_request webhook → apps/web → review_jobs)
    │
    ▼
-GitHub Action (apps/action)
+Worker (apps/worker)
    │
-   ├── authenticate with the workflow token
+   ├── mint an installation token
    ├── load PR, changed files, diff
    ├── build the repository index at the base commit
    ├── score the change's blast radius from that index
@@ -173,7 +97,6 @@ Review pipeline
                                             │
                                             ▼
                             GitHub Check Run + annotations
-                            (or job summary, on a fork PR)
 ```
 
 ---
@@ -244,7 +167,6 @@ Reinforcing rules:
 
 ```text
 apps/
-  action/     Event parsing → review pipeline → check run (or job summary)
   cli/        `pr-review`: the same pipeline over a working tree from a
               command line, and the pre-push hook that blocks on it
   mcp/        Local MCP server: the same pipeline over a working tree,
@@ -256,7 +178,7 @@ packages/
   ai/         Provider selection (model.ts), prompts, and agents/: the
               general agent, its runtime loop and read-only tools
   reviewer/   Review pipeline, validation chain, check-run rendering
-  github/     GitHub client (workflow-token auth) + Octokit calls
+  github/     GitHub client (installation-token auth) + Octokit calls
   schemas/    Zod schemas: ReviewFinding, the review trigger contract
   logging/    Structured single-line JSON logger
 evals/        Fixture repositories and the harness that runs the real
@@ -265,8 +187,8 @@ docs/         index.html — the architecture walkthrough, published to
               Pages and now also served by apps/web at /docs/walkthrough;
               claude/ — how the agent skills read this repo
               (.nojekyll beside it, so Pages serves the file as written)
-scripts/      esbuild bundler for apps/action, its smoke test, and the
-              Langfuse prompt seeder
+scripts/      esbuild bundler for the cli, mcp and worker, and their
+              smoke tests
 ```
 
 ### Failure
@@ -274,59 +196,43 @@ scripts/      esbuild bundler for apps/action, its smoke test, and the
 The review pipeline (`packages/reviewer/src/review-pipeline.ts`) runs the one
 agent, then `validate`. The agent's tool-calling loop is one `generateText`
 call (`packages/ai/src/agents/runtime.ts`), capped at 12 steps. If the agent
-fails the pipeline throws, which fails the workflow step, so the run can be
-retried from the Actions UI.
+fails the pipeline throws, which fails the job; the worker retries it up to
+three times before publishing a `failure` check run.
 
 ### Review memory
 
-With [`memory-branch`](#configuration) set, the agent gets deprioritisation
-hints: shapes this repository has repeatedly left alone (five ignores, no
-resolves) are named in a `# Repository history` block. They are evidence, not
-rules: the prompt still forbids inventing a finding, and a shape with no signal
-for 90 days is forgotten. Suppressions match on title shape alone.
-`memory.hints_attached` logs how many hints reached the agent.
+The [MCP server](#mcp-server) keeps a review memory with its checkout: shapes
+this repository has repeatedly left alone (five ignores, no resolves) are named
+to the agent in a `# Repository history` block, and suppressed findings are
+hidden. They are evidence, not rules: the prompt still forbids inventing a
+finding, and a shape with no signal for 90 days is forgotten. Suppressions match
+on title shape alone. `memory.hints_attached` logs how many hints reached the
+agent.
 
 ---
 
 ## Configuration
 
-Set as `with:` inputs on the Action step ([`apps/action/action.yml`](apps/action/action.yml)):
+Each repository's settings live on the dashboard at
+`/o/<slug>/repos/<owner>/<name>/settings`; a repository with none gets the
+defaults. See [`apps/web`](apps/web/README.md#repository-settings).
 
-| Input | Required | Purpose |
+| Setting | Default | Purpose |
 | --- | --- | --- |
-| `api-key` | yes, as the input or through `env` | Key for the selected provider, which the agent authenticates with. Store as a repository or organisation secret; never inline it. Falls back to the provider's own variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) when left empty, so a workflow can pass keys through `env` instead of choosing one in YAML. With neither set, the step skips the review with a notice and succeeds. |
-| `model-provider` | no (default `openai`) | Which provider the agent calls: `openai` or `anthropic`. An unknown name fails the step before any model call. |
-| `github-token` | no (default `${{ github.token }}`) | Token for the eight read-only repository tools and for publishing the check run. |
-| `model` | no (default: the provider's own — `gpt-5.6-luna`, `claude-sonnet-5`) | Model id, as the provider spells it. |
-| `model-base-url` | no (default: the provider's own host) | Overrides the provider's API host — a gateway, a proxy, or a compatible endpoint (for `openai`, one that accepts `max_completion_tokens`). |
-| `incremental` | no (default `false`) | Whether a review reads only the commits added since this pull request was last reviewed. `true` turns it on; any other value leaves it off. See [Incremental review](#incremental-review). |
-| `index` | no (default `true`) | Whether the review builds a [repository index](#repository-index) from the pull request's base commit before the agent starts. `false` turns it off. |
-| `fix` | no (default `false`) | Whether verified [fixes](#fixes) are committed to the pull request branch. `true` turns it on; any other value leaves it off. Needs `contents: write`. |
-| `memory-branch` | no (default: empty, the feature off) | Branch the action stores its review memory on: one JSON file recording what this repository did with each past finding. Repeatedly ignored shapes are deprioritised for the agent. Needs `contents: write` and `closed` in the workflow's `types`. |
-| `langfuse-public-key` | no | Supply this and the secret key to fetch the agent system prompt from [Langfuse](#seeding-the-managed-prompts) and export traces there. Both unset is the default, and runs on the in-code prompts. |
-| `langfuse-secret-key` | no | The other half. Setting only one of the two disables both features and logs `langfuse.disabled_incomplete_credentials`. |
-| `langfuse-base-url` | no (default `https://cloud.langfuse.com`) | Langfuse host, for a self-hosted or regional instance. Keys are region-scoped: the wrong host 401s and drops every trace. |
-| `langfuse-prompt-label` | no (default `production`) | Which labelled version of each prompt to fetch — try a prompt change on one repository before promoting it. |
-| `langfuse-record-io` | no (default `false`) | Whether traces carry the prompts, completions and tool results of each model call — the diff and every file an agent read. `true` turns it on, for debugging a prompt; any other value keeps traces to timings, token counts and outcomes. |
+| Mode | `every_pr` | `every_pr` reviews every opened, pushed or reopened pull request; `label` only those labelled `ai-review`; `off` none. |
+| Model | the provider's own (`gpt-5.6-luna`, `claude-sonnet-5`) | Model id, from those the organization key's provider offers. |
+| Fixes | off | Whether verified [fixes](#fixes) are committed to the pull request branch. |
+
+The provider and API key are the organization's, saved by an owner at
+`/o/<slug>/settings`. With none saved, a review publishes a neutral check run
+asking for one and calls no model.
 
 ### Model providers
 
 Models are reached through the [AI SDK](https://ai-sdk.dev). Which providers
 are allowed, what each one's default model is, and which environment variable
-carries its key live in `packages/ai/src/model.ts`, selected by
-`model-provider`:
-
-```yaml
-        with:
-          model-provider: anthropic
-          api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          model: claude-sonnet-5
-```
-
-`model-base-url` points a provider at a gateway, a proxy, or any endpoint
-speaking its API — OpenAI is bound to Chat Completions rather than the
-Responses API for that reason. Adding a provider is an entry in `PROVIDERS`
-and nothing else.
+carries its key live in `packages/ai/src/model.ts`, selected by the saved
+key's provider. Adding a provider is an entry in `PROVIDERS` and nothing else.
 
 Prompt caching is explicit on `anthropic`, the provider whose API takes cache
 breakpoints (`packages/ai/src/agents/runtime.ts`). On the default provider,
@@ -364,16 +270,9 @@ collapses to zero, something above a breakpoint started varying between turns.
 
 ### Incremental review
 
-Off by default in the Action; on by default in hosted mode, where the worker
-reviews every push and `REVIEW_INCREMENTAL=false` turns it off. Turning it on
-narrows what the agent reads on a push to a pull request they have already
-reviewed:
-
-```yaml
-        with:
-          api-key: ${{ secrets.OPENAI_API_KEY }}
-          incremental: "true"
-```
+On by default: the worker reviews every push, and `REVIEW_INCREMENTAL=false`
+turns it off. It narrows what the agent reads on a push to a pull request it
+has already reviewed.
 
 **The baseline is the check run itself.** `AI PR Review` is written against each
 head commit, so the newest earlier commit carrying a completed one is the commit
@@ -409,7 +308,7 @@ nothing new must not read as a clean one.
 **What it costs you:** a bug introduced in an earlier commit but only visible
 given the newest commit's context is outside the diff the agent is handed.
 `get_diff` means they can still reach it; nothing makes them. That is the trade
-the input buys, which is why it ships off.
+incremental review makes.
 
 ### Repository index
 
@@ -464,29 +363,13 @@ Reading the archive is capped at 50 MB, 20 000 files and 512 KB per file, and
 Hitting a cap marks the index truncated rather than failing; the block says so.
 A repository too large to archive, an unreachable endpoint, or any other
 failure is logged as `index.failed` and the review runs exactly as it would
-without the index. Set the `index` input to `false` to skip the build entirely.
+without the index.
 
 ---
 
-Nothing is read from a secrets store at runtime — the workflow token and the
-`api-key` input are the only credentials involved, and neither ever needs to be
-provisioned outside GitHub's own secret settings.
-
 ### Fixes
 
-Off by default. Turning it on lets one review commit its verified patches:
-
-```yaml
-permissions:
-  contents: write        # only needed for fix: true
-  pull-requests: write
-  checks: write
-
-# ...
-        with:
-          api-key: ${{ secrets.OPENAI_API_KEY }}
-          fix: "true"
-```
+Off by default; a repository owner turns them on in the repository's settings.
 
 What is committed is never what an agent said, only what deterministic code
 could prove: every patch quotes the lines it replaces, and a quote that does
@@ -495,36 +378,21 @@ while its finding is still published. At most 5 files and 200 lines change per
 review, and the commit is a plain fast-forward on the branch tip the review
 read — a push that landed during the review wins.
 
-Leaving `fix` off loses nothing. The same verified patches are rendered as
+Leaving fixes off loses nothing. The same verified patches are rendered as
 GitHub suggested changes on the review comments, which apply in one click; that
-is also what happens on a fork, whose token cannot write, or when the branch
-moved. The review body always says which of the two happened.
+is also what happens when the branch moved. The review body always says which
+of the two happened.
 
-This repository has not turned it on for itself.
-[`.github/workflows/self-review.yml`](.github/workflows/self-review.yml) still
-grants `contents: read` and omits `fix`, so its own reviews propose fixes as
-suggested changes and commit nothing. Enabling it is two lines, and is a
-deliberate decision rather than the state this repository ships in.
+The commit carries a marker line. Its push triggers another review, which runs
+as normal but fixes nothing: a run whose head commit is one of ours never
+commits on top of it.
 
-The commit is authored by `github-actions[bot]` and carries a marker line. A
-push made with `GITHUB_TOKEN` does not trigger workflows, so the review does not
-re-run itself; if you swap in a PAT that does, the marker is the second guard —
-a run whose head commit is one of ours reviews as normal but fixes nothing.
+### App permissions
 
-### Token permissions
-
-Every one of them degrades rather than fails, except the first. Write access to
-file contents is requested only for `fix: true`; merges and approvals never.
-
-| Permission | With it | Without it |
-| --- | --- | --- |
-| `contents: read` | Reads files at the head and base commits, and the agent configuration | The action cannot run |
-| `pull-requests: write` | Findings post as inline review comments | The check run annotates the same lines instead, and logs `review.comments.degraded` |
-| `checks: write` | Publishes the `AI PR Review` check run and its annotations | The whole review is written to the workflow job summary instead, and logs `review.published.degraded` |
-| `contents: write` | Commits verified fixes to the pull request branch, when `fix: true` | The same fixes are offered as suggested changes, and it logs `review.fixes.degraded` |
-
-A fork-triggered workflow gets a read-only token, so both degradations fire at
-once and the review lands in the job summary. The step still exits 0.
+Repository **Contents** (read and write), **Pull requests** (read and write),
+**Checks** (read and write) and **Metadata** (read); the full list is in
+[`apps/web`](apps/web/README.md#registering-the-app). Contents write is used
+only for the fix commit; merges and approvals never.
 
 ---
 
@@ -536,41 +404,14 @@ Requires Node.js `>=22 <26` and pnpm `>=10`.
 pnpm install
 pnpm typecheck        # tsc --noEmit across every workspace package
 pnpm test             # vitest run — the full Vitest suite
-pnpm build            # esbuild → apps/action/dist/index.mjs (Node 24, ESM)
+pnpm build            # every package, and the cli, mcp and worker bundles
 ```
 
-Workspace packages are consumed as TypeScript source and compiled into a
-single self-contained bundle by `scripts/build-bundle.mjs` — nothing is left
-external, since the Actions runner provides nothing beyond the Node runtime
-itself.
+Workspace packages are consumed as TypeScript source and compiled into
+self-contained bundles by `scripts/build-bundle.mjs`.
 
-Put local secret values in `.env.local` (gitignored) when exercising the
-handler outside Actions. `scripts/seed-prompts.mjs`, the MCP server and
-`packages/db` read it.
-
-### Seeding the managed prompts
-
-The agent's prompt is editable in Langfuse, but a project only serves it once
-it holds it — until then every review falls back to the in-code prompt and
-reports `loadedCount: 0`. Publish this build's prompt with:
-
-```sh
-pnpm seed-prompts -- --dry-run           # decide everything, write nothing
-pnpm seed-prompts -- --label staging     # try a label before promoting
-pnpm seed-prompts                        # publish to `production`
-```
-
-It needs `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` (plus
-`LANGFUSE_BASE_URL` when self-hosting or on a regional host), from the
-environment or `.env.local`.
-
-Re-running is a no-op when the labelled version already matches, so it never
-piles identical versions onto a current project. A prompt that has been edited
-in Langfuse keeps serving reviews — that is the point of managing them there —
-and is superseded, not erased, the next time the seeder runs. A prompt that
-would fail the contract guard in `packages/ai/src/prompts.ts` is never
-published, since installing one would mean every review silently falling back
-from it.
+Put local secret values in `.env.local` (gitignored). The worker, the MCP
+server and `packages/db` read it.
 
 ---
 
@@ -620,7 +461,7 @@ runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
 | Tool | What it does |
 | --- | --- |
 | `review_local_changes` | Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed |
-| `review_pull_request` | Reviews a GitHub pull request; a dry run unless `publish: true`, which posts the check run and comments as the Action would |
+| `review_pull_request` | Reviews a GitHub pull request; a dry run unless `publish: true`, which posts the check run and comments as the App would |
 | `suppress_finding` | Marks a false positive so later reviews of that checkout exclude it and report how many they hid; stored with the checkout, matched by title shape |
 | `repository_overview`, `find_references`, `describe_file` | The [repository index](#repository-index), built from the working tree, with no network |
 | `list_reviews`, `get_review`, `review_trends` | Stored review history, scoped by the dashboard's own access rules to your GitHub account |
@@ -628,7 +469,7 @@ runs `node apps/mcp/start.mjs`, which rebuilds the bundle before it starts.
 Cancelling a review — Ctrl-C in the client, or any `notifications/cancelled` —
 aborts the agent's model calls, and a cancelled run publishes nothing.
 
-A local review takes the same path as the Action, with a git-backed client in
+A local review takes the same path as the hosted one, with a git-backed client in
 place of GitHub's, so the [trust boundary](#the-trust-boundary) is unchanged:
 only validated findings come back. It needs an `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`; GitHub access
 uses `GITHUB_TOKEN` or the `gh` login. Configuration, and the MCP Bundle path
@@ -641,7 +482,7 @@ for shipping it beyond this checkout, are in
 
 Every seam that decides what reaches GitHub is covered by unit tests: event
 parsing, the agent loop and its tool dispatch, the diff line index, the
-validation chain, duplicate removal, check-run rendering, and the fork-PR job-summary fallback.
+validation chain, duplicate removal, and check-run rendering.
 The model client and Octokit are both injected behind narrow interfaces, so the
 suite makes no network calls and runs in under two seconds.
 
@@ -697,7 +538,7 @@ has no publish method, and the delivery closes over no client.
 
 Only the Octokit-backed adapters — `createInstallationClient` and
 `createTokenClient` — return all three intersected, because an installation
-token really can do all of it; the Action and the MCP server take that
+token really can do all of it; the worker and the MCP server take that
 intersection through their environment seams and hand each half to the
 narrower consumer that wants it.
 
@@ -708,47 +549,20 @@ publish method at all.
 
 ---
 
-## Publishing the Action
+## CI and deploys
 
-`.github/workflows/release-action.yml` runs on a `v*` tag (or manual dispatch):
-it calls `ci.yml` (typecheck → test → build and smoke-test the bundles), then
-takes the smoke-tested action bundle from that run and pushes only `action.yml`,
-`dist/index.mjs`, `LICENSE`, and a usage `README.md` to a separate public repo,
-moving that repo's major-version alias (`v3`) to the new tag and cutting a
-GitHub Release there. Before anything is committed there, the job refuses to
-move an alias that already exists if the new `action.yml` drops or renames an
-input the alias still publishes (`scripts/check-action-inputs.mjs`): a breaking
-input change needs the next major. Listing the Action on the Marketplace is a manual tick on
-that release, once, and the listing is keyed on the `name:` in `action.yml` —
-change it and the Marketplace URL moves with it. The engine, the tests, the
-spec, and this README stay in this repo, and are not published downstream.
-`.github/workflows/ci.yml` runs typecheck, tests, and the action, cli and mcp
-bundle smoke checks on every branch push (tags go through the release instead,
-and `main` through `.github/workflows/production.yml`, which then migrates the
-database and deploys the dashboard — see [`apps/web`](apps/web/README.md#deploys));
-`.github/workflows/self-review.yml` dogfoods the Action on this repo's own
-PRs, but only on a pull request labelled `ai-review` — reviews cost tokens, so
-they are opt-in. Add the label to review, remove it to stop. Without a key for
-`vars.MODEL_PROVIDER` the Action skips with a notice.
-
-Required repository configuration for the release workflow:
-
-| Setting | Purpose |
-| --- | --- |
-| `vars.ACTION_RELEASE_REPO` | Target public repo, e.g. `sunnyeyles/pr-review-action` |
-| `secrets.ACTION_RELEASE_TOKEN` | Token with `contents: write` on that repo |
-
-The self review reads `secrets.OPENAI_API_KEY` / `secrets.ANTHROPIC_API_KEY`,
-`secrets.LANGFUSE_PUBLIC_KEY`, `secrets.LANGFUSE_SECRET_KEY` and
-`secrets.DASHBOARD_TOKEN`, plus the non-secret `vars.MODEL_PROVIDER`,
-`vars.REVIEW_MODEL`, `vars.LANGFUSE_BASE_URL` and `vars.DASHBOARD_URL`.
+`.github/workflows/ci.yml` runs typecheck, lint, tests, and the cli and mcp
+bundle smoke checks on every branch push. `main` goes through
+`.github/workflows/production.yml`, which runs the same checks, then migrates
+the database and deploys the dashboard and the worker — see
+[`apps/web`](apps/web/README.md#deploys).
 
 ---
 
 ## Observability
 
-Structured single-line JSON logs land in the workflow run's own log stream,
-under event names, grouped by what they trace:
+Structured single-line JSON logs land in the worker's log stream (Cloud
+Logging), under event names, grouped by what they trace:
 
 | Stage | Events |
 | --- | --- |
@@ -757,10 +571,7 @@ under event names, grouped by what they trace:
 | Index | `index.built`, `index.skipped`, `index.failed` |
 | Agent | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
-| Langfuse | `langfuse.disabled_incomplete_credentials`, `langfuse.prompts.loaded`, `langfuse.prompts.unavailable`, `langfuse.prompts.fallback_used`, `tracing.flush_failed` |
-
-That is every event a review run can emit. `pnpm seed-prompts` emits its own
-`langfuse.prompts.seed_*` set, which no review ever writes.
+| Job | `review_job.started`, `review_job.succeeded`, `review_job.superseded`, `review_job.retrying`, `review_job.dropped`, `review_job.no_model_key`, `review_job.recorded`, `review.fixes.disabled` |
 
 Events carry the repository, PR
 number, head SHA, duration, finding count, and token usage (four
@@ -778,22 +589,12 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
   [`docs/index.html`](docs/index.html) still serves the same walkthrough on
   [Pages](https://sunnyeyles.github.io/pr-review-agents/) until that site has a
   public URL to retire it to.
-- **[Incremental review](docs/incremental-review.md)** — the design behind the
-  `incremental` input: where the baseline comes from, every way it widens back
+- **[Incremental review](docs/incremental-review.md)** — the design behind
+  incremental review: where the baseline comes from, every way it widens back
   to a full review, and what recall it costs.
 
 ## Out of scope
 
-The Action itself stays self-contained: it reads the pull request, publishes the
-review, and keeps no state beyond its memory. No automatic merging or approval,
-no vector database, no repository embeddings. What memory there is stays a
-single JSON file of finding shapes — see [Review memory](#review-memory).
-
-Review history and a dashboard now live in [`apps/web`](apps/web), separately
-from the Action and optional to run. It reads and writes the schema in
-[`packages/db`](packages/db): a review reaches it only when both
-[`dashboard-token` and `dashboard-url`](#where-your-code-goes) are set, in
-which case [`publish-dashboard.ts`](packages/reviewer/src/publish-dashboard.ts)
-posts the review record to `<dashboard-url>/api/ingest`, which
-[`packages/db/src/ingest.ts`](packages/db/src/ingest.ts) stores. Set neither,
-the default, and the review is published to GitHub only.
+No automatic merging or approval, no vector database, no repository embeddings.
+Review history lives on the dashboard in [`apps/web`](apps/web), stored through
+[`packages/db/src/ingest.ts`](packages/db/src/ingest.ts).

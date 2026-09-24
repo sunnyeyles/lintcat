@@ -14,14 +14,12 @@ import { generateText, isStepCount, type ModelMessage } from "ai";
 
 import {
   buildReviewSystemPrompt,
-  renderRepositoryHints,
   type AgentDefinition,
 } from "#src/agents/definition";
 import { extractAgentOutput } from "#src/agents/output";
 import type { ReviewModel } from "#src/model";
 import type { ReviewAgent, ReviewContext } from "#src/agent-contract";
 import { isCancellation } from "#src/cancellation";
-import type { ManagedPrompts } from "#src/prompts";
 import {
   renderRepository,
   renderRepositoryIndex,
@@ -163,20 +161,9 @@ export interface ReviewAgentDeps {
   maxTurns?: number | undefined;
   /** Receives agent.started / agent.completed / agent.failed. */
   logger?: StructuredLogger | undefined;
-  /** Pre-resolved system prompts; missing agents fall back to the in-code prompt. */
-  systemPrompts?: ManagedPrompts | undefined;
   onUsage?: ((report: AgentUsageReport) => void) | undefined;
   /** The repository at the base commit; absent when off, failed or unbuilt. */
   index?: RepositoryIndex | undefined;
-}
-
-/** Adds the hint block unless the prompt already carries it. */
-function appendRepositoryHints(
-  prompt: string,
-  hints: readonly string[] | undefined,
-): string {
-  const block = renderRepositoryHints(hints);
-  return prompt.includes(block) ? prompt : `${prompt}${block}`;
 }
 
 /**
@@ -188,12 +175,7 @@ export function createReviewAgent(
   deps: ReviewAgentDeps,
 ): ReviewAgent {
   const maxTurns = deps.maxTurns ?? DEFAULT_MAX_TURNS;
-  const managed = deps.systemPrompts?.[agent.category];
-  // A managed prompt knows nothing of this run's hints, so they are appended.
-  const systemPrompt =
-    managed === undefined
-      ? buildReviewSystemPrompt(agent)
-      : appendRepositoryHints(managed, agent.repositoryHints);
+  const systemPrompt = buildReviewSystemPrompt(agent);
   const logger = deps.logger ?? createConsoleLogger();
   const model = deps.model;
 

@@ -1,9 +1,5 @@
 /** Shared Zod schemas for the review trigger contract and review findings. */
 export {
-  isLearnPullRequestAction,
-  isSupportedPullRequestAction,
-} from "#src/pull-request-event";
-export {
   categoryLabel,
   findingCategorySchema,
   findingPatchSchema,

@@ -44,7 +44,7 @@ export default async function SignInPage({
       <PageHeader
         eyebrow="Dashboard"
         title="Sign in"
-        description="Every review the action publishes for your organization, read from the dashboard's database."
+        description="Every review LintCat publishes for your organization, read from the dashboard's database."
       />
       {error ? (
         <Alert variant="destructive">

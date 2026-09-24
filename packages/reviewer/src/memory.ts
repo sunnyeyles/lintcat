@@ -2,11 +2,6 @@
  * What a repository has done with our findings, aggregated per (category,
  * title shape). The stored file is untrusted: a bad read degrades to empty.
  */
-import {
-  httpStatus,
-  type PullRequestReadClient,
-  type ReviewPublishClient,
-} from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import {
   reviewMemorySchema,
@@ -69,40 +64,6 @@ export interface MemoryStore {
 }
 
 export const MEMORY_FILE_PATH = "memory.json";
-
-/** The store the action uses: one JSON file on a branch it owns. */
-export function createBranchMemoryStore(
-  client: Pick<PullRequestReadClient, "getFileContents"> &
-    Pick<ReviewPublishClient, "writeFileOnBranch">,
-  repository: { owner: string; repo: string },
-  branch: string,
-): MemoryStore {
-  return {
-    async read() {
-      try {
-        return await client.getFileContents({
-          ...repository,
-          path: MEMORY_FILE_PATH,
-          ref: branch,
-        });
-      } catch (error: unknown) {
-        if (httpStatus(error) === 404) {
-          return undefined;
-        }
-        throw error;
-      }
-    },
-    write(content) {
-      return client.writeFileOnBranch({
-        ...repository,
-        branch,
-        path: MEMORY_FILE_PATH,
-        content,
-        message: "chore(pr-review-agents): update review memory",
-      });
-    },
-  };
-}
 
 export function emptyMemory(): ReviewMemory {
   return { version: 1, shapes: [], suppressions: [] };

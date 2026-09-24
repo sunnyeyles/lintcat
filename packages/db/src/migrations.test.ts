@@ -31,8 +31,8 @@ async function columns(table: string): Promise<string[]> {
 }
 
 describe("migrations applied in order to an empty database", () => {
-  it("keep the ingest token, and the review's own token counters", async () => {
-    expect(await columns("organizations")).toContain("ingest_token");
+  it("drop the ingest token, and keep the review's own token counters", async () => {
+    expect(await columns("organizations")).not.toContain("ingest_token");
     expect(await columns("findings")).not.toContain("agent");
     expect(await columns("agent_runs")).toEqual([]);
     expect(await columns("reviews")).toEqual([
@@ -73,7 +73,6 @@ describe("migrations applied in order to an empty database", () => {
       "created_at",
       "github_account_id",
       "id",
-      "ingest_token",
       "installation_id",
       "name",
       "slug",

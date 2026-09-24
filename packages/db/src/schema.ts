@@ -59,8 +59,6 @@ export const organizations = pgTable("organizations", {
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   // Set on uninstall, which also clears installationId; the rows and history stay.
   uninstalledAt: timestamp("uninstalled_at", { withTimezone: true }),
-  // SHA-256 hex of the ingest secret; the secret itself is never stored.
-  ingestToken: text("ingest_token").unique(),
   createdAt: createdAt(),
 });
 

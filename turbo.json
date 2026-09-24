@@ -1,7 +1,6 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "globalPassThroughEnv": [
-    "GITHUB_ACTIONS",
     "APP_DOMAIN",
     "PORT",
     "WORKER_POLL_MS",

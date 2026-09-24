@@ -6,10 +6,8 @@ import { buildRepositoryIndex } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it } from "vitest";
 
-import type { ManagedPrompts } from "#src/prompts";
 import {
   buildReviewSystemPrompt,
-  withRepositoryHints,
 } from "#src/agents/definition";
 import { GENERAL_AGENT } from "#src/agents/general-agent";
 import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
@@ -130,7 +128,6 @@ function makeAgent(
   responses: ScriptedResponse[],
   options: {
     maxTurns?: number;
-    systemPrompts?: ManagedPrompts;
     index?: ReturnType<typeof fakeIndex>;
   } = {},
 ) {
@@ -142,9 +139,6 @@ function makeAgent(
     github,
     logger,
     ...(options.maxTurns !== undefined ? { maxTurns: options.maxTurns } : {}),
-    ...(options.systemPrompts !== undefined
-      ? { systemPrompts: options.systemPrompts }
-      : {}),
     ...(options.index !== undefined ? { index: options.index } : {}),
   });
   return { agent, create, calls: calls as unknown as Call[], github, entries };
@@ -874,51 +868,6 @@ describe("prompt caching", () => {
       cacheReadInputTokens: 4_000,
       outputTokens: 35,
     });
-  });
-});
-
-describe("pre-resolved system prompts", () => {
-  it("uses the injected prompt for an agent that has one", async () => {
-    const injected = "INJECTED CORRECTNESS SYSTEM PROMPT";
-    const { agent, calls } = makeAgent(
-      [message([textBlock(finalJson)], "end_turn")],
-      { systemPrompts: { general: injected } },
-    );
-
-    await agent.run(context);
-
-    expect(systemOf(calls[0])).toBe(injected);
-  });
-
-  it("appends this run's repository hints to a managed prompt", async () => {
-    const hint =
-      'This repository has repeatedly not acted on findings like "missing tenant check in". Report one only if it is clearly severe.';
-    const injected = "INJECTED SECURITY SYSTEM PROMPT";
-    const { model, calls } = makeModel([message([textBlock(finalJson)], "end_turn")]);
-    const agent = createReviewAgent(withRepositoryHints(generalAgent, [hint]), {
-      model,
-      github: makeGithub(),
-      logger: createCapturingLogger().logger,
-      systemPrompts: { general: injected },
-    });
-
-    await agent.run(context);
-
-    expect(systemOf(calls[0] as Call)).toBe(
-      `${injected}\n\n# Repository history\nFindings like these have repeatedly been left unaddressed in this repository. They are deprioritised, not banned: report one only if it is clearly severe.\n- ${hint}`,
-    );
-  });
-
-  it("falls back to the in-code prompt for an agent that has none", async () => {
-    // A map covering only other agents must leave this one untouched.
-    const { agent, calls } = makeAgent(
-      [message([textBlock(finalJson)], "end_turn")],
-      { systemPrompts: { "docs-drift": "SOMEONE ELSE'S PROMPT" } },
-    );
-
-    await agent.run(context);
-
-    expect(systemOf(calls[0])).toBe(buildReviewSystemPrompt(generalAgent));
   });
 });
 

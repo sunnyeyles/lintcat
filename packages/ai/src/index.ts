@@ -48,19 +48,3 @@ export {
   withRepositoryHints,
   type AgentDefinition,
 } from "#src/agents/definition";
-export {
-  DEFAULT_LANGFUSE_BASE_URL,
-  DEFAULT_PROMPT_LABEL,
-  createLangfusePromptClient,
-  inCodePrompts,
-  loadManagedPrompts,
-  type LangfusePromptClient,
-  type LangfusePromptClientConfig,
-  type ManagedPrompts,
-} from "#src/prompts";
-export {
-  createLangfusePromptWriter,
-  seedFailed,
-  seedManagedPrompts,
-  type LangfusePromptWriter,
-} from "#src/seed-prompts";
