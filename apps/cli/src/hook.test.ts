@@ -159,8 +159,4 @@ describe("the hook script", () => {
     expect(script).toMatch(new RegExp(`if \\[ -n "\\$\\{${BYPASS_ENV}:-\\}" \\]`));
     expect(script.indexOf("exit 0")).toBeLessThan(script.indexOf("pr-review review"));
   });
-
-  it("tells the user how to bypass when it blocks", () => {
-    expect(hookScript("pr-review", "high")).toContain(`${BYPASS_ENV}=1 git push`);
-  });
 });

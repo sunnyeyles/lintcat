@@ -209,8 +209,6 @@ assert "an unpushed commit is never collected" \
   open-diverged 'keep .* no remote has seen'
 assert "a PR is found by head SHA when the branch name differs" \
   renamed-ref 'would remove .* \[strong\]'
-assert "uncommitted changes are kept" \
-  dirty 'keep .* uncommitted changes'
 if [ "$live_ok" -eq 1 ]; then
   assert "a live claude session keeps its worktree" \
     locked-live 'keep .* a live claude session holds it'

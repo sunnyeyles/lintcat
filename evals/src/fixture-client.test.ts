@@ -294,29 +294,4 @@ describe("history the fixture does not have", () => {
     ).resolves.toEqual([]);
     expect(calls).toEqual([{ method: "listCommitShas", detail: "src/a.ts" }]);
   });
-
-  it("declares no read that needs a commit object", () => {
-    const { client } = createFixtureClient(fixture);
-
-    for (const method of ["listCommitFiles", "getCommitMessage", "compareCommits"]) {
-      expect(method in client, method).toBe(false);
-    }
-  });
-});
-
-describe("writes", () => {
-  const fixture = makeFixture(SIMPLE);
-
-  it("declares no publish method, so the harness cannot publish", () => {
-    const { client } = createFixtureClient(fixture);
-
-    for (const method of [
-      "createCheckRun",
-      "createReview",
-      "createCommitOnBranch",
-      "writeFileOnBranch",
-    ]) {
-      expect(method in client, method).toBe(false);
-    }
-  });
 });

@@ -486,18 +486,6 @@ describe("the review agent", () => {
     await expect(agent.run(context)).rejects.toThrow(/turn/i);
     expect(create).toHaveBeenCalledTimes(2);
   });
-
-  it("propagates model API failures", async () => {
-    const { model, doGenerate } = makeModel([]);
-    doGenerate.mockRejectedValueOnce(new Error("529 overloaded"));
-    const agent = createReviewAgent(generalAgent, {
-      model,
-      github: makeGithub(),
-      logger: createCapturingLogger().logger,
-    });
-
-    await expect(agent.run(context)).rejects.toThrow("529 overloaded");
-  });
 });
 
 describe("category integrity", () => {

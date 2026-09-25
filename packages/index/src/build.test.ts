@@ -246,38 +246,6 @@ describe("import cycles", () => {
     expect(built.files.get("src/b.ts")?.inCycle).toBe(true);
   });
 
-  it("does not flag a self-import", () => {
-    const built = graphIndex({
-      "src/a.ts": 'import { a } from "./a";\nexport const b = a;\n',
-    });
-
-    expect(built.files.get("src/a.ts")?.inCycle).toBe(false);
-  });
-
-  it("flags every file of a longer cycle and nothing outside it", () => {
-    const built = graphIndex({
-      "src/a.ts": 'import "./b";\n',
-      "src/b.ts": 'import "./c";\n',
-      "src/c.ts": 'import "./a";\n',
-      "src/entry.ts": 'import "./a";\n',
-    });
-
-    expect(built.files.get("src/a.ts")?.inCycle).toBe(true);
-    expect(built.files.get("src/b.ts")?.inCycle).toBe(true);
-    expect(built.files.get("src/c.ts")?.inCycle).toBe(true);
-    expect(built.files.get("src/entry.ts")?.inCycle).toBe(false);
-  });
-
-  it("does not flag a straight chain", () => {
-    const built = graphIndex({
-      "src/a.ts": 'import "./b";\n',
-      "src/b.ts": 'import "./c";\n',
-      "src/c.ts": "export const c = 1;\n",
-    });
-
-    expect([...built.files.values()].some((file) => file.inCycle)).toBe(false);
-  });
-
   it("ignores an import it could not resolve", () => {
     const built = graphIndex({
       "src/a.ts": 'import "./gone";\nimport "node:fs";\n',

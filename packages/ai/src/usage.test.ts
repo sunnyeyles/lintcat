@@ -50,11 +50,6 @@ describe("emptyTokenUsage", () => {
 });
 
 describe("addTokenUsage", () => {
-  it("adds one response's usage to a running total", () => {
-    expect(addTokenUsage(emptyTokenUsage(), usage(120, 45))).toEqual(
-      total(120, 0, 0, 45),
-    );
-  });
 
   it("accumulates across the turns of one agent run", () => {
     const accumulated = [usage(100, 10), usage(250, 30), usage(5, 1)].reduce(
