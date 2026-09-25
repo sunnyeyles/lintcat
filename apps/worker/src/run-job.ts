@@ -74,7 +74,7 @@ function noKeyOutput(slug: string, url: string | undefined): CheckRunOutput {
     title: "Add a model key to review this pull request",
     summary:
       `No model key is saved for **${slug}**, so no review ran and no model was called. ` +
-      `An organization owner can add one under ${where}, then push a commit or re-add the \`ai-review\` label.`,
+      `An owner of the account can add one under ${where}, then push a commit or re-add the \`ai-review\` label.`,
   };
 }
 

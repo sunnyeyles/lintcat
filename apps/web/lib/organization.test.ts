@@ -10,7 +10,7 @@ import { createTestDatabase } from "@pr-review/db/test-database";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { autoForwardPath, membershipsForUser } from "@/lib/organization";
+import { autoForwardPath, membershipsForUser, ownsPersonalAccount } from "@/lib/organization";
 
 describe("autoForwardPath", () => {
   const organization = { slug: "acme" } as Organization;
@@ -28,6 +28,28 @@ describe("autoForwardPath", () => {
         { organization: other, role: "member" },
       ]),
     ).toBeUndefined();
+  });
+});
+
+describe("ownsPersonalAccount", () => {
+  const personal = { githubAccountId: 7, accountType: "user" } as Organization;
+  const acme = { githubAccountId: 9, accountType: "organization" } as Organization;
+
+  it("is true when the user's own account is among their accounts", () => {
+    expect(
+      ownsPersonalAccount(
+        [
+          { organization: acme, role: "member" },
+          { organization: personal, role: "owner" },
+        ],
+        7,
+      ),
+    ).toBe(true);
+  });
+
+  it("is false with only organizations, or none", () => {
+    expect(ownsPersonalAccount([{ organization: acme, role: "owner" }], 7)).toBe(false);
+    expect(ownsPersonalAccount([], 7)).toBe(false);
   });
 });
 

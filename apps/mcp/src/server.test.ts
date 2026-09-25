@@ -610,7 +610,7 @@ describe("history tools", () => {
   it("refuses a review resource for someone who is not a member", async () => {
     const client = await connect(environment({ database: () => database }), async () => 999);
 
-    await expect(readResource(client, "pr-review://review/acme/1")).rejects.toThrow(/No organization "acme"/);
+    await expect(readResource(client, "pr-review://review/acme/1")).rejects.toThrow(/No account "acme"/);
   });
 
   it("aggregates trends for a member", async () => {
@@ -625,7 +625,7 @@ describe("history tools", () => {
 
     const { isError, texts } = await call(client, "list_reviews", { org: "acme" });
     expect(isError).toBe(true);
-    expect(texts[0]).toContain('No organization "acme"');
+    expect(texts[0]).toContain('No account "acme"');
   });
 });
 

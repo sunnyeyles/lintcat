@@ -41,8 +41,8 @@ export async function scopeToOrganization(
   if (access.status !== "allowed") {
     throw new Error(
       repoRef
-        ? `No readable repository ${repo} in organization "${org}" for your GitHub account.`
-        : `No organization "${org}" that your GitHub account is a member of.`,
+        ? `No readable repository ${repo} in account "${org}" for your GitHub account.`
+        : `No account "${org}" that your GitHub account can access.`,
     );
   }
   return {
@@ -61,7 +61,7 @@ export async function readStoredReview(
   const { source } = await scopeToOrganization(environment, githubId, org, undefined);
   const review = await source.getReview(id);
   if (review === null) {
-    throw new Error(`No review ${id} in organization "${org}" that your GitHub account can read.`);
+    throw new Error(`No review ${id} in account "${org}" that your GitHub account can read.`);
   }
   return {
     ...summariseReview(review),

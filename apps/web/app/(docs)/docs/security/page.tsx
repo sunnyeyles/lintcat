@@ -35,7 +35,7 @@ export default function SecurityPage() {
           </Bullet>
           <Bullet>
             <strong>Your model provider sees the code it reviews.</strong> Reviews run on your
-            organization&rsquo;s own Anthropic or OpenAI key, under your agreement with that
+            account&rsquo;s own Anthropic or OpenAI key, under your agreement with that
             provider.
           </Bullet>
           <Bullet>

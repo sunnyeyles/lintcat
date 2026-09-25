@@ -81,7 +81,7 @@ export default function McpServerPage() {
         <P>
           A local review is the same review the GitHub App runs, with the same checks on every
           finding and fix. It reads your local checkout instead of GitHub, and runs on your
-          machine with your own key, not the organization&rsquo;s.
+          machine with your own key, not the account&rsquo;s.
         </P>
       </Section>
     </DocsArticle>
