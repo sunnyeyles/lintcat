@@ -348,12 +348,12 @@ function createLocalGitClient(
   // Taken once, so every reader of one review sees the same working tree.
   const changes = () => {
     snapshot ??= (async () => {
-      // Fixed prefixes: diff.mnemonicPrefix or diff.noprefix would otherwise rename every path.
+      // Fixed prefixes and rename detection, whatever diff.noprefix or diff.renames the user's config sets.
       const tracked = await git(root, [
         "diff",
         "--no-color",
         "--no-ext-diff",
-        "--no-renames",
+        "--find-renames",
         "--src-prefix=a/",
         "--dst-prefix=b/",
         baseSha,

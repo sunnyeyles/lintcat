@@ -53,6 +53,23 @@ describe("openLocalRepository", () => {
     expect(files.map((file) => file.filename)).toEqual(["src/api.ts", "src/sessions.ts", "src/draft.ts"]);
   });
 
+  it("reports a rename under its new path whatever diff.renames the user's config sets", async () => {
+    repo.git("config", "diff.renames", "false");
+    repo.git("checkout", "--", "src/sessions.ts");
+    repo.git("mv", "src/sessions.ts", "src/session-store.ts");
+    const local = await openLocalRepository(repo.root, "main");
+
+    const files = await local.client.listChangedFiles(local.target);
+    expect(files).toContainEqual({
+      filename: "src/session-store.ts",
+      status: "renamed",
+      previous_filename: "src/sessions.ts",
+      additions: 0,
+      deletions: 0,
+    });
+    expect(files.map((file) => file.filename)).not.toContain("src/sessions.ts");
+  });
+
   it("skips a nested repository and diffs many untracked files without a process each", async () => {
     const nested = createTestRepo({ "inner.ts": "export {};\n" });
     repo.git("clone", "-q", nested.root, "vendor-checkout");
