@@ -44,6 +44,9 @@ const github: GithubAppClient = {
   async getRepositoryPermission() {
     throw new Error("membership sync never reads repository permissions");
   },
+  async findUserInstallation() {
+    throw new Error("membership sync never looks up an installation");
+  },
   async getInstallation() {
     throw new Error("membership sync never reads the installation");
   },
