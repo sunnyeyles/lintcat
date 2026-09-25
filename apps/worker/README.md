@@ -55,7 +55,9 @@ Run — nothing here changes them.
 7. Writes the review straight to the database through ingest's write path, so a
    rerun of the same commit replaces its findings and its blast radius (risk
    score and band, factors, and dependent file paths and counts; never source
-   text). A failure here is logged and never fails a review already on GitHub.
+   text). A record the schema rejects is logged as `review_job.record_invalid`
+   with the failing field paths and not stored. A failure here is logged and
+   never fails a review already on GitHub.
 
 ## Superseding
 

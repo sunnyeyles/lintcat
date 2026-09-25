@@ -418,4 +418,34 @@ describe("ingestReviewRecord, with a risk score", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.risk).toBeNull();
   });
+
+  it("rejects an out-of-bounds risk by its path alone, and writes nothing", async () => {
+    const outOfBounds = { ...record, risk: { ...risk, score: 150 } };
+
+    await expect(ingestReviewRecord(database, organizationId, outOfBounds)).resolves.toEqual({
+      ok: false,
+      reason: "invalid-record",
+      issues: ["risk.score"],
+    });
+    expect(await database.select().from(repos)).toEqual([]);
+    expect(await database.select().from(reviews)).toEqual([]);
+    expect(await database.select().from(findings)).toEqual([]);
+  });
+
+  it("names every failing path, with array indexes, and none of the values", async () => {
+    const result = await ingestReviewRecord(database, organizationId, {
+      ...record,
+      risk: {
+        ...risk,
+        factors: [{ label: "fractional", points: 2.5 }],
+        dependents: ["src/api/login.ts", ""],
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "invalid-record",
+      issues: ["risk.factors.0.points", "risk.dependents.1"],
+    });
+  });
 });

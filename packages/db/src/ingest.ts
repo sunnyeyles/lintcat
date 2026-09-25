@@ -1,4 +1,4 @@
-import type { ReviewRecord } from "@pr-review/schemas";
+import { reviewRecordSchema, type ReviewRecord } from "@pr-review/schemas";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "./client";
 import { saveRepositoryGraph } from "./repository-graphs";
@@ -14,13 +14,22 @@ export type IngestFailure = "organization-not-found" | "owner-mismatch" | "repo-
 
 export type IngestResult =
   | { ok: true; reviewId: number }
+  // Paths only: a failing value can be a repository file path.
+  | { ok: false; reason: "invalid-record"; issues: string[] }
   | { ok: false; reason: IngestFailure };
 
 export async function ingestReviewRecord(
   database: Database,
   organizationId: number,
-  record: ReviewRecord,
+  input: ReviewRecord,
 ): Promise<IngestResult> {
+  const parsed = reviewRecordSchema.safeParse(input);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((issue) => issue.path.map(String).join("."));
+    return { ok: false, reason: "invalid-record", issues };
+  }
+  const record = parsed.data;
+
   const organization = await findOrganization(database, organizationId);
   if (!organization) return { ok: false, reason: "organization-not-found" };
   if (!ownsRepo(organization, record.owner)) {
