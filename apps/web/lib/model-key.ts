@@ -2,7 +2,7 @@ import {
   removeModelKey,
   saveModelKey,
   type Database,
-  type MembershipRole,
+  type AccessRole,
   type Organization,
 } from "@pr-review/db";
 import { z } from "zod";
@@ -31,7 +31,7 @@ const formSchema = z.object({
 
 interface OwnerAccess {
   organization: Organization;
-  role: MembershipRole;
+  role: AccessRole;
 }
 
 const NOT_OWNER: ModelKeyFormState = {

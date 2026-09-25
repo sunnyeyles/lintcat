@@ -180,6 +180,31 @@ describe("syncSignInMemberships", () => {
     expect(left).toEqual([{ repoId: repoIds[0]!.id }]);
   });
 
+  it("keeps a collaborator's repo access where they were never a member", async () => {
+    const alice = await install("alice", { accountType: "user" });
+    const acme = await install("acme");
+    githubMembers = { acme: [] };
+    const [user] = await database
+      .insert(users)
+      .values({ githubId: mona.githubId, login: mona.login })
+      .returning();
+    const repoIds = await database
+      .insert(repos)
+      .values([
+        { organizationId: alice.id, owner: "alice", name: "vault", private: true },
+        { organizationId: acme.id, owner: "acme", name: "vault", private: true },
+      ])
+      .returning({ id: repos.id });
+    await database
+      .insert(repoAccess)
+      .values(repoIds.map(({ id }) => ({ userId: user!.id, repoId: id, permission: "write" as const })));
+
+    await sync();
+
+    const kept = await database.select({ repoId: repoAccess.repoId }).from(repoAccess);
+    expect(kept.map(({ repoId }) => repoId).sort()).toEqual(repoIds.map(({ id }) => id).sort());
+  });
+
   it("makes a personal account's own user its owner, with no GitHub call", async () => {
     await install("mona", { accountType: "user", accountId: mona.githubId });
     await install("someone-else", { accountType: "user" });

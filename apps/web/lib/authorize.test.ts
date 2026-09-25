@@ -209,6 +209,63 @@ describe("authorize", () => {
       expect(unknown).toStrictEqual(unknownOrganization);
     });
 
+    describe("a collaborator, with repo rows but no membership", () => {
+      let collaboratorId: number;
+
+      beforeEach(async () => {
+        collaboratorId = await insertUser(2, "outsider");
+      });
+
+      it("reads exactly the repos granted, not the account's other public ones", async () => {
+        await grant(collaboratorId, ledger, "write");
+
+        expect(await authorize(database, outsider, "acme")).toEqual({
+          status: "allowed",
+          organization: acme,
+          role: "collaborator",
+          readableRepos: [{ id: ledger, isOwner: false }],
+        });
+        expect(
+          await authorize(database, outsider, "acme", { owner: "acme", name: "widgets" }),
+        ).toEqual({ status: "not-found" });
+      });
+
+      it("owns a repo they administer, and only that one", async () => {
+        await grant(collaboratorId, ledger, "admin");
+        await grant(collaboratorId, vault, "read");
+
+        expect(
+          await authorize(database, outsider, "acme", { owner: "acme", name: "ledger" }),
+        ).toMatchObject({ status: "allowed", role: "collaborator", repo: { id: ledger, isOwner: true } });
+        expect(
+          await authorize(database, outsider, "acme", { owner: "acme", name: "vault" }),
+        ).toMatchObject({ repo: { id: vault, isOwner: false } });
+      });
+
+      it("is not-found once their only granted repo is removed", async () => {
+        await grant(collaboratorId, gone, "admin");
+
+        expect(await authorize(database, outsider, "acme")).toEqual({ status: "not-found" });
+      });
+
+      it("is not-found in a suspended account", async () => {
+        await grant(collaboratorId, ledger, "read");
+        await database
+          .update(organizations)
+          .set({ suspendedAt: new Date() })
+          .where(eq(organizations.id, acme.id));
+
+        expect(await authorize(database, outsider, "acme")).toEqual({ status: "not-found" });
+      });
+
+      it("gets nothing in another account from these rows", async () => {
+        await grant(collaboratorId, ledger, "admin");
+        await insertOrganization(20, "globex");
+
+        expect(await authorize(database, outsider, "globex")).toEqual({ status: "not-found" });
+      });
+    });
+
     it("keeps one user's access rows from reading another organization's repos", async () => {
       const globex = await insertOrganization(20, "globex");
       await join(monaId, globex, "member");
