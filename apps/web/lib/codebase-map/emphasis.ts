@@ -3,13 +3,20 @@ import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 import { searchFiles } from "@/lib/codebase-map/search";
 import type { MapViewState } from "@/lib/codebase-map/types";
 
-export type EmphasisLevel = "focus" | "changed" | "neighbour" | "context" | "dimmed";
+export type EmphasisLevel =
+  | "focus"
+  | "changed"
+  | "neighbour"
+  | "impacted"
+  | "context"
+  | "dimmed";
 
 /** Shape names, so emphasis never rests on colour alone. */
 export const EMPHASIS_MARKERS: Record<EmphasisLevel, string> = {
   focus: "ring",
   changed: "filled-square",
   neighbour: "chevron",
+  impacted: "outline-square",
   context: "outline-circle",
   dimmed: "hairline",
 };
@@ -18,8 +25,9 @@ export const EMPHASIS_RANK: Record<EmphasisLevel, number> = {
   focus: 0,
   changed: 1,
   neighbour: 2,
-  context: 3,
-  dimmed: 4,
+  impacted: 3,
+  context: 4,
+  dimmed: 5,
 };
 
 export interface FileEmphasis {
@@ -41,6 +49,7 @@ export function emphasise(
   const hood = neighbourhood(graph, view.focusedPath, steps);
   const matches = new Set(searchFiles(graph.files, view.query).map((r) => r.path));
   const narrowed = hood.focus !== null || view.query.trim() !== "";
+  const showImpacted = view.hideImpacted !== true;
 
   const emphasis = new Map<string, FileEmphasis>();
   for (const file of graph.files) {
@@ -51,6 +60,8 @@ export function emphasise(
       emphasis.set(path, at(path, "changed"));
     } else if (hood.dependencies.has(path) || hood.dependents.has(path)) {
       emphasis.set(path, at(path, "neighbour"));
+    } else if (showImpacted && file.impacted === true) {
+      emphasis.set(path, at(path, "impacted"));
     } else if (matches.has(path) || !narrowed) {
       emphasis.set(path, at(path, "context"));
     } else {

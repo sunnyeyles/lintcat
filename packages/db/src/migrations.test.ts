@@ -48,6 +48,7 @@ describe("migrations applied in order to an empty database", () => {
       "output_tokens",
       "pr_number",
       "repo_id",
+      "risk",
       "summary",
     ]);
   });
@@ -281,6 +282,29 @@ describe("the every-PR default migration on a populated database", () => {
       { repo_id: 1, mode: "label" },
       { repo_id: 2, mode: "off" },
       { repo_id: 3, mode: "every_pr" },
+    ]);
+  });
+});
+
+describe("the review risk migration on a populated database", () => {
+  it("leaves reviews stored before it with no risk, and takes one after", async () => {
+    const { pg, applyTarget } = await migratedUpTo("0016_");
+    await pg.exec(`
+      insert into organizations (github_account_id, account_type, slug, name) values (1, 'user', 'acme', 'acme');
+      insert into repos (organization_id, owner, name) values (1, 'acme', 'widgets');
+      insert into reviews (repo_id, pr_number, head_sha, summary) values (1, 1, 'a', 's');
+    `);
+    await applyTarget();
+    await pg.exec(`
+      insert into reviews (repo_id, pr_number, head_sha, summary, risk) values (1, 2, 'b', 's', '{"score": 58, "band": "medium"}');
+    `);
+
+    const result = await pg.query<{ pr_number: number; band: string | null }>(
+      "select pr_number, risk->>'band' as band from reviews order by pr_number",
+    );
+    expect(result.rows).toEqual([
+      { pr_number: 1, band: null },
+      { pr_number: 2, band: "medium" },
     ]);
   });
 });

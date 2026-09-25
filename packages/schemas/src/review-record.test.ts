@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAX_REPOSITORY_GRAPH_BASE64,
+  MAX_RISK_DEPENDENTS,
   reviewRecordSchema,
   type ReviewRecord,
 } from "#src/index";
@@ -205,5 +206,104 @@ describe("reviewRecordSchema, with a repository graph", () => {
         }).success,
       ).toBe(false);
     }
+  });
+});
+
+describe("reviewRecordSchema, with a risk score", () => {
+  const risk = {
+    score: 58,
+    band: "medium",
+    partial: false,
+    factors: [
+      { label: "41 files depend on this change", points: 31 },
+      { label: "crosses 3 packages", points: 16 },
+    ],
+    hubs: [{ path: "src/auth/session.ts", dependents: 38 }],
+    counts: {
+      direct: 12,
+      transitive: 41,
+      entryPoints: 2,
+      untested: 0,
+      inCycle: 0,
+      brokenImporters: 0,
+    },
+    packages: 3,
+    dependents: ["src/api/login.ts", "src/api/logout.ts"],
+  };
+  const withRisk = { ...validRecord, risk };
+
+  it("accepts a record carrying a risk score, and keeps it whole", () => {
+    const result = reviewRecordSchema.safeParse(withRisk);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual(withRisk);
+    }
+  });
+
+  it("accepts a record from an older sender that has no risk", () => {
+    const result = reviewRecordSchema.safeParse(validRecord);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("risk");
+    }
+  });
+
+  it("accepts a change nothing depends on", () => {
+    const quiet = {
+      ...risk,
+      score: 0,
+      band: "low",
+      factors: [],
+      hubs: [],
+      counts: { ...risk.counts, direct: 0, transitive: 0, entryPoints: 0 },
+      packages: 0,
+      dependents: [],
+    };
+    expect(
+      reviewRecordSchema.safeParse({ ...validRecord, risk: quiet }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a score or band out of range", () => {
+    for (const bad of [
+      { score: -1 },
+      { score: 101 },
+      { score: 12.5 },
+      { band: "critical" },
+      { factors: [{ label: "", points: 3 }] },
+      { factors: [{ label: "x", points: -1 }] },
+      { hubs: [{ path: "", dependents: 1 }] },
+      { counts: { ...risk.counts, transitive: -1 } },
+      { packages: 1.5 },
+    ]) {
+      expect(
+        reviewRecordSchema.safeParse({ ...validRecord, risk: { ...risk, ...bad } })
+          .success,
+      ).toBe(false);
+    }
+  });
+
+  it("rejects more dependents than the cap", () => {
+    const dependents = Array.from(
+      { length: MAX_RISK_DEPENDENTS + 1 },
+      (_, at) => `src/file-${at}.ts`,
+    );
+    expect(
+      reviewRecordSchema.safeParse({ ...validRecord, risk: { ...risk, dependents } })
+        .success,
+    ).toBe(false);
+    expect(
+      reviewRecordSchema.safeParse({
+        ...validRecord,
+        risk: { ...risk, dependents: dependents.slice(0, MAX_RISK_DEPENDENTS) },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a risk missing a field", () => {
+    const { counts: _counts, ...noCounts } = risk;
+    expect(
+      reviewRecordSchema.safeParse({ ...validRecord, risk: noCounts }).success,
+    ).toBe(false);
   });
 });

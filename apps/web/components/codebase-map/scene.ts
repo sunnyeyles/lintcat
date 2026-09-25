@@ -35,6 +35,8 @@ export interface SceneNode {
   direction: NeighbourDirection | null;
   fileCount: number;
   changedCount: number;
+  /** Zero while the impacted overlay is hidden. */
+  impactedCount: number;
   heat: Heat;
 }
 
@@ -76,6 +78,7 @@ export function buildScene(
   const clustering = clusterGraph(graph, view);
   const emphasis = emphasise(graph, view, steps);
   const hood = neighbourhood(graph, view.focusedPath, steps);
+  const showImpacted = view.hideImpacted !== true;
 
   const nodes: SceneNode[] = [];
   const byId = new Map<string, SceneNode>();
@@ -86,6 +89,7 @@ export function buildScene(
       for (const path of group.files) {
         const point = positions.get(path)!;
         const mark = emphasis.get(path)!;
+        const file = graph.byPath.get(path);
         const node: SceneNode = {
           id: path,
           kind: "file",
@@ -104,7 +108,9 @@ export function buildScene(
               ? "dependent"
               : null,
           fileCount: 1,
-          changedCount: graph.byPath.get(path)?.changed === true ? 1 : 0,
+          changedCount: file?.changed === true ? 1 : 0,
+          impactedCount:
+            showImpacted && file?.impacted === true && file.changed !== true ? 1 : 0,
           heat: heatOf(heat[path]),
         };
         nodes.push(node);
@@ -130,6 +136,8 @@ export function buildScene(
       ? groupCentre(group.id, LAYOUT)
       : { x: x / group.files.length, y: y / group.files.length };
     if (empty) level = group.changedCount > 0 ? "changed" : "context";
+    // A summary's count covers files not here to rank.
+    if (showImpacted && group.impactedCount > 0) level = lowerRank(level, "impacted");
     const node: SceneNode = {
       id: group.id,
       kind: "group",
@@ -144,6 +152,7 @@ export function buildScene(
       direction: null,
       fileCount: group.fileCount,
       changedCount: group.changedCount,
+      impactedCount: showImpacted ? group.impactedCount : 0,
       heat: group.heatCounts ? heatOf(group.heatCounts) : heatOfPaths(heat, group.files),
     };
     nodes.push(node);

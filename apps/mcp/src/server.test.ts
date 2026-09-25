@@ -280,6 +280,18 @@ describe("review_local_changes", () => {
     expect(details.findings.map((finding: { title: string }) => finding.title)).toEqual(["Admin is always on"]);
   });
 
+  it("counts a renamed file's importers at its old path in the blast radius", async () => {
+    repo.git("mv", "src/sessions.ts", "src/session-store.ts");
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main" });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reviewed 1 changed file(s)");
+    expect(texts[0]).toMatch(/Blast radius: \w+ \(\d+\)\*\* · 1 file .*depends on this change/);
+    expect(texts[0]).toContain("- `src/session-store.ts` — 1 dependent");
+  });
+
   it("says so when there is nothing to review", async () => {
     repo.commit("admin");
     repo.git("checkout", "-q", "main");
@@ -602,7 +614,7 @@ describe("history tools", () => {
   it("refuses a review resource for someone who is not a member", async () => {
     const client = await connect(environment({ database: () => database }), async () => 999);
 
-    await expect(readResource(client, "pr-review://review/acme/1")).rejects.toThrow(/No organization "acme"/);
+    await expect(readResource(client, "pr-review://review/acme/1")).rejects.toThrow(/No account "acme"/);
   });
 
   it("aggregates trends for a member", async () => {
@@ -617,7 +629,7 @@ describe("history tools", () => {
 
     const { isError, texts } = await call(client, "list_reviews", { org: "acme" });
     expect(isError).toBe(true);
-    expect(texts[0]).toContain('No organization "acme"');
+    expect(texts[0]).toContain('No account "acme"');
   });
 });
 

@@ -64,7 +64,11 @@ export {
   type ReviewPolicy,
   type ReviewRunSpec,
 } from "#src/review-run";
-export type { ReviewIndexRequest } from "#src/build-index";
+export {
+  buildReviewIndex,
+  type ReviewIndexRequest,
+} from "#src/build-index";
+export { assessBlastRadius } from "#src/blast-radius";
 export {
   addSuppression,
   computeHints,

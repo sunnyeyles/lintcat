@@ -74,6 +74,10 @@ function buildParts(
       ];
     case "filled-square":
       return [{ d: polygon([[-r, -r], [r, -r], [r, r], [-r, r]]), mode: "fill", width: 0 }];
+    case "outline-square": {
+      const s = r * 0.8;
+      return [{ d: polygon([[-s, -s], [s, -s], [s, s], [-s, s]]), mode: "stroke", width: 1.5 }];
+    }
     case "chevron":
       if (direction === "both") {
         return [

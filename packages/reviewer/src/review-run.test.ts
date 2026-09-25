@@ -5,6 +5,7 @@ import {
   type ReviewContext,
 } from "@pr-review/ai";
 import type {
+  BlameRange,
   ChangedFile,
   CheckRunSummary,
   CheckRunsRequest,
@@ -115,6 +116,7 @@ function makeClient() {
     ),
     getBranchTip: vi.fn(async () => target.headSha),
     getCommitMessage: vi.fn(async () => "Rate limit sessions"),
+    blame: vi.fn(async (): Promise<BlameRange[]> => []),
     listReviewThreads: vi.fn(async (): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async (_input: CreateCheckRunInput) => ({ id: 987 })),
     createReview: vi.fn(async (_input: CreateReviewInput) => ({ id: 654 })),
@@ -310,6 +312,39 @@ describe("runReview: policy", () => {
     });
 
     expect(client.getRepositoryArchive).not.toHaveBeenCalled();
+  });
+
+  it("blames nothing when the policy switches reviewer suggestions off", async () => {
+    const client = makeClient();
+    const { engine } = scriptedEngine();
+
+    await runReview({
+      client,
+      target,
+      delivery: recordingDelivery().delivery,
+      engine,
+      policy: { suggestReviewers: false },
+      logger,
+    });
+
+    expect(client.blame).not.toHaveBeenCalled();
+  });
+
+  it("suggests reviewers unless the policy says otherwise", async () => {
+    const client = makeClient();
+    const { engine } = scriptedEngine();
+
+    await runReview({
+      client,
+      target,
+      delivery: recordingDelivery().delivery,
+      engine,
+      logger,
+    });
+
+    expect(client.blame).toHaveBeenCalledWith(
+      expect.objectContaining({ ref: baseSha, path: "src/sessions.ts" }),
+    );
   });
 
   it("narrows the review to the commits since the last one", async () => {

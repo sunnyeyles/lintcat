@@ -89,6 +89,7 @@ Worker (apps/worker)
    ├── load PR, changed files, diff
    ├── build the repository index at the base commit
    ├── score the change's blast radius from that index
+   ├── suggest reviewers from blame at the base commit and CODEOWNERS, beside the agent
    │
    ▼
 Review pipeline
@@ -525,12 +526,13 @@ one names the intersection it needs, so no type says "everything" any more:
 | Interface | What it covers | Who declines part of it |
 | --- | --- | --- |
 | `PullRequestReadClient` | the pull request, its diff, its existing review state, and repository contents, search and archive at a ref | nobody — all four adapters serve every method |
-| `RepositoryHistoryClient` | commits: which exist, what they touched, what they say, what a branch points at, how two compare | the local checkout (`compareCommits`), the eval fixture (`compareCommits`, `listCommitFiles`, `getCommitMessage`) |
+| `RepositoryHistoryClient` | commits: which exist, what they touched, what they say, what a branch points at, how two compare, who last wrote each line of a file | the local checkout (`compareCommits`), the eval fixture (`compareCommits`, `listCommitFiles`, `getCommitMessage`, `blame`) |
 | `ReviewPublishClient` | the check run, the review, a commit on a branch, a file written to a branch | the local checkout and the eval fixture, all four methods |
 
 The two repository-only adapters declare only what they honour — the local
 checkout `PullRequestReadClient & Omit<RepositoryHistoryClient, "compareCommits">`,
-the eval fixture that minus `listCommitFiles` and `getCommitMessage` — so what
+the eval fixture that minus `listCommitFiles`, `getCommitMessage` and
+`blame` — so what
 they decline is a compile error at the call, not a throw. A review run takes
 that narrow `ReviewClient` and writes only through its `ReviewDelivery`, so
 publishing is unreachable from a checkout or a fixture twice over: the client
@@ -569,6 +571,7 @@ Logging), under event names, grouped by what they trace:
 | Review | `review.skipped`, `review.started`, `review.model_selected`, `review.loaded`, `review.cancelled`, `review.failed` |
 | Scope | `review.scope_resolved`, `review.scope_unreadable`, `review.incremental.no_changes`, `review.carried_forward.unreadable` |
 | Index | `index.built`, `index.skipped`, `index.failed` |
+| Reviewers | `reviewers.suggested`, `reviewers.skipped`, `reviewers.blame_failed`, `reviewers.failed` |
 | Agent | `agent.started`, `agent.completed`, `agent.failed`, `agent.cancelled` |
 | Publishing | `findings.validated`, `review.comments.published`, `review.comments.degraded`, `review.comments.list_failed`, `review.published`, `review.published.degraded` |
 | Job | `review_job.started`, `review_job.succeeded`, `review_job.superseded`, `review_job.retrying`, `review_job.dropped`, `review_job.no_model_key`, `review_job.recorded`, `review.fixes.disabled` |

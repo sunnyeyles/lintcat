@@ -30,6 +30,12 @@ describe("normaliseGraph", () => {
     });
   });
 
+  it("keeps the impacted flag a file arrives with", () => {
+    const graph = normaliseGraph({ files: [{ path: "a.ts", impacted: true }], imports: [] });
+
+    expect(graph.byPath.get("a.ts")).toEqual({ path: "a.ts", impacted: true });
+  });
+
   it("tolerates missing flags without inventing them", () => {
     const graph = normaliseGraph({ files: [{ path: "a.ts" }], imports: [] });
 

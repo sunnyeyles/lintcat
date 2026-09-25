@@ -43,6 +43,41 @@ function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
   };
 }
 
+/** The stored blast radius keeps this many dependents, and reaches this far. */
+const IMPACT_CAP = 200;
+const IMPACT_STEPS = 2;
+
+/** Marks what imports the change, the way a stored `risk.dependents` would. */
+function withImpact(graph: MapGraph): MapGraph {
+  const importers = new Map<string, string[]>();
+  for (const edge of graph.imports) {
+    const list = importers.get(edge.to);
+    if (list) list.push(edge.from);
+    else importers.set(edge.to, [edge.from]);
+  }
+
+  const changed = new Set(graph.files.filter((f) => f.changed === true).map((f) => f.path));
+  const impacted = new Set<string>();
+  let frontier = [...changed];
+  for (let step = 0; step < IMPACT_STEPS; step += 1) {
+    const next: string[] = [];
+    for (const path of frontier) {
+      for (const from of importers.get(path) ?? []) {
+        if (impacted.size >= IMPACT_CAP || changed.has(from) || impacted.has(from)) continue;
+        impacted.add(from);
+        next.push(from);
+      }
+    }
+    frontier = next;
+  }
+
+  if (impacted.size === 0) return graph;
+  return {
+    ...graph,
+    files: graph.files.map((file) => (impacted.has(file.path) ? { ...file, impacted: true } : file)),
+  };
+}
+
 const SEVERITY_CYCLE = ["high", "medium", "low", "medium"] as const;
 
 /** Findings on every seventh file, so the heat layer has something to draw. */
@@ -67,7 +102,7 @@ export interface FixtureSource {
 }
 
 export function fixtureSource(kind: FixtureKind, files: number): FixtureSource {
-  const graph = fixtureGraph(kind, files);
+  const graph = withImpact(fixtureGraph(kind, files));
   const source = {
     graph,
     heat: fixtureHeat(graph),

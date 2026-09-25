@@ -44,7 +44,7 @@ export default async function SignInPage({
       <PageHeader
         eyebrow="Dashboard"
         title="Sign in"
-        description="Every review LintCat publishes for your organization, read from the dashboard's database."
+        description="Every review LintCat publishes for your repositories, read from the dashboard's database."
       />
       {error ? (
         <Alert variant="destructive">
@@ -58,7 +58,7 @@ export default async function SignInPage({
           </EmptyMedia>
           <EmptyTitle>Reviews your agents wrote</EmptyTitle>
           <EmptyDescription>
-            Sign in with GitHub to see your organizations' repositories, reviews and
+            Sign in with GitHub to see your repositories, reviews and
             findings.
           </EmptyDescription>
         </EmptyHeader>

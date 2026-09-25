@@ -6,7 +6,7 @@ import { reviewResourceUri } from "#src/resources/context-resources";
 import { readStoredReview, scopeToOrganization, summariseReview } from "#src/review-history";
 import { json } from "#src/tools/shared";
 
-const orgSchema = z.string().min(1).describe('The organization slug, as in the dashboard URL /o/<slug>.');
+const orgSchema = z.string().min(1).describe('The account slug (a GitHub organization or personal account), as in the dashboard URL /o/<slug>.');
 const repoSchema = z
   .string()
   .regex(/^[^/\s]+\/[^/\s]+$/)
@@ -24,7 +24,7 @@ export function registerHistoryTools(
     {
       title: "List past reviews",
       description:
-        "List the most recent reviews stored by the dashboard for an organization, newest first, with " +
+        "List the most recent reviews stored by the dashboard for an account, newest first, with " +
         "finding counts by severity and cost. Each review also comes back as a resource link, so its " +
         "findings can be attached instead of fetched. Only repositories your GitHub account can read " +
         "are included.",

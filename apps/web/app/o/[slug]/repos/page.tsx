@@ -21,7 +21,7 @@ async function ReposSummary({ slug }: { slug: string }) {
   const reviewCount = repos.reduce((n, repo) => n + repo.reviewCount, 0);
   return repos.length > 0
     ? `${formatNumber(repos.length)} connected repositories, ${formatNumber(reviewCount)} reviews all time. Most recently reviewed first.`
-    : "No repositories are connected to this organization yet.";
+    : "No repositories are connected to this account yet.";
 }
 
 async function ReposBody({ slug }: { slug: string }) {

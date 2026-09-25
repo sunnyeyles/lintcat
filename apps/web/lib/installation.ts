@@ -109,7 +109,7 @@ export function setupRequest(params: {
 
 export type SetupResult =
   | { status: "member"; slug: string }
-  | { status: "not_member"; slug: string }
+  | { status: "not_member"; slug: string; accountType: Organization["accountType"] }
   | { status: "unsupported" };
 
 /** Mirrors the installation now, without waiting for the webhook, then says where the user belongs. */
@@ -133,5 +133,5 @@ export async function completeSetup(
   const access = await authorize(deps.database, account, organization.slug);
   return access.status === "allowed"
     ? { status: "member", slug: organization.slug }
-    : { status: "not_member", slug: organization.slug };
+    : { status: "not_member", slug: organization.slug, accountType: organization.accountType };
 }

@@ -12,9 +12,14 @@ import {
   type RepositoryGraphSnapshot,
 } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
-import type { ReviewRecordGraph } from "@pr-review/schemas";
+import {
+  MAX_REPOSITORY_GRAPH_BASE64,
+  MAX_RISK_DEPENDENTS,
+  type ReviewRecordGraph,
+  type ReviewRecordRisk,
+} from "@pr-review/schemas";
 
-import { changeStatus } from "#src/blast-radius";
+import { changeStatus, type BlastRadius } from "#src/blast-radius";
 import type { DashboardReview, PublishToDashboard } from "#src/publish-dashboard";
 import {
   createCheckRunPublisher,
@@ -118,11 +123,38 @@ export function recordingDelivery(): RecordingDelivery {
 }
 
 /** The snapshot as the ingest payload carries it: base64 of gzipped JSON. */
-function graphPayload(snapshot: RepositoryGraphSnapshot): ReviewRecordGraph {
+function graphPayload(
+  snapshot: RepositoryGraphSnapshot,
+): ReviewRecordGraph | undefined {
+  const gzip = Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64");
+  // Past the schema's cap the whole record would be rejected, so only the map is dropped.
+  if (gzip.length > MAX_REPOSITORY_GRAPH_BASE64) return undefined;
   return {
-    gzip: Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64"),
+    gzip,
     fileCount: snapshot.files.length,
     edgeCount: snapshot.edges.length,
+  };
+}
+
+// Field by field, so nothing the impact grows later leaves without a decision.
+function riskPayload({ impact, risk }: BlastRadius): ReviewRecordRisk {
+  const { counts } = impact;
+  return {
+    score: risk.score,
+    band: risk.band,
+    partial: risk.partial,
+    factors: risk.factors.map(({ label, points }) => ({ label, points })),
+    hubs: impact.hubs.map(({ path, dependents }) => ({ path, dependents })),
+    counts: {
+      direct: counts.direct,
+      transitive: counts.transitive,
+      entryPoints: counts.entryPoints,
+      untested: counts.untested,
+      inCycle: counts.inCycle,
+      brokenImporters: counts.brokenImporters,
+    },
+    packages: impact.packages.length,
+    dependents: impact.transitive.slice(0, MAX_RISK_DEPENDENTS),
   };
 }
 
@@ -133,6 +165,8 @@ export function dashboardReview({
   durationMs,
 }: FinishedReviewRun): DashboardReview {
   const count = outcome.findings.length;
+  const graph =
+    outcome.graph === undefined ? undefined : graphPayload(outcome.graph);
   return {
     summary: count === 1 ? "1 finding" : `${count} findings`,
     durationMs,
@@ -143,7 +177,10 @@ export function dashboardReview({
       additions: file.additions,
       deletions: file.deletions,
     })),
-    ...(outcome.graph === undefined ? {} : { graph: graphPayload(outcome.graph) }),
+    ...(graph === undefined ? {} : { graph }),
+    ...(outcome.blastRadius === undefined
+      ? {}
+      : { risk: riskPayload(outcome.blastRadius) }),
     ...usage,
     // The patch is verbatim source, so the dashboard learns only that one survived.
     findings: outcome.findings.map(({ patch, ...finding }) => ({

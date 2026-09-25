@@ -6,6 +6,7 @@ import {
 import type {
   ReviewRecord,
   ReviewRecordChangedFile,
+  ReviewRecordRisk,
 } from "@pr-review/schemas";
 import { eq, inArray } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -261,6 +262,37 @@ describe("createDbSource", () => {
     expect(await source.getRepositoryGraph(theirs)).toBeUndefined();
     expect(await source.getChangedFiles(theirs)).toEqual([]);
     expect(await source.getRepositoryGraph(999_999)).toBeUndefined();
+  });
+
+  it("carries each review's risk on lists and on the review, null for one stored without", async () => {
+    const risk: ReviewRecordRisk = {
+      score: 74,
+      band: "high",
+      partial: true,
+      factors: [{ label: "64 files depend on this change", points: 35 }],
+      hubs: [{ path: "src/auth.ts", dependents: 64 }],
+      counts: {
+        direct: 9,
+        transitive: 64,
+        entryPoints: 3,
+        untested: 1,
+        inCycle: 1,
+        brokenImporters: 0,
+      },
+      packages: 4,
+      dependents: ["src/api/login.ts"],
+    };
+    const older = await ingest(acme, record());
+    const scored = await ingest(acme, record({ headSha: "b".repeat(40), prNumber: 8, risk }));
+    const source = await sourceFor(acme);
+
+    const listed = await source.listReviews();
+    expect(listed.map((review) => [review.id, review.risk])).toEqual([
+      [scored, risk],
+      [older, null],
+    ]);
+    expect((await source.getReview(scored))?.risk).toEqual(risk);
+    expect((await source.getReview(older))?.risk).toBeNull();
   });
 
   it("is empty for an organization with nothing recorded", async () => {

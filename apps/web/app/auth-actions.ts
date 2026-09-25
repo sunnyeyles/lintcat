@@ -1,6 +1,6 @@
 "use server";
 
-import { signIn, signOut } from "@/auth";
+import { signIn, signOut } from "@/lib/auth";
 import { appDomain } from "@/lib/host";
 import { apexUrl, safeCallbackUrl, SIGN_IN_PATH } from "@/lib/paths";
 import { requestLocation } from "@/lib/request";

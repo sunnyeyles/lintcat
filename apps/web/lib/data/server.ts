@@ -47,7 +47,9 @@ export async function getMapSource(
   reviewId: number,
 ): Promise<MapSource | undefined> {
   const review = await (await data(slug)).getReview(reviewId);
-  return review ? reviewMapSource(slug, reviewId, review.findings) : undefined;
+  return review
+    ? reviewMapSource(slug, reviewId, review.findings, review.risk?.dependents)
+    : undefined;
 }
 
 /** The map for a review the caller has already loaded, so its findings come along. */
@@ -55,11 +57,12 @@ export async function reviewMapSource(
   slug: string,
   reviewId: number,
   findings: readonly MapSourceFinding[],
+  dependents?: readonly string[],
 ): Promise<MapSource> {
   const source = await data(slug);
   const [snapshot, changedFiles] = await Promise.all([
     cachedGraph(`${slug}\u0000${reviewId}`, () => source.getRepositoryGraph(reviewId)),
     source.getChangedFiles(reviewId),
   ]);
-  return mapFromSnapshot(snapshot, changedFiles, findings);
+  return mapFromSnapshot(snapshot, changedFiles, findings, dependents);
 }

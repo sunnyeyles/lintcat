@@ -1,4 +1,7 @@
-import type { ReviewRecordChangedFile } from "@pr-review/schemas";
+import type {
+  ReviewRecordChangedFile,
+  ReviewRecordRisk,
+} from "@pr-review/schemas";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -172,6 +175,8 @@ export const reviews = pgTable(
       .default(0),
     cacheReadInputTokens: integer("cache_read_input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
+    // Null for a review stored before risk scoring, or run with the index off.
+    risk: jsonb("risk").$type<ReviewRecordRisk>(),
     createdAt: createdAt(),
   },
   (t) => [

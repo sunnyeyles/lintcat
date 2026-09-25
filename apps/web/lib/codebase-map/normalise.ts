@@ -30,7 +30,7 @@ export interface NormalisedGraph {
   totalFileCount: number;
 }
 
-const FLAG_KEYS = ["role", "package", "changed", "dead", "inCycle"] as const;
+const FLAG_KEYS = ["role", "package", "changed", "impacted", "dead", "inCycle"] as const;
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";

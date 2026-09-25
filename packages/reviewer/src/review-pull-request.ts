@@ -24,7 +24,7 @@ import {
 } from "@pr-review/logging";
 import type { ReviewFinding, ReviewMemory } from "@pr-review/schemas";
 
-import { assessBlastRadius } from "#src/blast-radius";
+import { assessBlastRadius, type BlastRadius } from "#src/blast-radius";
 import { buildReviewIndex } from "#src/build-index";
 import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
@@ -49,6 +49,7 @@ import {
 import type { ReviewPipelineResult } from "#src/review-pipeline";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
+import { suggestReviewers } from "#src/suggest-reviewers";
 
 /** What one review needs once its delivery has already been chosen. */
 export interface ReviewWithDeliveryDeps {
@@ -68,6 +69,8 @@ export interface ReviewWithDeliveryDeps {
   incremental?: boolean | undefined;
   /** Whether the repository index is built for this review; on by default. */
   index?: boolean | undefined;
+  /** Whether the check run suggests reviewers; on by default. */
+  suggestReviewers?: boolean | undefined;
   /** Aborting it stops the agents and publishes nothing. */
   signal?: AbortSignal | undefined;
 }
@@ -162,6 +165,8 @@ interface ReviewedTree {
   changedFiles: readonly ChangedFile[];
   /** The index, serialised; absent when the index was off or failed. */
   graph?: RepositoryGraphSnapshot | undefined;
+  /** Absent when the index was off or failed, or scoring failed. */
+  blastRadius?: BlastRadius | undefined;
 }
 
 /** One review's outcome, plus how the patches its agents proposed fared. */
@@ -198,6 +203,7 @@ export async function reviewWithDelivery(
     now = () => new Date(),
     incremental = false,
     index = true,
+    suggestReviewers: suggesting = true,
     signal,
   }: ReviewWithDeliveryDeps,
 ): Promise<ReviewOutcome> {
@@ -268,7 +274,7 @@ export async function reviewWithDelivery(
   );
 
   // Built once, before the agent starts, and serialised onto the outcome.
-  const repositoryIndex = await buildReviewIndex({
+  const { index: repositoryIndex, codeowners } = await buildReviewIndex({
     client,
     target,
     baseSha: pullRequest.baseSha,
@@ -283,28 +289,42 @@ export async function reviewWithDelivery(
   });
 
   // The AI boundary: only the validate step's output reaches GitHub.
-  const review = await runReviewPipeline({
-    client,
-    context: {
-      owner: target.owner,
-      repo: target.repo,
-      pullRequest,
-      changedFiles: scope.changedFiles,
-      diff: scope.diff,
-      incremental:
-        scope.kind === "incremental"
-          ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
-          : undefined,
-      signal,
-    },
-    agent: hinted,
-    index: repositoryIndex,
-  }).catch((error: unknown) => {
-    if (isCancellation(error, signal)) {
-      cancelled("agent");
-    }
-    throw error;
-  });
+  const [review, suggestedReviewers] = await Promise.all([
+    runReviewPipeline({
+      client,
+      context: {
+        owner: target.owner,
+        repo: target.repo,
+        pullRequest,
+        changedFiles: scope.changedFiles,
+        diff: scope.diff,
+        incremental:
+          scope.kind === "incremental"
+            ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
+            : undefined,
+        signal,
+      },
+      agent: hinted,
+      index: repositoryIndex,
+    }).catch((error: unknown) => {
+      if (isCancellation(error, signal)) {
+        cancelled("agent");
+      }
+      throw error;
+    }),
+    // Beside the agent, so blame adds no wait of its own.
+    suggestReviewers({
+      client,
+      target,
+      baseSha: pullRequest.baseSha,
+      author: pullRequest.author,
+      changedFiles,
+      codeowners,
+      enabled: suggesting,
+      now: now(),
+      logger,
+    }),
+  ]);
 
   logger.info("findings.validated", {
     ...fields,
@@ -359,6 +379,7 @@ export async function reviewWithDelivery(
           ? incrementalNote(scope.sinceSha, scope.changedFiles.length)
           : undefined,
       blastRadius,
+      suggestedReviewers,
     },
     {
       publishCheckRun: publish,
@@ -379,5 +400,6 @@ export async function reviewWithDelivery(
     ...(repositoryIndex === undefined
       ? {}
       : { graph: snapshotRepositoryIndex(repositoryIndex) }),
+    ...(blastRadius === undefined ? {} : { blastRadius }),
   };
 }

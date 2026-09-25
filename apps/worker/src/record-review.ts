@@ -20,14 +20,19 @@ export function createDatabaseReviewPublisher(
     };
     try {
       const result = await ingestReviewRecord(database, organizationId, record);
-      if (!result.ok) {
+      if (result.ok) {
+        logger.info("review_job.recorded", { ...reviewCorrelation(target), reviewId: result.reviewId });
+      } else if (result.reason === "invalid-record") {
+        logger.error("review_job.record_invalid", {
+          ...reviewCorrelation(target),
+          issues: result.issues,
+        });
+      } else {
         logger.error("review_job.record_failed", {
           ...reviewCorrelation(target),
           reason: result.reason,
         });
-        return;
       }
-      logger.info("review_job.recorded", { ...reviewCorrelation(target), reviewId: result.reviewId });
     } catch (error) {
       logger.error("review_job.record_failed", {
         ...reviewCorrelation(target),
