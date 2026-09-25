@@ -1,4 +1,4 @@
-import { db } from "@pr-review/db";
+import { db, withWriteDatabase } from "@pr-review/db";
 import {
   Badge,
   Button,
@@ -17,17 +17,19 @@ import {
   TableHeader,
   TableRow,
 } from "@pr-review/design";
+import { createConsoleLogger, errorMessage } from "@pr-review/logging";
 import { FolderGit2 } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { RowLink } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { INSTALL_APP_URL, installAppUrl } from "@/lib/github-app";
+import { githubApp, INSTALL_APP_URL, installAppUrl } from "@/lib/github-app";
 import { appDomain } from "@/lib/host";
+import { recoverPersonalInstallation } from "@/lib/installation";
 import { autoForwardPath, membershipsForUser, ownsPersonalAccount } from "@/lib/organization";
 import { DASHBOARD_PATH, organizationPath, signInUrl } from "@/lib/paths";
-import { currentSession } from "@/lib/session";
+import { currentSession, type AppSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Accounts" };
 
@@ -37,6 +39,8 @@ export default async function OrganizationsPage() {
   const memberships = await membershipsForUser(db(), session.githubId);
   const forward = autoForwardPath(memberships);
   if (forward) redirect(forward);
+  const recovered = memberships.length === 0 ? await recoverInstallation(session) : undefined;
+  if (recovered) redirect(organizationPath(recovered));
 
   return (
     <div className="flex flex-col gap-8">
@@ -119,4 +123,21 @@ export default async function OrganizationsPage() {
       )}
     </div>
   );
+}
+
+async function recoverInstallation(session: AppSession): Promise<string | undefined> {
+  const logger = createConsoleLogger();
+  try {
+    const result = await withWriteDatabase((database) =>
+      recoverPersonalInstallation({ database, github: githubApp(), logger }, session),
+    );
+    return result?.status === "member" ? result.slug : undefined;
+  } catch (error) {
+    logger.error("setup.recover_failed", {
+      githubUserId: session.githubId,
+      login: session.login,
+      error: errorMessage(error),
+    });
+    return undefined;
+  }
 }
