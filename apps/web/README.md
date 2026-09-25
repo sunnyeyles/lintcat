@@ -62,7 +62,7 @@ a 401 and writes nothing.
 | `installation`              | `deleted`                        | Set `uninstalled_at` and clear `installation_id`; nothing is deleted          |
 | `installation_repositories` | `added`, `removed`               | Upsert those repos (clearing `removed_at`), or set their `removed_at`          |
 | `organization`              | `member_added`, `member_removed` | Re-check that user's membership with GitHub                                    |
-| `member`                    | `added`, `edited`, `removed`     | Same, when the repository belongs to an organization; then re-check that user's permission on the repo |
+| `member`                    | `added`, `edited`, `removed`     | Same, against the organization or, for a personal repo, its owner; then re-check that user's permission on the repo, member or not |
 | `membership`                | `added`, `removed`               | Same                                                                           |
 | `repository`                | `renamed`                        | Update the repo's owner and name                                               |
 | `repository`                | `privatized`, `publicized`       | Flip `repos.private`; `privatized` also sets `repo_access` from the repo's collaborators |
@@ -111,12 +111,16 @@ and sign-in share.
 
 `repo_access` holds a user's GitHub permission (`admin`, `maintain`, `write`,
 `triage`, `read`) on a repo. A member reads public repos, plus private ones they
-have a row for; an organization owner reads every repo. A **repository owner** is
-an organization owner, or `admin`/`maintain` on the repo. `lib/repo-access-sync.ts`
+have a row for; an organization owner reads every repo. A **collaborator** (rows
+but no membership, as on someone else's personal repo or as an outside
+collaborator) reads exactly the repos they have rows for; the role is derived by
+`authorize`, never stored (see `docs/adr/0003-repository-collaborators.md`). A
+**repository owner** is an organization owner, or `admin`/`maintain` on the repo. `lib/repo-access-sync.ts`
 holds the lookups the webhook and sign-in share.
 
 - A collaborator `member` event asks GitHub for that user's current permission
-  (`GET /repos/{owner}/{repo}/collaborators/{username}/permission`), one call.
+  (`GET /repos/{owner}/{repo}/collaborators/{username}/permission`), one call,
+  whether or not they are a member.
 - `privatized` lists the repo's collaborators (`affiliation=all`, which covers
   teams and the organization's base role), one paginated call, and makes the
   repo's rows exactly that list. If GitHub fails the repo is still made private
@@ -124,7 +128,10 @@ holds the lookups the webhook and sign-in share.
 - `repository` events carry no event time, so each action writes only its own
   field; a `privatized` and `publicized` delivered out of order can still
   settle on the older visibility.
-- Leaving an organization deletes the user's rows on its repos.
+- Leaving an organization deletes the user's rows on its repos. A revoke that
+  removes no membership keeps them: those rows are collaborator grants.
+- `privatized` sets rows only for users who have signed in; others get theirs
+  at sign-in.
 - Team changes (`team_add`, team membership) are not subscribed, so they land
   with the user's next sign-in.
 - Logged as `repo_access.granted`, `repo_access.revoked` or `repo_access.skipped`.
@@ -250,14 +257,21 @@ repo in each installed, unsuspended organization where the user is a plain
 member, up to eight at a time. Owners, public repos and personal accounts need
 no call. A failed lookup keeps that repo's stored row.
 
+Collaborator access is refreshed last, with the user's own token from the
+sign-in pass (a GitHub App user access token, used then and never stored):
+`GET /user/installations`, then `GET /user/installations/{id}/repositories` for
+each live installation where the user has no membership. The listed repos become
+exactly the user's rows in that account; an account no longer listed has its rows
+cleared. A failed listing keeps what was stored.
+
 ## Organizations and access
 
 Every organization page lives under `/o/<slug>/`. `authorize` (`packages/db/src/authorize.ts`)
 reads only the database and returns the organization, the user's role and the
 repos they may read (each with whether they own it), or not-found. Given a repo,
 it also returns that repo. An unknown slug, a suspended or uninstalled
-organization, a non-member and an unreadable or unknown repo get the same
-not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
+organization, a non-member with no granted repo and an unreadable or unknown
+repo get the same not-found. `requireOrganization(slug)` in `lib/session.ts` is the guard
 every organization layout and page calls: a signed-out visitor goes to
 `/sign-in?callbackUrl=<the page>` (the path comes from `proxy.ts`), and a
 not-found renders the 404.

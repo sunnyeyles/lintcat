@@ -21,6 +21,8 @@ import {
   ingestReviewRecord,
   memberships,
   organizations,
+  repoAccess,
+  repos,
   users,
   type Database,
 } from "@pr-review/db";
@@ -626,6 +628,32 @@ describe("history tools", () => {
     const { isError, texts } = await call(client, "list_reviews", { org: "acme" });
     expect(isError).toBe(true);
     expect(texts[0]).toContain('No account "acme"');
+  });
+
+  it("scopes a collaborator to the repositories granted to them", async () => {
+    const [acme] = await database.select().from(organizations);
+    const gadgets = await ingestReviewRecord(database, acme!.id, {
+      owner: "acme",
+      repo: "gadgets",
+      prNumber: 8,
+      headSha: "b".repeat(40),
+      summary: "Clean.",
+      durationMs: 1_000,
+      inputTokens: 10,
+      cacheCreationInputTokens: 0,
+      cacheReadInputTokens: 0,
+      outputTokens: 5,
+      findings: [],
+    });
+    if (!gadgets.ok) throw new Error(gadgets.reason);
+    const [collaborator] = await database.insert(users).values({ githubId: 202, login: "hubot" }).returning();
+    const widgets = (await database.select().from(repos)).find((repo) => repo.name === "widgets");
+    await database.insert(repoAccess).values({ userId: collaborator!.id, repoId: widgets!.id, permission: "read" });
+    const client = await connect(environment({ database: () => database }), async () => 202);
+
+    const listed = JSON.parse((await call(client, "list_reviews", { org: "acme" })).texts[0]!);
+
+    expect(listed.map((review: { repo: string }) => review.repo)).toEqual(["acme/widgets"]);
   });
 });
 
