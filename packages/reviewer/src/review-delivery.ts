@@ -13,6 +13,7 @@ import {
 } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
 import {
+  MAX_REPOSITORY_GRAPH_BASE64,
   MAX_RISK_DEPENDENTS,
   type ReviewRecordGraph,
   type ReviewRecordRisk,
@@ -122,9 +123,14 @@ export function recordingDelivery(): RecordingDelivery {
 }
 
 /** The snapshot as the ingest payload carries it: base64 of gzipped JSON. */
-function graphPayload(snapshot: RepositoryGraphSnapshot): ReviewRecordGraph {
+function graphPayload(
+  snapshot: RepositoryGraphSnapshot,
+): ReviewRecordGraph | undefined {
+  const gzip = Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64");
+  // Past the schema's cap the whole record would be rejected, so only the map is dropped.
+  if (gzip.length > MAX_REPOSITORY_GRAPH_BASE64) return undefined;
   return {
-    gzip: Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64"),
+    gzip,
     fileCount: snapshot.files.length,
     edgeCount: snapshot.edges.length,
   };
@@ -159,6 +165,8 @@ export function dashboardReview({
   durationMs,
 }: FinishedReviewRun): DashboardReview {
   const count = outcome.findings.length;
+  const graph =
+    outcome.graph === undefined ? undefined : graphPayload(outcome.graph);
   return {
     summary: count === 1 ? "1 finding" : `${count} findings`,
     durationMs,
@@ -169,7 +177,7 @@ export function dashboardReview({
       additions: file.additions,
       deletions: file.deletions,
     })),
-    ...(outcome.graph === undefined ? {} : { graph: graphPayload(outcome.graph) }),
+    ...(graph === undefined ? {} : { graph }),
     ...(outcome.blastRadius === undefined
       ? {}
       : { risk: riskPayload(outcome.blastRadius) }),

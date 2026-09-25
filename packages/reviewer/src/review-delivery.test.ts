@@ -1,4 +1,5 @@
 /** What a finished run contributes to the dashboard record. */
+import { randomBytes } from "node:crypto";
 import { emptyTokenUsage } from "@pr-review/ai";
 import type { ChangedFile } from "@pr-review/github";
 import {
@@ -132,6 +133,20 @@ describe("dashboardReview", () => {
     expect(
       decodeRepositoryGraph(Buffer.from(record.graph!.gzip, "base64")),
     ).toEqual(snapshot);
+  });
+
+  it("drops a graph past the schema's cap but keeps the review", () => {
+    const [file] = snapshot.files;
+    const files = Array.from({ length: 150_000 }, () => ({
+      ...file!,
+      path: `src/${randomBytes(48).toString("base64url")}.ts`,
+    }));
+    const record = dashboardReview(
+      run(outcome({ graph: { ...snapshot, files } })),
+    );
+
+    expect(record.graph).toBeUndefined();
+    expect(record.summary).toBeDefined();
   });
 
   it("sends no graph when the index was off or failed", () => {
