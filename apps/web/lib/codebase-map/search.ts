@@ -1,3 +1,4 @@
+import { baseName } from "@/lib/codebase-map/clustering";
 import type { MapFile } from "@/lib/codebase-map/types";
 
 type SearchMatchKind = "name-prefix" | "segment" | "substring";
@@ -14,14 +15,9 @@ const SEARCH_RANK: Record<SearchMatchKind, number> = {
   substring: 2,
 };
 
-function fileNameOf(path: string): string {
-  const cut = path.lastIndexOf("/");
-  return cut === -1 ? path : path.slice(cut + 1);
-}
-
 function kindOf(path: string, needle: string): SearchMatchKind | null {
   const lower = path.toLowerCase();
-  if (fileNameOf(lower).startsWith(needle)) return "name-prefix";
+  if (baseName(lower).startsWith(needle)) return "name-prefix";
   if (lower.split("/").some((segment) => segment.startsWith(needle))) return "segment";
   return lower.includes(needle) ? "substring" : null;
 }

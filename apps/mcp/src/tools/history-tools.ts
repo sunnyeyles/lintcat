@@ -1,10 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import type { McpEnvironment } from "#src/environment";
 import { reviewResourceUri } from "#src/resources/context-resources";
 import { readStoredReview, scopeToOrganization, summariseReview } from "#src/review-history";
+import { json } from "#src/tools/shared";
 
 const orgSchema = z.string().min(1).describe('The organization slug, as in the dashboard URL /o/<slug>.');
 const repoSchema = z
@@ -13,10 +13,6 @@ const repoSchema = z
   .optional()
   .describe('Limit to one repository, as "owner/name".');
 const rangeSchema = z.enum(["7d", "30d", "90d"]).optional().describe("Time window; defaults to 30d.");
-
-function json(value: unknown): CallToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
-}
 
 export function registerHistoryTools(
   server: McpServer,

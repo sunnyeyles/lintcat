@@ -1,4 +1,5 @@
 import {
+  baseName,
   clusterGraph,
   emphasise,
   EMPHASIS_RANK,
@@ -63,16 +64,6 @@ const FILE_RADIUS = 4;
 /** Wider than the module's default so groups read as separate islands rather than one hairball. */
 const LAYOUT = { mapRadius: 3600, groupRadius: 150 } as const;
 
-function fileNameOf(path: string): string {
-  const cut = path.lastIndexOf("/");
-  return cut === -1 ? path : path.slice(cut + 1);
-}
-
-function lastSegment(directory: string): string {
-  const cut = directory.lastIndexOf("/");
-  return cut === -1 ? directory : directory.slice(cut + 1);
-}
-
 function lowerRank(a: EmphasisLevel, b: EmphasisLevel): EmphasisLevel {
   return EMPHASIS_RANK[a] <= EMPHASIS_RANK[b] ? a : b;
 }
@@ -102,7 +93,7 @@ export function buildScene(
         const node: SceneNode = {
           id: path,
           kind: "file",
-          label: fileNameOf(path),
+          label: baseName(path),
           sublabel: path,
           x: point.x,
           y: point.y,
@@ -150,7 +141,7 @@ export function buildScene(
     const node: SceneNode = {
       id: group.id,
       kind: "group",
-      label: lastSegment(group.directory),
+      label: baseName(group.directory),
       sublabel: `${group.package ?? "no package"} · ${group.directory}`,
       x: centre.x,
       y: centre.y,

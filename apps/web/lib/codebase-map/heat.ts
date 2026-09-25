@@ -32,8 +32,7 @@ export function heatOf(counts: FindingCounts | undefined): Heat {
   return { counts, top, band: bandOf(counts.total) };
 }
 
-/** Sums a group's files, so findings stay visible while the group is collapsed. */
-export function heatOfPaths(heat: FindingHeat, paths: readonly string[]): Heat {
+export function sumHeat(heat: FindingHeat, paths: readonly string[]): FindingCounts {
   const counts: FindingCounts = { total: 0, high: 0, medium: 0, low: 0 };
   for (const path of paths) {
     const one = heat[path];
@@ -43,7 +42,12 @@ export function heatOfPaths(heat: FindingHeat, paths: readonly string[]): Heat {
     counts.medium += one.medium;
     counts.low += one.low;
   }
-  return heatOf(counts);
+  return counts;
+}
+
+/** Sums a group's files, so findings stay visible while the group is collapsed. */
+export function heatOfPaths(heat: FindingHeat, paths: readonly string[]): Heat {
+  return heatOf(sumHeat(heat, paths));
 }
 
 export function heatLabel(heat: Heat): string {

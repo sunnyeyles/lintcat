@@ -40,11 +40,9 @@ export {
 export { GENERAL_AGENT } from "#src/agents/general-agent";
 export {
   renderRepository,
-  renderRepositoryIndex,
   INDEX_ABSENT_LINE,
 } from "#src/agents/repository-index";
 export {
-  renderRepositoryHints,
   withRepositoryHints,
   type AgentDefinition,
 } from "#src/agents/definition";

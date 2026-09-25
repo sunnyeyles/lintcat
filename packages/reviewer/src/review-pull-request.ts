@@ -119,7 +119,7 @@ interface HintedRun {
   memory: ReviewMemory;
 }
 
-/** The run's hints; unhinted when there is no store or the read fails. */
+/** The run's hints; unhinted when there is no store, and `readMemory` never throws. */
 async function attachRepositoryHints(
   agent: AgentDefinition,
   store: MemoryStore | undefined,
@@ -127,22 +127,11 @@ async function attachRepositoryHints(
   logger: StructuredLogger,
   now: Date,
 ): Promise<HintedRun> {
-  const unhinted: HintedRun = { agent, memory: emptyMemory() };
   if (store === undefined) {
-    return unhinted;
+    return { agent, memory: emptyMemory() };
   }
 
-  let memory = emptyMemory();
-  try {
-    memory = await readMemory(store, logger);
-  } catch (error) {
-    logger.error("memory.read_failed", {
-      ...reviewCorrelation(target),
-      reason: errorMessage(error),
-      fallback: "reviewing without repository hints",
-    });
-    return unhinted;
-  }
+  const memory = await readMemory(store, logger);
 
   const hints = computeHints(memory, now);
   logger.info("memory.hints_attached", {

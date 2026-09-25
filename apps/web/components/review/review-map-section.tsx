@@ -9,8 +9,8 @@ import {
 } from "@pr-review/design";
 import { MapPinOff } from "lucide-react";
 
-import { mapFromSnapshot, mapPayload, resolveLodThreshold } from "@/lib/codebase-map";
-import { getChangedFiles, getRepositoryGraph } from "@/lib/data/server";
+import { mapPayload, resolveLodThreshold } from "@/lib/codebase-map";
+import { reviewMapSource } from "@/lib/data/server";
 
 import { ReviewMap } from "./review-map";
 
@@ -54,11 +54,7 @@ export async function ReviewMapSection({
   /** The stored blast radius; absent for a review scored before it was kept. */
   dependents?: readonly string[];
 }) {
-  const [snapshot, changedFiles] = await Promise.all([
-    getRepositoryGraph(slug, reviewId),
-    getChangedFiles(slug, reviewId),
-  ]);
-  const source = mapFromSnapshot(snapshot, changedFiles, findings, dependents);
+  const source = await reviewMapSource(slug, reviewId, findings, dependents);
   const payload = mapPayload(source, {
     threshold: resolveLodThreshold(process.env.CODEBASE_MAP_LOD_THRESHOLD),
   });

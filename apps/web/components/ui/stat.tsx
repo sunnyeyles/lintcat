@@ -12,8 +12,7 @@ import type { ReactNode } from "react";
 
 type StatDelta = {
   value: string;
-  trend?: "up" | "down" | "flat";
-  tone?: "neutral" | "ok" | "warn" | "stop";
+  tone?: "ok" | "stop";
 };
 
 export type StatProps = {
@@ -23,12 +22,6 @@ export type StatProps = {
   hint?: ReactNode;
   children?: ReactNode;
   className?: string;
-};
-
-const TREND_GLYPH: Record<NonNullable<StatDelta["trend"]>, string> = {
-  up: "↑",
-  down: "↓",
-  flat: "→",
 };
 
 export function Stat({ label, value, delta, hint, children, className }: StatProps) {
@@ -45,7 +38,6 @@ export function Stat({ label, value, delta, hint, children, className }: StatPro
               variant={delta.tone === "stop" ? "destructive" : "secondary"}
               className="tabular-nums"
             >
-              {delta.trend ? `${TREND_GLYPH[delta.trend]} ` : ""}
               {delta.value}
             </Badge>
           </CardAction>

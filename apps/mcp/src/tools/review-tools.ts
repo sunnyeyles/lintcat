@@ -10,6 +10,7 @@ import { openLocalRepository, type LocalRepository, type LocalScope } from "#src
 import { openLocalMemoryStore } from "#src/local-memory-store";
 import { runReview, type ReviewResult } from "#src/review";
 import { selectReviewEngine } from "#src/review-engine";
+import { repoPathSchema } from "#src/tools/shared";
 
 /** Said whenever sampling stood in for a provider key, so nobody reads this as a full review. */
 const SINGLE_SHOT_NOTICE =
@@ -19,10 +20,7 @@ const SINGLE_SHOT_NOTICE =
   "key-backed review and misses anything that needs reading further.";
 
 const scopeSchema = {
-  repoPath: z
-    .string()
-    .optional()
-    .describe("Path to the git checkout; defaults to the server's working directory."),
+  repoPath: repoPathSchema,
   base: z
     .string()
     .optional()

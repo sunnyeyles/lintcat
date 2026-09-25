@@ -2,7 +2,8 @@
 
 import { Badge, Button, Empty, EmptyDescription, EmptyHeader, EmptyTitle, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
 
-import { heatOf, neighbourhood, SEVERITIES } from "@/lib/codebase-map";
+import { SEVERITIES } from "@/components/review/sort";
+import { heatOf, neighbourhood } from "@/lib/codebase-map";
 import type { FindingHeat, NormalisedGraph } from "@/lib/codebase-map";
 import { SeverityBadge } from "@/components/ui";
 

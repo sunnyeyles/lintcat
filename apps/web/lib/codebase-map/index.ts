@@ -18,13 +18,13 @@ export type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 export { neighbourhood, neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
 export type { NeighbourDirection } from "@/lib/codebase-map/neighbourhood";
 
-export { findingHeat, mapFromSnapshot, SEVERITIES } from "@/lib/codebase-map/from-snapshot";
-export type { FindingHeat, MapSource } from "@/lib/codebase-map/from-snapshot";
+export { findingHeat, mapFromSnapshot } from "@/lib/codebase-map/from-snapshot";
+export type { FindingHeat, MapSource, MapSourceFinding } from "@/lib/codebase-map/from-snapshot";
 
 export { heatOf, heatOfPaths } from "@/lib/codebase-map/heat";
 export type { Heat } from "@/lib/codebase-map/heat";
 
-export { clusterGraph, groupIdFor } from "@/lib/codebase-map/clustering";
+export { baseName, clusterGraph, groupIdFor } from "@/lib/codebase-map/clustering";
 export type { Clustering } from "@/lib/codebase-map/clustering";
 
 export { emphasise, EMPHASIS_MARKERS, EMPHASIS_RANK } from "@/lib/codebase-map/emphasis";

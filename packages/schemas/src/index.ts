@@ -2,7 +2,6 @@
 export {
   categoryLabel,
   findingCategorySchema,
-  findingPatchSchema,
   reviewFindingSchema,
   wellFormedFindings,
   type FindingCategory,
@@ -10,9 +9,7 @@ export {
   type ReviewFinding,
 } from "#src/review-finding";
 export {
-  memoryShapeSchema,
   reviewMemorySchema,
-  suppressionSchema,
   type MemoryShape,
   type ReviewMemory,
   type Suppression,
@@ -20,8 +17,6 @@ export {
 export {
   MAX_REPOSITORY_GRAPH_BASE64,
   MAX_RISK_DEPENDENTS,
-  reviewRecordChangedFileSchema,
-  reviewRecordGraphSchema,
   reviewRecordRiskSchema,
   reviewRecordSchema,
   type ReviewRecord,

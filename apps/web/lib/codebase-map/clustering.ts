@@ -31,6 +31,11 @@ export interface Clustering {
   groupOfFile: ReadonlyMap<string, string>;
 }
 
+export function baseName(path: string): string {
+  const cut = path.lastIndexOf("/");
+  return cut === -1 ? path : path.slice(cut + 1);
+}
+
 export function directoryOf(path: string): string {
   const cut = path.lastIndexOf("/");
   return cut === -1 ? "." : path.slice(0, cut);

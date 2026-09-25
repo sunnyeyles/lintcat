@@ -250,7 +250,6 @@ export function MapExplorer() {
             </div>
           )}
           <MapLegend
-            heat
             impacted={
               map.hasImpacted
                 ? { shown: map.showImpacted, onShownChange: map.setShowImpacted }

@@ -7,14 +7,14 @@ const overlay = (shown: boolean) => ({ shown, onShownChange: () => {} });
 
 describe("MapLegend", () => {
   it("has no impacted entry or switch for a map without impacted files", () => {
-    const markup = renderToStaticMarkup(<MapLegend heat />);
+    const markup = renderToStaticMarkup(<MapLegend />);
 
     expect(markup).not.toMatch(/impacted/i);
     expect(markup).not.toContain('role="switch"');
   });
 
   it("lists impacted files in their own colour, with the overlay switch on", () => {
-    const markup = renderToStaticMarkup(<MapLegend heat impacted={overlay(true)} />);
+    const markup = renderToStaticMarkup(<MapLegend impacted={overlay(true)} />);
 
     expect(markup).toContain("Impacted: depends on the change");
     expect(markup).toContain("Collapsed directory holding impacted files");
