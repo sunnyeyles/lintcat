@@ -38,7 +38,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
 
   const dashboard = (
     <Button asChild variant="outline">
-      <Link href={DASHBOARD_PATH}>Your organizations</Link>
+      <Link href={DASHBOARD_PATH}>Your accounts</Link>
     </Button>
   );
 
@@ -59,7 +59,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
       <State
         icon={<Link2Off />}
         title="This link is missing its installation"
-        description="GitHub sends you here after installing the App. Start the installation from GitHub, or go back to your organizations."
+        description="GitHub sends you here after installing the App. Start the installation from GitHub, or go back to your accounts."
       >
         <Button asChild>
           <a href={INSTALL_APP_URL}>Install the GitHub App</a>
@@ -93,8 +93,16 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
     return (
       <State
         icon={<UserX />}
-        title={`You are not a member of ${result.slug}`}
-        description={`The App is installed on ${result.slug}, but GitHub does not list ${session.login} as a member of it. To use another account, sign out here and switch accounts on GitHub before signing back in, or ask an owner of ${result.slug} to add you.`}
+        title={
+          result.accountType === "user"
+            ? `You are signed in as ${session.login}, not ${result.slug}`
+            : `You are not a member of ${result.slug}`
+        }
+        description={
+          result.accountType === "user"
+            ? `The App is installed on the personal account ${result.slug}, but you are signed in as ${session.login}. Only ${result.slug} can open it. Sign out here, switch to ${result.slug} on GitHub, then sign back in.`
+            : `The App is installed on ${result.slug}, but GitHub does not list ${session.login} as a member of it. To use another account, sign out here and switch accounts on GitHub before signing back in, or ask an owner of ${result.slug} to add you.`
+        }
       >
         <div className="flex gap-2">
           <form action={signOutOfDashboard}>
@@ -122,7 +130,7 @@ export default async function SetupPage({ searchParams }: { searchParams: Search
     <State
       icon={<Clock />}
       title="Waiting for GitHub"
-      description="The installation has not reached the dashboard yet. Reload in a moment, or check your organizations."
+      description="The installation has not reached the dashboard yet. Reload in a moment, or check your accounts."
     >
       <div className="flex gap-2">
         <Button asChild>
@@ -150,7 +158,7 @@ function State({
       <PageHeader
         eyebrow="Dashboard"
         title="Setting up"
-        description="Connecting the GitHub App installation to your organization."
+        description="Connecting the GitHub App installation to your account."
       />
       <Empty>
         <EmptyHeader>

@@ -127,7 +127,7 @@ async function ReposGlance({ slug }: { slug: string }) {
           slug={slug}
           repos={repos}
           limit={6}
-          caption="Repositories connected to this organization, most recently reviewed first."
+          caption="Repositories connected to this account, most recently reviewed first."
         />
       ) : (
         <Empty>

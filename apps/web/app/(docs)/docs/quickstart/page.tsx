@@ -29,23 +29,24 @@ export default function QuickstartPage() {
     >
       <Section id="install" title="1. Install the GitHub App">
         <P>
-          Install LintCat on your GitHub organization or personal account, and choose all
-          repositories or only some. GitHub then sends you back to the dashboard, signed in,
-          with your organization set up.
+          Install LintCat on your personal GitHub account or on an organization, and choose
+          all repositories or only some. You don&rsquo;t need an organization: your own
+          account works on its own. GitHub then sends you back to the dashboard, signed in,
+          with the account set up.
         </P>
         <Button asChild>
           <a href={INSTALL_APP_URL}>Install the GitHub App</a>
         </Button>
         <Note title="Not an owner?">
-          If you aren&rsquo;t an owner of the organization, GitHub sends the install to an
-          owner to approve. Once they do, sign in again and the organization shows up.
+          If you install on an organization you don&rsquo;t own, GitHub sends the install to
+          an owner to approve. Once they do, sign in again and the organization shows up.
         </Note>
       </Section>
 
       <Section id="key" title="2. Add a model key">
         <P>
           On the dashboard, open <strong>Settings</strong> in the sidebar, pick Anthropic or
-          OpenAI and paste an API key. Only organization owners see this page. The key is
+          OpenAI and paste an API key. Only owners of the account see this page. The key is
           stored encrypted and never shown again; the dashboard shows only its last four
           characters.
         </P>

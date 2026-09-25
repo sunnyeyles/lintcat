@@ -56,8 +56,8 @@ export default function IntroductionPage() {
 
       <Section id="getting-it" title="Getting it on your repositories">
         <P>
-          Install the LintCat GitHub App on your organization or personal account, and pick
-          the repositories it may review. An organization owner saves one Anthropic or OpenAI
+          Install the LintCat GitHub App on your personal account or an organization, and pick
+          the repositories it may review. An owner of the account saves one Anthropic or OpenAI
           API key on the dashboard; reviews run on that key, so model usage is billed to
           your provider account.
         </P>

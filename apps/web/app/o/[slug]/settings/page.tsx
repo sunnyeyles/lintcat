@@ -27,7 +27,7 @@ export default async function SettingsPage({
       <PageHeader
         eyebrow="Settings"
         title="Model key"
-        description="Reviews run on your organization's own model provider key. Once it is saved, LintCat reviews pull requests on your installed repositories with this key."
+        description="Reviews run on this account's own model provider key. Once it is saved, LintCat reviews pull requests on your installed repositories with this key."
       />
       <div className="mt-8 max-w-2xl">
         <ModelKeyForm

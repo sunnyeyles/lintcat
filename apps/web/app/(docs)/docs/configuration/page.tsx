@@ -47,14 +47,14 @@ export default function ConfigurationPage() {
       href="/docs/configuration"
       eyebrow="Using LintCat"
       title="Configuration"
-      description="Everything is set on the dashboard. One model key per organization, and a few settings per repository."
+      description="Everything is set on the dashboard. One model key per account, and a few settings per repository."
       headings={HEADINGS}
     >
       <Section id="model-key" title="Model key">
         <P>
-          Reviews run on your organization&rsquo;s own Anthropic or OpenAI API key. An
-          organization owner sets it under <strong>Settings</strong> in the dashboard sidebar;
-          other members don&rsquo;t see that page.
+          Reviews run on the account&rsquo;s own Anthropic or OpenAI API key. An owner of
+          the account (on a personal account, you) sets it under <strong>Settings</strong> in
+          the dashboard sidebar; other members don&rsquo;t see that page.
         </P>
         <P>
           The key is stored encrypted and only the review service ever reads it back. The
@@ -67,7 +67,7 @@ export default function ConfigurationPage() {
       <Section id="repositories" title="Repository settings">
         <P>
           Each repository has a <strong>Settings</strong> page, linked from the repository on
-          the dashboard. Anyone who can see the repository can view it; organization owners
+          the dashboard. Anyone who can see the repository can view it; account owners
           and people with admin or maintain access to the repository can change it.
         </P>
         <Card className="py-0">
@@ -100,7 +100,7 @@ export default function ConfigurationPage() {
       <Section id="models" title="Models">
         <P>
           Each repository uses the provider default unless you pick a model on its settings
-          page. The choices follow the provider of the organization&rsquo;s key:
+          page. The choices follow the provider of the account&rsquo;s key:
         </P>
         <Card className="py-0">
           <Table>

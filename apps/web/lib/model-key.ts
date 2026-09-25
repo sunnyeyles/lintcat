@@ -36,7 +36,7 @@ interface OwnerAccess {
 
 const NOT_OWNER: ModelKeyFormState = {
   status: "error",
-  message: "Only an organization owner can change the model key.",
+  message: "Only an owner of this account can change the model key.",
 };
 
 export async function saveModelKeyForm(

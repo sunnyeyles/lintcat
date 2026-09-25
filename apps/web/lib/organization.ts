@@ -22,6 +22,13 @@ export function autoForwardPath(
   return list.length === 1 ? organizationPath(list[0]!.organization.slug) : undefined;
 }
 
+export function ownsPersonalAccount(
+  list: readonly OrganizationMembership[],
+  githubId: number,
+): boolean {
+  return list.some(({ organization }) => organization.githubAccountId === githubId);
+}
+
 /** Every live organization the user belongs to, oldest membership first. */
 export async function membershipsForUser(
   database: Database,

@@ -19,7 +19,7 @@ A finding can include a **suggested fix**. LintCat checks the fix against the fi
 
 ## Getting it on your repositories {#getting-it}
 
-Install the LintCat GitHub App on your organization or personal account, and pick the repositories it may review. An organization owner saves one Anthropic or OpenAI API key on the dashboard; reviews run on that key, so model usage is billed to your provider account.
+Install the LintCat GitHub App on your personal account or an organization, and pick the repositories it may review. An owner of the account saves one Anthropic or OpenAI API key on the dashboard; reviews run on that key, so model usage is billed to your provider account.
 
 By default every pull request is reviewed when it is opened, and again on every push. Switch a repository to review only pull requests with the \`ai-review\` label, or turn it off, from its settings page. A new push replaces a review still in progress, so comments are always on the latest commit.
 
@@ -55,15 +55,15 @@ Three steps, a few minutes, and nothing to commit to your repository.
 
 ## 1. Install the GitHub App {#install}
 
-Install LintCat on your GitHub organization or personal account, and choose all repositories or only some. GitHub then sends you back to the dashboard, signed in, with your organization set up.
+Install LintCat on your personal GitHub account or on an organization, and choose all repositories or only some. You don’t need an organization: your own account works on its own. GitHub then sends you back to the dashboard, signed in, with the account set up.
 
 [Install the GitHub App](https://github.com/apps/LintcatPR/installations/new)
 
-**Note: Not an owner?** If you aren’t an owner of the organization, GitHub sends the install to an owner to approve. Once they do, sign in again and the organization shows up.
+**Note: Not an owner?** If you install on an organization you don’t own, GitHub sends the install to an owner to approve. Once they do, sign in again and the organization shows up.
 
 ## 2. Add a model key {#key}
 
-On the dashboard, open **Settings** in the sidebar, pick Anthropic or OpenAI and paste an API key. Only organization owners see this page. The key is stored encrypted and never shown again; the dashboard shows only its last four characters.
+On the dashboard, open **Settings** in the sidebar, pick Anthropic or OpenAI and paste an API key. Only owners of the account see this page. The key is stored encrypted and never shown again; the dashboard shows only its last four characters.
 
 Until a key is saved, a pull request that would be reviewed gets a neutral check run asking an owner to add one, and no model is called.
 
@@ -86,17 +86,17 @@ To review only the pull requests you pick, switch the repository to the \`ai-rev
 
 # Configuration
 
-Everything is set on the dashboard. One model key per organization, and a few settings per repository.
+Everything is set on the dashboard. One model key per account, and a few settings per repository.
 
 ## Model key {#model-key}
 
-Reviews run on your organization’s own Anthropic or OpenAI API key. An organization owner sets it under **Settings** in the dashboard sidebar; other members don’t see that page.
+Reviews run on the account’s own Anthropic or OpenAI API key. An owner of the account (on a personal account, you) sets it under **Settings** in the dashboard sidebar; other members don’t see that page.
 
 The key is stored encrypted and only the review service ever reads it back. The dashboard shows the provider and the last four characters, nothing more. Replacing the key takes effect on the next review; removing it stops reviews until a new one is added.
 
 ## Repository settings {#repositories}
 
-Each repository has a **Settings** page, linked from the repository on the dashboard. Anyone who can see the repository can view it; organization owners and people with admin or maintain access to the repository can change it.
+Each repository has a **Settings** page, linked from the repository on the dashboard. Anyone who can see the repository can view it; account owners and people with admin or maintain access to the repository can change it.
 | When reviews run | What happens |
 | Every pull request | Default. Every pull request is reviewed when it is opened or reopened, and on every push. |
 | On the ai-review label | A pull request is reviewed when it gets the label, and on every push while it carries it. |
@@ -106,7 +106,7 @@ Each repository has a **Settings** page, linked from the repository on the dashb
 
 ## Models {#models}
 
-Each repository uses the provider default unless you pick a model on its settings page. The choices follow the provider of the organization’s key:
+Each repository uses the provider default unless you pick a model on its settings page. The choices follow the provider of the account’s key:
 | Provider | Models |
 | Anthropic | claude-sonnet-5, claude-haiku-4-5, claude-sonnet-4-5 |
 | OpenAI | gpt-5.6-luna, gpt-5.6-luna-mini |
@@ -185,7 +185,7 @@ LintCat reads your code to review it, and that is all the AI part can do. Everyt
 
 ## What LintCat can access {#access}
 - **Only the repositories you pick** when you install the GitHub App. The permissions it asks for, and why, are listed under [Configuration](/docs/configuration#permissions).
-- **Your model provider sees the code it reviews.** Reviews run on your organization’s own Anthropic or OpenAI key, under your agreement with that provider.
+- **Your model provider sees the code it reviews.** Reviews run on your account’s own Anthropic or OpenAI key, under your agreement with that provider.
 - **Your key stays encrypted.** Only the review service reads it back; the dashboard shows its last four characters and nothing more.
 
 ## What it never does {#never}
@@ -235,6 +235,6 @@ Register it in any MCP client as a local stdio server named \`pr-review\`. It ne
 
 ## The same review as the App {#same-path}
 
-A local review is the same review the GitHub App runs, with the same checks on every finding and fix. It reads your local checkout instead of GitHub, and runs on your machine with your own key, not the organization’s.`,
+A local review is the same review the GitHub App runs, with the same checks on every finding and fix. It reads your local checkout instead of GitHub, and runs on your machine with your own key, not the account’s.`,
   },
 ];

@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-const orgArg = z.string().min(1).describe('The organization slug, as in the dashboard URL /o/<slug>.');
+const orgArg = z.string().min(1).describe('The account slug (a GitHub organization or personal account), as in the dashboard URL /o/<slug>.');
 const repoArg = z.string().optional().describe('Limit to one repository, as "owner/name".');
 
 function userPrompt(text: string): GetPromptResult {
@@ -74,7 +74,7 @@ export function registerWorkflowPrompts(server: McpServer): void {
       userPrompt(
         lines(
           `Triage ${finding === undefined ? "the most severe finding" : `the finding "${finding}"`} ` +
-            `in review ${review} of organization "${org}".`,
+            `in review ${review} of account "${org}".`,
           "",
           `1. Call \`get_review\` with org "${org}" and id ${review} to read the finding: file, line, severity,`,
           "   category, explanation and suggested fix.",
@@ -91,7 +91,7 @@ export function registerWorkflowPrompts(server: McpServer): void {
     {
       title: "What the review history shows",
       description:
-        "Summarise what the stored reviews say about a repository or organization over time: how many " +
+        "Summarise what the stored reviews say about a repository or account over time: how many " +
         "reviews ran, which categories and agents keep finding things, whether findings are trending up " +
         "or down, and what the reviews cost. Use this for retrospectives, for questions like \"what do we " +
         "keep getting wrong\", or when the user asks about review volume, trends or spend.",
@@ -104,7 +104,7 @@ export function registerWorkflowPrompts(server: McpServer): void {
     ({ org, repo, range }) =>
       userPrompt(
         lines(
-          `Summarise the review history for organization "${org}"` +
+          `Summarise the review history for account "${org}"` +
             (repo === undefined ? "" : `, repository ${repo}`) +
             (range === undefined ? "" : `, over the last ${range}`) +
             ".",

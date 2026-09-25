@@ -172,7 +172,7 @@ describe("completeSetup", () => {
 
     const result = await completeSetup(deps(), INSTALLATION_ID, account(hubot));
 
-    expect(result).toEqual({ status: "not_member", slug: "acme" });
+    expect(result).toEqual({ status: "not_member", slug: "acme", accountType: "organization" });
     expect(await counts()).toEqual({ organizations: 1, repos: 1, memberships: 1 });
   });
 

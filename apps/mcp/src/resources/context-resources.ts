@@ -45,7 +45,7 @@ export function registerContextResources(
       title: "A stored review",
       description:
         "One review stored by the dashboard, with every finding, as `get_review` " +
-        "returns it. `org` is the organization slug and `id` the review id that list_reviews links to. " +
+        "returns it. `org` is the account slug and `id` the review id that list_reviews links to. " +
         "Only repositories your GitHub account can read resolve.",
       mimeType: "application/json",
     },

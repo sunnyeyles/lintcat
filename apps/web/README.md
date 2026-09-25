@@ -218,15 +218,22 @@ renders them through `lib/auth-errors.ts`. Sign-out returns to the apex
 
 ### Onboarding
 
-A signed-in user with no organization sees **Install the GitHub App**, which
-opens GitHub's install page. GitHub returns to
+No organization is needed: a personal account is an account like any other,
+with its own user as owner. A signed-in user with no account sees **Install on
+@login**, which opens GitHub's install page for their own account
+(`installAppUrl` with `target_id`), and **Install on an organization**, which
+opens GitHub's account chooser. A user who has accounts but not their own is
+offered **Add your personal account**. This needs the App to be public
+(installable on any account); a private App installs only on its owner's
+account. GitHub returns to
 `/dashboard/setup?installation_id=…&setup_action=install`. That page fetches
 the installation with the App's JWT and runs the same install path as the
 webhook (`installOrganization` in `lib/installation.ts`), so it works before
 the delivery arrives, and both paths converge whichever runs first. The user is
 then forwarded to the organization or, if GitHub does not list them as a
 member, told which account the App is on and offered sign-out, since the install
-may have run under a different GitHub login. `setup_action=request` (a non-admin asking an owner to
+may have run under a different GitHub login. For a personal account the page
+says so outright: only that account's own login can open it. `setup_action=request` (a non-admin asking an owner to
 install) renders a note; a missing or malformed `installation_id` renders the
 Install button again.
 
