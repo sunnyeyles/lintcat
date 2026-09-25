@@ -11,7 +11,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { appDomain } from "@/lib/host";
 import {
   organizationPath,
