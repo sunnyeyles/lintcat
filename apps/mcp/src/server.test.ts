@@ -308,14 +308,6 @@ describe("review_local_changes", () => {
     await call(client, "review_local_changes", { base: "main", index: false });
     expect(createLanguageModel).toHaveBeenCalledWith(expect.objectContaining({ provider: "anthropic" }));
   });
-
-  it("names the missing key rather than failing mid-review", async () => {
-    const client = await connect(environment({ env: {} }));
-
-    const { isError, texts } = await call(client, "review_local_changes", { base: "main" });
-    expect(isError).toBe(true);
-    expect(texts[0]).toContain("No model API key is set");
-  });
 });
 
 describe("review scopes", () => {

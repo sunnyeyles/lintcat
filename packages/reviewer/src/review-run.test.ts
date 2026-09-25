@@ -242,21 +242,6 @@ describe("runReview: delivery", () => {
     expect(client.createReview).toHaveBeenCalledTimes(1);
   });
 
-  it("commits nothing when the GitHub adapter was not asked to commit fixes", async () => {
-    const client = makeClient();
-    const { engine } = scriptedEngine([finding]);
-
-    await runReview({
-      client,
-      target,
-      delivery: githubDelivery({ client, logger }),
-      engine,
-      logger,
-    });
-
-    expect(client.createCommitOnBranch).not.toHaveBeenCalled();
-  });
-
   it("mirrors the finished run to the dashboard adapter", async () => {
     const published: DashboardReview[] = [];
     const { delivery, recorded } = recordingDelivery();

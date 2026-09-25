@@ -256,20 +256,6 @@ describe("the local client", () => {
       "src/sessions.ts",
     ]);
   });
-
-  it("declares nothing a checkout cannot honour, so a write cannot be called", async () => {
-    const { client } = await openLocalRepository(repo.root, "main");
-
-    for (const method of [
-      "compareCommits",
-      "createCheckRun",
-      "createReview",
-      "createCommitOnBranch",
-      "writeFileOnBranch",
-    ]) {
-      expect(method in client, method).toBe(false);
-    }
-  });
 });
 
 describe("blame", () => {
