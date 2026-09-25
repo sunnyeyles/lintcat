@@ -69,6 +69,19 @@ describe("mergeGraphs", () => {
     expect(file.dead).toBe(true);
   });
 
+  it("brings an arriving file's impacted flag in", () => {
+    const merged = mergeGraphs(base, {
+      files: [
+        { path: "src/b.ts", impacted: true },
+        { path: "lib/one.ts", package: "web", impacted: true },
+      ],
+      imports: [],
+    });
+    const impacted = normaliseGraph(merged).files.filter((f) => f.impacted === true);
+
+    expect(impacted.map((f) => f.path)).toEqual(["lib/one.ts", "src/b.ts"]);
+  });
+
   it("retires a summary once every one of its files is present", () => {
     const merged = mergeGraphs(base, slice);
 

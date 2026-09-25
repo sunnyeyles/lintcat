@@ -113,6 +113,7 @@ export function lodGraph(
       id: group.id,
       fileCount: group.fileCount,
       changedCount: group.changedCount,
+      ...(group.impactedCount > 0 ? { impactedCount: group.impactedCount } : {}),
       ...(counts.total > 0 ? { heat: counts } : {}),
     });
   }

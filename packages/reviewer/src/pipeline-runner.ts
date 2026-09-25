@@ -15,10 +15,12 @@ import {
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
 
-/** What one review reads. The two optional methods are absent on an adapter with no commit graph. */
+/** What one review reads. The optional methods are absent on an adapter with no commit graph. */
 export type ReviewClient = PullRequestReadClient &
   Pick<RepositoryHistoryClient, "listCommitShas" | "listPullRequestCommitShas"> &
-  Partial<Pick<RepositoryHistoryClient, "listCommitFiles" | "compareCommits">>;
+  Partial<
+    Pick<RepositoryHistoryClient, "listCommitFiles" | "compareCommits" | "blame">
+  >;
 
 /** One pipeline run's inputs, named rather than positional. */
 export interface ReviewPipelineRun {

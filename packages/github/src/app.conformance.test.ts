@@ -58,6 +58,26 @@ function fragments(contents: string, terms: readonly string[]): { fragment: stri
     .map((fragment) => ({ fragment }));
 }
 
+/** Each file is one commit's work; an unknown path gets empty ranges, not a NOT_FOUND error. */
+function blameResponse(path: unknown) {
+  const contents = FILES.get(String(path));
+  const lines = contents === undefined ? 0 : contents.split("\n").length - 1;
+  const commit = {
+    oid: HEAD_SHA,
+    committedDate: "2026-09-01T10:00:00Z",
+    author: { name: "The Octocat", email: "octocat@github.com", user: { login: "octocat" } },
+  };
+  return {
+    repository: {
+      object: {
+        blame: {
+          ranges: lines === 0 ? [] : [{ startingLine: 1, endingLine: lines, commit }],
+        },
+      },
+    },
+  };
+}
+
 function stubOctokit(): OctokitLike {
   return {
     rest: {
@@ -138,7 +158,10 @@ function stubOctokit(): OctokitLike {
         create: unused("checks.create"),
       },
     },
-    graphql: unused("graphql"),
+    graphql: (query, variables) =>
+      query.includes("blame(")
+        ? Promise.resolve(blameResponse(variables["path"]))
+        : unused("graphql")(),
   };
 }
 

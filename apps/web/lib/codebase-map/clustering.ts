@@ -14,6 +14,8 @@ export interface MapGroup {
   /** The group's real size, which exceeds `files.length` while it is a summary. */
   fileCount: number;
   changedCount: number;
+  /** Files depending on the change that are not changed themselves. */
+  impactedCount: number;
   containsFocus: boolean;
   internalImports: number;
   collapsed: boolean;
@@ -59,6 +61,7 @@ interface Draft {
   directory: string;
   files: string[];
   changedCount: number;
+  impactedCount: number;
   containsFocus: boolean;
   internalImports: number;
 }
@@ -81,6 +84,7 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
         directory: directoryOf(file.path),
         files: [],
         changedCount: 0,
+        impactedCount: 0,
         containsFocus: false,
         internalImports: 0,
       };
@@ -88,6 +92,7 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
     }
     draft.files.push(file.path);
     if (file.changed === true) draft.changedCount += 1;
+    else if (file.impacted === true) draft.impactedCount += 1;
     if (file.path === view.focusedPath) draft.containsFocus = true;
     groupOfFile.set(file.path, id);
   }
@@ -120,6 +125,7 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
       ...draft,
       fileCount,
       changedCount: Math.max(draft.changedCount, summary?.changedCount ?? 0),
+      impactedCount: Math.max(draft.impactedCount, summary?.impactedCount ?? 0),
       loaded: draft.files.length >= fileCount,
       ...(summary?.heat ? { heatCounts: summary.heat } : {}),
       collapsed: false,
@@ -134,6 +140,7 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
       files: [],
       fileCount: summary.fileCount,
       changedCount: summary.changedCount,
+      impactedCount: summary.impactedCount ?? 0,
       containsFocus: false,
       internalImports: 0,
       loaded: false,

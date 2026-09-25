@@ -1,3 +1,6 @@
+import { Label, Switch } from "@pr-review/design";
+import { useId } from "react";
+
 import { EMPHASIS_MARKERS } from "@/lib/codebase-map";
 import type { NeighbourDirection } from "@/lib/codebase-map";
 
@@ -7,7 +10,10 @@ interface Entry {
   marker: string;
   direction: NeighbourDirection | null;
   colour: string;
+  stroke?: string;
   label: string;
+  /** Listed only while the map has impacted files. */
+  impacted?: true;
 }
 
 const ENTRIES: Entry[] = [
@@ -17,6 +23,13 @@ const ENTRIES: Entry[] = [
     direction: null,
     colour: "var(--map-module-changed)",
     label: "Changed in this PR",
+  },
+  {
+    marker: EMPHASIS_MARKERS.impacted,
+    direction: null,
+    colour: "var(--map-module-impacted)",
+    label: "Impacted: depends on the change",
+    impacted: true,
   },
   {
     marker: EMPHASIS_MARKERS.neighbour,
@@ -48,6 +61,14 @@ const ENTRIES: Entry[] = [
     colour: "var(--map-structure)",
     label: "Collapsed package directory",
   },
+  {
+    marker: "group",
+    direction: null,
+    colour: "var(--map-structure)",
+    stroke: "var(--map-module-impacted)",
+    label: "Collapsed directory holding impacted files",
+    impacted: true,
+  },
 ];
 
 function Swatch({ entry }: { entry: Entry }) {
@@ -61,9 +82,8 @@ function Swatch({ entry }: { entry: Entry }) {
           fill={part.mode === "fill" ? entry.colour : "none"}
           stroke={
             part.mode === "stroke"
-              ? entry.marker === "group"
-                ? "var(--map-structure-border)"
-                : entry.colour
+              ? (entry.stroke ??
+                (entry.marker === "group" ? "var(--map-structure-border)" : entry.colour))
               : "none"
           }
           strokeWidth={part.width}
@@ -79,13 +99,38 @@ const HEAT: { colour: string; label: string }[] = [
   { colour: "var(--severity-low)", label: "Worst finding is low" },
 ];
 
-export function MapLegend() {
+interface ImpactedOverlay {
+  shown: boolean;
+  onShownChange: (shown: boolean) => void;
+}
+
+export function MapLegend({
+  impacted,
+}: {
+  /** Absent when no file depends on the change, which leaves the legend as it was. */
+  impacted?: ImpactedOverlay;
+}) {
+  const switchId = useId();
+  const entries = impacted ? ENTRIES : ENTRIES.filter((entry) => !entry.impacted);
   return (
     <div>
       <h3 className="text-xs font-semibold tracking-wide uppercase">Legend</h3>
+      {impacted ? (
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <Label htmlFor={switchId} className="text-xs font-normal">
+            Show files that depend on the change
+          </Label>
+          <Switch
+            id={switchId}
+            size="sm"
+            checked={impacted.shown}
+            onCheckedChange={impacted.onShownChange}
+          />
+        </div>
+      ) : null}
       <ul className="mt-2 space-y-1.5">
-        {ENTRIES.map((entry) => (
-          <li key={`${entry.marker}-${entry.direction}`} className="flex items-center gap-2">
+        {entries.map((entry) => (
+          <li key={entry.label} className="flex items-center gap-2">
             <Swatch entry={entry} />
             <span className="text-muted-foreground text-xs">{entry.label}</span>
           </li>

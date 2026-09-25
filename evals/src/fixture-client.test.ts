@@ -298,7 +298,7 @@ describe("history the fixture does not have", () => {
   it("declares no read that needs a commit object", () => {
     const { client } = createFixtureClient(fixture);
 
-    for (const method of ["listCommitFiles", "getCommitMessage", "compareCommits"]) {
+    for (const method of ["listCommitFiles", "getCommitMessage", "compareCommits", "blame"]) {
       expect(method in client, method).toBe(false);
     }
   });

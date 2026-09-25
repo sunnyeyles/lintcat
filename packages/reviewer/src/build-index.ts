@@ -3,7 +3,11 @@
  * improve a review, never fail one.
  */
 import type { PullRequestReadClient } from "@pr-review/github";
-import { buildRepositoryIndex, type RepositoryIndex } from "@pr-review/index";
+import {
+  buildRepositoryIndex,
+  findCodeowners,
+  type RepositoryIndex,
+} from "@pr-review/index";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
@@ -18,27 +22,36 @@ export interface ReviewIndexRequest {
   logger: StructuredLogger;
 }
 
-/** undefined whenever the index is off or could not be built. */
+/** What one review reads out of the base archive. */
+export interface ReviewIndex {
+  /** undefined whenever the index is off or could not be built. */
+  index: RepositoryIndex | undefined;
+  /** The CODEOWNERS file GitHub reads, kept even when the index build fails. */
+  codeowners: string | undefined;
+}
+
 export async function buildReviewIndex({
   client,
   target,
   baseSha,
   enabled,
   logger,
-}: ReviewIndexRequest): Promise<RepositoryIndex | undefined> {
+}: ReviewIndexRequest): Promise<ReviewIndex> {
   const fields = reviewCorrelation(target);
   if (!enabled) {
     logger.info("index.skipped", { ...fields, reason: "the index input is off" });
-    return undefined;
+    return { index: undefined, codeowners: undefined };
   }
 
   const startedAt = Date.now();
+  let codeowners: string | undefined;
   try {
     const archive = await client.getRepositoryArchive({
       owner: target.owner,
       repo: target.repo,
       ref: baseSha,
     });
+    codeowners = findCodeowners(archive.files);
     const index = buildRepositoryIndex({
       sha: archive.sha,
       files: archive.files,
@@ -52,7 +65,7 @@ export async function buildReviewIndex({
       truncated: index.truncated,
       durationMs: Date.now() - startedAt,
     });
-    return index;
+    return { index, codeowners };
   } catch (error) {
     logger.error("index.failed", {
       ...fields,
@@ -60,6 +73,6 @@ export async function buildReviewIndex({
       durationMs: Date.now() - startedAt,
       fallback: "reviewing without the repository index",
     });
-    return undefined;
+    return { index: undefined, codeowners };
   }
 }

@@ -10,6 +10,7 @@ const TOKENS = [
   "--ring",
   "--map-module",
   "--map-module-changed",
+  "--map-module-impacted",
   "--map-structure",
   "--map-structure-border",
   "--map-label",
@@ -33,7 +34,7 @@ function readPalette(element: Element): MapPalette {
   return palette;
 }
 
-/** Re-read on a theme class change, because canvas cannot inherit CSS variables. */
+/** Re-read on a colour mode or theme change, because canvas cannot inherit CSS variables. */
 export function usePalette(element: Element | null): MapPalette | null {
   const [palette, setPalette] = useState<MapPalette | null>(null);
 
@@ -44,7 +45,7 @@ export function usePalette(element: Element | null): MapPalette | null {
     const observer = new MutationObserver(refresh);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["class", "style", "data-theme"],
+      attributeFilter: ["class", "style", "data-theme", "data-color-mode"],
     });
     return () => observer.disconnect();
   }, [element]);

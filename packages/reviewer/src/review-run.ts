@@ -31,6 +31,8 @@ export interface ReviewPolicy {
   incremental?: boolean | undefined;
   /** Build the repository index for this run; on unless switched off. */
   index?: boolean | undefined;
+  /** Suggest reviewers on the check run; on unless switched off. */
+  suggestReviewers?: boolean | undefined;
 }
 
 /** What the agent is built over, once the run has resolved it. */
@@ -125,6 +127,9 @@ export async function runReview({
       ? {}
       : { incremental: policy.incremental }),
     ...(policy.index === undefined ? {} : { index: policy.index }),
+    ...(policy.suggestReviewers === undefined
+      ? {}
+      : { suggestReviewers: policy.suggestReviewers }),
   });
 
   const run: FinishedReviewRun = {

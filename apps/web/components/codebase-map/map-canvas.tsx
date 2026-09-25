@@ -39,6 +39,8 @@ function nodeColour(node: SceneNode, palette: MapPalette): string {
       return palette["--ring"];
     case "changed":
       return palette["--map-module-changed"];
+    case "impacted":
+      return palette["--map-module-impacted"];
     case "neighbour":
       return node.direction === "dependent"
         ? palette["--map-kind-3"]
@@ -161,7 +163,12 @@ export function MapCanvas({
         continue;
       }
       const fill = nodeColour(node, colours);
-      const stroke = node.kind === "group" ? colours["--map-structure-border"] : fill;
+      const stroke =
+        node.kind !== "group"
+          ? fill
+          : node.level === "impacted"
+            ? colours["--map-module-impacted"]
+            : colours["--map-structure-border"];
       // Zoomed out, a marker at its world radius is sub-pixel and the map turns to mush.
       const radius = Math.max(node.radius, minRadius);
       const shapeKey = `${node.marker}|${node.direction ?? "-"}|${radius}`;

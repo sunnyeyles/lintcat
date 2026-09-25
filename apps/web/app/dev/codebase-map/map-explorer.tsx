@@ -249,7 +249,13 @@ export function MapExplorer() {
               <Skeleton className="h-24 w-full" />
             </div>
           )}
-          <MapLegend />
+          <MapLegend
+            impacted={
+              map.hasImpacted
+                ? { shown: map.showImpacted, onShownChange: map.setShowImpacted }
+                : undefined
+            }
+          />
         </aside>
       </div>
     </div>

@@ -8,8 +8,9 @@ import type {
   ReviewRecord,
   ReviewRecordChangedFile,
   ReviewRecordGraph,
+  ReviewRecordRisk,
 } from "@pr-review/schemas";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Database } from "./client";
@@ -356,5 +357,95 @@ describe("ingestReviewRecord, with a repository graph", () => {
         shaOf(stored - REPOSITORY_GRAPH_RETENTION + offset + 1),
       ),
     );
+  });
+});
+
+const risk: ReviewRecordRisk = {
+  score: 58,
+  band: "medium",
+  partial: false,
+  factors: [
+    { label: "41 files depend on this change", points: 31 },
+    { label: "crosses 3 packages", points: 16 },
+  ],
+  hubs: [{ path: "src/auth/session.ts", dependents: 38 }],
+  counts: {
+    direct: 12,
+    transitive: 41,
+    entryPoints: 2,
+    untested: 1,
+    inCycle: 0,
+    brokenImporters: 0,
+  },
+  packages: 3,
+  dependents: ["src/api/login.ts", "src/api/logout.ts"],
+};
+
+describe("ingestReviewRecord, with a risk score", () => {
+  it("stores the risk as it arrived", async () => {
+    const result = await ingestReviewRecord(database, organizationId, { ...record, risk });
+    expect(result.ok).toBe(true);
+
+    const [review] = await database.select().from(reviews);
+    expect(review?.risk).toEqual(risk);
+  });
+
+  it("stores no risk, as SQL null, for a sender that predates it", async () => {
+    await ingestReviewRecord(database, organizationId, record);
+
+    const [review] = await database.select().from(reviews);
+    expect(review?.risk).toBeNull();
+    const unscored = await database.select().from(reviews).where(isNull(reviews.risk));
+    expect(unscored).toHaveLength(1);
+  });
+
+  it("replaces the risk on a rerun of the same head, and clears it when the rerun has none", async () => {
+    await ingestReviewRecord(database, organizationId, { ...record, risk });
+    const rescored: ReviewRecordRisk = {
+      ...risk,
+      score: 12,
+      band: "low",
+      factors: [{ label: "1 file depends on this change", points: 12 }],
+      dependents: ["src/api/login.ts"],
+    };
+    await ingestReviewRecord(database, organizationId, { ...record, risk: rescored });
+
+    const [rerun] = await database.select().from(reviews);
+    expect(rerun?.risk).toEqual(rescored);
+
+    await ingestReviewRecord(database, organizationId, record);
+    const rows = await database.select().from(reviews);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.risk).toBeNull();
+  });
+
+  it("rejects an out-of-bounds risk by its path alone, and writes nothing", async () => {
+    const outOfBounds = { ...record, risk: { ...risk, score: 150 } };
+
+    await expect(ingestReviewRecord(database, organizationId, outOfBounds)).resolves.toEqual({
+      ok: false,
+      reason: "invalid-record",
+      issues: ["risk.score"],
+    });
+    expect(await database.select().from(repos)).toEqual([]);
+    expect(await database.select().from(reviews)).toEqual([]);
+    expect(await database.select().from(findings)).toEqual([]);
+  });
+
+  it("names every failing path, with array indexes, and none of the values", async () => {
+    const result = await ingestReviewRecord(database, organizationId, {
+      ...record,
+      risk: {
+        ...risk,
+        factors: [{ label: "fractional", points: 2.5 }],
+        dependents: ["src/api/login.ts", ""],
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "invalid-record",
+      issues: ["risk.factors.0.points", "risk.dependents.1"],
+    });
   });
 });

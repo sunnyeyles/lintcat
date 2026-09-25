@@ -207,6 +207,10 @@ An in-memory Postgres (PGlite) with `drizzle/` applied, so tests need no
 `DATABASE_URL`. `Database` is driver-agnostic, so anything typed against it
 takes the test client as readily as the Neon one.
 
+`ingestReviewRecord` parses the record with `reviewRecordSchema` before it
+reads or writes anything: a record that fails returns `invalid-record` with the
+failing field paths, never their values, and nothing is stored.
+
 `ingestReviewRecord` runs its writes one by one: the Neon HTTP driver behind
 `db()` has no interactive transactions. Writes that must be atomic go through
 `withWriteDatabase(run)`, a Neon WebSocket pool opened for `run` and closed

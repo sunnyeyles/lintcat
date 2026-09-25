@@ -3,6 +3,7 @@
  * from the package; the model and GitHub clients are structural fakes.
  */
 import type {
+  BlameRange,
   ChangedFile,
   CheckRunSummary,
   FileContentsRequest,
@@ -236,6 +237,17 @@ export function makeGithub() {
     compareCommits: vi.fn(async () => ({ status: "ahead" as const, files: [] })),
     getBranchTip: vi.fn(async () => headSha),
     getCommitMessage: vi.fn(async () => "Rate limit sessions"),
+    blame: vi.fn(
+      async (): Promise<BlameRange[]> => [
+        {
+          startLine: 1,
+          endLine: 1,
+          login: "octocat",
+          author: "The Octocat",
+          committedAt: "2026-09-01T10:00:00.000Z",
+        },
+      ],
+    ),
     listReviewThreads: vi.fn(async (_ref: PullRequestRef): Promise<ReviewThread[]> => []),
     createCheckRun: vi.fn(async () => ({ id: 987 })),
     createReview: vi.fn(async () => ({ id: 654 })),

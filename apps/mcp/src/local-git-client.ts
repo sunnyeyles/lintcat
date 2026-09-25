@@ -5,6 +5,7 @@ import {
   collectRepositoryFiles,
   DEFAULT_ARCHIVE_LIMITS,
   matchesTerms,
+  parseBlamePorcelain,
   parseSearchQuery,
   readRepositoryTarball,
   searchMatchedPaths,
@@ -355,12 +356,12 @@ function createLocalGitClient(
   // Taken once, so every reader of one review sees the same working tree.
   const changes = () => {
     snapshot ??= (async () => {
-      // Fixed prefixes: diff.mnemonicPrefix or diff.noprefix would otherwise rename every path.
+      // Fixed prefixes and rename detection, whatever diff.noprefix or diff.renames the user's config sets.
       const tracked = await git(root, [
         "diff",
         "--no-color",
         "--no-ext-diff",
-        "--no-renames",
+        "--find-renames",
         "--src-prefix=a/",
         "--dst-prefix=b/",
         baseSha,
@@ -389,6 +390,19 @@ function createLocalGitClient(
     } catch (error) {
       throw new GitError(`${file} does not exist at ${ref}: ${(error as Error).message}`, 404);
     }
+  };
+
+  // git blame fails outright on a path its commit lacks, and on a ref that is only a tree.
+  const blamable = async (ref: string, file: string): Promise<boolean> => {
+    if (ref === WORKING_TREE) {
+      try {
+        if (!statSync(resolveInside(root, file)).isFile()) return false;
+      } catch {
+        return false;
+      }
+    }
+    const commit = ref === WORKING_TREE ? "HEAD" : assertRef(ref);
+    return (await tryGit(root, ["cat-file", "-t", `${commit}^{commit}:${file}`])) === "blob";
   };
 
   return {
@@ -468,6 +482,13 @@ function createLocalGitClient(
     },
     async getCommitMessage({ sha }) {
       return git(root, ["log", "-1", "--format=%B", assertRef(sha)]);
+    },
+    async blame({ ref, path: file }) {
+      if (!(await blamable(ref, file))) {
+        return [];
+      }
+      const revision = ref === WORKING_TREE ? [] : [ref];
+      return parseBlamePorcelain(await git(root, ["blame", "--porcelain", ...revision, "--", file]));
     },
   };
 }

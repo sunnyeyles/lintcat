@@ -46,12 +46,15 @@ export async function ReviewMapSection({
   slug,
   reviewId,
   findings,
+  dependents,
 }: {
   slug: string;
   reviewId: number;
   findings: readonly Finding[];
+  /** The stored blast radius; absent for a review scored before it was kept. */
+  dependents?: readonly string[];
 }) {
-  const source = await reviewMapSource(slug, reviewId, findings);
+  const source = await reviewMapSource(slug, reviewId, findings, dependents);
   const payload = mapPayload(source, {
     threshold: resolveLodThreshold(process.env.CODEBASE_MAP_LOD_THRESHOLD),
   });

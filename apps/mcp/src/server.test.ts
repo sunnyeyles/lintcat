@@ -280,6 +280,18 @@ describe("review_local_changes", () => {
     expect(details.findings.map((finding: { title: string }) => finding.title)).toEqual(["Admin is always on"]);
   });
 
+  it("counts a renamed file's importers at its old path in the blast radius", async () => {
+    repo.git("mv", "src/sessions.ts", "src/session-store.ts");
+    const client = await connect(environment({ createLanguageModel: () => scriptedModel([]) }));
+
+    const { isError, texts } = await call(client, "review_local_changes", { base: "main" });
+
+    expect(isError).toBe(false);
+    expect(texts[0]).toContain("Reviewed 1 changed file(s)");
+    expect(texts[0]).toMatch(/Blast radius: \w+ \(\d+\)\*\* · 1 file .*depends on this change/);
+    expect(texts[0]).toContain("- `src/session-store.ts` — 1 dependent");
+  });
+
   it("says so when there is nothing to review", async () => {
     repo.commit("admin");
     repo.git("checkout", "-q", "main");

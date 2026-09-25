@@ -71,6 +71,7 @@
 
   --map-module: var(--fgColor-accent);
   --map-module-changed: var(--fgColor-severe);
+  --map-module-impacted: var(--data-pink-color-emphasis);
   --map-structure: var(--bgColor-muted);
   --map-structure-border: var(--borderColor-default);
   --map-label: var(--fgColor-default);
@@ -203,6 +204,7 @@
   --color-chart-5: var(--chart-5);
   --color-map-module: var(--map-module);
   --color-map-module-changed: var(--map-module-changed);
+  --color-map-module-impacted: var(--map-module-impacted);
   --color-map-structure: var(--map-structure);
   --color-map-structure-border: var(--map-structure-border);
   --color-map-label: var(--map-label);

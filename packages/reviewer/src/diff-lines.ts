@@ -61,6 +61,28 @@ function diffLinesFromPatch(patch: string): Set<number> {
   return shown;
 }
 
+/** A run of lines, 1-based and inclusive. */
+export interface LineRange {
+  readonly startLine: number;
+  readonly endLine: number;
+}
+
+const BASE_HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@/;
+
+/** The base-side lines each hunk header spans, context included; a pure insertion spans none. */
+export function baseRangesFromPatch(patch: string): LineRange[] {
+  const ranges: LineRange[] = [];
+  for (const line of patch.split("\n")) {
+    const hunk = BASE_HUNK_HEADER.exec(line);
+    const count = Number(hunk?.[2] ?? "1");
+    if (hunk && count > 0) {
+      const startLine = Number(hunk[1]);
+      ranges.push({ startLine, endLine: startLine + count - 1 });
+    }
+  }
+  return ranges;
+}
+
 /** Indexes changed files by filename. Files without a patch map to an empty set. */
 function buildLineIndex(
   files: readonly ChangedFile[],

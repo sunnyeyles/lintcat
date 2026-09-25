@@ -3,16 +3,15 @@ import type { Impact } from "@pr-review/index";
 
 /** Each factor's caps sum to 100, so the score needs no clamping. */
 export const RISK_WEIGHTS = {
-  dependents: { max: 35, saturatesAt: 64 },
-  packages: { each: 8, max: 20 },
-  entryPoints: { each: 5, max: 15 },
-  untested: { each: 5, max: 15 },
+  dependents: { max: 50, saturatesAt: 64 },
+  packages: { each: 8, max: 15 },
+  entryPoints: { each: 5, max: 10 },
+  untested: { each: 5, max: 10 },
   brokenImporters: { each: 5, max: 10 },
   cycle: 5,
+  // Saturated dependents across 3 packages reach high alone; 7 dependents reach medium.
+  bands: { mediumFrom: 25, highFrom: 60 },
 } as const;
-
-const MEDIUM_FROM = 35;
-const HIGH_FROM = 70;
 
 type RiskBand = "low" | "medium" | "high";
 
@@ -43,7 +42,8 @@ function dependentPoints(n: number): number {
 }
 
 function bandOf(score: number): RiskBand {
-  return score >= HIGH_FROM ? "high" : score >= MEDIUM_FROM ? "medium" : "low";
+  const { mediumFrom, highFrom } = RISK_WEIGHTS.bands;
+  return score >= highFrom ? "high" : score >= mediumFrom ? "medium" : "low";
 }
 
 /** Uses `impact.counts`, since the path lists are capped. */

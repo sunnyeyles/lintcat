@@ -133,6 +133,39 @@ describe("mapFromSnapshot", () => {
   });
 });
 
+describe("mapFromSnapshot with a blast radius", () => {
+  const three = snapshot({ files: [file("src/a.ts"), file("src/b.ts"), file("src/c.ts")] });
+
+  it("marks the stored dependents impacted and leaves the rest unflagged", () => {
+    const source = mapFromSnapshot(three, [changed("src/a.ts")], [], [" src/b.ts "]);
+
+    expect(source.graph?.files.find((f) => f.path === "src/b.ts")?.impacted).toBe(true);
+    expect(source.graph?.files.find((f) => f.path === "src/c.ts")).not.toHaveProperty("impacted");
+  });
+
+  it("keeps a changed dependent changed, not impacted", () => {
+    const source = mapFromSnapshot(three, [changed("src/a.ts")], [], ["src/a.ts", "src/c.ts"]);
+    const a = source.graph?.files.find((f) => f.path === "src/a.ts");
+
+    expect(a?.changed).toBe(true);
+    expect(a).not.toHaveProperty("impacted");
+    expect(source.changedPaths).toEqual(["src/a.ts"]);
+  });
+
+  it("adds no file for a dependent the snapshot does not have", () => {
+    const source = mapFromSnapshot(three, [changed("src/a.ts")], [], ["src/ghost.ts"]);
+
+    expect(source.graph?.files.map((f) => f.path)).toEqual(["src/a.ts", "src/b.ts", "src/c.ts"]);
+    expect(source.graph?.files.some((f) => f.impacted === true)).toBe(false);
+  });
+
+  it("flags nothing impacted for a review with no risk stored", () => {
+    const source = mapFromSnapshot(three, [changed("src/a.ts")], []);
+
+    expect(source.graph?.files.every((f) => !("impacted" in f))).toBe(true);
+  });
+});
+
 describe("findingHeat", () => {
   it("skips a finding with no file", () => {
     expect(findingHeat([found("  ", "high"), found("src/a.ts", "high")])).toEqual({
