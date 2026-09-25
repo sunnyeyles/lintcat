@@ -34,6 +34,11 @@ export {
 } from "#src/search";
 export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
+  createGithubUserClient,
+  type GithubUserClient,
+  type UserRepository,
+} from "#src/user-client";
+export {
   CHECK_RUN_NAME,
   type AnnotationLevel,
   type BlameRange,

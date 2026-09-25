@@ -1,14 +1,17 @@
 import {
+  listCollaboratorOrganizationIds,
   listInstalledOrganizations,
   listPrivateRepos,
   listUserMemberships,
+  replaceUserRepoAccess,
   setRepoAccess,
+  upsertAccountUser,
   type GithubAccount,
   type Organization,
   type Repo,
   type RepoPermission,
 } from "@pr-review/db";
-import type { GithubAppClient } from "@pr-review/github";
+import type { GithubAppClient, GithubUserClient } from "@pr-review/github";
 
 import { installedAccount, type MembershipSyncDeps } from "@/lib/membership-sync";
 import { reconcile } from "@/lib/reconcile";
@@ -110,5 +113,74 @@ export async function syncSignInRepoAccess(
     },
     apply: (database, entry) =>
       applyRepoAccess({ ...deps, database }, userId, account, entry, source),
+  });
+}
+
+interface CollaboratorGrants {
+  organization: Organization;
+  grants: { githubRepoId: number; permission: RepoPermission }[];
+}
+
+// One call for the user's installations, then one per account they collaborate in but don't belong to.
+export async function syncSignInCollaboratorAccess(
+  deps: MembershipSyncDeps & { userGithub?: GithubUserClient },
+  account: GithubAccount,
+): Promise<void> {
+  const source = "sign_in";
+  const identity = { source, githubUserId: account.githubId, login: account.login };
+  const { userGithub } = deps;
+  if (!userGithub) {
+    deps.logger.info("repo_access.skipped", { ...identity, reason: "no_user_token" });
+    return;
+  }
+  const listed = new Set((await userGithub.listInstallations()).map((entry) => entry.id));
+  const memberOf = new Set(
+    (await listUserMemberships(deps.database, account.githubId)).map(
+      (membership) => membership.organizationId,
+    ),
+  );
+  const stored = new Set(await listCollaboratorOrganizationIds(deps.database, account.githubId));
+  // A suspended account keeps its rows; authorize already shuts it.
+  const candidates = (await listInstalledOrganizations(deps.database)).filter(
+    (organization) =>
+      !organization.suspendedAt &&
+      !memberOf.has(organization.id) &&
+      (listed.has(organization.installationId!) || stored.has(organization.id)),
+  );
+  if (candidates.length === 0) return;
+  const user = await upsertAccountUser(deps.database, account);
+
+  await reconcile<Organization, CollaboratorGrants>({
+    database: deps.database,
+    logger: deps.logger,
+    skippedEvent: "repo_access.skipped",
+    candidates,
+    fields: (organization) => ({ ...identity, organization: organization.slug }),
+    order: ({ organization }) => organization.id,
+    async lookup(organization) {
+      if (!listed.has(organization.installationId!)) return { organization, grants: [] };
+      const repositories = await userGithub.listInstallationRepositories(
+        organization.installationId!,
+      );
+      return {
+        organization,
+        grants: repositories.map((repo) => ({
+          githubRepoId: repo.id,
+          permission: repo.permission,
+        })),
+      };
+    },
+    async apply(database, { organization, grants }) {
+      await replaceUserRepoAccess(database, {
+        userId: user.id,
+        organizationId: organization.id,
+        grants,
+      });
+      deps.logger.info("repo_access.collaborator_synced", {
+        ...identity,
+        organization: organization.slug,
+        repos: grants.length,
+      });
+    },
   });
 }

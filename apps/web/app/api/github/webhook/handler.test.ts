@@ -59,6 +59,12 @@ const hubot: OrganizationMember = {
   avatarUrl: null,
   role: "member",
 };
+const mallory: OrganizationMember = {
+  id: 3_000_000_003,
+  login: "mallory",
+  avatarUrl: null,
+  role: "member",
+};
 
 let database: Database;
 let listed: InstallationRepository[];
@@ -743,7 +749,7 @@ describe("handleGithubWebhook organization members", () => {
     ]);
   });
 
-  it("204s a collaborator change on a personal repository", async () => {
+  it("204s a collaborator change that names no account at all", async () => {
     const response = await deliver(memberEvent("member", "added", hubot, null));
     expect(response.status).toBe(204);
     expect(await roles()).toEqual([{ login: "octocat", role: "owner" }]);
@@ -921,6 +927,78 @@ describe("handleGithubWebhook repository collaborators", () => {
     collaborators = { "acme/secrets": [readAs(hubot, "read")] };
     await deliver(collaboratorEvent("removed", hubot, secrets));
     expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
+  });
+
+  it("gives an outside collaborator that repo alone, and no membership", async () => {
+    collaborators = { "acme/secrets": [readAs(mallory, "write")] };
+
+    const response = await deliver(collaboratorEvent("added", mallory, secrets));
+
+    expect(response.status).toBe(200);
+    expect(await readableBy(mallory)).toEqual(["secrets"]);
+    expect((await roles()).map(({ login }) => login)).not.toContain("mallory");
+
+    collaborators = { "acme/secrets": [] };
+    await deliver(collaboratorEvent("removed", mallory, secrets));
+    expect(await readableBy(mallory)).toBe("not-found");
+  });
+});
+
+describe("handleGithubWebhook personal repository collaborators", () => {
+  const mona = { id: ACCOUNT_ID, login: "Mona" };
+  const monaSecrets = { ...secrets, owner: "Mona" };
+  const monaWidgets = { ...widgets, owner: "Mona" };
+
+  beforeEach(async () => {
+    listed = [monaSecrets, monaWidgets];
+    await deliver(created("User", "Mona"));
+  });
+
+  function personalEvent(action: string, member: OrganizationMember, repo: InstallationRepository) {
+    return delivery("member", {
+      action,
+      member: payloadUser(member),
+      repository: { id: repo.id, name: repo.name, full_name: `Mona/${repo.name}`, owner: mona },
+      installation: { id: INSTALLATION_ID },
+    });
+  }
+
+  async function readableInMona(member: OrganizationMember) {
+    const result = await authorize(database, { githubId: member.id }, "mona");
+    if (result.status !== "allowed") return result.status;
+    const rows = await database.select({ id: repos.id, name: repos.name }).from(repos);
+    return result.readableRepos.map((entry) => rows.find((row) => row.id === entry.id)!.name).sort();
+  }
+
+  it("grants a collaborator that repository only, then revokes it", async () => {
+    collaborators = { "mona/secrets": [readAs(hubot, "write")] };
+
+    const response = await deliver(personalEvent("added", hubot, monaSecrets));
+
+    expect(response.status).toBe(200);
+    expect(await readableInMona(hubot)).toEqual(["secrets"]);
+    expect(await authorize(database, { githubId: hubot.id }, "mona")).toMatchObject({
+      role: "collaborator",
+    });
+
+    collaborators = { "mona/secrets": [] };
+    await deliver(personalEvent("removed", hubot, monaSecrets));
+    expect(await readableInMona(hubot)).toBe("not-found");
+  });
+
+  it("refreshes a personal repository's readers who have signed in, when it is made private", async () => {
+    await database.insert(users).values({ githubId: hubot.id, login: hubot.login });
+    collaborators = { "mona/widgets": [readAs(hubot, "maintain")] };
+
+    await deliver(
+      delivery("repository", {
+        action: "privatized",
+        repository: { ...payloadRepo({ ...monaWidgets, private: true }), owner: mona },
+        installation: { id: INSTALLATION_ID },
+      }),
+    );
+
+    expect(await readableInMona(hubot)).toEqual(["widgets"]);
   });
 });
 
