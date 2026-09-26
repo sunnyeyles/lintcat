@@ -2,7 +2,7 @@ import { Card, CardContent } from "@pr-review/design";
 import type { ReviewRecordRisk } from "@pr-review/schemas";
 
 import { RiskBadge } from "@/components/ui";
-import { formatNumber } from "@/lib/format";
+import { countLabel, plural } from "@/lib/format";
 
 import { FilePath } from "./file-path";
 
@@ -10,15 +10,11 @@ export type BlastRadiusCardProps = {
   risk: ReviewRecordRisk;
 };
 
-function count(n: number, one: string, many = `${one}s`): string {
-  return `${formatNumber(n)} ${n === 1 ? one : many}`;
-}
-
 function reach({ counts, packages }: ReviewRecordRisk): string {
   if (counts.transitive === 0) return "No indexed files depend on this change.";
-  const where = packages === 0 ? "" : ` in ${count(packages, "package")}`;
-  const verb = counts.transitive === 1 ? "depends" : "depend";
-  return `${count(counts.transitive, "file")}${where} ${verb} on this change.`;
+  const where = packages === 0 ? "" : ` in ${countLabel(packages, "package")}`;
+  const verb = plural(counts.transitive, "depends", "depend");
+  return `${countLabel(counts.transitive, "file")}${where} ${verb} on this change.`;
 }
 
 const subheading = "mb-1.5 text-xs text-muted-foreground";
@@ -28,7 +24,7 @@ export function BlastRadiusCard({ risk }: BlastRadiusCardProps) {
     <Card>
       <CardContent className="flex flex-col gap-4 py-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-mono text-xs tracking-wide text-muted-foreground uppercase">
+          <h2 className="eyebrow font-mono">
             Blast radius
           </h2>
           <RiskBadge band={risk.band} score={risk.score} />
@@ -44,7 +40,7 @@ export function BlastRadiusCard({ risk }: BlastRadiusCardProps) {
                 <li key={hub.path} className="flex items-baseline justify-between gap-3">
                   <FilePath file={hub.path} />
                   <span className="shrink-0 text-muted-foreground tabular-nums">
-                    {count(hub.dependents, "dependent")}
+                    {countLabel(hub.dependents, "dependent")}
                   </span>
                 </li>
               ))}

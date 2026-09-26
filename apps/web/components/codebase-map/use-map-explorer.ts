@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MapAdapter } from "@/components/codebase-map/adapter";
+import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
 import { buildScene, type SceneNode } from "@/components/codebase-map/scene";
 import { useMapGraph } from "@/components/codebase-map/use-map-graph";
-import type { MapHandle } from "@/components/codebase-map/view";
-import { groupIdFor, navigate, neighbourhood } from "@/lib/codebase-map";
+import { initialBounds, type MapHandle } from "@/components/codebase-map/view";
+import {
+  groupIdFor,
+  mapStatus,
+  navigate,
+  neighbourhood,
+  normaliseGraph,
+} from "@/lib/codebase-map";
 import type { FindingHeat, MapGraph, NavigationAxis } from "@/lib/codebase-map";
 
 export interface MapHover {
@@ -15,12 +22,30 @@ export interface MapHover {
   y: number;
 }
 
-export function useMapExplorer(
-  input: MapGraph,
-  inputHeat: FindingHeat,
-  adapter?: MapAdapter,
-  preferredStart?: string,
-) {
+const NO_PATHS: readonly string[] = [];
+const SHUT = { focusedPath: null, query: "", expandedGroups: new Set<string>() };
+
+export interface MapExplorerOptions {
+  input: MapGraph;
+  heat: FindingHeat;
+  adapter?: MapAdapter;
+  preferredStart?: string;
+  /** The payload the camera opens on; null fits the whole map. */
+  opening: MapGraph | null;
+  changedPaths?: readonly string[];
+}
+
+export function useMapExplorer({
+  input,
+  heat: inputHeat,
+  adapter,
+  preferredStart,
+  opening: openingGraph,
+  changedPaths = NO_PATHS,
+}: MapExplorerOptions) {
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const palette = usePalette(host);
+  const reducedMotion = usePrefersReducedMotion();
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
@@ -39,6 +64,25 @@ export function useMapExplorer(
     [focusedPath, query, expandedGroups, showImpacted],
   );
   const scene = useMemo(() => buildScene(graph, view, 1, heat), [graph, view, heat]);
+  const status = useMemo(() => mapStatus(graph), [graph]);
+
+  // Built from the payload handed over, not the live graph, so expanding never moves the camera.
+  const opening = useMemo(() => {
+    if (!openingGraph) return null;
+    const first = normaliseGraph(openingGraph);
+    return initialBounds(buildScene(first, SHUT), first, changedPaths);
+  }, [openingGraph, changedPaths]);
+
+  const fitOpening = useCallback(() => {
+    if (opening) handleRef.current?.fitBounds?.(opening);
+    else handleRef.current?.fit();
+  }, [opening]);
+
+  // Re-runs once the palette arrives, since the canvas mounts only then.
+  useEffect(() => {
+    const id = setTimeout(fitOpening, 0);
+    return () => clearTimeout(id);
+  }, [fitOpening, palette]);
 
   // Clustering counts ignore the overlay, so hiding it keeps the switch on screen.
   const hasImpacted = useMemo(
@@ -166,6 +210,12 @@ export function useMapExplorer(
   }, [focusedPath, graph, heat]);
 
   return {
+    setHost,
+    palette,
+    reducedMotion,
+    status,
+    opening,
+    fitOpening,
     graph,
     heat,
     loadedGroups,

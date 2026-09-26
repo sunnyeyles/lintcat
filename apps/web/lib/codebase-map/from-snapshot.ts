@@ -27,7 +27,7 @@ export interface MapSource {
   changedPaths: readonly string[];
 }
 
-function empty(): FindingCounts {
+export function noFindings(): FindingCounts {
   return { total: 0, high: 0, medium: 0, low: 0 };
 }
 
@@ -56,7 +56,7 @@ export function findingHeat(findings: readonly MapSourceFinding[]): FindingHeat 
   for (const finding of findings) {
     const path = typeof finding?.file === "string" ? finding.file.trim() : "";
     if (!path) continue;
-    const counts = (heat[path] ??= empty());
+    const counts = (heat[path] ??= noFindings());
     counts.total += 1;
     if (finding.severity === "high") counts.high += 1;
     else if (finding.severity === "medium") counts.medium += 1;

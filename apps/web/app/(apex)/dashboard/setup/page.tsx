@@ -1,13 +1,5 @@
 import { withWriteDatabase } from "@pr-review/db";
-import {
-  Button,
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@pr-review/design";
+import { Button, EmptyState } from "@pr-review/design";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
 import { Clock, Link2Off, MailCheck, ShieldOff, UserX } from "lucide-react";
 import type { Metadata } from "next";
@@ -22,13 +14,12 @@ import { githubApp, INSTALL_APP_URL } from "@/lib/github-app";
 import { appDomain } from "@/lib/host";
 import { completeSetup, setupRequest, type SetupResult } from "@/lib/installation";
 import { DASHBOARD_PATH, organizationPath, signInUrl } from "@/lib/paths";
+import type { SearchParams, SearchParamValues } from "@/lib/search-params";
 import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Setting up" };
 
 const SETUP_PATH = `${DASHBOARD_PATH}/setup`;
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function SetupPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
@@ -160,14 +151,7 @@ function State({
         title="Setting up"
         description="Connecting the GitHub App installation to your account."
       />
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">{icon}</EmptyMedia>
-          <EmptyTitle>{title}</EmptyTitle>
-          <EmptyDescription>{description}</EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>{children}</EmptyContent>
-      </Empty>
+      <EmptyState icon={icon} title={title} description={description} action={children} />
     </div>
   );
 }
@@ -175,7 +159,7 @@ function State({
 // Rebuilt from parsed values only, so nothing from the query is reflected as-is.
 function selfUrl(
   request: ReturnType<typeof setupRequest>,
-  params: Record<string, string | string[] | undefined>,
+  params: SearchParamValues,
 ): string {
   const query = new URLSearchParams();
   if (request.kind === "sync") query.set("installation_id", String(request.installationId));

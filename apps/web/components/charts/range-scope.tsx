@@ -23,7 +23,7 @@ export function RangeScope({ range, label = "Range", children }: RangeScopeProps
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="text-muted-foreground text-xs tracking-wide uppercase">{label}</span>
+        <span className="eyebrow">{label}</span>
         <Tabs
           value={range}
           onValueChange={(next) =>

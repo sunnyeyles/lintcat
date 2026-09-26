@@ -1,6 +1,11 @@
 import type { Severity } from "@pr-review/db/dashboard";
 
-import type { FindingCounts, FindingHeat } from "@/lib/codebase-map/from-snapshot";
+import {
+  noFindings,
+  type FindingCounts,
+  type FindingHeat,
+} from "@/lib/codebase-map/from-snapshot";
+import { countLabel } from "@/lib/format";
 
 /** How thick the ring is drawn, so the count reads without colour. */
 const HEAT_BANDS = [1, 3, 6] as const;
@@ -13,7 +18,7 @@ export interface Heat {
 }
 
 export const NO_HEAT: Heat = {
-  counts: { total: 0, high: 0, medium: 0, low: 0 },
+  counts: noFindings(),
   top: null,
   band: 0,
 };
@@ -33,7 +38,7 @@ export function heatOf(counts: FindingCounts | undefined): Heat {
 }
 
 export function sumHeat(heat: FindingHeat, paths: readonly string[]): FindingCounts {
-  const counts: FindingCounts = { total: 0, high: 0, medium: 0, low: 0 };
+  const counts = noFindings();
   for (const path of paths) {
     const one = heat[path];
     if (!one) continue;
@@ -57,5 +62,5 @@ export function heatLabel(heat: Heat): string {
     heat.counts.medium > 0 ? `${heat.counts.medium} medium` : null,
     heat.counts.low > 0 ? `${heat.counts.low} low` : null,
   ].filter((part): part is string => part !== null);
-  return `${heat.counts.total} finding${heat.counts.total === 1 ? "" : "s"}: ${parts.join(", ")}`;
+  return `${countLabel(heat.counts.total, "finding")}: ${parts.join(", ")}`;
 }

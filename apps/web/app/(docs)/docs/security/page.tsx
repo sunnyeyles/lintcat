@@ -2,20 +2,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
-import type { Heading } from "@/lib/docs";
+import { docsHeadings } from "@/lib/docs";
 
 export const metadata: Metadata = {
   title: "Security",
   description: "What LintCat can access, what it never does, and how it keeps noise off your pull requests.",
 };
 
-const HEADINGS: Heading[] = [
-  { id: "access", title: "What LintCat can access" },
-  { id: "never", title: "What it never does" },
-  { id: "quality", title: "Only findings worth reading" },
-  { id: "fixes", title: "Fixes you can trust" },
-  { id: "injection", title: "Prompt injection" },
-];
+const [H, HEADINGS] = docsHeadings({
+  access: "What LintCat can access",
+  never: "What it never does",
+  quality: "Only findings worth reading",
+  fixes: "Fixes you can trust",
+  injection: "Prompt injection",
+});
 
 export default function SecurityPage() {
   return (
@@ -26,7 +26,7 @@ export default function SecurityPage() {
       description="LintCat reads your code to review it, and that is all the AI part can do. Everything it posts is checked first, and it never approves, merges or blocks anything."
       headings={HEADINGS}
     >
-      <Section id="access" title="What LintCat can access">
+      <Section {...H.access}>
         <Bullets>
           <Bullet>
             <strong>Only the repositories you pick</strong> when you install the GitHub App. The
@@ -45,7 +45,7 @@ export default function SecurityPage() {
         </Bullets>
       </Section>
 
-      <Section id="never" title="What it never does">
+      <Section {...H.never}>
         <Bullets>
           <Bullet>
             <strong>The AI reviewer can only read.</strong> It can look through your code but
@@ -64,7 +64,7 @@ export default function SecurityPage() {
         </Bullets>
       </Section>
 
-      <Section id="quality" title="Only findings worth reading">
+      <Section {...H.quality}>
         <P>Before anything is posted, every finding has to pass these checks:</P>
         <Bullets>
           <Bullet>It points at a line this pull request added or changed.</Bullet>
@@ -74,7 +74,7 @@ export default function SecurityPage() {
         </Bullets>
       </Section>
 
-      <Section id="fixes" title="Fixes you can trust">
+      <Section {...H.fixes}>
         <P>
           A suggested fix is offered only when the lines it replaces match the file at the pull
           request&rsquo;s latest commit exactly, so it never lands on the wrong code. Fixes stay
@@ -86,7 +86,7 @@ export default function SecurityPage() {
         </Note>
       </Section>
 
-      <Section id="injection" title="Prompt injection">
+      <Section {...H.injection}>
         <P>
           Pull requests can contain text written to steer an AI. LintCat treats everything in
           the repository, including the title, description, diff and files, as code to review

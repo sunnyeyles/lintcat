@@ -5,6 +5,7 @@ import { useEffect, useId, useState, type RefObject } from "react";
 
 import { searchFiles } from "@/lib/codebase-map";
 import type { LodSearchResult, MapFile, SearchResult } from "@/lib/codebase-map";
+import { countLabel } from "@/lib/format";
 
 const SHOWN = 12;
 const DEBOUNCE_MS = 200;
@@ -69,7 +70,7 @@ export function MapSearch({
 
   return (
     <div>
-      <label htmlFor={`${listId}-input`} className="text-xs font-semibold tracking-wide uppercase">
+      <label htmlFor={`${listId}-input`} className="eyebrow">
         Find a file
       </label>
       <Input
@@ -96,7 +97,7 @@ export function MapSearch({
             ? "Searching the repo"
             : all.length === 0
               ? "No file matches"
-              : `${all.length} match${all.length === 1 ? "" : "es"}, best first`}
+              : `${countLabel(all.length, "match", "matches")}, best first`}
       </p>
       {shown.length > 0 ? (
         <ul className="mt-2 space-y-1">

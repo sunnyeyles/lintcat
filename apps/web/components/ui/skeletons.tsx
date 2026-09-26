@@ -14,15 +14,6 @@ import {
 
 import { StatGrid } from "./stat";
 
-// A span, because the header's description places it inside a <p>.
-export function InlineSkeleton({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn("bg-accent inline-block animate-pulse rounded-md align-middle", className)}
-    />
-  );
-}
-
 type StatShape = {
   hint?: boolean;
   sparkline?: boolean;

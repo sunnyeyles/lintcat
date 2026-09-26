@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
-import type { Heading } from "@/lib/docs";
+import { docsHeadings } from "@/lib/docs";
 import { INSTALL_APP_URL } from "@/lib/github-app";
 
 export const metadata: Metadata = {
@@ -11,12 +11,12 @@ export const metadata: Metadata = {
   description: "Install the GitHub App, add a model key, and label a pull request.",
 };
 
-const HEADINGS: Heading[] = [
-  { id: "install", title: "1. Install the GitHub App" },
-  { id: "key", title: "2. Add a model key" },
-  { id: "review", title: "3. Review a pull request" },
-  { id: "result", title: "What lands on the pull request" },
-];
+const [H, HEADINGS] = docsHeadings({
+  install: "1. Install the GitHub App",
+  key: "2. Add a model key",
+  review: "3. Review a pull request",
+  result: "What lands on the pull request",
+});
 
 export default function QuickstartPage() {
   return (
@@ -27,7 +27,7 @@ export default function QuickstartPage() {
       description="Three steps, a few minutes, and nothing to commit to your repository."
       headings={HEADINGS}
     >
-      <Section id="install" title="1. Install the GitHub App">
+      <Section {...H.install}>
         <P>
           Install LintCat on your personal GitHub account or on an organization, and choose
           all repositories or only some. You don&rsquo;t need an organization: your own
@@ -43,7 +43,7 @@ export default function QuickstartPage() {
         </Note>
       </Section>
 
-      <Section id="key" title="2. Add a model key">
+      <Section {...H.key}>
         <P>
           On the dashboard, open <strong>Settings</strong> in the sidebar, pick Anthropic or
           OpenAI and paste an API key. Only owners of the account see this page. The key is
@@ -56,7 +56,7 @@ export default function QuickstartPage() {
         </P>
       </Section>
 
-      <Section id="review" title="3. Review a pull request">
+      <Section {...H.review}>
         <P>
           Open a pull request on an installed repository. The review runs in the background
           and posts when it finishes, and every later push to that pull request is reviewed
@@ -69,7 +69,7 @@ export default function QuickstartPage() {
         </P>
       </Section>
 
-      <Section id="result" title="What lands on the pull request">
+      <Section {...H.result}>
         <Bullets>
           <Bullet>
             Inline review comments on the lines the findings point at, one per finding.

@@ -1,19 +1,10 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2023",
     "lib": ["dom", "dom.iterable", "ES2023"],
-    "module": "esnext",
-    "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "allowJs": true,
-    "strict": true,
-    "noEmit": true,
     "incremental": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "plugins": [{ "name": "next" }],
     "paths": { "@/*": ["./*"] }
   },

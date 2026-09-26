@@ -1,12 +1,4 @@
-import {
-  Button,
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@pr-review/design";
+import { Button, EmptyState } from "@pr-review/design";
 import { SearchX } from "lucide-react";
 import Link from "next/link";
 
@@ -19,22 +11,16 @@ export default function NotFound() {
     <div className="min-h-dvh">
       <DocsTopbar />
       <MainColumn>
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <SearchX />
-          </EmptyMedia>
-          <EmptyTitle>Page not found</EmptyTitle>
-          <EmptyDescription>
-            There is nothing here, or you do not have access to it.
-          </EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <Button asChild variant="outline">
-            <Link href={DASHBOARD_PATH}>Your accounts</Link>
-          </Button>
-        </EmptyContent>
-      </Empty>
+        <EmptyState
+          icon={<SearchX />}
+          title="Page not found"
+          description="There is nothing here, or you do not have access to it."
+          action={
+            <Button asChild variant="outline">
+              <Link href={DASHBOARD_PATH}>Your accounts</Link>
+            </Button>
+          }
+        />
       </MainColumn>
     </div>
   );

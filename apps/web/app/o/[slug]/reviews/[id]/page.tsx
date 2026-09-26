@@ -1,11 +1,4 @@
-import {
-  Button,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@pr-review/design";
+import { Button, EmptyState } from "@pr-review/design";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -21,20 +14,17 @@ import {
   ReviewSummaryPanel,
 } from "@/components/review";
 import { PageHeader } from "@/components/shell";
+import { Code } from "@/components/ui";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
+import { parseReviewId } from "@/lib/review-id";
 
 type PageProps = { params: Promise<{ slug: string; id: string }> };
 
-function parseId(raw: string): number | null {
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 && id <= 2 ** 31 - 1 ? id : null;
-}
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, id } = await params;
-  const parsed = parseId(id);
+  const parsed = parseReviewId(id);
   const review = parsed === null ? null : await (await data(slug)).getReview(parsed);
   if (!review) return { title: "Review not found" };
   return { title: `${review.repo.owner}/${review.repo.name} #${review.prNumber}` };
@@ -58,7 +48,7 @@ async function AdjacentReviews({
 
 export default async function ReviewDetailPage({ params }: PageProps) {
   const { slug, id } = await params;
-  const parsed = parseId(id);
+  const parsed = parseReviewId(id);
   if (parsed === null) notFound();
 
   const review = await (await data(slug)).getReview(parsed);
@@ -74,9 +64,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         title={`${review.repo.owner}/${review.repo.name} #${review.prNumber}`}
         description={
           <>
-            <code className="rounded-sm border border-border bg-muted px-1 py-0.5 text-foreground">
-              {shortSha(review.headSha)}
-            </code>{" "}
+            <Code className="text-foreground">{shortSha(review.headSha)}</Code>{" "}
             · ran{" "}
             <time dateTime={review.createdAt.toISOString()}>
               {formatRelative(review.createdAt)}
@@ -111,18 +99,11 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         </Suspense>
 
         {review.findings.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ShieldCheck />
-              </EmptyMedia>
-              <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
-              <EmptyDescription>
-                The reviewer ran and every candidate finding was dropped before publish.
-                That is the clean outcome, not a failure.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState
+            icon={<ShieldCheck />}
+            title="Nothing survived validation on this head"
+            description="The reviewer ran and every candidate finding was dropped before publish. That is the clean outcome, not a failure."
+          />
         ) : (
           <FindingsTable findings={review.findings} />
         )}

@@ -91,7 +91,7 @@ export function Sidebar({ slug, organizationName, isOwner = false, className }: 
       )}
     >
       <div className="sticky top-16 px-3 py-5">
-        <p className="text-muted-foreground truncate border-b px-2.5 pb-2.5 text-xs tracking-wide uppercase">
+        <p className="eyebrow truncate border-b px-2.5 pb-2.5">
           {organizationName}
         </p>
         <div className="pt-3">

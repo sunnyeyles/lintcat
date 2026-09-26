@@ -1,12 +1,5 @@
 import type { Finding } from "@pr-review/db";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  Skeleton,
-} from "@pr-review/design";
+import { EmptyState, Skeleton } from "@pr-review/design";
 import { MapPinOff } from "lucide-react";
 
 import { mapPayload, resolveLodThreshold } from "@/lib/codebase-map";
@@ -19,7 +12,7 @@ function Section({ children }: { children: React.ReactNode }) {
     <section aria-labelledby="map-heading">
       <h2
         id="map-heading"
-        className="text-muted-foreground mb-3 font-mono text-xs tracking-wide uppercase"
+        className="eyebrow mb-3 font-mono"
       >
         Map
       </h2>
@@ -62,19 +55,12 @@ export async function ReviewMapSection({
   return (
     <Section>
       {source.graph === undefined ? (
-        <Empty className="rounded-lg border border-dashed border-border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <MapPinOff />
-            </EmptyMedia>
-            <EmptyTitle>No repository graph for this review</EmptyTitle>
-            <EmptyDescription>
-              Indexing was off or it failed when this review ran, so there is nothing to draw.
-              This is not a claim that the repository is empty. A later review on this repo
-              will have a map once indexing succeeds.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState
+          className="rounded-lg border border-dashed border-border"
+          icon={<MapPinOff />}
+          title="No repository graph for this review"
+          description="Indexing was off or it failed when this review ran, so there is nothing to draw. This is not a claim that the repository is empty. A later review on this repo will have a map once indexing succeeds."
+        />
       ) : (
         <ReviewMap
           graph={payload.graph}

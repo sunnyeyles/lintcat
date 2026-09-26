@@ -44,6 +44,7 @@ export {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
+  EmptyState,
   EmptyTitle,
 } from "#src/components/empty";
 export { Input } from "#src/components/input";

@@ -1,11 +1,17 @@
 "use client";
 
-import { Badge, Button, Empty, EmptyDescription, EmptyHeader, EmptyTitle, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@pr-review/design";
 
-import { SEVERITIES } from "@/components/review/sort";
+import { SeverityMix } from "@/components/overview/severity-mix";
 import { heatOf, neighbourhood } from "@/lib/codebase-map";
 import type { FindingHeat, NormalisedGraph } from "@/lib/codebase-map";
-import { SeverityBadge } from "@/components/ui";
 
 const SHOWN = 12;
 
@@ -111,11 +117,7 @@ function Findings({
         <p className="text-muted-foreground mt-1 text-xs">None on this file in this review.</p>
       ) : (
         <>
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {SEVERITIES.filter((s) => counts[s] > 0).map((s) => (
-              <SeverityBadge key={s} severity={s} count={counts[s]} />
-            ))}
-          </div>
+          <SeverityMix bySeverity={counts} className="mt-1.5" />
           {onShow ? (
             <Button
               variant="outline"
@@ -145,14 +147,12 @@ export function FileDetails({
   const file = focusedPath === null ? undefined : graph.byPath.get(focusedPath);
   if (!file) {
     return (
-      <Empty className="border-border rounded-lg border border-dashed py-8">
-        <EmptyHeader>
-          <EmptyTitle className="text-sm">No file focused</EmptyTitle>
-          <EmptyDescription className="text-xs">
-            Click a file, search for one, or press an arrow key on the map.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EmptyState
+        compact
+        className="border-border rounded-lg border border-dashed py-8"
+        title="No file focused"
+        description="Click a file, search for one, or press an arrow key on the map."
+      />
     );
   }
 
@@ -161,7 +161,7 @@ export function FileDetails({
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-xs font-semibold tracking-wide uppercase">Focused file</h3>
+        <h3 className="eyebrow">Focused file</h3>
         <p className="mt-1 font-mono text-sm break-all">{file.path}</p>
         <p className="text-muted-foreground mt-1 text-xs">
           {file.package ?? "no package"}

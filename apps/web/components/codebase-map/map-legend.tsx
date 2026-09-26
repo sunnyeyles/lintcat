@@ -114,7 +114,7 @@ export function MapLegend({
   const entries = impacted ? ENTRIES : ENTRIES.filter((entry) => !entry.impacted);
   return (
     <div>
-      <h3 className="text-xs font-semibold tracking-wide uppercase">Legend</h3>
+      <h3 className="eyebrow">Legend</h3>
       {impacted ? (
         <div className="mt-2 flex items-center justify-between gap-2">
           <Label htmlFor={switchId} className="text-xs font-normal">

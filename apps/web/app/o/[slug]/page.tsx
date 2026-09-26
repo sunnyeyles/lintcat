@@ -5,63 +5,40 @@ import {
   AlertTitle,
   Button,
   Card,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
+  EmptyState,
 } from "@pr-review/design";
 import { KeyRound } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { RepoTable, ReviewsTable, Section, Sparkline } from "@/components/overview";
+import {
+  RepoTable,
+  ReviewsTable,
+  Section,
+  Sparkline,
+  TrendStatCards,
+} from "@/components/overview";
 import { PageHeader } from "@/components/shell";
 import { StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
 import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
-import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
+import { formatNumber, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 import { requireOrganization } from "@/lib/session";
 
 async function TrendStats({ slug }: { slug: string }) {
   const trends = await (await data(slug)).getTrends("30d");
-  const { totals } = trends;
-  const highShare =
-    totals.findings > 0
-      ? Math.round((totals.bySeverity.high / totals.findings) * 100)
-      : 0;
-
   return (
-    <>
-      <Stat
-        label="Reviews / 30d"
-        value={formatNumber(totals.reviews)}
-        hint="one per head SHA"
-      >
+    <TrendStatCards
+      totals={trends.totals}
+      range="30d"
+      sparkline={
         <Sparkline
           points={trends.points}
           label="Daily review volume over the last 30 days"
         />
-      </Stat>
-      <Stat
-        label="Findings / 30d"
-        value={formatNumber(totals.findings)}
-        hint={`${formatNumber(totals.bySeverity.medium)} medium · ${formatNumber(totals.bySeverity.low)} low`}
-      />
-      <Stat
-        label="High severity"
-        value={formatNumber(totals.bySeverity.high)}
-        delta={{
-          value: `${highShare}% of findings`,
-          tone: totals.bySeverity.high > 0 ? "stop" : "ok",
-        }}
-      />
-      <Stat
-        label="Median duration"
-        value={formatDuration(totals.medianDurationMs)}
-        hint="per review"
-      />
-    </>
+      }
+    />
   );
 }
 
@@ -105,14 +82,10 @@ async function RecentReviews({ slug }: { slug: string }) {
           caption="The eight most recent reviews, newest first."
         />
       ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No reviews yet</EmptyTitle>
-            <EmptyDescription>
-              Open a pull request on a connected repository and its review lands here.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState
+          title="No reviews yet"
+          description="Open a pull request on a connected repository and its review lands here."
+        />
       )}
     </Card>
   );
@@ -130,14 +103,10 @@ async function ReposGlance({ slug }: { slug: string }) {
           caption="Repositories connected to this account, most recently reviewed first."
         />
       ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No repositories connected</EmptyTitle>
-            <EmptyDescription>
-              Give the LintCat GitHub App access to a repository to see it here.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState
+          title="No repositories connected"
+          description="Give the LintCat GitHub App access to a repository to see it here."
+        />
       )}
     </Card>
   );

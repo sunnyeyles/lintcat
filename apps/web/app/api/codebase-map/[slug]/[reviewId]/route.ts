@@ -1,4 +1,5 @@
 import { getMapSource } from "@/lib/data/server";
+import { parseReviewId } from "@/lib/review-id";
 
 import { handleCodebaseMap } from "./handler";
 
@@ -9,8 +10,8 @@ type Context = { params: Promise<{ slug: string; reviewId: string }> };
 
 export async function POST(request: Request, { params }: Context): Promise<Response> {
   const { slug, reviewId } = await params;
-  const id = Number(reviewId);
-  if (!Number.isInteger(id) || id <= 0 || id > 2 ** 31 - 1) {
+  const id = parseReviewId(reviewId);
+  if (id === null) {
     return Response.json({ error: "invalid review id" }, { status: 400 });
   }
 

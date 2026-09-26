@@ -1,4 +1,5 @@
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
+import { countLabel } from "@/lib/format";
 
 type MapStatusKind = "empty" | "no-changes" | "partial" | "ready";
 
@@ -58,7 +59,7 @@ export function mapStatus(graph: NormalisedGraph): MapStatus {
     reasons.push({
       code: "unresolved-imports",
       count: unresolved,
-      message: `${unresolved} import${unresolved === 1 ? "" : "s"} point at files this map doesn't have.`,
+      message: `${countLabel(unresolved, "import")} point at files this map doesn't have.`,
     });
   }
   if (graph.truncated) {
@@ -76,21 +77,21 @@ export function mapStatus(graph: NormalisedGraph): MapStatus {
     reasons.push({
       code: "unknown-changed-flags",
       count: unknownChanged,
-      message: `Change data is unknown for ${unknownChanged} file${unknownChanged === 1 ? "" : "s"}.`,
+      message: `Change data is unknown for ${countLabel(unknownChanged, "file")}.`,
     });
   }
   if (unknownDead > 0) {
     reasons.push({
       code: "unknown-dead-flags",
       count: unknownDead,
-      message: `Dead-file data is unknown for ${unknownDead} file${unknownDead === 1 ? "" : "s"}, not clean.`,
+      message: `Dead-file data is unknown for ${countLabel(unknownDead, "file")}, not clean.`,
     });
   }
   if (unknownCycle > 0) {
     reasons.push({
       code: "unknown-cycle-flags",
       count: unknownCycle,
-      message: `Cycle data is unknown for ${unknownCycle} file${unknownCycle === 1 ? "" : "s"}, not cycle-free.`,
+      message: `Cycle data is unknown for ${countLabel(unknownCycle, "file")}, not cycle-free.`,
     });
   }
 

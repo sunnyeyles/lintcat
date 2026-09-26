@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  Alert,
-  AlertDescription,
   Card,
   CardContent,
   CardDescription,
@@ -10,16 +8,14 @@ import {
   CardHeader,
   CardTitle,
   Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Switch,
 } from "@pr-review/design";
 import { useActionState, useId } from "react";
 
+import { FormStatus } from "@/components/ui/form-status";
+import { SelectField } from "@/components/ui/select-field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import type { Option } from "@/lib/forms";
 import type { RepoSettingsFormState } from "@/lib/repo-settings";
 
 import { saveRepoSettingsAction } from "./actions";
@@ -29,8 +25,8 @@ export type RepoSettingsFormProps = {
   owner: string;
   name: string;
   isOwner: boolean;
-  modes: { value: string; label: string }[];
-  models: { value: string; label: string }[];
+  modes: Option[];
+  models: Option[];
   current: { mode: string; model: string; fixes: boolean };
 };
 
@@ -65,37 +61,25 @@ export function RepoSettingsForm({
       <form action={formAction}>
         <fieldset disabled={!isOwner} className="contents">
           <CardContent className="grid gap-5">
-            <div className="grid gap-2">
-              <Label htmlFor="repo-settings-mode">When reviews run</Label>
-              <Select name="mode" defaultValue={current.mode}>
-                <SelectTrigger id="repo-settings-mode" className="w-full sm:w-72">
-                  <SelectValue placeholder="Choose a mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  {modes.map((mode) => (
-                    <SelectItem key={mode.value} value={mode.value}>
-                      {mode.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <SelectField
+              id="repo-settings-mode"
+              name="mode"
+              label="When reviews run"
+              options={modes}
+              defaultValue={current.mode}
+              placeholder="Choose a mode"
+              triggerClassName="sm:w-72"
+            />
 
-            <div className="grid gap-2">
-              <Label htmlFor="repo-settings-model">Model</Label>
-              <Select name="model" defaultValue={current.model}>
-                <SelectTrigger id="repo-settings-model" className="w-full sm:w-72">
-                  <SelectValue placeholder="Choose a model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {models.map((model) => (
-                    <SelectItem key={model.value} value={model.value}>
-                      {model.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <SelectField
+              id="repo-settings-model"
+              name="model"
+              label="Model"
+              options={models}
+              defaultValue={current.model}
+              placeholder="Choose a model"
+              triggerClassName="sm:w-72"
+            />
 
             <div className="flex items-center justify-between gap-4">
               <div className="grid gap-0.5">
@@ -112,14 +96,10 @@ export function RepoSettingsForm({
               />
             </div>
 
-            {state.status === "error" && (
-              <Alert variant="destructive">
-                <AlertDescription>{state.message}</AlertDescription>
-              </Alert>
-            )}
-            <p role="status" className="text-muted-foreground text-sm empty:hidden">
-              {state.status === "saved" ? "Saved." : ""}
-            </p>
+            <FormStatus
+              error={state.status === "error" ? state.message : undefined}
+              message={state.status === "saved" ? "Saved." : ""}
+            />
           </CardContent>
           {isOwner && (
             <CardFooter className="mt-5">

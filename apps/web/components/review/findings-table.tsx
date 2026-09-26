@@ -4,11 +4,7 @@ import type { Finding } from "@pr-review/db";
 import {
   Button,
   Card,
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
+  EmptyState,
   Label,
   Select,
   SelectContent,
@@ -25,7 +21,7 @@ import {
 } from "@pr-review/design";
 import { useId, useMemo, useState } from "react";
 
-import { SeverityBadge } from "@/components/ui";
+import { Code, SeverityBadge } from "@/components/ui";
 import type { Severity } from "@pr-review/db/dashboard";
 
 import { ConfidenceMeter } from "./confidence-meter";
@@ -61,7 +57,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
   return (
     <section aria-labelledby="findings-heading">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-        <h2 id={FINDINGS_ANCHOR} className="text-muted-foreground font-mono text-xs tracking-wide uppercase">
+        <h2 id={FINDINGS_ANCHOR} className="eyebrow font-mono">
           Findings
         </h2>
         <div className="flex flex-wrap items-end gap-3">
@@ -97,9 +93,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
       {file === null ? null : (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground text-xs">Showing findings on</span>
-          <code className="rounded-sm border border-border bg-muted px-1 py-0.5 font-mono text-xs">
-            {file}
-          </code>
+          <Code className="text-xs">{file}</Code>
           <Button variant="ghost" size="sm" onClick={clearFile}>
             Show all files
           </Button>
@@ -111,19 +105,15 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
       </p>
 
       {rows.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No findings match these filters</EmptyTitle>
-            <EmptyDescription>
-              Widen the severity filter to see the rest of this review.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
+        <EmptyState
+          title="No findings match these filters"
+          description="Widen the severity filter to see the rest of this review."
+          action={
             <Button variant="outline" size="sm" onClick={reset}>
               Clear filters
             </Button>
-          </EmptyContent>
-        </Empty>
+          }
+        />
       ) : (
         <Card className="py-0">
           <Table className="min-w-[52rem] table-fixed">

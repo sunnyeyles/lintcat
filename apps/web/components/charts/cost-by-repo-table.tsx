@@ -4,10 +4,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
+  EmptyState,
   Progress,
   Table,
   TableBody,
@@ -18,7 +15,8 @@ import {
   TableRow,
 } from "@pr-review/design";
 
-import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
+import { RepoName } from "@/components/ui";
+import { formatNumber, formatPercent, formatTokens, formatUsd, share } from "@/lib/format";
 import type { Usage } from "@pr-review/db/dashboard";
 
 import { sumTokens } from "./series";
@@ -43,12 +41,10 @@ export function CostByRepoTable({
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>No repository spend</EmptyTitle>
-              <EmptyDescription>Nothing was reviewed in {rangePhrase}.</EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          <EmptyState
+            title="No repository spend"
+            description={`Nothing was reviewed in ${rangePhrase}.`}
+          />
         ) : (
           <Table>
             <TableCaption>
@@ -74,11 +70,11 @@ export function CostByRepoTable({
             </TableHeader>
             <TableBody>
               {rows.map((row) => {
-                const share = total === 0 ? 0 : (row.costUsd / total) * 100;
+                const part = share(row.costUsd, total);
                 return (
                   <TableRow key={row.repo.id}>
                     <TableCell className="whitespace-nowrap">
-                      {row.repo.owner}/{row.repo.name}
+                      <RepoName owner={row.repo.owner} name={row.repo.name} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatNumber(row.reviewCount)}
@@ -91,8 +87,8 @@ export function CostByRepoTable({
                     </TableCell>
                     <TableCell className="text-right">
                       <span className="flex items-center justify-end gap-2">
-                        <span className="tabular-nums">{share.toFixed(1)}%</span>
-                        <Progress value={share} className="h-1.5 w-12 shrink-0" />
+                        <span className="tabular-nums">{formatPercent(part, 1)}</span>
+                        <Progress value={part} className="h-1.5 w-12 shrink-0" />
                       </span>
                     </TableCell>
                   </TableRow>

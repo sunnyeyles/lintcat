@@ -27,7 +27,7 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0 flex-1 basis-[18rem]">
-        <p className="text-muted-foreground text-xs tracking-wide uppercase">
+        <p className="eyebrow">
           {eyebrow}
         </p>
         <h1

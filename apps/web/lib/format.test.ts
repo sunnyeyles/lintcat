@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countLabel,
   formatDuration,
   formatNumber,
+  formatPercent,
   formatRelative,
   formatTokens,
   formatUsd,
+  plural,
+  share,
   shortSha,
 } from "./format";
 
@@ -155,5 +159,27 @@ describe("shortSha", () => {
 
   it("trims surrounding whitespace first", () => {
     expect(shortSha("  9f1c0a2b3d4e  ")).toBe("9f1c0a2");
+  });
+});
+
+describe("share and formatPercent", () => {
+  it("is zero of nothing rather than NaN", () => {
+    expect(share(3, 0)).toBe(0);
+    expect(share(1, 4)).toBe(25);
+  });
+
+  it("rounds to the digits asked for", () => {
+    expect(formatPercent(share(1, 3))).toBe("33%");
+    expect(formatPercent(share(1, 3), 1)).toBe("33.3%");
+    expect(formatPercent(Number.NaN)).toBe("—");
+  });
+});
+
+describe("countLabel", () => {
+  it("pluralises everything but one", () => {
+    expect(countLabel(1, "file")).toBe("1 file");
+    expect(countLabel(0, "file")).toBe("0 files");
+    expect(countLabel(1200, "match", "matches")).toBe("1,200 matches");
+    expect(plural(2, "depends", "depend")).toBe("depend");
   });
 });
