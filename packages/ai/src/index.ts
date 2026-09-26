@@ -9,19 +9,12 @@ export {
   resolveModelId,
   resolveModelProvider,
   DEFAULT_MODEL_PROVIDER,
-  MODEL_CHOICES,
-  MODEL_PROVIDERS,
   ModelProviderError,
   apiKeyEnvFor,
   type LanguageModelConfig,
-  type ModelProvider,
   type ReviewModel,
 } from "#src/model";
-export {
-  modelApiKeyEnvNames,
-  modelConfigFromEnv,
-  type ModelEnvNames,
-} from "#src/model-env";
+export { modelApiKeyEnvNames, modelConfigFromEnv } from "#src/model-env";
 export type {
   ReviewAgent,
   ReviewContext,
@@ -31,7 +24,6 @@ export {
   isCancellation,
   throwIfCancelled,
 } from "#src/cancellation";
-export { addTokenUsage, emptyTokenUsage, type TokenUsage } from "#src/usage";
 export {
   createReviewAgent,
   type AgentUsageReport,

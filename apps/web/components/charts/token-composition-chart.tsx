@@ -4,7 +4,8 @@ import { ChartLegend, ChartLegendContent } from "@pr-review/design/chart";
 import { AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatPercent, formatTokens, formatUsd, share } from "@/lib/format";
-import type { TokenCounts, UsagePoint } from "@pr-review/db/dashboard";
+import type { UsagePoint } from "@pr-review/db/dashboard";
+import type { TokenUsage } from "@pr-review/schemas";
 
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
@@ -19,7 +20,7 @@ export function TokenCompositionChart({
   rangePhrase,
 }: {
   points: UsagePoint[];
-  totals: TokenCounts;
+  totals: TokenUsage;
   costByClass: Record<TokenKey, number>;
   costTotal: number;
   rangePhrase: string;

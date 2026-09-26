@@ -1,9 +1,9 @@
 /** Provider selection: which model a configured name resolves to. */
+import { MODEL_PROVIDERS } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_MODEL_PROVIDER,
-  MODEL_PROVIDERS,
   ModelProviderError,
   apiKeyEnvFor,
   createLanguageModel,

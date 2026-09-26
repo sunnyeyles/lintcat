@@ -22,7 +22,7 @@ import {
 import { useId, useMemo, useState } from "react";
 
 import { Code, SeverityBadge } from "@/components/ui";
-import type { Severity } from "@pr-review/db/dashboard";
+import type { Severity } from "@pr-review/schemas";
 
 import { ConfidenceMeter } from "./confidence-meter";
 import { FilePath } from "./file-path";

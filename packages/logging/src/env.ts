@@ -1,8 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-/** The nearest .env.local at or above `from`. */
-export function findLocalEnvFile(from: string = process.cwd()): string | undefined {
+function findLocalEnvFile(from: string = process.cwd()): string | undefined {
   let dir = from;
   while (true) {
     const candidate = join(dir, ".env.local");

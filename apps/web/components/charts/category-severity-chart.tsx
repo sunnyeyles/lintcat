@@ -9,7 +9,8 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatNumber } from "@/lib/format";
-import type { CategoryCount, Severity } from "@pr-review/db/dashboard";
+import type { CategoryCount } from "@pr-review/db/dashboard";
+import type { Severity } from "@pr-review/schemas";
 
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";

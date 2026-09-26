@@ -3,16 +3,14 @@
  * policy in; agent, model, pipeline and memory held here.
  */
 import {
-  addTokenUsage,
-  emptyTokenUsage,
   GENERAL_AGENT,
   type AgentDefinition,
   type ReviewAgent,
   type ReviewModel,
-  type TokenUsage,
 } from "@pr-review/ai";
 import type { RepositoryIndex } from "@pr-review/index";
 import { createConsoleLogger, type StructuredLogger } from "@pr-review/logging";
+import { addTokenUsage, emptyTokenUsage, type TokenUsage } from "@pr-review/schemas";
 
 import type { MemoryStore } from "#src/memory";
 import {

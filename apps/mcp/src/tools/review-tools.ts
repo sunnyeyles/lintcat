@@ -10,7 +10,7 @@ import { chooseScope, LOCAL_SCOPE_KINDS } from "#src/local-git-client";
 import { reviewLocalCheckout } from "#src/local-review-run";
 import { runReview, type ReviewResult } from "#src/review";
 import { selectReviewEngine } from "#src/review-engine";
-import { jsonContent, repoPathSchema } from "#src/tools/shared";
+import { repoPathSchema } from "#src/tools/shared";
 
 /** Said whenever sampling stood in for a provider key, so nobody reads this as a full review. */
 const SINGLE_SHOT_NOTICE =
@@ -61,7 +61,7 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
         ? [{ type: "text" as const, text: SINGLE_SHOT_NOTICE }]
         : []),
       { type: "text", text: `${heading}${suppressed}\n\n${result.summary}` },
-      jsonContent(details),
+      { type: "text", text: JSON.stringify(details, null, 2) },
     ],
   };
 }

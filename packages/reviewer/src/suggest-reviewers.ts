@@ -1,21 +1,22 @@
 /** Who to ask for review: who last wrote the lines a change touches, then CODEOWNERS. Never throws. */
-import type {
-  BlameRange,
-  ChangedFile,
-  RepositoryHistoryClient,
+import {
+  reviewCorrelation,
+  type BlameRange,
+  type ChangedFile,
+  type RepositoryHistoryClient,
 } from "@pr-review/github";
 import { ownersOf, parseCodeowners } from "@pr-review/index";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import { changeStatus } from "#src/blast-radius";
 import { baseRangesFromPatch, type LineRange } from "#src/diff-lines";
-import { DAY_MS } from "#src/memory";
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 
 export const MAX_SUGGESTED_REVIEWERS = 3;
 export const MAX_BLAMED_FILES = 10;
 export const BLAME_CONCURRENCY = 4;
 const HALF_LIFE_DAYS = 180;
+const DAY_MS = 86_400_000;
 
 /** `handle` has no `@`; a team reads `org/team`. */
 export type SuggestedReviewer =

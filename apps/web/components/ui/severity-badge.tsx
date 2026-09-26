@@ -1,6 +1,6 @@
 import { Badge, cn } from "@pr-review/design";
 
-import type { Severity } from "@pr-review/db/dashboard";
+import type { Severity } from "@pr-review/schemas";
 
 import { LEVEL_TONE } from "./level-tone";
 

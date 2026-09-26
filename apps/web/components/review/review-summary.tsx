@@ -1,8 +1,7 @@
 import { Card, CardContent } from "@pr-review/design";
-import type { ReviewRecordRisk } from "@pr-review/schemas";
+import type { ReviewRecordRisk, Severity } from "@pr-review/schemas";
 
 import { SeverityMix } from "@/components/overview/severity-mix";
-import type { Severity } from "@pr-review/db/dashboard";
 
 import { BlastRadiusCard } from "./blast-radius-card";
 

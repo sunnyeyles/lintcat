@@ -12,7 +12,7 @@ import { checkoutRoot } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
 import { openLocalMemoryStore } from "#src/local-memory-store";
-import { jsonContent, repoPathSchema } from "#src/tools/shared";
+import { repoPathSchema } from "#src/tools/shared";
 
 export function registerMemoryTools(
   server: McpServer,
@@ -74,7 +74,7 @@ export function registerMemoryTools(
               `Suppressed ${category} findings shaped like "${titleShape(title)}" in ${root}. ` +
               `${updated.suppressions.length} suppression(s) now live in ${store.path}.`,
           },
-          jsonContent(updated.suppressions),
+          { type: "text", text: JSON.stringify(updated.suppressions, null, 2) },
         ],
       };
     },

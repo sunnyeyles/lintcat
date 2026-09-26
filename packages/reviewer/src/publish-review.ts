@@ -5,6 +5,7 @@
 import {
   httpStatus,
   isPermissionError,
+  reviewCorrelation,
   type RepositoryHistoryClient,
   type ReviewPublishClient,
 } from "@pr-review/github";
@@ -24,7 +25,7 @@ import {
   type RenderedReview,
   type ReviewNotes,
 } from "#src/render-review";
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 import type { SuggestedReviewer } from "#src/suggest-reviewers";
 
 /** What the comment publisher itself can report. */

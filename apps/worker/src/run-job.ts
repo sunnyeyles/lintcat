@@ -23,19 +23,19 @@ import {
   type RetryPolicy,
   type ReviewJob,
 } from "@pr-review/db";
-import type {
-  CheckRunOutput,
-  GithubAppClient,
-  PullRequestReadClient,
-  RepositoryHistoryClient,
-  ReviewPublishClient,
+import {
+  reviewCorrelation,
+  type CheckRunOutput,
+  type GithubAppClient,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
+  type ReviewPublishClient,
 } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import {
   dashboardDelivery,
   githubDelivery,
   isFixCommit,
-  reviewCorrelation,
   runReview,
   type PublishFixes,
   type ReviewDelivery,

@@ -1,13 +1,14 @@
 /** Every failure here widens to a full review; none fails one. */
 import {
   CHECK_RUN_NAME,
+  reviewCorrelation,
   type ChangedFile,
   type PullRequestReadClient,
   type RepositoryHistoryClient,
 } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 
 interface FullReviewScope {
   kind: "full";

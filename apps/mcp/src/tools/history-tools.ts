@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { McpEnvironment } from "#src/environment";
 import { reviewResourceUri } from "#src/resources/context-resources";
 import { readStoredReview, scopeToOrganization, summariseReview } from "#src/review-history";
-import { json, jsonContent } from "#src/tools/shared";
+import { json } from "#src/tools/shared";
 
 const orgSchema = z.string().min(1).describe('The account slug (a GitHub organization or personal account), as in the dashboard URL /o/<slug>.');
 const repoSchema = z
@@ -41,7 +41,7 @@ export function registerHistoryTools(
       const summaries = reviews.map(summariseReview);
       return {
         content: [
-          jsonContent(summaries),
+          { type: "text", text: JSON.stringify(summaries, null, 2) },
           ...summaries.map((review) => ({
             type: "resource_link" as const,
             uri: reviewResourceUri(org, review.id),

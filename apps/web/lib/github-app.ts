@@ -1,5 +1,5 @@
-import { requiredEnv } from "@pr-review/db";
 import { githubAppClientFromEnv, type GithubAppClient } from "@pr-review/github";
+import { requiredEnv } from "@pr-review/logging";
 
 export function githubWebhookSecret(): string {
   return requiredEnv("GITHUB_APP_WEBHOOK_SECRET");

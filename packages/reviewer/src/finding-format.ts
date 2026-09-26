@@ -9,8 +9,6 @@ import {
   type ReviewFinding,
 } from "@pr-review/schemas";
 
-export { countLabel };
-
 /** The finding's heading: severity, category, and title. */
 export function heading(finding: ReviewFinding): string {
   return `${finding.severity.toUpperCase()} — ${categoryLabel(finding.category)}: ${finding.title}`;

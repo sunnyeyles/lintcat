@@ -23,7 +23,6 @@ export function isPermissionError(error: unknown): boolean {
   return status === 403 || status === 404;
 }
 
-/** Runs `fn`, turning a 404 into `fallback`; every other failure still throws. */
 export async function notFoundAs<T, F>(fallback: F, fn: () => Promise<T>): Promise<T | F> {
   try {
     return await fn();

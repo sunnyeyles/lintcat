@@ -7,12 +7,8 @@ import type {
 
 import type { Finding, Organization, Repo, Review } from "../schema";
 
-export type { Severity };
-
-export type TokenCounts = TokenUsage;
-
 export type ReviewSummary = Review &
-  TokenCounts & {
+  TokenUsage & {
     repo: Repo;
     findingCount: number;
     bySeverity: Record<Severity, number>;
@@ -56,15 +52,15 @@ export type Trends = {
   };
 };
 
-export type UsagePoint = TokenCounts & {
+export type UsagePoint = TokenUsage & {
   date: string;
   costUsd: number;
 };
 
 export type Usage = {
   points: UsagePoint[];
-  byRepo: Array<{ repo: Repo; costUsd: number; reviewCount: number } & TokenCounts>;
-  totals: TokenCounts & { costUsd: number; reviewCount: number };
+  byRepo: Array<{ repo: Repo; costUsd: number; reviewCount: number } & TokenUsage>;
+  totals: TokenUsage & { costUsd: number; reviewCount: number };
 };
 
 export type Range = "7d" | "30d" | "90d";

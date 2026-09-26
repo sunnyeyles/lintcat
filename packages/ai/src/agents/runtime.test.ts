@@ -4,6 +4,7 @@
  */
 import { buildRepositoryIndex } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
+import { emptyTokenUsage } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,12 +12,8 @@ import {
 } from "#src/agents/definition";
 import { GENERAL_AGENT } from "#src/agents/general-agent";
 import { INDEX_ABSENT_LINE } from "#src/agents/repository-index";
-import {
-  AgentRunError,
-  createReviewAgent,
-  type AgentUsageReport,
-} from "#src/agents/runtime";
-import { emptyTokenUsage } from "#src/usage";
+import { AgentRunError } from "#src/agents/output";
+import { createReviewAgent, type AgentUsageReport } from "#src/agents/runtime";
 import {
   REVIEW_TOOL_NAMES,
   archiveFiles,

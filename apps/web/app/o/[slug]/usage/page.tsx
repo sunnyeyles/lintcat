@@ -1,4 +1,5 @@
-import { costOf, type Range, type TokenCounts } from "@pr-review/db/dashboard";
+import { costOf, type Range } from "@pr-review/db/dashboard";
+import type { TokenUsage } from "@pr-review/schemas";
 import { EmptyState } from "@pr-review/design";
 import type { Metadata } from "next";
 import { Suspense } from "react";
@@ -22,7 +23,7 @@ import type { SearchParams } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: "Tokens & cost" };
 
-const NO_TOKENS: TokenCounts = {
+const NO_TOKENS: TokenUsage = {
   inputTokens: 0,
   cacheCreationInputTokens: 0,
   cacheReadInputTokens: 0,
@@ -30,7 +31,7 @@ const NO_TOKENS: TokenCounts = {
 };
 
 // Priced one class at a time, so the parts sum to the whole the chart splits.
-function costPerClass(totals: TokenCounts): { byClass: Record<TokenKey, number>; total: number } {
+function costPerClass(totals: TokenUsage): { byClass: Record<TokenKey, number>; total: number } {
   const byClass = {} as Record<TokenKey, number>;
   let total = 0;
   for (const key of Object.keys(NO_TOKENS) as TokenKey[]) {

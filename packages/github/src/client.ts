@@ -13,16 +13,8 @@ export interface PullRequestRef {
   pullRequestNumber: number;
 }
 
-export interface ReviewCorrelation {
-  repository: string;
-  pullRequestNumber: number;
-  headSha: string;
-}
-
 /** The correlation fields every event of one review carries. */
-export function reviewCorrelation(
-  target: PullRequestRef & { headSha: string },
-): ReviewCorrelation {
+export function reviewCorrelation(target: PullRequestRef & { headSha: string }) {
   return {
     repository: `${target.owner}/${target.repo}`,
     pullRequestNumber: target.pullRequestNumber,

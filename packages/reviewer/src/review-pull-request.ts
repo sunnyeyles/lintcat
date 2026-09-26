@@ -8,10 +8,11 @@ import {
   withRepositoryHints,
   type AgentDefinition,
 } from "@pr-review/ai";
-import type {
-  ChangedFile,
-  ExistingReviewComment,
-  PullRequestReadClient,
+import {
+  reviewCorrelation,
+  type ChangedFile,
+  type ExistingReviewComment,
+  type PullRequestReadClient,
 } from "@pr-review/github";
 import {
   snapshotRepositoryIndex,
@@ -51,7 +52,7 @@ import {
   type PostedFinding,
 } from "#src/render-review";
 import type { ReviewPipelineResult } from "#src/review-pipeline";
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 import { suggestReviewers } from "#src/suggest-reviewers";
 

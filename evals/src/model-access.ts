@@ -4,12 +4,11 @@
  */
 import {
   DEFAULT_MODEL_PROVIDER,
-  MODEL_PROVIDERS,
   apiKeyEnvFor,
   defaultModelFor,
   modelConfigFromEnv,
-  type ModelProvider,
 } from "@pr-review/ai";
+import { MODEL_PROVIDERS, type ModelProvider } from "@pr-review/schemas";
 
 /** Environment variable selecting the provider under evaluation. */
 const PROVIDER_ENV = "MODEL_PROVIDER";

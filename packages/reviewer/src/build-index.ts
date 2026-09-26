@@ -2,7 +2,7 @@
  * Builds one review's repository index. Never throws: the index can only
  * improve a review, never fail one.
  */
-import type { PullRequestReadClient } from "@pr-review/github";
+import { reviewCorrelation, type PullRequestReadClient } from "@pr-review/github";
 import {
   buildRepositoryIndex,
   findCodeowners,
@@ -10,7 +10,7 @@ import {
 } from "@pr-review/index";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 
 export interface ReviewIndexRequest {
   client: PullRequestReadClient;

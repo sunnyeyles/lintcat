@@ -36,7 +36,6 @@ export function bundle({ entryPoint, outfile, logLevel = "info" }) {
   });
 }
 
-/** An app's entry point and the bundle built from it. */
 export function appBundlePaths(appDir) {
   return {
     entryPoint: path.join(appDir, "src", "index.ts"),

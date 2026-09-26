@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { SEVERITIES } from "@/components/review/sort";
 import { SeverityBadge } from "@/components/ui";
-import type { Severity } from "@pr-review/db/dashboard";
+import type { Severity } from "@pr-review/schemas";
 
 export type SeverityMixProps = {
   bySeverity: Record<Severity, number>;

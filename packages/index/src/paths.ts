@@ -43,7 +43,6 @@ export function stemOf(path: string, extensions: "last" | "all"): string {
   return dot <= 0 ? base : base.slice(0, dot);
 }
 
-/** The directory names above `path`, outermost first. */
 export function directorySegments(path: string): string[] {
   return path.split("/").slice(0, -1);
 }

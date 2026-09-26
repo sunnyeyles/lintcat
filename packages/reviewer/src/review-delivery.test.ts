@@ -1,6 +1,5 @@
 /** What a finished run contributes to the dashboard record. */
 import { randomBytes } from "node:crypto";
-import { emptyTokenUsage } from "@pr-review/ai";
 import type { ChangedFile } from "@pr-review/github";
 import {
   buildRepositoryIndex,
@@ -10,6 +9,7 @@ import {
 } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import {
+  emptyTokenUsage,
   MAX_RISK_DEPENDENTS,
   reviewRecordSchema,
   type ReviewFinding,

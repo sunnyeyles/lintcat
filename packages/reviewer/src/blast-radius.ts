@@ -1,5 +1,5 @@
 /** A review's blast radius and risk score. Never throws: it only adds to a review. */
-import type { ChangedFile } from "@pr-review/github";
+import { reviewCorrelation, type ChangedFile } from "@pr-review/github";
 import {
   computeImpact,
   type Impact,
@@ -9,7 +9,7 @@ import {
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { CHANGE_STATUSES } from "@pr-review/schemas";
 
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 import { scoreRisk, type RiskScore } from "#src/risk-score";
 
 export interface BlastRadius {

@@ -1,4 +1,4 @@
-import type { Severity } from "@pr-review/db/dashboard";
+import type { Severity } from "@pr-review/schemas";
 
 import {
   noFindings,

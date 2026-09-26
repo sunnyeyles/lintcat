@@ -5,7 +5,6 @@ import { errorMessage } from "@pr-review/logging";
 import type { McpEnvironment } from "#src/environment";
 import { readWorkingTreeFile } from "#src/local-git-client";
 import { readStoredReview } from "#src/review-history";
-import { jsonText } from "#src/tools/shared";
 
 const REVIEW_RESOURCE_TEMPLATE = "pr-review://review/{org}/{id}";
 const FILE_RESOURCE_TEMPLATE = "pr-review://file/{+path}";
@@ -30,7 +29,7 @@ function variable(variables: Variables, name: string, uri: URL): string {
 function jsonResource(uri: URL, value: unknown): ReadResourceResult {
   return {
     contents: [
-      { uri: uri.toString(), mimeType: "application/json", text: jsonText(value) },
+      { uri: uri.toString(), mimeType: "application/json", text: JSON.stringify(value, null, 2) },
     ],
   };
 }
