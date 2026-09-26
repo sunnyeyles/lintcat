@@ -9,7 +9,7 @@ import {
   type ReviewPublishClient,
 } from "@pr-review/github";
 import type { StructuredLogger } from "@pr-review/logging";
-import type { ReviewFinding } from "@pr-review/schemas";
+import { shortSha, type ReviewFinding } from "@pr-review/schemas";
 
 import { applyFixes, type FixInput, type FixOutcome } from "#src/apply-fixes";
 import type { BlastRadius } from "#src/blast-radius";
@@ -142,7 +142,7 @@ function fixNote(outcome: FixOutcome, patchCount: number): string | undefined {
     return undefined;
   }
   if (outcome.status === "applied") {
-    return `> **Note:** ${fixCount(patchCount)} committed to this branch as \`${outcome.sha.slice(0, 7)}\`.`;
+    return `> **Note:** ${fixCount(patchCount)} committed to this branch as \`${shortSha(outcome.sha)}\`.`;
   }
   if (outcome.status === "unavailable") {
     return `> **Note:** ${fixCount(patchCount)} could not be committed (${outcome.reason}), and ${patchCount === 1 ? "is" : "are"} offered as suggested changes below.`;

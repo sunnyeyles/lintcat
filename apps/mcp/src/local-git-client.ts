@@ -17,6 +17,7 @@ import {
   type RepositoryHistoryClient,
 } from "@pr-review/github";
 import type { ReviewTarget } from "@pr-review/reviewer";
+import { shortSha } from "@pr-review/schemas";
 
 import { assertRef, git, gitBuffer, GitError } from "#src/git";
 import { addedFileDiff, parseUnifiedDiff } from "#src/unified-diff";
@@ -152,7 +153,7 @@ async function resolveRange(root: string, range: string): Promise<ResolvedScope>
     baseSha,
     headRef: headSha,
     commitRange: baseSha === EMPTY_TREE ? headSha : `${baseSha}..${headSha}`,
-    headLabel: `${to} (${headSha.slice(0, 7)})`,
+    headLabel: `${to} (${shortSha(headSha)})`,
   };
 }
 
@@ -342,7 +343,7 @@ async function resolveTreeish(root: string, ref: string): Promise<string> {
 
 function scopeTitle(scope: ResolvedScope, branch: string): string {
   if (scope.kind === "staged") return `Staged changes on ${branch}`;
-  if (scope.kind === "range") return `Commits ${scope.baseRef}..${scope.headRef.slice(0, 7)}`;
+  if (scope.kind === "range") return `Commits ${scope.baseRef}..${shortSha(scope.headRef)}`;
   return `Local changes on ${branch}`;
 }
 

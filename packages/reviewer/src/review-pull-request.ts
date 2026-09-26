@@ -22,13 +22,17 @@ import {
   errorMessage,
   type StructuredLogger,
 } from "@pr-review/logging";
-import type { ReviewFinding, ReviewMemory } from "@pr-review/schemas";
+import {
+  countLabel,
+  shortSha,
+  type ReviewFinding,
+  type ReviewMemory,
+} from "@pr-review/schemas";
 
 import { assessBlastRadius, type BlastRadius } from "#src/blast-radius";
 import { buildReviewIndex } from "#src/build-index";
 import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import { buildDiffLineIndex } from "#src/diff-lines";
-import { countLabel } from "#src/finding-format";
 import { deliverReview, type PublishReview } from "#src/publish-review";
 import type { ReviewDelivery } from "#src/review-delivery";
 import {
@@ -150,11 +154,11 @@ function stillOpen(
 }
 
 function incrementalNote(sinceSha: string, fileCount: number): string {
-  return `> **Note:** This review read the ${countLabel(fileCount, "file")} changed since \`${sinceSha.slice(0, 7)}\`; earlier commits were reviewed then.`;
+  return `> **Note:** This review read the ${countLabel(fileCount, "file")} changed since \`${shortSha(sinceSha)}\`; earlier commits were reviewed then.`;
 }
 
 function noNewChangesNote(sinceSha: string): string {
-  return `> **Note:** No file this pull request changed has moved since \`${sinceSha.slice(0, 7)}\`, so nothing was reviewed.`;
+  return `> **Note:** No file this pull request changed has moved since \`${shortSha(sinceSha)}\`, so nothing was reviewed.`;
 }
 
 /** What the review read: the commit it was indexed at and the files it covered. */

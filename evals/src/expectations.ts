@@ -2,7 +2,7 @@
  * What each fixture must produce: category and location, never wording.
  * Locations anchor to source markers, which must match exactly one line.
  */
-import type { ReviewFinding } from "@pr-review/schemas";
+import { findingLocation, type ReviewFinding } from "@pr-review/schemas";
 
 import type { LoadedFixture } from "#src/fixture";
 import type { FixtureReview } from "#src/run-fixture-review";
@@ -95,10 +95,9 @@ function inAnchor(finding: ReviewFinding, anchor: ResolvedAnchor): boolean {
 
 /** One finding rendered for a failure message. */
 function describeFinding(finding: ReviewFinding): string {
-  const at = finding.line === undefined ? finding.file : `${finding.file}:${finding.line}`;
   return (
     `- [${finding.category}/${finding.severity}/confidence ${finding.confidence}] ` +
-    `${at} — ${finding.title}`
+    `${findingLocation(finding)} — ${finding.title}`
   );
 }
 

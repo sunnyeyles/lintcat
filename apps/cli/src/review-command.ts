@@ -11,6 +11,7 @@ import {
   runReview,
   type McpEnvironment,
 } from "@pr-review/mcp/local-review";
+import { shortSha } from "@pr-review/schemas";
 
 import type { ReviewOptions } from "#src/options";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
@@ -65,7 +66,7 @@ async function review(
     options.scope,
   );
   const changed = await local.client.listChangedFiles(local.target);
-  const where = `${local.scope.headLabel} of ${local.root} against ${local.baseRef} (${local.baseSha.slice(0, 7)})`;
+  const where = `${local.scope.headLabel} of ${local.root} against ${local.baseRef} (${shortSha(local.baseSha)})`;
   if (changed.length === 0) {
     out(`Nothing to review: no changes in ${where}.`);
     return EXIT_OK;

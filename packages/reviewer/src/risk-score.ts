@@ -1,5 +1,6 @@
 /** How risky a change is, scored 0–100 from its blast radius. */
 import type { Impact } from "@pr-review/index";
+import { countLabel, type RiskBand } from "@pr-review/schemas";
 
 /** Each factor's caps sum to 100, so the score needs no clamping. */
 export const RISK_WEIGHTS = {
@@ -13,8 +14,6 @@ export const RISK_WEIGHTS = {
   bands: { mediumFrom: 25, highFrom: 60 },
 } as const;
 
-type RiskBand = "low" | "medium" | "high";
-
 interface RiskFactor {
   readonly label: string;
   readonly points: number;
@@ -27,9 +26,6 @@ export interface RiskScore {
   readonly factors: readonly RiskFactor[];
   readonly partial: boolean;
 }
-
-const plural = (n: number, one: string, many: string): string =>
-  `${n} ${n === 1 ? one : many}`;
 
 const perItem = (n: number, weight: { each: number; max: number }): number =>
   Math.min(weight.max, weight.each * n);
@@ -52,7 +48,7 @@ export function scoreRisk(impact: Impact): RiskScore {
   const packages = impact.packages.length;
   const candidates: RiskFactor[] = [
     {
-      label: `${plural(counts.transitive, "file depends", "files depend")} on this change`,
+      label: `${countLabel(counts.transitive, "file depends", "files depend")} on this change`,
       points: dependentPoints(counts.transitive),
     },
     {
@@ -60,15 +56,15 @@ export function scoreRisk(impact: Impact): RiskScore {
       points: perItem(Math.max(0, packages - 1), RISK_WEIGHTS.packages),
     },
     {
-      label: `reaches ${plural(counts.entryPoints, "entry point", "entry points")}`,
+      label: `reaches ${countLabel(counts.entryPoints, "entry point", "entry points")}`,
       points: perItem(counts.entryPoints, RISK_WEIGHTS.entryPoints),
     },
     {
-      label: `${plural(counts.untested, "changed source file has", "changed source files have")} no tests`,
+      label: `${countLabel(counts.untested, "changed source file has", "changed source files have")} no tests`,
       points: perItem(counts.untested, RISK_WEIGHTS.untested),
     },
     {
-      label: `breaks ${plural(counts.brokenImporters, "import", "imports")}`,
+      label: `breaks ${countLabel(counts.brokenImporters, "import", "imports")}`,
       points: perItem(counts.brokenImporters, RISK_WEIGHTS.brokenImporters),
     },
     {

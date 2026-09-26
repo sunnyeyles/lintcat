@@ -1,4 +1,5 @@
 import { saveRepoSettings, type Database, type RepoReviewMode } from "@pr-review/db";
+import { MODEL_CHOICES } from "@pr-review/schemas";
 import { z } from "zod";
 
 import type { ModelKeyProvider } from "@/lib/model-key";
@@ -10,11 +11,8 @@ export const REPO_REVIEW_MODES: Record<RepoReviewMode, string> = {
   every_pr: "Every pull request",
 };
 
-/** The models a repo may choose per provider; a test keeps this in step with @pr-review/ai. */
-export const REPO_MODEL_CHOICES: Record<ModelKeyProvider, readonly string[]> = {
-  anthropic: ["claude-sonnet-5", "claude-haiku-4-5", "claude-sonnet-4-5"],
-  openai: ["gpt-5.6-luna", "gpt-5.6-luna-mini"],
-};
+/** The models a repo may choose per provider: exactly those the worker accepts. */
+export const REPO_MODEL_CHOICES = MODEL_CHOICES;
 
 // Radix Select cannot hold an empty value, so "use the provider's default" needs a name.
 export const DEFAULT_MODEL_VALUE = "default";

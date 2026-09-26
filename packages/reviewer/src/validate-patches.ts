@@ -3,16 +3,30 @@
  * `expected` text does not match the head commit is discarded, never applied.
  */
 import type { ChangedFile, PullRequestReadClient } from "@pr-review/github";
-import type { FindingPatch, ReviewFinding } from "@pr-review/schemas";
+import {
+  compareFindingStrength,
+  type FindingPatch,
+  type ReviewFinding,
+} from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
-import { compareFindingStrength } from "#src/validate-findings";
 
 /** At most this many files may be edited by one review. */
 export const MAX_PATCHED_FILES = 5;
 
 /** At most this many replaced lines across the whole review. */
 export const MAX_PATCHED_LINES = 200;
+
+export function patchLineCount(patch: Pick<FindingPatch, "startLine" | "endLine">): number {
+  return patch.endLine - patch.startLine + 1;
+}
+
+/** Which cap, if either, `files` edited files and `lines` replaced lines would break. */
+export function exceededPatchCap(files: number, lines: number): "files" | "lines" | undefined {
+  if (files > MAX_PATCHED_FILES) return "files";
+  if (lines > MAX_PATCHED_LINES) return "lines";
+  return undefined;
+}
 
 /** One file's complete contents once every kept patch is applied. */
 export interface PatchedFile {
@@ -130,7 +144,7 @@ function applyPatches(text: FileText, patches: readonly FindingPatch[]): FileTex
     const replacement = withoutTrailingNewline(patch.replacement);
     lines.splice(
       patch.startLine - 1,
-      patch.endLine - patch.startLine + 1,
+      patchLineCount(patch),
       ...(patch.replacement === "" ? [] : replacement.split("\n")),
     );
   }
@@ -188,12 +202,9 @@ export async function verifyPatches(
       continue;
     }
 
-    const lineCount = patch.endLine - patch.startLine + 1;
-    const newFile = !kept.has(finding.file);
-    if (newFile && kept.size >= MAX_PATCHED_FILES) {
-      continue;
-    }
-    if (patchedLines + lineCount > MAX_PATCHED_LINES) {
+    const lineCount = patchLineCount(patch);
+    const fileCount = kept.size + (kept.has(finding.file) ? 0 : 1);
+    if (exceededPatchCap(fileCount, patchedLines + lineCount) !== undefined) {
       continue;
     }
 

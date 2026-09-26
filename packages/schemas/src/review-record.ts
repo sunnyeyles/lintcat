@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { reviewFindingSchema } from "#src/review-finding";
+import { SEVERITIES } from "#src/severity";
+import type { TokenUsage } from "#src/token-usage";
 
 const count = z.number().int().nonnegative();
 
@@ -9,10 +11,14 @@ const reviewRecordFindingSchema = reviewFindingSchema
   .omit({ patch: true })
   .extend({ hasPatch: z.boolean().optional() });
 
+export const CHANGE_STATUSES = ["added", "modified", "removed", "renamed"] as const;
+
+export type ChangeStatus = (typeof CHANGE_STATUSES)[number];
+
 /** One file the pull request touched, with its line counts. */
 const reviewRecordChangedFileSchema = z.object({
   path: z.string().min(1),
-  status: z.enum(["added", "modified", "removed", "renamed"]),
+  status: z.enum(CHANGE_STATUSES),
   additions: count,
   deletions: count,
 });
@@ -41,7 +47,8 @@ export const MAX_RISK_DEPENDENTS = 200;
 
 const repositoryPath = z.string().min(1).max(4096);
 
-const riskBandSchema = z.enum(["low", "medium", "high"]);
+// A risk band reads on the same scale as a finding's severity.
+const riskBandSchema = z.enum(SEVERITIES);
 
 export type RiskBand = z.infer<typeof riskBandSchema>;
 
@@ -77,6 +84,13 @@ export const reviewRecordRiskSchema = z.object({
 
 export type ReviewRecordRisk = z.infer<typeof reviewRecordRiskSchema>;
 
+const tokenUsageShape = {
+  inputTokens: count.default(0),
+  cacheCreationInputTokens: count.default(0),
+  cacheReadInputTokens: count.default(0),
+  outputTokens: count.default(0),
+} satisfies Record<keyof TokenUsage, z.ZodType>;
+
 /** One review as the dashboard stores it; a rerun of the same `headSha` replaces it. */
 export const reviewRecordSchema = z
   .object({
@@ -87,10 +101,7 @@ export const reviewRecordSchema = z
     summary: z.string(),
     durationMs: count,
     // Older actions omit these; unknown keys such as `agentRuns` are stripped.
-    inputTokens: count.default(0),
-    cacheCreationInputTokens: count.default(0),
-    cacheReadInputTokens: count.default(0),
-    outputTokens: count.default(0),
+    ...tokenUsageShape,
     findings: z.array(reviewRecordFindingSchema),
     /** The pull request's base commit; absent from a sender that predates it. */
     baseSha: z.string().min(1).max(64).optional(),

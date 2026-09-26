@@ -1,12 +1,15 @@
 /** How a validated finding reads in a terminal: one location per finding. */
-import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
+import {
+  categoryLabel,
+  compareSeverity,
+  findingLocation,
+  severityRank,
+  SEVERITIES,
+  type ReviewFinding,
+  type Severity,
+} from "@pr-review/schemas";
 
 import type { FailOn } from "#src/options";
-
-/** Severity order, lowest first; the index is what a threshold compares. */
-const SEVERITIES = ["low", "medium", "high"] as const;
-
-type Severity = (typeof SEVERITIES)[number];
 
 const COLOURS: Record<Severity, string> = {
   low: "\u001b[36m",
@@ -22,11 +25,6 @@ const WIDTH = 88;
 
 export interface RenderOptions {
   color: boolean;
-}
-
-/** `file` alone, or `file:line` when the finding is line-anchored. */
-function location(finding: ReviewFinding): string {
-  return finding.line === undefined ? finding.file : `${finding.file}:${finding.line}`;
 }
 
 /** Greedy wrap at `WIDTH` columns, including the indent; a long word overhangs. */
@@ -57,7 +55,7 @@ export function renderFinding(finding: ReviewFinding, options: RenderOptions): s
   const header = [
     paint(severity.toUpperCase().padEnd(6), COLOURS[severity] + BOLD, options),
     paint(categoryLabel(finding.category), DIM, options),
-    location(finding),
+    findingLocation(finding),
   ].join(" ");
   const lines = [header, ...wrap(finding.title, "  "), ...wrap(finding.explanation, "  ")];
   if (finding.suggestedFix !== undefined) {
@@ -69,8 +67,7 @@ export function renderFinding(finding: ReviewFinding, options: RenderOptions): s
 /** Highest severity first, then by file and line, so the blockers lead. */
 export function orderFindings(findings: readonly ReviewFinding[]): ReviewFinding[] {
   return [...findings].sort((left, right) => {
-    const bySeverity =
-      SEVERITIES.indexOf(right.severity) - SEVERITIES.indexOf(left.severity);
+    const bySeverity = compareSeverity(right.severity, left.severity);
     if (bySeverity !== 0) return bySeverity;
     return left.file.localeCompare(right.file) || (left.line ?? 0) - (right.line ?? 0);
   });
@@ -82,8 +79,8 @@ export function blockingFindings(
   failOn: FailOn,
 ): ReviewFinding[] {
   if (failOn === "off") return [];
-  const threshold = SEVERITIES.indexOf(failOn);
-  return findings.filter((finding) => SEVERITIES.indexOf(finding.severity) >= threshold);
+  const threshold = severityRank(failOn);
+  return findings.filter((finding) => severityRank(finding.severity) >= threshold);
 }
 
 function counts(findings: readonly ReviewFinding[]): string {
