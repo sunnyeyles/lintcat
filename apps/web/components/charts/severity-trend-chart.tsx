@@ -59,7 +59,7 @@ export function SeverityTrendChart({
       <AreaChart data={points} margin={CHART_MARGIN}>
         <CartesianGrid vertical={false} />
         <XAxis {...DATE_AXIS} />
-        <YAxis {...valueAxis(38, formatNumber, { allowDecimals: false })} />
+        <YAxis {...valueAxis(38)} allowDecimals={false} />
         <DailyTooltip />
         <ChartLegend content={<ChartLegendContent />} />
         {stackedAreas(SEVERITY_SERIES, "severity")}

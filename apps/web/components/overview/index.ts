@@ -1,11 +1,5 @@
 export { RepoTable } from "./repo-table";
-export {
-  DurationCell,
-  FindingsCell,
-  HeadCell,
-  ReviewsTable,
-  WhenCell,
-} from "./reviews-table";
+export { DurationCell, HeadCell, ReviewsTable, WhenCell } from "./reviews-table";
 export { RowLink } from "./row-link";
 export { Section } from "./section";
 export { SeverityMix } from "./severity-mix";

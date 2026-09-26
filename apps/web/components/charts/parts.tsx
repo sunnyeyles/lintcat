@@ -20,19 +20,11 @@ export const DATE_AXIS = {
   interval: "preserveStartEnd",
 } satisfies ComponentProps<typeof XAxis>;
 
-export function valueAxis(
-  width: number,
-  format: (value: number) => string = formatNumber,
-  extra: ComponentProps<typeof YAxis> = {},
-): ComponentProps<typeof YAxis> {
-  return { width, tickLine: false, axisLine: false, tickMargin: 8, tickFormatter: format, ...extra };
+export function valueAxis(width: number, format = formatNumber): ComponentProps<typeof YAxis> {
+  return { width, tickLine: false, axisLine: false, tickMargin: 8, tickFormatter: format };
 }
 
-export function DailyTooltip({
-  format = formatNumber,
-}: {
-  format?: (value: number) => string;
-}) {
+export function DailyTooltip({ format = formatNumber }: { format?: (value: number) => string }) {
   return (
     <ChartTooltip
       content={

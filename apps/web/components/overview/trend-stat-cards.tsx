@@ -4,13 +4,7 @@ import { Stat } from "@/components/ui/stat";
 import { formatDuration, formatNumber, formatPercent, share } from "@/lib/format";
 import type { Trends } from "@pr-review/db/dashboard";
 
-export type TrendStatCardsProps = {
-  totals: Trends["totals"];
-  /** The range as the labels print it, such as "30d". */
-  range: string;
-  /** Drawn under the reviews stat. */
-  sparkline?: ReactNode;
-};
+type TrendStatCardsProps = { totals: Trends["totals"]; range: string; sparkline?: ReactNode };
 
 export function TrendStatCards({ totals, range, sparkline }: TrendStatCardsProps) {
   const { high, medium, low } = totals.bySeverity;

@@ -13,19 +13,11 @@ import { MapSearch } from "@/components/codebase-map/map-search";
 import type { useMapExplorer } from "@/components/codebase-map/use-map-explorer";
 import { countLabel } from "@/lib/format";
 
-export type MapExplorerState = ReturnType<typeof useMapExplorer>;
-
 // Literal class strings, so Tailwind sees every height it has to generate.
-const SIZES = {
+export const MAP_SIZES = {
   review: { surface: "h-[60vh] min-h-[380px] w-full", aside: "max-h-[60vh]" },
   tall: { surface: "h-[68vh] min-h-[420px] w-full", aside: "max-h-[68vh]" },
 } as const;
-
-export type MapWorkspaceSize = keyof typeof SIZES;
-
-export function mapSurface(size: MapWorkspaceSize): string {
-  return SIZES[size].surface;
-}
 
 export function PendingGroups({ count }: { count: number }) {
   if (count === 0) return null;
@@ -36,22 +28,18 @@ export function PendingGroups({ count }: { count: number }) {
   );
 }
 
-export interface MapWorkspaceProps {
-  map: MapExplorerState;
-  size: MapWorkspaceSize;
-  /** The canvas's accessible name, which lists the keys it answers to. */
+type MapWorkspaceProps = {
+  map: ReturnType<typeof useMapExplorer>;
+  size: keyof typeof MAP_SIZES;
   label: string;
-  /** Drawn instead of the canvas, as while it loads or when there is nothing to map. */
   placeholder?: ReactNode;
-  /** Under the canvas. */
   controls?: ReactNode;
-  /** Skeletons stand in for search, details and groups until the data is ready. */
-  ready?: boolean;
+  // Stands in for search, details and groups until the data is ready.
   sidebarFallback?: ReactNode;
   searcher?: MapAdapter["search"];
   searchRef?: RefObject<HTMLInputElement | null>;
   onShowFindings?: (path: string) => void;
-}
+};
 
 export function MapWorkspace({
   map,
@@ -59,13 +47,12 @@ export function MapWorkspace({
   label,
   placeholder,
   controls,
-  ready = true,
   sidebarFallback,
   searcher,
   searchRef,
   onShowFindings,
 }: MapWorkspaceProps) {
-  const { surface, aside } = SIZES[size];
+  const { surface, aside } = MAP_SIZES[size];
   const { graph, scene, palette, focusedGroupId, toggleGroup } = map;
 
   return (
@@ -106,7 +93,7 @@ export function MapWorkspace({
       </div>
 
       <aside className={cn(aside, "space-y-6 overflow-y-auto pr-1")}>
-        {ready ? (
+        {sidebarFallback ?? (
           <>
             <MapSearch
               files={graph.files}
@@ -129,8 +116,6 @@ export function MapWorkspace({
             />
             <GroupList clustering={scene.clustering} onToggle={toggleGroup} />
           </>
-        ) : (
-          sidebarFallback
         )}
         <MapLegend
           impacted={

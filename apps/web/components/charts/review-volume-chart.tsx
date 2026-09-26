@@ -58,7 +58,7 @@ export function ReviewVolumeChart({
       <AreaChart data={points} margin={CHART_MARGIN}>
         <CartesianGrid vertical={false} />
         <XAxis {...DATE_AXIS} />
-        <YAxis {...valueAxis(38, formatNumber, { allowDecimals: false })} />
+        <YAxis {...valueAxis(38)} allowDecimals={false} />
         <DailyTooltip />
         {trendArea("reviews", "Reviews")}
       </AreaChart>

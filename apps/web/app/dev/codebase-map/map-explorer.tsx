@@ -11,16 +11,12 @@ import {
   type FixtureSource,
 } from "@/components/codebase-map/fixtures";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
-import {
-  mapSurface,
-  MapWorkspace,
-  PendingGroups,
-} from "@/components/codebase-map/map-workspace";
+import { MAP_SIZES, MapWorkspace, PendingGroups } from "@/components/codebase-map/map-workspace";
 import { useMapExplorer } from "@/components/codebase-map/use-map-explorer";
 import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
 
 const FIXTURES: FixtureKind[] = ["ready", "partial", "no-changes", "empty"];
-const SURFACE = mapSurface("tall");
+const SURFACE = MAP_SIZES.tall.surface;
 
 const NO_GRAPH: MapGraph = { files: [], imports: [] };
 const NO_HEAT: FindingHeat = {};
@@ -162,12 +158,13 @@ export function MapExplorer() {
         size="tall"
         label="Codebase map. Arrow keys move along dependencies, dependents and siblings. Enter toggles a group. Slash opens search. Escape clears the focus."
         placeholder={placeholder}
-        ready={ready}
         sidebarFallback={
-          <div className="space-y-3">
-            <Skeleton className="h-9 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
+          ready ? undefined : (
+            <div className="space-y-3">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          )
         }
         searcher={source?.adapter?.search}
         searchRef={searchRef}

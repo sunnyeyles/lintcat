@@ -10,29 +10,21 @@ import {
 
 import type { Option } from "@/lib/forms";
 
-export type SelectFieldProps = {
+type SelectFieldProps = {
   id: string;
   name: string;
   label: string;
   options: readonly Option[];
   defaultValue?: string;
-  placeholder?: string;
-  triggerClassName?: string;
+  placeholder: string;
+  triggerClassName: string;
 };
 
-export function SelectField({
-  id,
-  name,
-  label,
-  options,
-  defaultValue,
-  placeholder,
-  triggerClassName,
-}: SelectFieldProps) {
+export function SelectField({ id, label, options, placeholder, triggerClassName, ...select }: SelectFieldProps) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Select name={name} defaultValue={defaultValue}>
+      <Select {...select}>
         <SelectTrigger id={id} className={cn("w-full", triggerClassName)}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>

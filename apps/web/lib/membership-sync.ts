@@ -57,14 +57,12 @@ export function installedAccount(
   };
 }
 
-export type InactiveReason = "organization_not_installed" | "installation_suspended";
-
-/** Installed and not suspended, the only state in which GitHub is asked about the account. */
+// Installed and not suspended, the only state in which GitHub is asked about the account.
 export function activeInstallation(
   organization: Organization | undefined,
 ):
   | { organization: Organization; installed: InstalledAccount; inactive?: never }
-  | { inactive: InactiveReason } {
+  | { inactive: "organization_not_installed" | "installation_suspended" } {
   const installed = organization && installedAccount(organization);
   if (!organization || !installed) return { inactive: "organization_not_installed" };
   if (organization.suspendedAt) return { inactive: "installation_suspended" };
