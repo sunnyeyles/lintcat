@@ -5,6 +5,7 @@ import type { ChangedFile } from "@pr-review/github";
 import {
   buildRepositoryIndex,
   decodeRepositoryGraph,
+  MAX_IMPACT_FILES,
   snapshotRepositoryIndex,
 } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
@@ -174,6 +175,10 @@ describe("dashboardReview", () => {
       ...record,
     });
     expect(success).toBe(true);
+  });
+
+  it("caps dependents where the index caps its impact lists", () => {
+    expect(MAX_RISK_DEPENDENTS).toBe(MAX_IMPACT_FILES);
   });
 
   it("caps the dependents it sends, whatever the impact carries", () => {

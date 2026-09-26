@@ -28,7 +28,7 @@ export const HINT_CAP = 10;
 const MEMORY_TTL_DAYS = 90;
 
 const MAX_SHAPE_LENGTH = 200;
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Path-, dotted- and camelCase tokens name one call site, not a pattern. */
 function isSpecific(token: string): boolean {

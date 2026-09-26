@@ -1,4 +1,5 @@
 /** Who owns a path, by GitHub's CODEOWNERS rules. */
+import { globSource } from "#src/paths";
 
 export interface CodeownersRule {
   readonly pattern: string;
@@ -12,52 +13,18 @@ const LOCATIONS = [".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"];
 /** Negation and character classes, which GitHub does not support. */
 const UNSUPPORTED = /^!|\[/;
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
-}
-
-function segmentSource(segment: string): string {
-  let source = "";
-  for (let at = 0; at < segment.length; at += 1) {
-    const char = segment[at]!;
-    if (char === "\\" && at + 1 < segment.length) {
-      at += 1;
-      source += escapeRegExp(segment[at]!);
-    } else if (char === "*") {
-      source += "[^/]*";
-      while (segment[at + 1] === "*") {
-        at += 1;
-      }
-    } else if (char === "?") {
-      source += "[^/]";
-    } else {
-      source += escapeRegExp(char);
-    }
-  }
-  return source;
-}
-
 function patternToRegExp(pattern: string): RegExp {
   const directoryOnly = pattern.endsWith("/");
   const trimmed = pattern.replace(/^\//, "").replace(/\/$/, "");
   const anchored = pattern.startsWith("/") || trimmed.includes("/");
-  const segments = trimmed.split("/");
-  let source = anchored ? "" : "(?:.*/)?";
-  segments.forEach((segment, at) => {
-    const last = at === segments.length - 1;
-    if (segment === "**") {
-      source += last ? ".*" : "(?:.*/)?";
-    } else {
-      source += segmentSource(segment) + (last ? "" : "/");
-    }
-  });
+  const head = anchored ? "" : "(?:.*/)?";
   // GitHub departs from gitignore here: `docs/*` owns only docs' direct children.
   const tail = directoryOnly
     ? "/.*"
-    : segments.at(-1) === "*"
+    : trimmed.split("/").at(-1) === "*"
       ? ""
       : "(?:/.*)?";
-  return new RegExp(`^${source}${tail}$`);
+  return new RegExp(`^${head}${globSource(trimmed)}${tail}$`);
 }
 
 /** The pattern and owners of one line, before any trailing comment. */

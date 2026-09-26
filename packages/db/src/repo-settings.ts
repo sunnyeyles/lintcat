@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import type { Database } from "./client";
 import { repoSettings, type RepoReviewMode, type RepoSettings } from "./schema";
@@ -55,7 +55,7 @@ export async function saveRepoSettings(
     .values(values)
     .onConflictDoUpdate({
       target: repoSettings.repoId,
-      set: { ...input, updatedAt: sql`now()` },
+      set: input,
     })
     .returning();
   if (!row) throw new Error("repo settings upsert returned no row");

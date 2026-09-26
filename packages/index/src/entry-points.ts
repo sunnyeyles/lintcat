@@ -4,11 +4,12 @@
  */
 import type { PackageManifest } from "#src/manifests";
 import {
-  basenameOf,
   directoryOf,
+  directorySegments,
   extensionOf,
   joinPath,
   MODULE_EXTENSIONS,
+  stemOf,
 } from "#src/paths";
 import { moduleCandidates } from "#src/resolve";
 import type { FileRole } from "#src/roles";
@@ -102,13 +103,6 @@ export function collectEntryPoints(
   return { declared, indexDirectories };
 }
 
-/** The base name with its last extension dropped, lowercased. */
-function stemOf(path: string): string {
-  const base = basenameOf(path);
-  const dot = base.lastIndexOf(".");
-  return (dot <= 0 ? base : base.slice(0, dot)).toLowerCase();
-}
-
 /** True when something other than an import reaches this file. */
 export function isEntryPoint(
   path: string,
@@ -122,17 +116,14 @@ export function isEntryPoint(
     return true;
   }
   if (
-    path
-      .split("/")
-      .slice(0, -1)
-      .some((segment) => ENTRY_DIRECTORIES.has(segment))
+    directorySegments(path).some((segment) => ENTRY_DIRECTORIES.has(segment))
   ) {
     return true;
   }
   if (!MODULE_EXTENSIONS.includes(extensionOf(path))) {
     return false;
   }
-  const stem = stemOf(path);
+  const stem = stemOf(path, "last").toLowerCase();
   return (
     FRAMEWORK_STEMS.has(stem) ||
     (stem === "index" && entries.indexDirectories.has(directoryOf(path)))
