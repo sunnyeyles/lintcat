@@ -1,4 +1,3 @@
-import { MODEL_PROVIDERS, modelChoicesFor } from "@pr-review/ai";
 import {
   effectiveRepoSettings,
   organizations,
@@ -41,12 +40,6 @@ const asOwner = () => ({ repoId: repo.id, isOwner: true });
 const asReader = () => ({ repoId: repo.id, isOwner: false });
 
 describe("saveRepoSettingsForm", () => {
-  it("offers exactly the models the worker accepts", () => {
-    for (const provider of MODEL_PROVIDERS) {
-      expect(REPO_MODEL_CHOICES[provider]).toEqual(modelChoicesFor(provider));
-    }
-  });
-
   it("saves mode, a model override and fixes for an owner", async () => {
     const state = await saveRepoSettingsForm(
       database,

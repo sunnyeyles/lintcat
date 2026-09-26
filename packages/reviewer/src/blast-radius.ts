@@ -7,6 +7,7 @@ import {
   type RepositoryIndex,
 } from "@pr-review/index";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
+import { CHANGE_STATUSES } from "@pr-review/schemas";
 
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { scoreRisk, type RiskScore } from "#src/risk-score";
@@ -16,11 +17,11 @@ export interface BlastRadius {
   readonly risk: RiskScore;
 }
 
-const CHANGE_STATUSES = new Set(["added", "modified", "removed", "renamed"]);
+const KNOWN_STATUSES = new Set<string>(CHANGE_STATUSES);
 
 // GitHub's copied, changed and unchanged have no status of their own here.
 export function changeStatus(status: string): ImpactChange["status"] {
-  return CHANGE_STATUSES.has(status)
+  return KNOWN_STATUSES.has(status)
     ? (status as ImpactChange["status"])
     : "modified";
 }

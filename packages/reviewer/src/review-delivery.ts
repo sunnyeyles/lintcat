@@ -13,6 +13,7 @@ import {
 } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
 import {
+  countLabel,
   MAX_REPOSITORY_GRAPH_BASE64,
   MAX_RISK_DEPENDENTS,
   type ReviewRecordGraph,
@@ -168,7 +169,7 @@ export function dashboardReview({
   const graph =
     outcome.graph === undefined ? undefined : graphPayload(outcome.graph);
   return {
-    summary: count === 1 ? "1 finding" : `${count} findings`,
+    summary: countLabel(count, "finding"),
     durationMs,
     baseSha: outcome.baseSha,
     changedFiles: outcome.changedFiles.map((file) => ({

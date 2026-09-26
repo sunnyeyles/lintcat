@@ -1,5 +1,6 @@
 import { authorize } from "@pr-review/db";
 import { createDbSource, type DataSource, type ReviewSummary } from "@pr-review/db/dashboard";
+import { shortSha } from "@pr-review/schemas";
 
 import type { McpEnvironment } from "#src/environment";
 
@@ -13,7 +14,7 @@ export function summariseReview(review: ReviewSummary) {
     id: review.id,
     repo: `${review.repo.owner}/${review.repo.name}`,
     prNumber: review.prNumber,
-    headSha: review.headSha.slice(0, 7),
+    headSha: shortSha(review.headSha),
     createdAt: review.createdAt,
     summary: review.summary,
     findingCount: review.findingCount,

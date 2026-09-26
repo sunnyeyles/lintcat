@@ -1,16 +1,15 @@
 import type { RepositoryGraphSnapshot } from "@pr-review/index";
-import type { ReviewRecordChangedFile } from "@pr-review/schemas";
+import type {
+  ReviewRecordChangedFile,
+  Severity,
+  TokenUsage,
+} from "@pr-review/schemas";
 
 import type { Finding, Organization, Repo, Review } from "../schema";
 
-export type Severity = "low" | "medium" | "high";
+export type { Severity };
 
-export type TokenCounts = {
-  inputTokens: number;
-  cacheCreationInputTokens: number;
-  cacheReadInputTokens: number;
-  outputTokens: number;
-};
+export type TokenCounts = TokenUsage;
 
 export type ReviewSummary = Review &
   TokenCounts & {

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { SEVERITIES } from "#src/severity";
+
 /**
  * A category names one review agent, and the agent set is configurable — the
  * shape is constrained here, membership against the run's agents.
@@ -15,7 +17,7 @@ export type FindingCategory = z.infer<typeof findingCategorySchema>;
  * A mechanical replacement of new-side lines `startLine`..`endLine`.
  * `expected` is that range's exact current text; a mismatch discards the patch.
  */
-const findingPatchSchema = z
+export const findingPatchSchema = z
   .object({
     startLine: z.number().int().positive(),
     endLine: z.number().int().positive(),
@@ -37,7 +39,7 @@ export const reviewFindingSchema = z.object({
   file: z.string().min(1),
   line: z.number().int().positive().optional(),
   category: findingCategorySchema,
-  severity: z.enum(["low", "medium", "high"]),
+  severity: z.enum(SEVERITIES),
   title: z.string().min(1),
   explanation: z.string().min(1),
   suggestedFix: z.string().min(1).optional(),

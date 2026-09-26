@@ -5,19 +5,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { AgentUsageReport } from "@pr-review/ai";
 import {
   addTokenUsage,
+  costOf,
   emptyTokenUsage,
-  type AgentUsageReport,
+  modelPrice,
   type TokenUsage,
-} from "@pr-review/ai";
-
-/** USD per million tokens: input, cache write, cache read, output. */
-const PRICES: Record<string, readonly [number, number, number, number]> = {
-  "claude-sonnet-5": [2, 2.5, 0.2, 10],
-  "claude-sonnet-4-5": [3, 3.75, 0.3, 15],
-  "claude-haiku-4-5": [1, 1.25, 0.1, 5],
-};
+} from "@pr-review/schemas";
 
 /** What one fixture's review spent, and how its assertions went. */
 export interface FixtureUsageRow {
@@ -40,22 +35,12 @@ export interface UsageReport {
   totals: Omit<FixtureUsageRow, "fixture">;
 }
 
+/** Undefined for an unpriced model: a report must not pass a guess off as its cost. */
 export function estimateCostUsd(
   model: string,
   usage: TokenUsage,
 ): number | undefined {
-  const price = PRICES[model];
-  if (price === undefined) {
-    return undefined;
-  }
-  const [input, cacheWrite, cacheRead, output] = price;
-  return (
-    (usage.inputTokens * input +
-      usage.cacheCreationInputTokens * cacheWrite +
-      usage.cacheReadInputTokens * cacheRead +
-      usage.outputTokens * output) /
-    1_000_000
-  );
+  return modelPrice(model) === undefined ? undefined : costOf(model, usage);
 }
 
 export function createUsageCollector(model: string) {

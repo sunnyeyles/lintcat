@@ -1,8 +1,9 @@
 /** The command line: what `pr-review` was asked to do, before anything is read. */
 import type { LocalScope } from "@pr-review/mcp/local-review";
+import type { Severity } from "@pr-review/schemas";
 
 /** The severity that makes a review fail; "off" never fails. */
-export type FailOn = "low" | "medium" | "high" | "off";
+export type FailOn = Severity | "off";
 
 const FAIL_ON: readonly FailOn[] = ["low", "medium", "high", "off"];
 

@@ -3,13 +3,14 @@
  * caller owns the API call. validateFindings already settles anchoring.
  */
 import type { ReviewComment } from "@pr-review/github";
-import type { ReviewFinding } from "@pr-review/schemas";
-
-import { countLabel, heading, summarise } from "#src/finding-format";
 import {
   compareFindingStrength,
-  normaliseTitle,
-} from "#src/validate-findings";
+  countLabel,
+  type ReviewFinding,
+} from "@pr-review/schemas";
+
+import { heading, summarise } from "#src/finding-format";
+import { normaliseTitle } from "#src/validate-findings";
 
 export interface RenderedReview {
   body: string;

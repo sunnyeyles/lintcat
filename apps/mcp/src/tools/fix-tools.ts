@@ -3,9 +3,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   applyVerifiedPatches,
+  exceededPatchCap,
   MAX_PATCHED_FILES,
   MAX_PATCHED_LINES,
+  patchLineCount,
 } from "@pr-review/reviewer";
+import { findingPatchSchema, type FindingPatch } from "@pr-review/schemas";
 import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
@@ -14,25 +17,17 @@ import type { McpEnvironment } from "#src/environment";
 import { repositoryRoot, resolveInside } from "#src/local-git-client";
 import { repoPathSchema } from "#src/tools/shared";
 
-type FindingPatch = Parameters<typeof applyVerifiedPatches>[1][number];
-
-const patchSchema = z
-  .object({
+const patchSchema = findingPatchSchema
+  .safeExtend({
     file: z
       .string()
       .min(1)
       .describe('Repository-relative path, exactly as the finding reported it, e.g. "src/auth.ts".'),
-    startLine: z.number().int().positive().describe("First line the patch replaces, 1-based."),
-    endLine: z.number().int().positive().describe("Last line the patch replaces, inclusive."),
-    expected: z
-      .string()
-      .min(1)
-      .describe("That range's exact current text. A mismatch means the file moved, and the call is refused."),
-    replacement: z.string().describe("The text to put in its place; empty deletes the range."),
   })
-  .refine((patch) => patch.endLine >= patch.startLine, {
-    message: "endLine must not precede startLine",
-  });
+  .describe(
+    "Replaces lines startLine..endLine (1-based, inclusive) with `replacement`; empty deletes them. " +
+      "`expected` is that range's exact current text: a mismatch means the file moved, and the call is refused.",
+  );
 
 type FixPatch = z.infer<typeof patchSchema>;
 
@@ -42,10 +37,6 @@ interface PlannedFile {
   original: string;
   content: string;
   patchCount: number;
-}
-
-function lineCount(patch: FixPatch): number {
-  return patch.endLine - patch.startLine + 1;
 }
 
 function byFile(patches: readonly FixPatch[]): Map<string, FixPatch[]> {
@@ -62,13 +53,14 @@ function byFile(patches: readonly FixPatch[]): Map<string, FixPatch[]> {
 }
 
 function assertWithinCaps(patches: readonly FixPatch[], files: number): void {
-  if (files > MAX_PATCHED_FILES) {
+  const lines = patches.reduce((total, patch) => total + patchLineCount(patch), 0);
+  const exceeded = exceededPatchCap(files, lines);
+  if (exceeded === "files") {
     throw new Error(
       `A fix may touch at most ${MAX_PATCHED_FILES} files; this one names ${files}. Nothing was written.`,
     );
   }
-  const lines = patches.reduce((total, patch) => total + lineCount(patch), 0);
-  if (lines > MAX_PATCHED_LINES) {
+  if (exceeded === "lines") {
     throw new Error(
       `A fix may replace at most ${MAX_PATCHED_LINES} lines; this one replaces ${lines}. Nothing was written.`,
     );

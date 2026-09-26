@@ -1,7 +1,10 @@
-// Provider selection: adding a provider is an entry in PROVIDERS and nothing else.
+// Provider selection: adding a provider is an entry here and in @pr-review/schemas' MODEL_PROVIDERS.
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import { MODEL_CHOICES, MODEL_PROVIDERS, type ModelProvider } from "@pr-review/schemas";
 import type { LanguageModel } from "ai";
+
+export { MODEL_CHOICES, MODEL_PROVIDERS, type ModelProvider };
 
 /** The SDK also accepts a gateway model string; we always build a model object. */
 export type ReviewModel = Extract<LanguageModel, { modelId: string }>;
@@ -41,11 +44,7 @@ const PROVIDERS = {
         ...(baseUrl === undefined ? {} : { baseURL: baseUrl }),
       }).chat(modelId),
   },
-} as const satisfies Record<string, ProviderEntry>;
-
-export type ModelProvider = keyof typeof PROVIDERS;
-
-export const MODEL_PROVIDERS = Object.keys(PROVIDERS) as ModelProvider[];
+} as const satisfies Record<ModelProvider, ProviderEntry>;
 
 /** The provider used when configuration names none. */
 export const DEFAULT_MODEL_PROVIDER: ModelProvider = "openai";
@@ -79,12 +78,6 @@ export function resolveModelProvider(selection: string): ModelProvider {
 export function defaultModelFor(provider: ModelProvider): string {
   return PROVIDERS[provider].defaultModel;
 }
-
-// A hosted repo's model choice, one level below the provider chosen by its key.
-const MODEL_CHOICES: Record<ModelProvider, readonly string[]> = {
-  anthropic: ["claude-sonnet-5", "claude-haiku-4-5", "claude-sonnet-4-5"],
-  openai: ["gpt-5.6-luna", "gpt-5.6-luna-mini"],
-};
 
 export function modelChoicesFor(provider: ModelProvider): readonly string[] {
   return MODEL_CHOICES[provider];

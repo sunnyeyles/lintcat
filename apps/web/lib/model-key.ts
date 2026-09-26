@@ -5,11 +5,19 @@ import {
   type MembershipRole,
   type Organization,
 } from "@pr-review/db";
+import { MODEL_PROVIDERS, type ModelProvider } from "@pr-review/schemas";
 import { z } from "zod";
 
-/** The providers a hosted review can run on; a test keeps this in step with @pr-review/ai. */
-export const MODEL_KEY_PROVIDERS = { anthropic: "Anthropic", openai: "OpenAI" } as const;
-export type ModelKeyProvider = keyof typeof MODEL_KEY_PROVIDERS;
+/** Display names for the providers a hosted review can run on. */
+export const MODEL_KEY_PROVIDERS = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+} as const satisfies Record<ModelProvider, string>;
+export type ModelKeyProvider = ModelProvider;
+
+export function isModelKeyProvider(value: string | undefined): value is ModelKeyProvider {
+  return value !== undefined && (MODEL_PROVIDERS as readonly string[]).includes(value);
+}
 
 // What the form sees after a submit; it never carries the key back to the browser.
 export type ModelKeyFormState =
@@ -19,7 +27,7 @@ export type ModelKeyFormState =
   | { status: "error"; message: string };
 
 const formSchema = z.object({
-  provider: z.enum(Object.keys(MODEL_KEY_PROVIDERS) as [ModelKeyProvider, ...ModelKeyProvider[]], {
+  provider: z.enum(MODEL_PROVIDERS, {
     error: "Choose a provider.",
   }),
   apiKey: z

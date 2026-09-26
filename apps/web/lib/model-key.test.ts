@@ -1,6 +1,5 @@
 import { randomBytes } from "node:crypto";
 
-import { MODEL_PROVIDERS } from "@pr-review/ai";
 import {
   modelKeys,
   organizations,
@@ -11,11 +10,7 @@ import {
 import { createTestDatabase } from "@pr-review/db/test-database";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  MODEL_KEY_PROVIDERS,
-  removeModelKeyForm,
-  saveModelKeyForm,
-} from "@/lib/model-key";
+import { removeModelKeyForm, saveModelKeyForm } from "@/lib/model-key";
 
 const encryptionKey = randomBytes(32);
 const API_KEY = "sk-ant-api03-abcdefghijklmnop-wxyz";
@@ -41,10 +36,6 @@ const owner = () => ({ organization, role: "owner" as const });
 const member = () => ({ organization, role: "member" as const });
 
 describe("saveModelKeyForm", () => {
-  it("offers exactly the providers the reviewer can run", () => {
-    expect(Object.keys(MODEL_KEY_PROVIDERS).sort()).toEqual([...MODEL_PROVIDERS].sort());
-  });
-
   it("saves the key sealed and answers with only its last four characters", async () => {
     const state = await saveModelKeyForm(
       database,

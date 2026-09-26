@@ -8,13 +8,17 @@ import type {
   CheckRunConclusion,
   CheckRunOutput,
 } from "@pr-review/github";
-import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
+import {
+  categoryLabel,
+  compareFindingStrength,
+  countLabel,
+  type ReviewFinding,
+} from "@pr-review/schemas";
 
 import type { BlastRadius } from "#src/blast-radius";
-import { countLabel, summarise } from "#src/finding-format";
+import { summarise } from "#src/finding-format";
 import type { PostedFinding } from "#src/render-review";
 import type { SuggestedReviewer } from "#src/suggest-reviewers";
-import { compareFindingStrength } from "#src/validate-findings";
 
 /** The GitHub checks API accepts at most 50 annotations per request. */
 export const MAX_ANNOTATIONS_PER_REQUEST = 50;

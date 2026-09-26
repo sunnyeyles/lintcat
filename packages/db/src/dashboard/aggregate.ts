@@ -1,3 +1,12 @@
+import {
+  addTokenUsage,
+  costOf as modelCostOf,
+  emptySeverityCounts,
+  emptyTokenUsage,
+  SEVERITIES,
+  type TokenUsage,
+} from "@pr-review/schemas";
+
 import type { Repo } from "../schema";
 
 import {
@@ -5,43 +14,20 @@ import {
   type Range,
   type ReviewDetail,
   type Severity,
-  type TokenCounts,
   type Trends,
   type Usage,
   type UsagePoint,
 } from "./types";
 
-// USD per million tokens; cache reads bill at a tenth of input.
-const PRICE = { input: 3, cacheWrite: 3.75, cacheRead: 0.3, output: 15 };
+export const emptySeverity: () => Record<Severity, number> = emptySeverityCounts;
 
-export function emptySeverity(): Record<Severity, number> {
-  return { low: 0, medium: 0, high: 0 };
+function addTokens(into: TokenUsage, from: TokenUsage) {
+  Object.assign(into, addTokenUsage(into, from));
 }
 
-function zeroTokens(): TokenCounts {
-  return {
-    inputTokens: 0,
-    cacheCreationInputTokens: 0,
-    cacheReadInputTokens: 0,
-    outputTokens: 0,
-  };
-}
-
-function addTokens(into: TokenCounts, from: TokenCounts) {
-  into.inputTokens += from.inputTokens;
-  into.cacheCreationInputTokens += from.cacheCreationInputTokens;
-  into.cacheReadInputTokens += from.cacheReadInputTokens;
-  into.outputTokens += from.outputTokens;
-}
-
-export function costOf(t: TokenCounts): number {
-  return (
-    (t.inputTokens * PRICE.input +
-      t.cacheCreationInputTokens * PRICE.cacheWrite +
-      t.cacheReadInputTokens * PRICE.cacheRead +
-      t.outputTokens * PRICE.output) /
-    1_000_000
-  );
+// Reviews do not record their model, so every one is costed at the fallback rate.
+export function costOf(t: TokenUsage): number {
+  return modelCostOf(undefined, t);
 }
 
 function dayKey(d: Date): string {
@@ -100,22 +86,19 @@ export function computeTrends(
   const byDay = new Map(
     dayBuckets(range).map((date) => [
       date,
-      { date, reviews: 0, low: 0, medium: 0, high: 0 },
+      { date, reviews: 0, ...emptySeverity() },
     ]),
   );
   const bySeverity = emptySeverity();
   const durations: number[] = [];
   for (const v of scoped) {
     durations.push(v.durationMs);
-    bySeverity.low += v.bySeverity.low;
-    bySeverity.medium += v.bySeverity.medium;
-    bySeverity.high += v.bySeverity.high;
     const bucket = byDay.get(dayKey(v.createdAt));
-    if (!bucket) continue;
-    bucket.reviews += 1;
-    bucket.low += v.bySeverity.low;
-    bucket.medium += v.bySeverity.medium;
-    bucket.high += v.bySeverity.high;
+    if (bucket) bucket.reviews += 1;
+    for (const severity of SEVERITIES) {
+      bySeverity[severity] += v.bySeverity[severity];
+      if (bucket) bucket[severity] += v.bySeverity[severity];
+    }
   }
 
   return {
@@ -123,7 +106,7 @@ export function computeTrends(
     byCategory,
     totals: {
       reviews: scoped.length,
-      findings: bySeverity.low + bySeverity.medium + bySeverity.high,
+      findings: SEVERITIES.reduce((sum, severity) => sum + bySeverity[severity], 0),
       bySeverity,
       medianDurationMs: median(durations),
     },
@@ -137,15 +120,15 @@ export function computeUsage(
   range: Range,
 ): Usage {
   const byDay = new Map<string, UsagePoint>(
-    dayBuckets(range).map((date) => [date, { date, costUsd: 0, ...zeroTokens() }]),
+    dayBuckets(range).map((date) => [date, { date, costUsd: 0, ...emptyTokenUsage() }]),
   );
-  const totals = zeroTokens();
-  const byRepo = new Map<number, { reviewCount: number; tokens: TokenCounts }>();
+  const totals = emptyTokenUsage();
+  const byRepo = new Map<number, { reviewCount: number; tokens: TokenUsage }>();
   for (const v of scoped) {
     addTokens(totals, v);
     let entry = byRepo.get(v.repoId);
     if (!entry) {
-      entry = { reviewCount: 0, tokens: zeroTokens() };
+      entry = { reviewCount: 0, tokens: emptyTokenUsage() };
       byRepo.set(v.repoId, entry);
     }
     entry.reviewCount += 1;
@@ -160,7 +143,7 @@ export function computeUsage(
     .map((repo) => {
       const { reviewCount, tokens } = byRepo.get(repo.id) ?? {
         reviewCount: 0,
-        tokens: zeroTokens(),
+        tokens: emptyTokenUsage(),
       };
       return { repo, reviewCount, costUsd: costOf(tokens), ...tokens };
     })

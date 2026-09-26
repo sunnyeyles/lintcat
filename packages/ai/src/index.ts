@@ -9,6 +9,7 @@ export {
   resolveModelId,
   resolveModelProvider,
   DEFAULT_MODEL_PROVIDER,
+  MODEL_CHOICES,
   MODEL_PROVIDERS,
   ModelProviderError,
   apiKeyEnvFor,

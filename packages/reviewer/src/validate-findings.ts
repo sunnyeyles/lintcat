@@ -3,7 +3,11 @@
  * confidence, unverified, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
  */
 import type { ChangedFile } from "@pr-review/github";
-import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
+import {
+  compareFindingStrength,
+  wellFormedFindings,
+  type ReviewFinding,
+} from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
 
@@ -16,27 +20,6 @@ const UNVERIFIED_CLAIM =
 
 /** At most this many findings are published per review. */
 export const MAX_FINDINGS = 10;
-
-const severityRank: Record<ReviewFinding["severity"], number> = {
-  high: 3,
-  medium: 2,
-  low: 1,
-};
-
-/**
- * Orders findings strongest first: severity rank, then confidence, descending.
- * Ties keep the caller's order, since Array.prototype.sort is stable.
- */
-export function compareFindingStrength(
-  a: ReviewFinding,
-  b: ReviewFinding,
-): number {
-  const severityDelta = severityRank[b.severity] - severityRank[a.severity];
-  if (severityDelta !== 0) {
-    return severityDelta;
-  }
-  return b.confidence - a.confidence;
-}
 
 /** Titles compare on words alone, so punctuation and case cannot split a pair. */
 export function normaliseTitle(title: string): string {

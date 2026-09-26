@@ -31,6 +31,8 @@ export {
 } from "#src/apply-fixes";
 export {
   applyVerifiedPatches,
+  exceededPatchCap,
+  patchLineCount,
   verifyPatches,
   MAX_PATCHED_FILES,
   MAX_PATCHED_LINES,
