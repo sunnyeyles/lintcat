@@ -311,7 +311,7 @@ worktree_idle_seconds() {
   admin=$(git -C "$path" rev-parse --absolute-git-dir 2>/dev/null) || return 1
   index="$admin/index"
   [ -f "$index" ] || return 1
-  mtime=$(stat -f %m "$index" 2>/dev/null || stat -c %Y "$index" 2>/dev/null)
+  mtime=$(stat -c %Y "$index" 2>/dev/null || stat -f %m "$index" 2>/dev/null)
   [ -n "$mtime" ] || return 1
   printf '%s' "$(($(date +%s) - mtime))"
 }
