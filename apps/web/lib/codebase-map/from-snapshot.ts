@@ -1,6 +1,5 @@
-import type { Severity } from "@pr-review/db/dashboard";
 import type { RepositoryGraphSnapshot } from "@pr-review/index";
-import type { ReviewRecordChangedFile } from "@pr-review/schemas";
+import type { ReviewRecordChangedFile, Severity } from "@pr-review/schemas";
 
 import type {
   FindingCounts,

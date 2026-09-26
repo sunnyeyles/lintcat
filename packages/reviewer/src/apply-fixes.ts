@@ -5,13 +5,14 @@
 import {
   httpStatus,
   isPermissionError,
+  reviewCorrelation,
   type RepositoryHistoryClient,
   type ReviewPublishClient,
 } from "@pr-review/github";
 import type { StructuredLogger } from "@pr-review/logging";
 
 import { fixCount } from "#src/finding-format";
-import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+import type { ReviewTarget } from "#src/review-target";
 import type { PatchedFile } from "#src/validate-patches";
 
 /** Names this system's own commits, so a later run does not fix its own fix. */

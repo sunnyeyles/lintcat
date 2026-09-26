@@ -2,7 +2,6 @@
  * Delivery: the one seam a review run writes through. GitHub, the dashboard
  * and publishing nothing at all are adapters here.
  */
-import type { TokenUsage } from "@pr-review/ai";
 import type {
   RepositoryHistoryClient,
   ReviewPublishClient,
@@ -18,6 +17,7 @@ import {
   MAX_RISK_DEPENDENTS,
   type ReviewRecordGraph,
   type ReviewRecordRisk,
+  type TokenUsage,
 } from "@pr-review/schemas";
 
 import { changeStatus, type BlastRadius } from "#src/blast-radius";

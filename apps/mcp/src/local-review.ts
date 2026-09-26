@@ -5,20 +5,6 @@ export {
   processEnvironment,
   type McpEnvironment,
 } from "#src/environment";
-export {
-  chooseScope,
-  LOCAL_SCOPE_KINDS,
-  openLocalRepository,
-  repositoryRoot,
-  type LocalRepository,
-  type LocalScope,
-  type ResolvedScope,
-} from "#src/local-git-client";
-export { openLocalMemoryStore, type LocalMemoryStore } from "#src/local-memory-store";
-export {
-  reviewLocalCheckout,
-  type LocalReviewRequest,
-  type LocalReviewRun,
-} from "#src/local-review-run";
-export { runReview, type ReviewRequest, type ReviewResult } from "#src/review";
-export { modelReviewEngine, type SelectedEngine } from "#src/review-engine";
+export { chooseScope, repositoryRoot, type LocalScope } from "#src/local-git-client";
+export { reviewLocalCheckout } from "#src/local-review-run";
+export { modelReviewEngine } from "#src/review-engine";

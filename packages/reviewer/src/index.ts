@@ -98,4 +98,4 @@ export {
   type RenderedReview,
   type ReviewNotes,
 } from "#src/render-review";
-export { reviewCorrelation, type ReviewTarget } from "#src/review-target";
+export type { ReviewTarget } from "#src/review-target";

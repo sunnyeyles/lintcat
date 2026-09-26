@@ -181,7 +181,7 @@ const membershipSchema = z.object({
   user: memberSchema.nullable(),
 });
 
-/** An installation as GitHub sends it, in API responses and webhook payloads alike. */
+// The same shape arrives in API responses and webhook payloads.
 export const installationSchema = z
   .object({
     id: z.number(),
@@ -196,10 +196,6 @@ export const installationSchema = z
     }),
   );
 
-export function parseInstallation(data: unknown): AppInstallation {
-  return installationSchema.parse(data);
-}
-
 /** Wraps per-installation Octokits in the App client; authentication is the caller's only job. */
 export function createAppClient(installation: InstallationOctokit): GithubAppClient {
   return {
@@ -207,7 +203,7 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
       const { data } = await installation(installationId).rest.apps.getInstallation({
         installation_id: installationId,
       });
-      return parseInstallation(data);
+      return installationSchema.parse(data);
     },
 
     async createInstallationToken(installationId) {
@@ -330,14 +326,10 @@ export function createGithubAppClient(config: GithubAppConfig): GithubAppClient 
   });
 }
 
-/** GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY; a single-line key carries its newlines as literal `\\n`. */
-export function githubAppConfigFromEnv(): GithubAppConfig {
-  return {
+// Single-line env values carry the PEM's newlines as literal `\n`.
+export function githubAppClientFromEnv(): GithubAppClient {
+  return createGithubAppClient({
     appId: requiredEnv("GITHUB_APP_ID"),
     privateKey: requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n"),
-  };
-}
-
-export function githubAppClientFromEnv(): GithubAppClient {
-  return createGithubAppClient(githubAppConfigFromEnv());
+  });
 }

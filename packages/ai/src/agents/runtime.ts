@@ -11,6 +11,7 @@ import {
   errorName,
   type StructuredLogger,
 } from "@pr-review/logging";
+import { addTokenUsage, emptyTokenUsage, type TokenUsage } from "@pr-review/schemas";
 import { generateText, isStepCount, type ModelMessage } from "ai";
 
 import {
@@ -31,12 +32,7 @@ import {
   type OpeningMessageLimits,
 } from "#src/agents/opening-message";
 import { createReviewTools, type ReviewToolsClient } from "#src/agents/tools";
-import {
-  addTokenUsage,
-  emptyTokenUsage,
-  toTokenUsage,
-  type TokenUsage,
-} from "#src/usage";
+import { toTokenUsage } from "#src/usage";
 
 /** One agent run's spend, reported on success and on failure alike. */
 export interface AgentUsageReport {
@@ -46,8 +42,6 @@ export interface AgentUsageReport {
   salvaged: boolean;
   usage: TokenUsage;
 }
-
-export { AgentRunError };
 
 /** Model-call round trips before the agent is declared failed. */
 const DEFAULT_MAX_TURNS = 12;

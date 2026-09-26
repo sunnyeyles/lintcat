@@ -4,8 +4,6 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { MODEL_CHOICES, MODEL_PROVIDERS, type ModelProvider } from "@pr-review/schemas";
 import type { LanguageModel } from "ai";
 
-export { MODEL_CHOICES, MODEL_PROVIDERS, type ModelProvider };
-
 /** The SDK also accepts a gateway model string; we always build a model object. */
 export type ReviewModel = Extract<LanguageModel, { modelId: string }>;
 

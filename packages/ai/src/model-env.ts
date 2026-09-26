@@ -1,12 +1,11 @@
-/** Model configuration read from environment variables whose names each caller picks. */
+import { MODEL_PROVIDERS, type ModelProvider } from "@pr-review/schemas";
+
 import {
   apiKeyEnvFor,
   DEFAULT_MODEL_PROVIDER,
   defaultModelFor,
-  MODEL_PROVIDERS,
   resolveModelProvider,
   type LanguageModelConfig,
-  type ModelProvider,
 } from "#src/model";
 
 type Env = Readonly<Record<string, string | undefined>>;

@@ -1,3 +1,4 @@
+import { emptySeverityCounts, type Severity } from "@pr-review/schemas";
 import {
   and,
   asc,
@@ -29,7 +30,6 @@ import {
   computeTrends,
   computeUsage,
   costOf,
-  emptySeverity,
   windowStart,
 } from "./aggregate";
 import type {
@@ -38,7 +38,6 @@ import type {
   RepoSummary,
   ReviewDetail,
   ReviewSummary,
-  Severity,
 } from "./types";
 
 type ReviewFilter = {
@@ -105,7 +104,7 @@ function toCategoryCounts(rows: CategoryRow[]): CategoryCount[] {
     let hit = seen.get(row.category);
     if (!hit) {
       hit = {
-        entry: { category: row.category, count: 0, bySeverity: emptySeverity() },
+        entry: { category: row.category, count: 0, bySeverity: emptySeverityCounts() },
         firstSeen: row.firstSeen,
       };
       seen.set(row.category, hit);
@@ -196,7 +195,7 @@ export function createDbSource(
     const severityFor = new Map<number, Record<Severity, number>>();
     for (const row of severityRows) {
       let counts = severityFor.get(row.reviewId);
-      if (!counts) severityFor.set(row.reviewId, (counts = emptySeverity()));
+      if (!counts) severityFor.set(row.reviewId, (counts = emptySeverityCounts()));
       counts[row.severity] += row.n;
     }
 
@@ -205,7 +204,7 @@ export function createDbSource(
         review,
         repo,
         findingsFor.get(review.id) ?? [],
-        severityFor.get(review.id) ?? emptySeverity(),
+        severityFor.get(review.id) ?? emptySeverityCounts(),
       ),
     );
   }

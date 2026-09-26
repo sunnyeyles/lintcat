@@ -1,7 +1,8 @@
 /** Writes a finished hosted run straight to the database, through the ingest write path. */
 import { ingestReviewRecord, type Database } from "@pr-review/db";
+import { reviewCorrelation } from "@pr-review/github";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
-import { reviewCorrelation, type PublishToDashboard } from "@pr-review/reviewer";
+import type { PublishToDashboard } from "@pr-review/reviewer";
 import type { ReviewRecord } from "@pr-review/schemas";
 
 /** Never throws: a review already published to GitHub must not fail on this step. */

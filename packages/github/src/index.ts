@@ -10,9 +10,7 @@ export {
   createAppClient,
   createGithubAppClient,
   githubAppClientFromEnv,
-  githubAppConfigFromEnv,
   installationSchema,
-  parseInstallation,
   type AppInstallation,
   type AppOctokitLike,
   type GithubAppClient,
@@ -25,7 +23,7 @@ export {
   type RepositoryPermission,
 } from "#src/app-client";
 export { parseBlamePorcelain } from "#src/blame";
-export { httpStatus, isPermissionError, notFoundAs } from "#src/errors";
+export { httpStatus, isPermissionError } from "#src/errors";
 export {
   SEARCH_LIMITS,
   boundSnippets,
@@ -40,7 +38,6 @@ export { createTokenClient, type GithubTokenConfig } from "#src/token";
 export {
   CHECK_RUN_NAME,
   reviewCorrelation,
-  type ReviewCorrelation,
   type AnnotationLevel,
   type BlameRange,
   type BlameRequest,

@@ -1,5 +1,4 @@
-import { requiredEnv } from "@pr-review/db";
-import { errorMessage, type StructuredLogger } from "@pr-review/logging";
+import { errorMessage, requiredEnv, type StructuredLogger } from "@pr-review/logging";
 import { after } from "next/server";
 
 export interface WorkerPingerConfig {

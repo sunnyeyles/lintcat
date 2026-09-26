@@ -1,5 +1,5 @@
 import type { ChartConfig } from "@pr-review/design/chart";
-import type { Severity, TokenCounts } from "@pr-review/db/dashboard";
+import type { Severity, TokenUsage } from "@pr-review/schemas";
 
 export type SeriesDef<K extends string> = { key: K; label: string };
 
@@ -16,7 +16,7 @@ export const SEVERITY_CONFIG = {
   high: { label: "High", color: "var(--severity-high)" },
 } satisfies ChartConfig;
 
-export type TokenKey = keyof TokenCounts;
+export type TokenKey = keyof TokenUsage;
 
 // Ordered cheapest to dearest per the price table, so loudness tracks unit price.
 export const TOKEN_SERIES: readonly SeriesDef<TokenKey>[] = [
@@ -33,7 +33,7 @@ export const TOKEN_CONFIG = {
   outputTokens: { label: "Output", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
-export function sumTokens(t: TokenCounts): number {
+export function sumTokens(t: TokenUsage): number {
   return (
     t.inputTokens +
     t.cacheCreationInputTokens +

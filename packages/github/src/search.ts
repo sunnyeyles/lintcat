@@ -15,7 +15,6 @@ export const SEARCH_LIMITS = {
 
 const SNIPPET_OVERFLOW_MARKER = "…";
 
-/** The last segment of a `/`-separated repository path. */
 export function basenameOf(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }

@@ -1,6 +1,5 @@
 /** Postgres (Neon) access via Drizzle: the `db()` client and the table schema. */
 export { db, withWriteDatabase, type Database } from "./client";
-export { findLocalEnvFile, requiredEnv } from "./env";
 export {
   ingestReviewRecord,
   type IngestFailure,

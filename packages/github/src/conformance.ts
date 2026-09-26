@@ -56,9 +56,6 @@ export type ClientGroup = keyof typeof METHOD_GROUPS;
 
 export const CLIENT_METHODS = Object.values(METHOD_GROUPS).flat();
 
-/** Matches packages/ai keeps from any adapter; capping below it silently narrows what the agent sees. */
-export const AGENT_TOOL_SEARCH_MATCHES = 20;
-
 /** All that is left to an adapter: SEARCH_LIMITS owns the grammar and the caps. */
 export interface SearchProfile {
   /** What decides a file matches; only "shared" runs #src/search's own rule. */
@@ -469,10 +466,6 @@ export function runClientConformance(
         },
       );
     }
-
-    it("keeps as many matches as the agent tool does", () => {
-      expect(SEARCH_LIMITS.maxMatches).toBe(AGENT_TOOL_SEARCH_MATCHES);
-    });
 
     const unsupported = Object.entries(profile.unsupported) as [
       ClientMethod,

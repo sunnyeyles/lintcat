@@ -4,6 +4,7 @@ import {
   emptySeverityCounts,
   emptyTokenUsage,
   SEVERITIES,
+  type Severity,
   type TokenUsage,
 } from "@pr-review/schemas";
 
@@ -13,13 +14,10 @@ import {
   type CategoryCount,
   type Range,
   type ReviewDetail,
-  type Severity,
   type Trends,
   type Usage,
   type UsagePoint,
 } from "./types";
-
-export const emptySeverity: () => Record<Severity, number> = emptySeverityCounts;
 
 function addTokens(into: TokenUsage, from: TokenUsage) {
   Object.assign(into, addTokenUsage(into, from));
@@ -67,7 +65,7 @@ export function categoryCounts(scoped: ReviewDetail[]): CategoryCount[] {
       const entry = categories.get(f.category) ?? {
         category: f.category,
         count: 0,
-        bySeverity: emptySeverity(),
+        bySeverity: emptySeverityCounts(),
       };
       entry.count += 1;
       entry.bySeverity[f.severity as Severity] += 1;
@@ -86,10 +84,10 @@ export function computeTrends(
   const byDay = new Map(
     dayBuckets(range).map((date) => [
       date,
-      { date, reviews: 0, ...emptySeverity() },
+      { date, reviews: 0, ...emptySeverityCounts() },
     ]),
   );
-  const bySeverity = emptySeverity();
+  const bySeverity = emptySeverityCounts();
   const durations: number[] = [];
   for (const v of scoped) {
     durations.push(v.durationMs);
