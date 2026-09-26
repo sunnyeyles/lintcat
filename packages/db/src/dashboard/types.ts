@@ -24,6 +24,12 @@ export type ReviewDetail = ReviewSummary & {
   findings: Finding[];
 };
 
+export type ReviewStat = TokenCounts &
+  Pick<Review, "id" | "repoId" | "createdAt" | "durationMs"> & {
+    bySeverity: Record<Severity, number>;
+    costUsd: number;
+  };
+
 export type RepoSummary = Repo & {
   reviewCount: number;
   findingCount: number;

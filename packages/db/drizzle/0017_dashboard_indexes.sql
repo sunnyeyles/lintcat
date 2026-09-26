@@ -1,0 +1,2 @@
+CREATE INDEX "findings_review_severity_idx" ON "findings" USING btree ("review_id","severity");--> statement-breakpoint
+CREATE INDEX "reviews_repo_created_idx" ON "reviews" USING btree ("repo_id","created_at");

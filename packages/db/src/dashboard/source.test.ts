@@ -436,8 +436,8 @@ describe("createDbSource deduplicates reads within one instance", () => {
       source.getUsage("30d"),
     ]);
 
-    expect(separate.selects()).toBe(6);
-    expect(shared.selects()).toBe(4);
+    expect(separate.selects()).toBe(4);
+    expect(shared.selects()).toBe(3);
     expect(trends).toEqual(apartTrends);
     expect(usage).toEqual(apartUsage);
   });

@@ -181,6 +181,7 @@ export const reviews = pgTable(
   },
   (t) => [
     uniqueIndex("reviews_repo_pr_head_sha_idx").on(t.repoId, t.prNumber, t.headSha),
+    index("reviews_repo_created_idx").on(t.repoId, t.createdAt),
   ],
 );
 
@@ -276,20 +277,24 @@ export const rateLimits = pgTable(
 );
 
 // Mirrors reviewFindingSchema in @pr-review/schemas; keep the two in step.
-export const findings = pgTable("findings", {
-  id: serial("id").primaryKey(),
-  reviewId: integer("review_id")
-    .notNull()
-    .references(() => reviews.id, { onDelete: "cascade" }),
-  file: text("file").notNull(),
-  line: integer("line"),
-  category: text("category").notNull(),
-  severity: severityEnum("severity").notNull(),
-  title: text("title").notNull(),
-  explanation: text("explanation").notNull(),
-  suggestedFix: text("suggested_fix"),
-  confidence: real("confidence").notNull(),
-});
+export const findings = pgTable(
+  "findings",
+  {
+    id: serial("id").primaryKey(),
+    reviewId: integer("review_id")
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    file: text("file").notNull(),
+    line: integer("line"),
+    category: text("category").notNull(),
+    severity: severityEnum("severity").notNull(),
+    title: text("title").notNull(),
+    explanation: text("explanation").notNull(),
+    suggestedFix: text("suggested_fix"),
+    confidence: real("confidence").notNull(),
+  },
+  (t) => [index("findings_review_severity_idx").on(t.reviewId, t.severity)],
+);
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
