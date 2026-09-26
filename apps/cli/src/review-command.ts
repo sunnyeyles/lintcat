@@ -1,17 +1,14 @@
 /** One `pr-review review`: the MCP server's local review path, printed to a terminal. */
 import path from "node:path";
 
-import { apiKeyEnvFor, MODEL_PROVIDERS } from "@pr-review/ai";
+import { modelApiKeyEnvNames } from "@pr-review/ai";
 import { createSilentLogger } from "@pr-review/logging";
 import {
   hasModelApiKey,
   modelReviewEngine,
-  openLocalMemoryStore,
-  openLocalRepository,
-  runReview,
+  reviewLocalCheckout,
   type McpEnvironment,
 } from "@pr-review/mcp/local-review";
-import { shortSha } from "@pr-review/schemas";
 
 import type { ReviewOptions } from "#src/options";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
@@ -35,7 +32,7 @@ const CANCELLED_MESSAGE = "pr-review: review cancelled before it finished; no ve
 function missingKeyMessage(): string {
   return (
     `No model API key is set, so there is nothing to run the review with. Set ` +
-    `${MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ")} in your environment or in this project's .env.local.`
+    `${modelApiKeyEnvNames()} in your environment or in this project's .env.local.`
   );
 }
 
@@ -60,30 +57,22 @@ async function review(
     err(missingKeyMessage());
     return EXIT_ERROR;
   }
-  const local = await openLocalRepository(
-    path.resolve(environment.cwd, options.repoPath ?? "."),
-    options.base,
-    options.scope,
+  const { result, where } = await reviewLocalCheckout(
+    { ...environment, logger: options.verbose ? environment.logger : createSilentLogger() },
+    {
+      repoPath: path.resolve(environment.cwd, options.repoPath ?? "."),
+      base: options.base,
+      scope: options.scope,
+      selectEngine: () => modelReviewEngine(environment),
+      index: options.index,
+      signal,
+      onStart: (changed, at) => err(`Reviewing ${changed} changed file(s): ${at}.`),
+    },
   );
-  const changed = await local.client.listChangedFiles(local.target);
-  const where = `${local.scope.headLabel} of ${local.root} against ${local.baseRef} (${shortSha(local.baseSha)})`;
-  if (changed.length === 0) {
+  if (result === undefined) {
     out(`Nothing to review: no changes in ${where}.`);
     return EXIT_OK;
   }
-  err(`Reviewing ${changed.length} changed file(s): ${where}.`);
-
-  const result = await runReview(
-    { ...environment, logger: options.verbose ? environment.logger : createSilentLogger() },
-    {
-      client: local.client,
-      target: local.target,
-      selected: modelReviewEngine(environment),
-      index: options.index,
-      memory: await openLocalMemoryStore(local.root),
-      signal,
-    },
-  );
 
   if (signal?.aborted === true) return EXIT_CANCELLED;
   const { findings, suppressed } = result.outcome;

@@ -7,7 +7,7 @@ import {
   MODEL_PROVIDERS,
   apiKeyEnvFor,
   defaultModelFor,
-  resolveModelProvider,
+  modelConfigFromEnv,
   type ModelProvider,
 } from "@pr-review/ai";
 
@@ -49,15 +49,12 @@ function missingApiKeyMessage(provider: ModelProvider): string {
 export function requireModelAccess(
   env: Record<string, string | undefined>,
 ): ModelAccess {
-  const provider = resolveModelProvider(env[PROVIDER_ENV]?.trim() ?? "");
-  const apiKey = env[apiKeyEnvFor(provider)]?.trim() ?? "";
+  const { provider, apiKey, modelId } = modelConfigFromEnv(env, {
+    provider: PROVIDER_ENV,
+    model: MODEL_ENV,
+  });
   if (apiKey === "") {
     throw new Error(missingApiKeyMessage(provider));
   }
-  const model = env[MODEL_ENV]?.trim() ?? "";
-  return {
-    provider,
-    apiKey,
-    model: model === "" ? defaultModelFor(provider) : model,
-  };
+  return { provider, apiKey, model: modelId };
 }

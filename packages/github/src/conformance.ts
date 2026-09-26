@@ -8,7 +8,7 @@ import type {
   RepositoryHistoryClient,
   ReviewPublishClient,
 } from "#src/client";
-import { SEARCH_LIMITS } from "#src/search";
+import { SEARCH_LIMITS, basenameOf } from "#src/search";
 
 export type ClientMethod =
   | keyof PullRequestReadClient
@@ -164,10 +164,6 @@ export interface ConformanceCase {
 }
 
 const SAMPLE_SHA = "9f2c1a4b7e5d3c8a6f0b2d4e6a8c0e2f4a6b8d0c";
-
-function baseName(path: string): string {
-  return path.slice(path.lastIndexOf("/") + 1);
-}
 
 /** Neither absent nor rejected, so the suite can hold the adapter to its answers. */
 function honours(profile: AdapterProfile, method: ClientMethod): boolean {
@@ -373,7 +369,7 @@ export function runClientConformance(
       expect(result.incompleteResults).toBe(false);
       expect(result.totalCount).toBeGreaterThanOrEqual(result.matches.length);
       for (const match of result.matches) {
-        expect(match.name).toBe(baseName(match.path));
+        expect(match.name).toBe(basenameOf(match.path));
         expectBoundedSnippets(match.snippets);
       }
       if (honoursQuery(profile)) {

@@ -2,14 +2,10 @@ import { execFile } from "node:child_process";
 import process from "node:process";
 
 import {
-  apiKeyEnvFor,
   createLanguageModel,
-  DEFAULT_MODEL_PROVIDER,
-  defaultModelFor,
-  MODEL_PROVIDERS,
-  resolveModelProvider,
+  modelApiKeyEnvNames,
+  modelConfigFromEnv,
   type LanguageModelConfig,
-  type ModelProvider,
   type ReviewModel,
 } from "@pr-review/ai";
 import { db, type Database } from "@pr-review/db";
@@ -68,47 +64,31 @@ export function processEnvironment(): McpEnvironment {
   };
 }
 
+const MODEL_ENV_NAMES = {
+  provider: "PR_REVIEW_MODEL_PROVIDER",
+  model: "PR_REVIEW_MODEL",
+  baseUrl: "PR_REVIEW_MODEL_BASE_URL",
+};
+
 /** The run's default model, and the factory an agent's own `model` uses. */
 export interface ModelSelection {
   model: ReviewModel;
 }
 
-/** Unset, the default provider wins when its key is present, else any provider that has one. */
-function selectProvider(env: Record<string, string | undefined>): ModelProvider {
-  const named = env["PR_REVIEW_MODEL_PROVIDER"]?.trim() ?? "";
-  if (named !== "") {
-    return resolveModelProvider(named);
-  }
-  const hasKey = (provider: ModelProvider) => (env[apiKeyEnvFor(provider)]?.trim() ?? "") !== "";
-  return [DEFAULT_MODEL_PROVIDER, ...MODEL_PROVIDERS].find(hasKey) ?? DEFAULT_MODEL_PROVIDER;
-}
-
 /** Whether resolveModel would find a key; a named but unknown provider still throws. */
 export function hasModelApiKey(environment: McpEnvironment): boolean {
-  const { env } = environment;
-  return (env[apiKeyEnvFor(selectProvider(env))]?.trim() ?? "") !== "";
+  return modelConfigFromEnv(environment.env, MODEL_ENV_NAMES).apiKey !== "";
 }
 
 /** Reads PR_REVIEW_MODEL_PROVIDER / PR_REVIEW_MODEL / PR_REVIEW_MODEL_BASE_URL and the provider's key. */
 export function resolveModel(environment: McpEnvironment): ModelSelection {
-  const { env } = environment;
-  const provider = selectProvider(env);
-  const keyEnv = apiKeyEnvFor(provider);
-  const apiKey = env[keyEnv]?.trim() ?? "";
-  if (apiKey === "") {
-    const keys = MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ");
-    throw new Error(`No model API key is set. Set ${keys} in the MCP server's environment or .env.local.`);
+  const config = modelConfigFromEnv(environment.env, MODEL_ENV_NAMES);
+  if (config.apiKey === "") {
+    throw new Error(
+      `No model API key is set. Set ${modelApiKeyEnvNames()} in the MCP server's environment or .env.local.`,
+    );
   }
-  const baseUrl = env["PR_REVIEW_MODEL_BASE_URL"]?.trim() ?? "";
-  const modelId = env["PR_REVIEW_MODEL"]?.trim() || defaultModelFor(provider);
-  return {
-    model: environment.createLanguageModel({
-      provider,
-      apiKey,
-      ...(baseUrl === "" ? {} : { baseUrl }),
-      modelId,
-    }),
-  };
+  return { model: environment.createLanguageModel(config) };
 }
 
 /** GITHUB_TOKEN, then GH_TOKEN, then the `gh` CLI's own login. */

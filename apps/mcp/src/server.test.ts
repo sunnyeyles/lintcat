@@ -298,7 +298,7 @@ describe("review_local_changes", () => {
     const client = await connect(environment());
 
     const { texts } = await call(client, "review_local_changes", { base: "main" });
-    expect(texts[0]).toContain("No changes between main");
+    expect(texts[0]).toContain("No changes in the working tree");
   });
 
   it("uses whichever provider has a key", async () => {
@@ -374,7 +374,7 @@ describe("review scopes", () => {
     const { isError, texts } = await call(client, "review_local_changes", { range: "HEAD..HEAD" });
 
     expect(isError).toBe(false);
-    expect(texts[0]).toContain("No changes between");
+    expect(texts[0]).toContain("No changes in");
     expect(createLanguageModel).not.toHaveBeenCalled();
   });
 });

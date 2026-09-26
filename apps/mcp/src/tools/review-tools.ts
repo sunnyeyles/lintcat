@@ -1,16 +1,16 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { shortSha } from "@pr-review/schemas";
 import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import { resolveGithubToken, type McpEnvironment } from "#src/environment";
-import { GitError } from "#src/git";
-import { openLocalRepository, type LocalRepository, type LocalScope } from "#src/local-git-client";
-import { openLocalMemoryStore } from "#src/local-memory-store";
+import { chooseScope, LOCAL_SCOPE_KINDS } from "#src/local-git-client";
+import { reviewLocalCheckout } from "#src/local-review-run";
 import { runReview, type ReviewResult } from "#src/review";
 import { selectReviewEngine } from "#src/review-engine";
-import { repoPathSchema } from "#src/tools/shared";
+import { jsonContent, repoPathSchema } from "#src/tools/shared";
 
 /** Said whenever sampling stood in for a provider key, so nobody reads this as a full review. */
 const SINGLE_SHOT_NOTICE =
@@ -29,7 +29,7 @@ const scopeSchema = {
         'or to HEAD for scope "staged". Not allowed with a range.',
     ),
   scope: z
-    .enum(["working-tree", "staged", "range"])
+    .enum(LOCAL_SCOPE_KINDS)
     .optional()
     .describe(
       'What to review: "working-tree" (default) is commits since the base plus uncommitted and ' +
@@ -42,39 +42,6 @@ const scopeSchema = {
       'Commit range, e.g. "HEAD~3..HEAD", "main...feature" or a single commit. Implies scope "range".',
     ),
 };
-
-interface ScopeArgs {
-  repoPath?: string | undefined;
-  base?: string | undefined;
-  scope?: "working-tree" | "staged" | "range" | undefined;
-  range?: string | undefined;
-}
-
-function chooseScope({ scope, range }: ScopeArgs): LocalScope {
-  const kind = scope ?? (range === undefined ? "working-tree" : "range");
-  if (kind === "range") {
-    if (range === undefined) {
-      throw new GitError('scope "range" needs a `range`, e.g. "HEAD~3..HEAD"');
-    }
-    return { kind, range };
-  }
-  if (range !== undefined) {
-    throw new GitError(`a \`range\` cannot be reviewed with scope "${kind}"; drop one of them`);
-  }
-  return { kind };
-}
-
-async function openScoped(
-  environment: McpEnvironment,
-  connection: ConnectedClient,
-  args: ScopeArgs,
-): Promise<LocalRepository> {
-  return openLocalRepository(
-    await resolveCheckoutPath(environment, connection, args.repoPath),
-    args.base,
-    chooseScope(args),
-  );
-}
 
 function reviewResult(result: ReviewResult, heading: string): CallToolResult {
   const { outcome } = result;
@@ -94,7 +61,7 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
         ? [{ type: "text" as const, text: SINGLE_SHOT_NOTICE }]
         : []),
       { type: "text", text: `${heading}${suppressed}\n\n${result.summary}` },
-      { type: "text", text: JSON.stringify(details, null, 2) },
+      jsonContent(details),
     ],
   };
 }
@@ -126,31 +93,18 @@ export function registerReviewTools(
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ index, ...args }, extra) => {
-      const local = await openScoped(environment, connection, args);
-      const files = await local.client.listChangedFiles(local.target);
-      if (files.length === 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `No changes between ${local.baseRef} and ${local.scope.headLabel} of ${local.root}.`,
-            },
-          ],
-        };
-      }
-      const result = await runReview(environment, {
-        client: local.client,
-        target: local.target,
-        selected: selectReviewEngine(environment, connection),
+      const { result, changedFiles, where } = await reviewLocalCheckout(environment, {
+        repoPath: await resolveCheckoutPath(environment, connection, args.repoPath),
+        base: args.base,
+        scope: chooseScope(args.scope, args.range),
+        selectEngine: () => selectReviewEngine(environment, connection),
         index,
-        memory: await openLocalMemoryStore(local.root),
         signal: extra.signal,
       });
-      return reviewResult(
-        result,
-        `Reviewed ${files.length} changed file(s) in ${local.root}: ${local.scope.headLabel} against ` +
-          `${local.baseRef} (${local.baseSha.slice(0, 7)}).`,
-      );
+      if (result === undefined) {
+        return { content: [{ type: "text", text: `No changes in ${where}.` }] };
+      }
+      return reviewResult(result, `Reviewed ${changedFiles} changed file(s): ${where}.`);
     },
   );
 
@@ -185,7 +139,7 @@ export function registerReviewTools(
         ...(publish ? { publishTo: client } : {}),
         signal: extra.signal,
       });
-      const where = `${owner}/${repo}#${number} at ${pullRequest.headSha.slice(0, 7)}`;
+      const where = `${owner}/${repo}#${number} at ${shortSha(pullRequest.headSha)}`;
       return reviewResult(
         result,
         publish ? `Reviewed and published to ${where}.` : `Dry-run review of ${where}; nothing was posted.`,

@@ -31,9 +31,6 @@ export type ReviewToolsClient = PullRequestReadClient &
 /** Tool results larger than this are truncated to bound token usage. */
 const MAX_TOOL_RESULT_CHARS = 32_000;
 
-// Bounded by the search module's caps, not by truncate(): truncation would cut the JSON mid-string.
-export const MAX_SEARCH_MATCHES = SEARCH_LIMITS.maxMatches;
-
 const TRUNCATION_MARKER =
   "\n[... truncated: result exceeded the size limit; read the rest with startLine and endLine]";
 
@@ -46,7 +43,8 @@ function renderSearchResult(result: CodeSearchResult): string {
     {
       totalCount: result.totalCount,
       incompleteResults: result.incompleteResults,
-      matches: result.matches.slice(0, MAX_SEARCH_MATCHES).map((match) => ({
+      // Bounded by the search caps, not truncate(): truncation would cut the JSON mid-string.
+      matches: result.matches.slice(0, SEARCH_LIMITS.maxMatches).map((match) => ({
         path: match.path,
         name: match.name,
         snippets: boundSnippets(match.snippets),

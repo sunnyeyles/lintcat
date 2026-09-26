@@ -2,6 +2,8 @@
  * The shared structured-logging seam: one single-line JSON object per event.
  * Fields must be JSON-serialisable and must never contain secrets.
  */
+export { findLocalEnvFile, loadLocalEnvFile, requiredEnv } from "#src/env";
+
 type LogLevel = "info" | "error";
 
 /** Extra structured fields on one log line. Never include secrets. */
@@ -18,28 +20,30 @@ function logLine(level: LogLevel, event: string, fields: LogFields): string {
   return JSON.stringify({ level, event, ...fields });
 }
 
-/** The production logger: info to stdout, error to stderr. */
-export function createConsoleLogger(): StructuredLogger {
+type WriteLine = (line: string) => void;
+
+function createLineLogger(info: WriteLine, error: WriteLine): StructuredLogger {
   return {
     info(event, fields = {}) {
-      console.log(logLine("info", event, fields));
+      info(logLine("info", event, fields));
     },
     error(event, fields = {}) {
-      console.error(logLine("error", event, fields));
+      error(logLine("error", event, fields));
     },
   };
 }
 
+const toStdout: WriteLine = (line) => console.log(line);
+const toStderr: WriteLine = (line) => console.error(line);
+
+/** The production logger: info to stdout, error to stderr. */
+export function createConsoleLogger(): StructuredLogger {
+  return createLineLogger(toStdout, toStderr);
+}
+
 /** Every level to stderr, for a process whose stdout carries a protocol. */
 export function createStderrLogger(): StructuredLogger {
-  return {
-    info(event, fields = {}) {
-      console.error(logLine("info", event, fields));
-    },
-    error(event, fields = {}) {
-      console.error(logLine("error", event, fields));
-    },
-  };
+  return createLineLogger(toStderr, toStderr);
 }
 
 /** Drops every line, for a command whose own output is the only thing worth reading. */

@@ -42,7 +42,8 @@ import {
 } from "#src/client";
 import { archiveBytes, readRepositoryTarball } from "#src/archive";
 import { blameAuthor, joinCommitRuns } from "#src/blame";
-import { httpStatus } from "#src/errors";
+import { notFoundAs } from "#src/errors";
+import { PAGE_SIZE, paginate } from "#src/paginate";
 
 /**
  * The slice of Octokit this package consumes. Octokit satisfies it
@@ -207,8 +208,6 @@ export interface OctokitLike {
   graphql(query: string, variables: Record<string, unknown>): Promise<unknown>;
 }
 
-const PAGE_SIZE = 100;
-
 /** The fields of a pulls.get response we map into PullRequestDetails. */
 const pullResponseSchema = z.object({
   number: z.number(),
@@ -230,9 +229,8 @@ const changedFilesSchema = z.array(
   }),
 );
 
-const checkRunResponseSchema = z.object({ id: z.number() });
-
-const reviewResponseSchema = z.object({ id: z.number() });
+/** A created check run or review: only its id is read back. */
+const createdResponseSchema = z.object({ id: z.number() });
 
 const reviewCommentsSchema = z.array(z.object({ body: z.string() }));
 
@@ -240,7 +238,7 @@ const REVIEW_THREADS_QUERY = `
   query ReviewThreads($owner: String!, $name: String!, $number: Int!, $cursor: String) {
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
-        reviewThreads(first: 100, after: $cursor) {
+        reviewThreads(first: ${PAGE_SIZE}, after: $cursor) {
           pageInfo { hasNextPage endCursor }
           nodes {
             isResolved
@@ -426,41 +424,24 @@ function contentFragments(
     .filter((fragment) => fragment !== undefined);
 }
 
-/** Walks numbered pages until a short one; GitHub sends no other end marker. */
-async function paginate<T>(
-  fetchPage: (page: number) => Promise<{ data: unknown }>,
-  parsePage: (data: unknown) => T[],
-): Promise<T[]> {
-  const items: T[] = [];
-  for (let page = 1; ; page += 1) {
-    const pageItems = parsePage((await fetchPage(page)).data);
-    items.push(...pageItems);
-    if (pageItems.length < PAGE_SIZE) {
-      return items;
-    }
-  }
+/** The head SHA of one branch; a missing branch is GitHub's 404. */
+async function branchTip(
+  octokit: OctokitLike,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string> {
+  const response = await octokit.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+  return refSchema.parse(response.data).object.sha;
 }
 
-/** The head SHA of one branch, or undefined when GitHub says it has none. */
-async function branchSha(
+function branchSha(
   octokit: OctokitLike,
   owner: string,
   repo: string,
   branch: string,
 ): Promise<string | undefined> {
-  try {
-    const response = await octokit.rest.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${branch}`,
-    });
-    return refSchema.parse(response.data).object.sha;
-  } catch (error) {
-    if (httpStatus(error) === 404) {
-      return undefined;
-    }
-    throw error;
-  }
+  return notFoundAs(undefined, () => branchTip(octokit, owner, repo, branch));
 }
 
 /** Branches the default branch's head when `branch` does not exist yet. */
@@ -488,32 +469,49 @@ async function ensureBranch(
   });
 }
 
+/** One repos.getContent entry, refused unless it is a plain file. */
+async function getFileEntry<T extends { type: string }>(
+  octokit: OctokitLike,
+  request: FileContentsRequest,
+  schema: z.ZodType<T>,
+): Promise<T> {
+  const response = await octokit.rest.repos.getContent({
+    owner: request.owner,
+    repo: request.repo,
+    path: request.path,
+    ref: request.ref,
+  });
+  if (Array.isArray(response.data)) {
+    throw new Error(`${request.path} is a directory, not a file`);
+  }
+  const data = schema.parse(response.data);
+  if (data.type !== "file") {
+    throw new Error(`${request.path} is a ${data.type}, not a file`);
+  }
+  return data;
+}
+
 /** The blob SHA an overwrite must supply; undefined when the file is new. */
 async function existingFileSha(
   octokit: OctokitLike,
   request: WriteFileRequest,
 ): Promise<string | undefined> {
-  try {
-    const response = await octokit.rest.repos.getContent({
-      owner: request.owner,
-      repo: request.repo,
-      path: request.path,
-      ref: request.branch,
-    });
-    if (Array.isArray(response.data)) {
-      throw new Error(`${request.path} is a directory, not a file`);
-    }
-    const data = existingFileSchema.parse(response.data);
-    if (data.type !== "file") {
-      throw new Error(`${request.path} is a ${data.type}, not a file`);
-    }
-    return data.sha;
-  } catch (error) {
-    if (httpStatus(error) === 404) {
-      return undefined;
-    }
-    throw error;
-  }
+  const entry = await notFoundAs(undefined, () =>
+    getFileEntry(octokit, { ...request, ref: request.branch }, existingFileSchema),
+  );
+  return entry?.sha;
+}
+
+async function getCommit(
+  octokit: OctokitLike,
+  request: { owner: string; repo: string; sha: string },
+): Promise<unknown> {
+  const response = await octokit.rest.repos.getCommit({
+    owner: request.owner,
+    repo: request.repo,
+    ref: request.sha,
+  });
+  return response.data;
 }
 
 /**
@@ -568,19 +566,7 @@ export function createInstallationClient(
     },
 
     async getFileContents(request: FileContentsRequest): Promise<string> {
-      const response = await octokit.rest.repos.getContent({
-        owner: request.owner,
-        repo: request.repo,
-        path: request.path,
-        ref: request.ref,
-      });
-      if (Array.isArray(response.data)) {
-        throw new Error(`${request.path} is a directory, not a file`);
-      }
-      const data = fileContentsSchema.parse(response.data);
-      if (data.type !== "file") {
-        throw new Error(`${request.path} is a ${data.type}, not a file`);
-      }
+      const data = await getFileEntry(octokit, request, fileContentsSchema);
       if (data.encoding !== "base64") {
         throw new Error(
           `${request.path} has unsupported content encoding "${data.encoding}"` +
@@ -647,31 +633,16 @@ export function createInstallationClient(
     },
 
     async listCommitFiles(request: CommitFilesRequest): Promise<string[]> {
-      const response = await octokit.rest.repos.getCommit({
-        owner: request.owner,
-        repo: request.repo,
-        ref: request.sha,
-      });
-      const data = commitFilesSchema.parse(response.data);
+      const data = commitFilesSchema.parse(await getCommit(octokit, request));
       return (data.files ?? []).map((file) => file.filename);
     },
 
-    async getBranchTip(request: BranchTipRequest): Promise<string> {
-      const response = await octokit.rest.git.getRef({
-        owner: request.owner,
-        repo: request.repo,
-        ref: `heads/${request.branch}`,
-      });
-      return refSchema.parse(response.data).object.sha;
+    getBranchTip(request: BranchTipRequest): Promise<string> {
+      return branchTip(octokit, request.owner, request.repo, request.branch);
     },
 
     async getCommitMessage(request: CommitMessageRequest): Promise<string> {
-      const response = await octokit.rest.repos.getCommit({
-        owner: request.owner,
-        repo: request.repo,
-        ref: request.sha,
-      });
-      return commitMessageSchema.parse(response.data).commit.message;
+      return commitMessageSchema.parse(await getCommit(octokit, request)).commit.message;
     },
 
     async blame(request: BlameRequest): Promise<BlameRange[]> {
@@ -724,7 +695,7 @@ export function createInstallationClient(
         conclusion: input.conclusion,
         output,
       });
-      return checkRunResponseSchema.parse(response.data);
+      return createdResponseSchema.parse(response.data);
     },
 
     listPullRequestCommitShas(ref: PullRequestRef): Promise<string[]> {
@@ -832,7 +803,7 @@ export function createInstallationClient(
           body: comment.body,
         })),
       });
-      return reviewResponseSchema.parse(response.data);
+      return createdResponseSchema.parse(response.data);
     },
 
     async createCommitOnBranch(input: CreateCommitInput): Promise<CommitRef> {

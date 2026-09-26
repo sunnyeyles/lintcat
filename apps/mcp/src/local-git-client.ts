@@ -16,6 +16,7 @@ import {
   type RepositoryFileEntry,
   type RepositoryHistoryClient,
 } from "@pr-review/github";
+import { errorMessage } from "@pr-review/logging";
 import type { ReviewTarget } from "@pr-review/reviewer";
 import { shortSha } from "@pr-review/schemas";
 
@@ -28,11 +29,32 @@ export const WORKING_TREE = "WORKING_TREE";
 /** git's own empty tree, the base of a range whose head is the root commit. */
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
+export const LOCAL_SCOPE_KINDS = ["working-tree", "staged", "range"] as const;
+
 /** Which slice of a checkout to review. */
 export type LocalScope =
   | { kind: "working-tree" }
   | { kind: "staged" }
   | { kind: "range"; range: string };
+
+/** No kind means "range" when a range is given, else "working-tree". */
+export function chooseScope(kind?: string | undefined, range?: string | undefined): LocalScope {
+  const named = kind ?? (range === undefined ? "working-tree" : "range");
+  const known = LOCAL_SCOPE_KINDS.find((candidate) => candidate === named);
+  if (known === undefined) {
+    throw new GitError(`scope must be one of ${LOCAL_SCOPE_KINDS.join(", ")}, not ${JSON.stringify(named)}`);
+  }
+  if (known === "range") {
+    if (range === undefined) {
+      throw new GitError('scope "range" needs a range, e.g. "HEAD~3..HEAD"');
+    }
+    return { kind: known, range };
+  }
+  if (range !== undefined) {
+    throw new GitError(`a range cannot be reviewed with scope "${known}"; drop one of them`);
+  }
+  return { kind: known };
+}
 
 export interface ResolvedScope {
   kind: LocalScope["kind"];
@@ -221,6 +243,10 @@ export async function openLocalRepository(
   return { ...repository, client: createLocalGitClient(repository) };
 }
 
+export function isWithin(root: string, candidate: string): boolean {
+  return candidate === root || candidate.startsWith(root + path.sep);
+}
+
 /** A path inside the checkout, with symlinks resolved; anything else is a 404. */
 export function resolveInside(root: string, file: string): string {
   const resolved = path.resolve(root, file);
@@ -230,7 +256,7 @@ export function resolveInside(root: string, file: string): string {
   } catch {
     throw new GitError(`${file} does not exist in the working tree`, 404);
   }
-  if (real !== root && !real.startsWith(root + path.sep)) {
+  if (!isWithin(root, real)) {
     throw new GitError(`${file} is outside the repository`, 404);
   }
   return real;
@@ -389,7 +415,7 @@ function createLocalGitClient(
     try {
       return await git(root, ["show", `${assertRef(ref)}:${file}`]);
     } catch (error) {
-      throw new GitError(`${file} does not exist at ${ref}: ${(error as Error).message}`, 404);
+      throw new GitError(`${file} does not exist at ${ref}: ${errorMessage(error)}`, 404);
     }
   };
 

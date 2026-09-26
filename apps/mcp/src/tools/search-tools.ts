@@ -1,10 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { resolveCheckoutPath } from "#src/checkout-path";
+import { checkoutRoot } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
-import { repositoryRoot, searchWorkingTree } from "#src/local-git-client";
+import { searchWorkingTree } from "#src/local-git-client";
 import { json, repoPathSchema } from "#src/tools/shared";
 
 /** Lines, not files, so `SEARCH_LIMITS.maxMatches` is a cap on a different thing. */
@@ -37,8 +37,7 @@ export function registerSearchTools(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ query, path: scope, repoPath }) => {
-      const checkout = await resolveCheckoutPath(environment, client, repoPath);
-      const root = await repositoryRoot(checkout);
+      const root = await checkoutRoot(environment, client, repoPath);
       const hits = await searchWorkingTree(root, query, scope);
       return json({
         root,

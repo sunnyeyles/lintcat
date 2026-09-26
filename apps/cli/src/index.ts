@@ -2,15 +2,14 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { findLocalEnvFile } from "@pr-review/db";
+import { loadLocalEnvFile } from "@pr-review/logging";
 import { processEnvironment } from "@pr-review/mcp/local-review";
 
 import { runCli } from "#src/cli";
 import { cancelOnInterrupt } from "#src/interrupt";
 
 // This project's .env.local, found from the command's own files, never the checkout it reviews.
-const envFile = findLocalEnvFile(path.dirname(fileURLToPath(import.meta.url)));
-if (envFile !== undefined) process.loadEnvFile(envFile);
+loadLocalEnvFile(path.dirname(fileURLToPath(import.meta.url)));
 
 /** How to launch this command again, for the hook it installs. */
 function commandLine(): string {

@@ -1,9 +1,5 @@
 /** Which way a review will be run: the key-backed tool loop, or one client-sampling call. */
-import {
-  apiKeyEnvFor,
-  createSamplingAgent,
-  MODEL_PROVIDERS,
-} from "@pr-review/ai";
+import { createSamplingAgent, modelApiKeyEnvNames } from "@pr-review/ai";
 import type { ReviewEngine } from "@pr-review/reviewer";
 
 import type { ConnectedClient } from "#src/client-capabilities";
@@ -17,7 +13,7 @@ export interface SelectedEngine {
 
 /** Said when the machine has neither a key nor a client willing to run the model. */
 function noModelAccessMessage(): string {
-  const keys = MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ");
+  const keys = modelApiKeyEnvNames();
   return (
     `No model API key is set and this client does not offer sampling, so there is no way to run a review. ` +
     `Set ${keys} in the MCP server's environment or .env.local, or connect from a client that answers sampling/createMessage.`
