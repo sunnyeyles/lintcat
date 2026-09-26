@@ -1,28 +1,19 @@
-import { cn } from "@pr-review/design";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Toc } from "@/components/docs/toc";
+import { PagerCard } from "@/components/ui/pager-card";
 import { docsNeighbours, type DocsPage, type Heading } from "@/lib/docs";
 
 function Neighbour({ page, direction }: { page: DocsPage; direction: "previous" | "next" }) {
   const next = direction === "next";
   return (
-    <Link
+    <PagerCard
       href={page.href}
-      className={cn(
-        "group flex flex-1 flex-col gap-1 rounded-sm border border-border bg-card px-4 py-3 no-underline transition-colors hover:border-primary",
-        next ? "items-end text-right" : "items-start",
-      )}
+      direction={next ? "forward" : "back"}
+      label={next ? "Next" : "Previous"}
     >
-      <span className="eyebrow flex items-center gap-1.5">
-        {next ? null : <ArrowLeft className="size-3" />}
-        {next ? "Next" : "Previous"}
-        {next ? <ArrowRight className="size-3" /> : null}
-      </span>
-      <span className="text-label text-foreground group-hover:text-link">{page.title}</span>
-    </Link>
+      <span className="text-label">{page.title}</span>
+    </PagerCard>
   );
 }
 

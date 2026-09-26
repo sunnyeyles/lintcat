@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
-import { DOCS_HOME, DOCS_PAGES, type Heading, LOOKS_FOR } from "@/lib/docs";
+import { DOCS_HOME, DOCS_PAGES, LOOKS_FOR, docsHeadings } from "@/lib/docs";
 import { INSTALL_APP_URL } from "@/lib/github-app";
 
 export const metadata: Metadata = {
@@ -12,12 +12,12 @@ export const metadata: Metadata = {
     "LintCat reviews your pull requests and leaves inline comments. Install the GitHub App; there is nothing to add to your CI.",
 };
 
-const HEADINGS: Heading[] = [
-  { id: "what-it-does", title: "What it does" },
-  { id: "getting-it", title: "Getting it on your repositories" },
-  { id: "reviewer", title: "What the reviewer looks for" },
-  { id: "keep-reading", title: "Keep reading" },
-];
+const [H, HEADINGS] = docsHeadings({
+  "what-it-does": "What it does",
+  "getting-it": "Getting it on your repositories",
+  reviewer: "What the reviewer looks for",
+  "keep-reading": "Keep reading",
+});
 
 export default function IntroductionPage() {
   return (
@@ -40,7 +40,7 @@ export default function IntroductionPage() {
         </Button>
       </div>
 
-      <Section id="what-it-does" title="What it does">
+      <Section {...H["what-it-does"]}>
         <P>
           One reviewer reads each pull request in a single pass, looking for correctness,
           security, performance, test and documentation problems. You don&rsquo;t need to
@@ -54,7 +54,7 @@ export default function IntroductionPage() {
         </P>
       </Section>
 
-      <Section id="getting-it" title="Getting it on your repositories">
+      <Section {...H["getting-it"]}>
         <P>
           Install the LintCat GitHub App on your personal account or an organization, and pick
           the repositories it may review. An owner of the account saves one Anthropic or OpenAI
@@ -74,7 +74,7 @@ export default function IntroductionPage() {
         </Note>
       </Section>
 
-      <Section id="reviewer" title="What the reviewer looks for">
+      <Section {...H.reviewer}>
         <Bullets>
           {LOOKS_FOR.map(([name, reviews]) => (
             <Bullet key={name}>
@@ -84,7 +84,7 @@ export default function IntroductionPage() {
         </Bullets>
       </Section>
 
-      <Section id="keep-reading" title="Keep reading">
+      <Section {...H["keep-reading"]}>
         <div className="grid gap-3 sm:grid-cols-2">
           {DOCS_PAGES.filter((page) => page.href !== DOCS_HOME).map((page) => (
             <Card key={page.href} className="transition-colors hover:border-primary">

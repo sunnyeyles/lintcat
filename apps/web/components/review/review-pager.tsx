@@ -1,8 +1,6 @@
-import { cn } from "@pr-review/design";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import Link from "next/link";
-
 import type { ReviewSummary } from "@pr-review/db/dashboard";
+
+import { PagerCard } from "@/components/ui/pager-card";
 import { organizationPath } from "@/lib/paths";
 
 export type ReviewPagerProps = {
@@ -21,23 +19,16 @@ function PagerLink({
   direction: "newer" | "older";
 }) {
   const newer = direction === "newer";
-  const Icon = newer ? ArrowLeft : ArrowRight;
   return (
-    <Link
+    <PagerCard
       href={organizationPath(slug, `/reviews/${review.id}`)}
-      className={cn(
-        "group flex min-w-0 flex-1 basis-56 items-center gap-2.5 rounded-sm border border-border bg-card px-3.5 py-3 transition-colors outline-none hover:border-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        newer ? "" : "flex-row-reverse text-right",
-      )}
+      direction={newer ? "back" : "forward"}
+      label={newer ? "Newer" : "Older"}
     >
-      <Icon className="size-3.5 shrink-0 text-muted-foreground group-hover:text-link" />
-      <span className="min-w-0">
-        <span className="text-muted-foreground text-xs tracking-wide uppercase block font-mono">{newer ? "Newer" : "Older"}</span>
-        <span className="block truncate font-mono text-sm text-foreground">
-          {review.repo.owner}/{review.repo.name} #{review.prNumber}
-        </span>
+      <span className="font-mono text-sm">
+        {review.repo.owner}/{review.repo.name} #{review.prNumber}
       </span>
-    </Link>
+    </PagerCard>
   );
 }
 

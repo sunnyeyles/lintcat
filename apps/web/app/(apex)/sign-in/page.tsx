@@ -1,13 +1,4 @@
-import {
-  Alert,
-  AlertDescription,
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@pr-review/design";
+import { Alert, AlertDescription, EmptyState } from "@pr-review/design";
 import { LogIn } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -18,11 +9,10 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { signInErrorMessage } from "@/lib/auth-errors";
 import { appDomain } from "@/lib/host";
 import { DASHBOARD_PATH, returnUrl, safeCallbackUrl } from "@/lib/paths";
+import type { SearchParams } from "@/lib/search-params";
 import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Sign in" };
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function SignInPage({
   searchParams,
@@ -51,24 +41,17 @@ export default async function SignInPage({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <LogIn />
-          </EmptyMedia>
-          <EmptyTitle>Reviews your agents wrote</EmptyTitle>
-          <EmptyDescription>
-            Sign in with GitHub to see your repositories, reviews and
-            findings.
-          </EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
+      <EmptyState
+        icon={<LogIn />}
+        title="Reviews your agents wrote"
+        description="Sign in with GitHub to see your repositories, reviews and findings."
+        action={
           <form action={signInWithGithub}>
             <input type="hidden" name="callbackUrl" value={callbackUrl} />
             <SubmitButton pendingLabel="Redirecting to GitHub">Sign in with GitHub</SubmitButton>
           </form>
-        </EmptyContent>
-      </Empty>
+        }
+      />
     </div>
   );
 }

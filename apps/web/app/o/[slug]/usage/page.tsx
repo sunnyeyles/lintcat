@@ -1,10 +1,5 @@
 import { costOf, type Range, type TokenCounts } from "@pr-review/db/dashboard";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@pr-review/design";
+import { EmptyState } from "@pr-review/design";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
@@ -22,11 +17,10 @@ import { PageHeader } from "@/components/shell";
 import { ChartCardSkeleton, StatGridSkeleton } from "@/components/ui";
 import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
-import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
+import { formatNumber, formatPercent, formatTokens, formatUsd, share } from "@/lib/format";
+import type { SearchParams } from "@/lib/search-params";
 
 export const metadata: Metadata = { title: "Tokens & cost" };
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const NO_TOKENS: TokenCounts = {
   inputTokens: 0,
@@ -35,19 +29,15 @@ const NO_TOKENS: TokenCounts = {
   outputTokens: 0,
 };
 
-function costPerClass(totals: TokenCounts): Record<TokenKey, number> {
-  return {
-    inputTokens: costOf({ ...NO_TOKENS, inputTokens: totals.inputTokens }),
-    cacheCreationInputTokens: costOf({
-      ...NO_TOKENS,
-      cacheCreationInputTokens: totals.cacheCreationInputTokens,
-    }),
-    cacheReadInputTokens: costOf({
-      ...NO_TOKENS,
-      cacheReadInputTokens: totals.cacheReadInputTokens,
-    }),
-    outputTokens: costOf({ ...NO_TOKENS, outputTokens: totals.outputTokens }),
-  };
+// Priced one class at a time, so the parts sum to the whole the chart splits.
+function costPerClass(totals: TokenCounts): { byClass: Record<TokenKey, number>; total: number } {
+  const byClass = {} as Record<TokenKey, number>;
+  let total = 0;
+  for (const key of Object.keys(NO_TOKENS) as TokenKey[]) {
+    byClass[key] = costOf({ ...NO_TOKENS, [key]: totals[key] });
+    total += byClass[key];
+  }
+  return { byClass, total };
 }
 
 function UsageSkeleton() {
@@ -69,11 +59,7 @@ async function UsageBody({ slug, range }: { slug: string; range: Range }) {
   const { totals } = usage;
 
   const tokenTotal = sumTokens(totals);
-  const cacheShare =
-    tokenTotal > 0 ? (totals.cacheReadInputTokens / tokenTotal) * 100 : 0;
-  const costByClass = costPerClass(totals);
-  const cacheCostShare =
-    totals.costUsd > 0 ? (costByClass.cacheReadInputTokens / totals.costUsd) * 100 : 0;
+  const cost = costPerClass(totals);
 
   return (
     <>
@@ -90,9 +76,9 @@ async function UsageBody({ slug, range }: { slug: string; range: Range }) {
         />
         <Stat
           label="Cache-read share"
-          value={`${cacheShare.toFixed(1)}%`}
+          value={formatPercent(share(totals.cacheReadInputTokens, tokenTotal), 1)}
           delta={{
-            value: `${cacheCostShare.toFixed(1)}% of spend`,
+            value: `${formatPercent(share(cost.byClass.cacheReadInputTokens, cost.total), 1)} of spend`,
             tone: "ok",
           }}
           hint="cache reads bill at a tenth of input"
@@ -109,12 +95,10 @@ async function UsageBody({ slug, range }: { slug: string; range: Range }) {
       </StatGrid>
 
       {totals.reviewCount === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No usage to report</EmptyTitle>
-            <EmptyDescription>{`No reviews were billed in ${phrase}. Try a wider range.`}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState
+          title="No usage to report"
+          description={`No reviews were billed in ${phrase}. Try a wider range.`}
+        />
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2">
           <div className="min-w-0 xl:col-span-2">
@@ -124,7 +108,8 @@ async function UsageBody({ slug, range }: { slug: string; range: Range }) {
             <TokenCompositionChart
               points={usage.points}
               totals={totals}
-              costByClass={costByClass}
+              costByClass={cost.byClass}
+              costTotal={cost.total}
               rangePhrase={phrase}
             />
           </div>

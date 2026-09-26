@@ -11,18 +11,18 @@ import {
 import type { Metadata } from "next";
 
 import { DocsArticle, Note, P, Section } from "@/components/docs";
-import type { Heading } from "@/lib/docs";
+import { docsHeadings } from "@/lib/docs";
 
 export const metadata: Metadata = {
   title: "MCP server",
   description: "Run the reviewer over a working tree, inside your coding agent, before you push.",
 };
 
-const HEADINGS: Heading[] = [
-  { id: "running", title: "Running it" },
-  { id: "tools", title: "Tools" },
-  { id: "same-path", title: "The same review as the App" },
-];
+const [H, HEADINGS] = docsHeadings({
+  running: "Running it",
+  tools: "Tools",
+  "same-path": "The same review as the App",
+});
 
 const TOOLS = [
   ["review_local_changes", "Reviews the working tree against its base branch — commits since the merge-base plus uncommitted and untracked files — before anything is pushed."],
@@ -40,7 +40,7 @@ export default function McpServerPage() {
       description="Runs the reviewer inside a coding agent such as Claude Code, over local stdio, so a change is reviewed before it is pushed."
       headings={HEADINGS}
     >
-      <Section id="running" title="Running it">
+      <Section {...H.running}>
         <P>
           Register it in any MCP client as a local stdio server named{" "}
           <code>pr-review</code>. It needs an <code>ANTHROPIC_API_KEY</code> or{" "}
@@ -49,7 +49,7 @@ export default function McpServerPage() {
         </P>
       </Section>
 
-      <Section id="tools" title="Tools">
+      <Section {...H.tools}>
         <Card className="py-0">
           <Table>
             <TableCaption className="sr-only">
@@ -77,7 +77,7 @@ export default function McpServerPage() {
         </Note>
       </Section>
 
-      <Section id="same-path" title="The same review as the App">
+      <Section {...H["same-path"]}>
         <P>
           A local review is the same review the GitHub App runs, with the same checks on every
           finding and fix. It reads your local checkout instead of GitHub, and runs on your

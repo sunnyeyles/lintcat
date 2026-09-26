@@ -1,19 +1,22 @@
 "use client";
 
-import {
-  type ChartConfig,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@pr-review/design/chart";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import type { ChartConfig } from "@pr-review/design/chart";
+import { AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatUsd } from "@/lib/format";
 import type { UsagePoint } from "@pr-review/db/dashboard";
 
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
+import {
+  CHART_MARGIN,
+  DailyTooltip,
+  DATE_AXIS,
+  peakOf,
+  trendArea,
+  valueAxis,
+} from "./parts";
 import { formatAxisDate } from "./series";
-import { formatWith } from "./tooltip-format";
 
 const CONFIG = {
   costUsd: { label: "Cost", color: "var(--chart-1)" },
@@ -27,10 +30,7 @@ export function SpendTrendChart({
   rangePhrase: string;
 }) {
   const total = points.reduce((sum, point) => sum + point.costUsd, 0);
-  const peak = points.reduce(
-    (best, point) => (point.costUsd > best.costUsd ? point : best),
-    points[0],
-  );
+  const peak = peakOf(points, (point) => point.costUsd);
 
   const summary =
     !peak || total === 0
@@ -54,42 +54,12 @@ export function SpendTrendChart({
         />
       }
     >
-      <AreaChart data={points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+      <AreaChart data={points} margin={CHART_MARGIN}>
         <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="date"
-          tickFormatter={formatAxisDate}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          minTickGap={28}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          width={52}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          tickFormatter={formatUsd}
-        />
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              labelFormatter={(l) => formatAxisDate(String(l))}
-              formatter={formatWith(formatUsd)}
-            />
-          }
-        />
-        <Area
-          type="monotone"
-          dataKey="costUsd"
-          name="Cost"
-          stroke="var(--color-costUsd)"
-          strokeWidth={2}
-          fill="var(--color-costUsd)"
-          fillOpacity={0.1}
-          isAnimationActive={false}
-        />
+        <XAxis {...DATE_AXIS} />
+        <YAxis {...valueAxis(52, formatUsd)} />
+        <DailyTooltip format={formatUsd} />
+        {trendArea("costUsd", "Cost")}
       </AreaChart>
     </ChartFrame>
   );

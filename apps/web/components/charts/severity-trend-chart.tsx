@@ -1,18 +1,14 @@
 "use client";
 
-import {
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@pr-review/design/chart";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { ChartLegend, ChartLegendContent } from "@pr-review/design/chart";
+import { AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { formatNumber } from "@/lib/format";
 import type { TrendPoint } from "@pr-review/db/dashboard";
 
 import { ChartDataTable } from "./chart-data-table";
 import { ChartFrame } from "./chart-frame";
+import { CHART_MARGIN, DailyTooltip, DATE_AXIS, stackedAreas, valueAxis } from "./parts";
 import { formatAxisDate, SEVERITY_CONFIG, SEVERITY_SERIES } from "./series";
 
 export function SeverityTrendChart({
@@ -60,45 +56,13 @@ export function SeverityTrendChart({
         />
       }
     >
-      <AreaChart data={points} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+      <AreaChart data={points} margin={CHART_MARGIN}>
         <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="date"
-          tickFormatter={formatAxisDate}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          minTickGap={28}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          width={38}
-          allowDecimals={false}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          tickFormatter={formatNumber}
-        />
-        <ChartTooltip
-          content={
-            <ChartTooltipContent labelFormatter={(l) => formatAxisDate(String(l))} />
-          }
-        />
+        <XAxis {...DATE_AXIS} />
+        <YAxis {...valueAxis(38, formatNumber, { allowDecimals: false })} />
+        <DailyTooltip />
         <ChartLegend content={<ChartLegendContent />} />
-        {SEVERITY_SERIES.map((series) => (
-          <Area
-            key={series.key}
-            type="monotone"
-            dataKey={series.key}
-            name={series.label}
-            stackId="severity"
-            fill={`var(--color-${series.key})`}
-            fillOpacity={0.9}
-            stroke="var(--color-card)"
-            strokeWidth={2}
-            isAnimationActive={false}
-          />
-        ))}
+        {stackedAreas(SEVERITY_SERIES, "severity")}
       </AreaChart>
     </ChartFrame>
   );

@@ -57,6 +57,20 @@ export function installedAccount(
   };
 }
 
+export type InactiveReason = "organization_not_installed" | "installation_suspended";
+
+/** Installed and not suspended, the only state in which GitHub is asked about the account. */
+export function activeInstallation(
+  organization: Organization | undefined,
+):
+  | { organization: Organization; installed: InstalledAccount; inactive?: never }
+  | { inactive: InactiveReason } {
+  const installed = organization && installedAccount(organization);
+  if (!organization || !installed) return { inactive: "organization_not_installed" };
+  if (organization.suspendedAt) return { inactive: "installation_suspended" };
+  return { organization, installed };
+}
+
 function memberDecision(member: OrganizationMember | null): MembershipDecision {
   if (!member) return { action: "revoke", reason: "not_github_org_member" };
   return member.role === "admin"
@@ -208,18 +222,19 @@ export async function syncSignInMemberships(
     fields,
     order: ({ organization }) => organization.id,
     async lookup(organization) {
-      const installed = installedAccount(organization);
-      if (!installed) return undefined;
-      if (organization.suspendedAt) {
-        deps.logger.info("membership.skipped", {
-          ...fields(organization),
-          reason: "installation_suspended",
-        });
+      const active = activeInstallation(organization);
+      if (active.inactive) {
+        if (active.inactive === "installation_suspended") {
+          deps.logger.info("membership.skipped", {
+            ...fields(organization),
+            reason: active.inactive,
+          });
+        }
         return undefined;
       }
       return {
         organization,
-        decision: await lookupMembership(deps.github, installed, account),
+        decision: await lookupMembership(deps.github, active.installed, account),
       };
     },
     apply: (database, { organization, decision }) =>

@@ -2,6 +2,7 @@ import { Alert, AlertDescription, AlertTitle, Badge } from "@pr-review/design";
 import { CircleCheck, CircleSlash, Info, TriangleAlert } from "lucide-react";
 
 import type { MapStatus } from "@/lib/codebase-map";
+import { countLabel } from "@/lib/format";
 
 const HEADINGS: Record<MapStatus["kind"], string> = {
   empty: "Nothing to map",
@@ -32,7 +33,7 @@ export function MapStatusBanner({ status }: { status: MapStatus }) {
         <p>
           {status.totalFileCount > status.fileCount
             ? `${status.fileCount} of ${status.totalFileCount} files loaded`
-            : `${status.fileCount} file${status.fileCount === 1 ? "" : "s"}`}{" "}
+            : countLabel(status.fileCount, "file")}{" "}
           · {status.changedCount} changed
           · change data on {status.flagCoverage.changed}, dead on {status.flagCoverage.dead}, cycle
           on {status.flagCoverage.inCycle}

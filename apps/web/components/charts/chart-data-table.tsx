@@ -22,7 +22,7 @@ export type ChartDataTableProps = {
 export function ChartDataTable({ caption, columns, rows }: ChartDataTableProps) {
   return (
     <details className="mt-3 border-t pt-2">
-      <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer text-xs tracking-wide uppercase outline-none focus-visible:ring-2">
+      <summary className="eyebrow hover:text-foreground focus-visible:ring-ring cursor-pointer outline-none focus-visible:ring-2">
         {caption}
       </summary>
       <div className="mt-2">

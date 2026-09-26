@@ -2,6 +2,8 @@ import { db, effectiveRepoSettings, findModelKeySummary } from "@pr-review/db";
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shell";
+import { RepoName } from "@/components/ui";
+import { toOptions } from "@/lib/forms";
 import { MODEL_KEY_PROVIDERS, type ModelKeyProvider } from "@/lib/model-key";
 import { DEFAULT_MODEL_VALUE, REPO_REVIEW_MODES, repoModelOptions } from "@/lib/repo-settings";
 import { requireRepo } from "@/lib/session";
@@ -32,10 +34,7 @@ export default async function RepoSettingsPage({
       <PageHeader
         eyebrow="Repository settings"
         title={
-          <span className="font-mono text-[0.85em]">
-            <span className="text-muted-foreground">{repo.owner}/</span>
-            {repo.name}
-          </span>
+          <RepoName owner={repo.owner} name={repo.name} className="font-mono text-[0.85em]" />
         }
         description={
           provider
@@ -49,7 +48,7 @@ export default async function RepoSettingsPage({
           owner={repo.owner}
           name={repo.name}
           isOwner={repo.isOwner}
-          modes={Object.entries(REPO_REVIEW_MODES).map(([value, label]) => ({ value, label }))}
+          modes={toOptions(REPO_REVIEW_MODES)}
           models={repoModelOptions(provider, settings.model)}
           current={{
             mode: settings.mode,

@@ -18,7 +18,7 @@ export function GroupList({ clustering, onToggle }: GroupListProps) {
 
   return (
     <div>
-      <h3 className="text-xs font-semibold tracking-wide uppercase">
+      <h3 className="eyebrow">
         Groups <span className="text-muted-foreground font-normal">({clustering.groups.length})</span>
       </h3>
       <ul className="mt-2 space-y-1">

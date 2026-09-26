@@ -4,6 +4,14 @@ export type DocsSection = { title: string; pages: DocsPage[] };
 
 export const DOCS_HOME = "/docs";
 
+/** A page's sections keyed by id, and the same headings in order for its table of contents. */
+export function docsHeadings<const T extends Record<string, string>>(
+  titles: T,
+): [{ [K in keyof T & string]: Heading }, Heading[]] {
+  const list = Object.entries(titles).map(([id, title]) => ({ id, title }));
+  return [Object.fromEntries(list.map((h) => [h.id, h])) as { [K in keyof T & string]: Heading }, list];
+}
+
 export const DOCS_NAV: DocsSection[] = [
   {
     title: "Start here",

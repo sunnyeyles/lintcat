@@ -3,12 +3,7 @@ import {
   Badge,
   Button,
   Card,
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
+  EmptyState,
   Table,
   TableBody,
   TableCaption,
@@ -46,28 +41,28 @@ export default async function OrganizationsPage() {
         description="Your personal account and the organizations you belong to. Pick one to see its repositories and reviews."
       />
       {memberships.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <FolderGit2 />
-            </EmptyMedia>
-            <EmptyTitle>Connect your repositories</EmptyTitle>
-            <EmptyDescription>
+        <EmptyState
+          icon={<FolderGit2 />}
+          title="Connect your repositories"
+          description={
+            <>
               You are signed in as <code>{session.login}</code>. Install the GitHub App on your
               personal account to review your own repositories. You do not need an organization. An
               organization&apos;s repositories need the App installed on that organization by one of
               its owners.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent className="flex-row justify-center gap-2">
-            <Button asChild>
-              <a href={installAppUrl(session.githubId)}>Install on @{session.login}</a>
-            </Button>
-            <Button asChild variant="outline">
-              <a href={INSTALL_APP_URL}>Install on an organization</a>
-            </Button>
-          </EmptyContent>
-        </Empty>
+            </>
+          }
+          action={
+            <div className="flex justify-center gap-2">
+              <Button asChild>
+                <a href={installAppUrl(session.githubId)}>Install on @{session.login}</a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href={INSTALL_APP_URL}>Install on an organization</a>
+              </Button>
+            </div>
+          }
+        />
       ) : (
         <>
           <Card className="py-0">

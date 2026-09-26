@@ -1,10 +1,19 @@
 import { cn } from "#src/cn"
 
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
+// `as="span"` for a skeleton inside phrasing content, such as a <p>.
+function Skeleton({
+  className,
+  as: Comp = "div",
+  ...props
+}: React.HTMLAttributes<HTMLElement> & { as?: "div" | "span" }) {
   return (
-    <div
+    <Comp
       data-slot="skeleton"
-      className={cn("animate-pulse rounded-md bg-accent", className)}
+      className={cn(
+        "animate-pulse rounded-md bg-accent",
+        Comp === "span" && "inline-block align-middle",
+        className
+      )}
       {...props}
     />
   )

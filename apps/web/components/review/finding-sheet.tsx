@@ -24,7 +24,7 @@ export type FindingSheetProps = {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="text-muted-foreground text-xs tracking-wide uppercase mb-2 font-mono">{title}</h3>
+      <h3 className="eyebrow mb-2 font-mono">{title}</h3>
       {children}
     </section>
   );

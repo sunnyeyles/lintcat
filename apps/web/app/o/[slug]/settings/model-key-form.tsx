@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  Alert,
-  AlertDescription,
   Card,
   CardContent,
   CardDescription,
@@ -11,24 +9,22 @@ import {
   CardTitle,
   Input,
   Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Separator,
 } from "@pr-review/design";
 import { KeyRound } from "lucide-react";
 import { useActionState } from "react";
 
+import { FormStatus } from "@/components/ui/form-status";
+import { SelectField } from "@/components/ui/select-field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import type { Option } from "@/lib/forms";
 import type { ModelKeyFormState } from "@/lib/model-key";
 
 import { removeModelKeyAction, saveModelKeyAction } from "./actions";
 
 export type ModelKeyFormProps = {
   slug: string;
-  providers: { value: string; label: string }[];
+  providers: Option[];
   /** What is saved now; only the last four characters of the key ever reach the browser. */
   current:
     | { provider: string; providerLabel: string; last4: string; updated: string }
@@ -61,21 +57,15 @@ export function ModelKeyForm({ slug, providers, current }: ModelKeyFormProps) {
 
       <form action={save}>
         <CardContent className="grid gap-5">
-          <div className="grid gap-2">
-            <Label htmlFor="model-key-provider">Provider</Label>
-            <Select name="provider" defaultValue={current?.provider ?? providers[0]?.value}>
-              <SelectTrigger id="model-key-provider" className="w-full sm:w-64">
-                <SelectValue placeholder="Choose a provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {providers.map((provider) => (
-                  <SelectItem key={provider.value} value={provider.value}>
-                    {provider.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SelectField
+            id="model-key-provider"
+            name="provider"
+            label="Provider"
+            options={providers}
+            defaultValue={current?.provider ?? providers[0]?.value}
+            placeholder="Choose a provider"
+            triggerClassName="sm:w-64"
+          />
           <div className="grid gap-2">
             <Label htmlFor="model-key-api-key">API key</Label>
             <Input
@@ -91,18 +81,16 @@ export function ModelKeyForm({ slug, providers, current }: ModelKeyFormProps) {
               Stored encrypted. It is never shown again, here or anywhere else.
             </p>
           </div>
-          {error?.status === "error" && (
-            <Alert variant="destructive">
-              <AlertDescription>{error.message}</AlertDescription>
-            </Alert>
-          )}
-          <p role="status" className="text-muted-foreground text-sm empty:hidden">
-            {saved.status === "saved" && current?.last4 === saved.last4
-              ? `Saved. Reviews now use the key ending in ${saved.last4}.`
-              : removed.status === "removed" && !current
-                ? "Removed. Labelled pull requests will ask for a key again."
-                : ""}
-          </p>
+          <FormStatus
+            error={error?.status === "error" ? error.message : undefined}
+            message={
+              saved.status === "saved" && current?.last4 === saved.last4
+                ? `Saved. Reviews now use the key ending in ${saved.last4}.`
+                : removed.status === "removed" && !current
+                  ? "Removed. Labelled pull requests will ask for a key again."
+                  : ""
+            }
+          />
         </CardContent>
         <CardFooter className="mt-5">
           <SubmitButton pendingLabel="Saving…">

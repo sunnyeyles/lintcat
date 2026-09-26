@@ -10,6 +10,7 @@ import {
 } from "@pr-review/design";
 
 import type { RepoSummary } from "@pr-review/db/dashboard";
+import { RepoName } from "@/components/ui";
 import { formatNumber, formatRelative, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 
@@ -55,8 +56,7 @@ export function RepoTable({ slug, repos, caption, limit }: RepoTableProps) {
           <TableRow key={repo.id} className="group relative">
             <TableCell className="whitespace-nowrap">
               <RowLink href={organizationPath(slug, `/repos/${repo.owner}/${repo.name}`)}>
-                <span className="text-muted-foreground">{repo.owner}/</span>
-                {repo.name}
+                <RepoName owner={repo.owner} name={repo.name} />
               </RowLink>
             </TableCell>
             <TableCell className="text-right tabular-nums">

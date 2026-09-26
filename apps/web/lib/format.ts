@@ -12,6 +12,24 @@ export function formatNumber(n: number): string {
   return rounded.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
+/** `part` as a percentage of `whole`, 0 when `whole` is. */
+export function share(part: number, whole: number): number {
+  return whole === 0 ? 0 : (part / whole) * 100;
+}
+
+export function formatPercent(n: number, digits = 0): string {
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toFixed(digits)}%`;
+}
+
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return n === 1 ? one : many;
+}
+
+export function countLabel(n: number, one: string, many?: string): string {
+  return `${formatNumber(n)} ${plural(n, one, many)}`;
+}
+
 export function formatTokens(n: number): string {
   if (!Number.isFinite(n)) return "—";
   const sign = n < 0 ? "-" : "";

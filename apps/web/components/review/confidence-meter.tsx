@@ -1,5 +1,7 @@
 import { cn } from "@pr-review/design";
 
+import { formatPercent, share } from "@/lib/format";
+
 function clamp01(n: number): number {
   return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0;
 }
@@ -17,7 +19,7 @@ export function ConfidenceMeter({
   barClassName,
   labelled = true,
 }: ConfidenceMeterProps) {
-  const pct = Math.round(clamp01(value) * 100);
+  const pct = Math.round(share(clamp01(value), 1));
   const tone = pct >= 85 ? "bg-primary" : "bg-muted-foreground";
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
@@ -27,7 +29,7 @@ export function ConfidenceMeter({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
-        aria-valuetext={`${pct}% confidence`}
+        aria-valuetext={`${formatPercent(pct)} confidence`}
         className={cn(
           "block h-1.5 w-full min-w-10 overflow-hidden rounded-sm bg-muted ring-border ring-1 ring-inset",
           barClassName,
@@ -35,12 +37,12 @@ export function ConfidenceMeter({
       >
         <span
           className={cn("block h-full rounded-sm", tone)}
-          style={{ width: `${pct}%` }}
+          style={{ width: formatPercent(pct) }}
         />
       </span>
       {labelled ? (
         <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-          {pct}%
+          {formatPercent(pct)}
         </span>
       ) : null}
     </span>

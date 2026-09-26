@@ -1,3 +1,4 @@
+import { DOCS_HOME } from "@/lib/docs";
 import {
   hostname,
   organizationSlugFromHost,
@@ -28,8 +29,8 @@ export function isApexOnly(pathname: string): boolean {
     page === DASHBOARD_PATH ||
     page.startsWith(`${DASHBOARD_PATH}/`) ||
     page === SIGN_IN_PATH ||
-    page === "/docs" ||
-    page.startsWith("/docs/")
+    page === DOCS_HOME ||
+    page.startsWith(`${DOCS_HOME}/`)
   );
 }
 

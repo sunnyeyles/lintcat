@@ -11,7 +11,7 @@ import {
 import type { Metadata } from "next";
 
 import { DocsArticle, Note, P, Section } from "@/components/docs";
-import type { Heading } from "@/lib/docs";
+import { docsHeadings } from "@/lib/docs";
 import { REPO_MODEL_CHOICES } from "@/lib/repo-settings";
 
 export const metadata: Metadata = {
@@ -19,13 +19,13 @@ export const metadata: Metadata = {
   description: "The model key, when each repository is reviewed, which model runs it, and fixes.",
 };
 
-const HEADINGS: Heading[] = [
-  { id: "model-key", title: "Model key" },
-  { id: "repositories", title: "Repository settings" },
-  { id: "models", title: "Models" },
-  { id: "fixes", title: "Fixes" },
-  { id: "permissions", title: "What the App can access" },
-];
+const [H, HEADINGS] = docsHeadings({
+  "model-key": "Model key",
+  repositories: "Repository settings",
+  models: "Models",
+  fixes: "Fixes",
+  permissions: "What the App can access",
+});
 
 const MODES = [
   ["Every pull request", "Default. Every pull request is reviewed when it is opened or reopened, and on every push."],
@@ -50,7 +50,7 @@ export default function ConfigurationPage() {
       description="Everything is set on the dashboard. One model key per account, and a few settings per repository."
       headings={HEADINGS}
     >
-      <Section id="model-key" title="Model key">
+      <Section {...H["model-key"]}>
         <P>
           Reviews run on the account&rsquo;s own Anthropic or OpenAI API key. An owner of
           the account (on a personal account, you) sets it under <strong>Settings</strong> in
@@ -64,7 +64,7 @@ export default function ConfigurationPage() {
         </P>
       </Section>
 
-      <Section id="repositories" title="Repository settings">
+      <Section {...H.repositories}>
         <P>
           Each repository has a <strong>Settings</strong> page, linked from the repository on
           the dashboard. Anyone who can see the repository can view it; account owners
@@ -97,7 +97,7 @@ export default function ConfigurationPage() {
         </Note>
       </Section>
 
-      <Section id="models" title="Models">
+      <Section {...H.models}>
         <P>
           Each repository uses the provider default unless you pick a model on its settings
           page. The choices follow the provider of the account&rsquo;s key:
@@ -134,7 +134,7 @@ export default function ConfigurationPage() {
         </Note>
       </Section>
 
-      <Section id="fixes" title="Fixes">
+      <Section {...H.fixes}>
         <P>
           With <strong>Commit verified fixes</strong> off, the default, a finding&rsquo;s fix
           arrives as a one-click suggested change on its review comment. Turn it on and
@@ -146,7 +146,7 @@ export default function ConfigurationPage() {
         </P>
       </Section>
 
-      <Section id="permissions" title="What the App can access">
+      <Section {...H.permissions}>
         <P>
           GitHub shows these when you install the App. It never approves or merges a pull
           request, and it only writes file contents when you turn fixes on.

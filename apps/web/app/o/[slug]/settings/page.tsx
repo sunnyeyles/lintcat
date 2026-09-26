@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/shell";
 import { formatRelative } from "@/lib/format";
+import { toOptions } from "@/lib/forms";
 import { MODEL_KEY_PROVIDERS, providerLabel } from "@/lib/model-key";
 import { requireOrganization } from "@/lib/session";
 
@@ -32,10 +33,7 @@ export default async function SettingsPage({
       <div className="mt-8 max-w-2xl">
         <ModelKeyForm
           slug={organization.slug}
-          providers={Object.entries(MODEL_KEY_PROVIDERS).map(([value, label]) => ({
-            value,
-            label,
-          }))}
+          providers={toOptions(MODEL_KEY_PROVIDERS)}
           current={
             summary && {
               provider: summary.provider,

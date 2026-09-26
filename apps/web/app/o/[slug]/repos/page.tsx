@@ -1,15 +1,9 @@
-import {
-  Card,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@pr-review/design";
+import { Card, EmptyState, Skeleton } from "@pr-review/design";
 import { cache, Suspense } from "react";
 
 import { RepoTable } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { InlineSkeleton, TableCardSkeleton } from "@/components/ui";
+import { TableCardSkeleton } from "@/components/ui";
 import { data } from "@/lib/data/server";
 import { formatNumber } from "@/lib/format";
 
@@ -35,15 +29,10 @@ async function ReposBody({ slug }: { slug: string }) {
       />
     </Card>
   ) : (
-    <Empty>
-      <EmptyHeader>
-        <EmptyTitle>No repositories yet</EmptyTitle>
-        <EmptyDescription>
-          Give the LintCat GitHub App access to a repository in your GitHub
-          settings and it will appear here.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <EmptyState
+      title="No repositories yet"
+      description="Give the LintCat GitHub App access to a repository in your GitHub settings and it will appear here."
+    />
   );
 }
 
@@ -60,7 +49,7 @@ export default async function ReposPage({
         eyebrow="Repositories"
         title="Repositories"
         description={
-          <Suspense fallback={<InlineSkeleton className="h-4 w-80 max-w-full" />}>
+          <Suspense fallback={<Skeleton as="span" className="h-4 w-80 max-w-full" />}>
             <ReposSummary slug={slug} />
           </Suspense>
         }

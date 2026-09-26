@@ -2,19 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, P, Section } from "@/components/docs";
-import type { Heading } from "@/lib/docs";
+import { docsHeadings } from "@/lib/docs";
 
 export const metadata: Metadata = {
   title: "How LintCat works",
   description: "What LintCat reads, what it looks for, and what makes it different.",
 };
 
-const HEADINGS: Heading[] = [
-  { id: "review", title: "How a review works" },
-  { id: "looks-for", title: "What it looks for" },
-  { id: "in-line", title: "Keeping the codebase in line" },
-  { id: "different", title: "How it's different" },
-];
+const [H, HEADINGS] = docsHeadings({
+  review: "How a review works",
+  "looks-for": "What it looks for",
+  "in-line": "Keeping the codebase in line",
+  different: "How it's different",
+});
 
 export default function HowItWorksPage() {
   return (
@@ -25,7 +25,7 @@ export default function HowItWorksPage() {
       description="LintCat reads a pull request the way a careful reviewer would: the diff, the code around it, and the parts of the repository it touches."
       headings={HEADINGS}
     >
-      <Section id="review" title="How a review works">
+      <Section {...H.review}>
         <Bullets>
           <Bullet>
             <strong>Read.</strong> The reviewer starts from the diff, then opens the surrounding
@@ -52,7 +52,7 @@ export default function HowItWorksPage() {
         </P>
       </Section>
 
-      <Section id="looks-for" title="What it looks for">
+      <Section {...H["looks-for"]}>
         <Bullets>
           <Bullet>
             <strong>Correctness:</strong> wrong conditions or bounds, unhandled empty input,
@@ -80,7 +80,7 @@ export default function HowItWorksPage() {
         </P>
       </Section>
 
-      <Section id="in-line" title="Keeping the codebase in line">
+      <Section {...H["in-line"]}>
         <P>
           A diff only shows what changed. Before the reviewer starts, LintCat maps the
           repository&rsquo;s imports, so for every changed file the reviewer already knows:
@@ -102,7 +102,7 @@ export default function HowItWorksPage() {
         </P>
       </Section>
 
-      <Section id="different" title="How it's different">
+      <Section {...H.different}>
         <Bullets>
           <Bullet>
             <strong>Nothing unchecked reaches your pull request.</strong> Every finding and fix

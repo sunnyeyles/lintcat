@@ -3,10 +3,8 @@ import {
   Button,
   Card,
   cn,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
+  EmptyState,
+  Skeleton,
   Table,
   TableBody,
   TableCaption,
@@ -20,19 +18,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 
-import { RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
+import {
+  DurationCell,
+  FindingsCell,
+  HeadCell,
+  RowLink,
+  Section,
+  Sparkline,
+  WhenCell,
+} from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { InlineSkeleton, StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
+import { RepoName, StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
 import { Stat, StatGrid } from "@/components/ui/stat";
 import type { ReviewSummary } from "@pr-review/db/dashboard";
 import { data } from "@/lib/data/server";
-import {
-  formatDuration,
-  formatNumber,
-  formatRelative,
-  formatUsd,
-  shortSha,
-} from "@/lib/format";
+import { formatDuration, formatNumber, formatRelative, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 
 type PrGroup = { prNumber: number; reviews: ReviewSummary[] };
@@ -184,22 +184,10 @@ async function ReviewHistory({
                           {grouped ? `rev ${revision}` : `#${group.prNumber}`}
                         </RowLink>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <code className="rounded-sm border border-border bg-muted px-1 py-0.5 text-sm">
-                          {shortSha(review.headSha)}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <SeverityMix bySeverity={review.bySeverity} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums whitespace-nowrap">
-                        {formatDuration(review.durationMs)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <time dateTime={review.createdAt.toISOString()}>
-                          {formatRelative(review.createdAt)}
-                        </time>
-                      </TableCell>
+                      <HeadCell sha={review.headSha} />
+                      <FindingsCell bySeverity={review.bySeverity} />
+                      <DurationCell ms={review.durationMs} />
+                      <WhenCell date={review.createdAt} />
                     </TableRow>
                   );
                 })}
@@ -208,14 +196,10 @@ async function ReviewHistory({
           })}
         </Table>
       ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No reviews for this repository</EmptyTitle>
-            <EmptyDescription>
-              No review has been published a review here yet.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState
+          title="No reviews for this repository"
+          description="No review has been published here yet."
+        />
       )}
     </Card>
   );
@@ -267,15 +251,12 @@ export default async function RepoDetailPage({
       <PageHeader
         eyebrow="Repository"
         title={
-          <span className="font-mono text-[0.85em]">
-            <span className="text-muted-foreground">{repo.owner}/</span>
-            {repo.name}
-          </span>
+          <RepoName owner={repo.owner} name={repo.name} className="font-mono text-[0.85em]" />
         }
         description={
           <>
             {`${formatNumber(repo.reviewCount)} reviews across `}
-            <Suspense fallback={<InlineSkeleton className="h-4 w-28" />}>
+            <Suspense fallback={<Skeleton as="span" className="h-4 w-28" />}>
               <PullRequestCount slug={slug} repoId={repo.id} />
             </Suspense>
             {` · last reviewed ${repo.lastReviewedAt ? formatRelative(repo.lastReviewedAt) : "never"}`}

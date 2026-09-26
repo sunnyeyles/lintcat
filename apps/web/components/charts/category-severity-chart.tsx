@@ -104,7 +104,7 @@ export function CategorySeverityChart({
           axisLine={false}
           tickMargin={8}
         />
-        <ChartTooltip content={<ChartTooltipContent />} />
+        <ChartTooltip content={<ChartTooltipContent valueFormatter={formatNumber} />} />
         <ChartLegend content={<ChartLegendContent />} />
         {SEVERITY_SERIES.map((series, index) => (
           <Bar

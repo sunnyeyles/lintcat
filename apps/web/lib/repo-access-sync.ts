@@ -1,8 +1,11 @@
 import {
+  findOrganizationById,
+  findRepoByGithubId,
   listInstalledOrganizations,
   listPrivateRepos,
   listUserMemberships,
   setRepoAccess,
+  type Database,
   type GithubAccount,
   type Organization,
   type Repo,
@@ -10,7 +13,11 @@ import {
 } from "@pr-review/db";
 import type { GithubAppClient } from "@pr-review/github";
 
-import { installedAccount, type MembershipSyncDeps } from "@/lib/membership-sync";
+import {
+  activeInstallation,
+  installedAccount,
+  type MembershipSyncDeps,
+} from "@/lib/membership-sync";
 import { reconcile } from "@/lib/reconcile";
 
 export interface RepoAccessLookup {
@@ -20,6 +27,16 @@ export interface RepoAccessLookup {
 }
 
 type SyncDeps = MembershipSyncDeps & { github: GithubAppClient };
+
+/** A tracked repo by its GitHub id, with the organization that owns it. */
+export async function findRepoWithOrganization(
+  database: Database,
+  githubRepoId: number,
+): Promise<{ repo: Repo; organization: Organization | undefined } | undefined> {
+  const repo = await findRepoByGithubId(database, githubRepoId);
+  if (!repo) return undefined;
+  return { repo, organization: await findOrganizationById(database, repo.organizationId) };
+}
 
 /** The user's current permission on one repo; null is no access. */
 export async function lookupRepoPermission(
@@ -77,7 +94,7 @@ export async function syncSignInRepoAccess(
   const userId = memberOf[0]!.userId;
   const organizations = (await listInstalledOrganizations(deps.database)).filter(
     (organization) =>
-      !organization.suspendedAt &&
+      !activeInstallation(organization).inactive &&
       memberOf.some((membership) => membership.organizationId === organization.id),
   );
 

@@ -4,7 +4,6 @@ import {
   effectiveRepoSettings,
   enqueueReviewJob,
   findOrganizationByAccountId,
-  findOrganizationById,
   findRepoByGithubId,
   markUninstalled,
   removeRepositories,
@@ -30,13 +29,17 @@ import {
   type InstallationDeps,
 } from "@/lib/installation";
 import {
+  activeInstallation,
   applyMembership,
-  installedAccount,
   lookupMembers,
   lookupMembership,
   replaceMembers,
 } from "@/lib/membership-sync";
-import { applyRepoAccess, lookupRepoPermission } from "@/lib/repo-access-sync";
+import {
+  applyRepoAccess,
+  findRepoWithOrganization,
+  lookupRepoPermission,
+} from "@/lib/repo-access-sync";
 import type { PingWorker } from "@/lib/worker-ping";
 
 export interface GithubWebhookDeps extends InstallationDeps {
@@ -335,11 +338,9 @@ async function onMemberChanged(
     login: user.login,
     avatarUrl: user.avatar_url ?? null,
   };
-  const organization = await findOrganizationByAccountId(
-    deps.database,
-    payloadOrganization.id,
+  const active = activeInstallation(
+    await findOrganizationByAccountId(deps.database, payloadOrganization.id),
   );
-  const installed = organization && installedAccount(organization);
   const skip = (reason: string) => {
     deps.logger.info("membership.skipped", {
       source,
@@ -350,8 +351,8 @@ async function onMemberChanged(
     });
     return false;
   };
-  if (!organization || !installed) return skip("organization_not_installed");
-  if (organization.suspendedAt) return skip("installation_suspended");
+  if (active.inactive) return skip(active.inactive);
+  const { organization, installed } = active;
 
   const decision = await lookupMembership(deps.github, installed, account);
   const repo = payloadRepository && (await findRepoByGithubId(deps.database, payloadRepository.id));
@@ -411,15 +412,15 @@ async function onPullRequest(
     headSha: pullRequest.head.sha,
     deliveryId,
   };
-  const repo = await findRepoByGithubId(deps.database, payload.repository.id);
-  const organization = repo && (await findOrganizationById(deps.database, repo.organizationId));
+  const found = await findRepoWithOrganization(deps.database, payload.repository.id);
   const skip = (reason: string) => {
     deps.logger.info("review_job.skipped", { ...fields, reason });
     return false;
   };
-  if (!repo || repo.removedAt) return skip("repository_not_tracked");
-  if (!organization || !installedAccount(organization)) return skip("organization_not_installed");
-  if (organization.suspendedAt) return skip("installation_suspended");
+  if (!found || found.repo.removedAt) return skip("repository_not_tracked");
+  const active = activeInstallation(found.organization);
+  if (active.inactive) return skip(active.inactive);
+  const { repo } = found;
   const settings = await effectiveRepoSettings(deps.database, repo.id);
   if (!wantsReview(payload, settings.mode)) return skip("review_not_requested");
   const result = await enqueueReviewJob(deps.database, {
@@ -452,8 +453,9 @@ async function onRepository(
   if (!REPOSITORY_ACTIONS.includes(action)) return false;
   const source = `repository.${action}`;
   const fields = { source, githubRepoId: repository.id, repo: `${repository.owner.login}/${repository.name}` };
-  const existing = await findRepoByGithubId(deps.database, repository.id);
-  const organization = existing && (await findOrganizationById(deps.database, existing.organizationId));
+  const found = await findRepoWithOrganization(deps.database, repository.id);
+  const existing = found?.repo;
+  const organization = found?.organization;
   if (!existing || !organization) {
     deps.logger.info("repository.skipped", { ...fields, reason: "repository_not_tracked" });
     return false;
@@ -503,8 +505,10 @@ async function listReaders(
   repository: z.infer<typeof repositoryEventSchema>["repository"],
   fields: Record<string, unknown>,
 ): Promise<{ githubId: number; permission: RepoPermission }[] | undefined> {
-  const installed = installedAccount(organization);
-  if (!installed || organization.suspendedAt || installed.accountType === "user") return undefined;
+  const active = activeInstallation(organization);
+  if (active.inactive) return undefined;
+  const { installed } = active;
+  if (installed.accountType === "user") return undefined;
   try {
     const listed = await deps.github.listRepositoryCollaborators(
       installed.installationId,

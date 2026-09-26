@@ -93,6 +93,36 @@ function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  compact = false,
+  ...props
+}: Omit<React.ComponentProps<"div">, "title"> & {
+  icon?: React.ReactNode
+  title: React.ReactNode
+  description?: React.ReactNode
+  action?: React.ReactNode
+  compact?: boolean
+}) {
+  return (
+    <Empty {...props}>
+      <EmptyHeader>
+        {icon ? <EmptyMedia variant="icon">{icon}</EmptyMedia> : null}
+        <EmptyTitle className={cn(compact && "text-sm")}>{title}</EmptyTitle>
+        {description ? (
+          <EmptyDescription className={cn(compact && "text-xs")}>
+            {description}
+          </EmptyDescription>
+        ) : null}
+      </EmptyHeader>
+      {action ? <EmptyContent>{action}</EmptyContent> : null}
+    </Empty>
+  )
+}
+
 export {
   Empty,
   EmptyHeader,
@@ -100,4 +130,5 @@ export {
   EmptyDescription,
   EmptyContent,
   EmptyMedia,
+  EmptyState,
 }

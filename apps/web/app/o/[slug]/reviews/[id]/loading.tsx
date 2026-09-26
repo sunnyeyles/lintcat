@@ -1,7 +1,7 @@
 import { Card, CardContent, Skeleton } from "@pr-review/design";
 
 import { PageHeader } from "@/components/shell";
-import { InlineSkeleton, TableCardSkeleton } from "@/components/ui";
+import { TableCardSkeleton } from "@/components/ui";
 
 export default function ReviewDetailLoading() {
   return (
@@ -9,8 +9,8 @@ export default function ReviewDetailLoading() {
       <PageHeader
         eyebrow="Review"
         size="record"
-        title={<InlineSkeleton className="h-lh w-72 max-w-full" />}
-        description={<InlineSkeleton className="h-lh w-96 max-w-full" />}
+        title={<Skeleton as="span" className="h-lh w-72 max-w-full" />}
+        description={<Skeleton as="span" className="h-lh w-96 max-w-full" />}
         actions={<Skeleton className="h-control w-40" />}
       />
 
