@@ -15,6 +15,11 @@ export const SEARCH_LIMITS = {
 
 const SNIPPET_OVERFLOW_MARKER = "…";
 
+/** The last segment of a `/`-separated repository path. */
+export function basenameOf(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+
 /** GitHub's grammar: a quoted phrase is one term, everything else splits on whitespace. */
 export function parseSearchQuery(query: string): string[] {
   return (query.match(/"[^"]*"|\S+/g) ?? [])
@@ -83,7 +88,7 @@ export function buildMatch(
     "contents" in source ? snippetWindows(source.contents, terms) : source.snippets;
   return {
     path,
-    name: path.slice(path.lastIndexOf("/") + 1),
+    name: basenameOf(path),
     snippets: boundSnippets(raw),
   };
 }

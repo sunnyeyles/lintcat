@@ -1,12 +1,10 @@
 /** The command line: what `pr-review` was asked to do, before anything is read. */
-import type { LocalScope } from "@pr-review/mcp/local-review";
+import { chooseScope, GitError, type LocalScope } from "@pr-review/mcp/local-review";
 
 /** The severity that makes a review fail; "off" never fails. */
 export type FailOn = "low" | "medium" | "high" | "off";
 
 const FAIL_ON: readonly FailOn[] = ["low", "medium", "high", "off"];
-
-const SCOPES = ["working-tree", "staged", "range"] as const;
 
 export interface ReviewOptions {
   kind: "review";
@@ -117,22 +115,12 @@ function readColor(flags: Flags): boolean | undefined {
 }
 
 function readScope(flags: Flags): LocalScope {
-  const range = flags.values.get("range");
-  const named = flags.values.get("scope") ?? (range === undefined ? "working-tree" : "range");
-  const kind = SCOPES.find((scope) => scope === named);
-  if (kind === undefined) {
-    throw new UsageError(`--scope must be one of ${SCOPES.join(", ")}, not ${JSON.stringify(named)}`);
+  try {
+    return chooseScope(flags.values.get("scope"), flags.values.get("range"));
+  } catch (error) {
+    if (error instanceof GitError) throw new UsageError(error.message);
+    throw error;
   }
-  if (kind === "range") {
-    if (range === undefined) {
-      throw new UsageError('--scope range needs a --range, e.g. --range "HEAD~3..HEAD"');
-    }
-    return { kind, range };
-  }
-  if (range !== undefined) {
-    throw new UsageError(`a --range cannot be reviewed with --scope ${kind}; drop one of them`);
-  }
-  return { kind };
 }
 
 const REVIEW_FLAGS = [

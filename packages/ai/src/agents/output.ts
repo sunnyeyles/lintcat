@@ -10,6 +10,14 @@ export const agentOutputSchema = z.object({
   findings: z.array(reviewFindingSchema),
 });
 
+/** An agent-level failure (bad final output, turn cap, ...). */
+export class AgentRunError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentRunError";
+  }
+}
+
 type AgentOutputResult =
   | { ok: true; findings: ReviewFinding[] }
   | { ok: false; error: string };
@@ -44,4 +52,16 @@ export function extractAgentOutput(text: string): AgentOutputResult {
   }
 
   return { ok: true, findings: parsed.data.findings };
+}
+
+/** Cross-category findings are dropped, never re-stamped. */
+export function acceptAgentOutput(
+  category: string,
+  output: AgentOutputResult,
+  failure: (error: string) => string,
+): ReviewFinding[] {
+  if (!output.ok) {
+    throw new AgentRunError(failure(output.error));
+  }
+  return output.findings.filter((finding) => finding.category === category);
 }

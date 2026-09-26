@@ -2,9 +2,14 @@
 import process from "node:process";
 
 import { createLanguageModel } from "@pr-review/ai";
-import { db, findLocalEnvFile, modelKeyEncryptionKey, requiredEnv } from "@pr-review/db";
-import { createGithubAppClient, createTokenClient } from "@pr-review/github";
-import { createConsoleLogger, errorMessage } from "@pr-review/logging";
+import { db, modelKeyEncryptionKey } from "@pr-review/db";
+import { githubAppClientFromEnv, createTokenClient } from "@pr-review/github";
+import {
+  createConsoleLogger,
+  errorMessage,
+  loadLocalEnvFile,
+  requiredEnv,
+} from "@pr-review/logging";
 
 import { runReviewJob, type JobRunnerDeps } from "#src/run-job";
 import { createDrainer, createHttpServer, listen } from "#src/server";
@@ -16,19 +21,14 @@ const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 60_000;
 
 async function main(): Promise<void> {
-  const envFile = findLocalEnvFile();
-  if (envFile) process.loadEnvFile(envFile);
+  loadLocalEnvFile();
   const logger = createConsoleLogger();
   const database = db();
   const appDomain = process.env.APP_DOMAIN?.trim();
 
   const jobDeps: JobRunnerDeps = {
     database,
-    // Single-line env values carry the PEM's newlines as literal `\n`.
-    github: createGithubAppClient({
-      appId: requiredEnv("GITHUB_APP_ID"),
-      privateKey: requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n"),
-    }),
+    github: githubAppClientFromEnv(),
     createClient: (token) => createTokenClient({ token }),
     createLanguageModel,
     encryptionKey: modelKeyEncryptionKey(),

@@ -35,9 +35,6 @@ importers:
       '@pr-review/ai':
         specifier: workspace:*
         version: link:../../packages/ai
-      '@pr-review/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -251,6 +248,9 @@ importers:
       '@pr-review/index':
         specifier: workspace:*
         version: link:../index
+      '@pr-review/logging':
+        specifier: workspace:*
+        version: link:../logging
       '@pr-review/schemas':
         specifier: workspace:*
         version: link:../schemas
@@ -340,6 +340,9 @@ importers:
       '@octokit/rest':
         specifier: ^22.0.1
         version: 22.0.1
+      '@pr-review/logging':
+        specifier: workspace:*
+        version: link:../logging
       zod:
         specifier: ^4.4.3
         version: 4.4.3

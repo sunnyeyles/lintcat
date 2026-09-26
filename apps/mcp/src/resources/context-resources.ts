@@ -1,9 +1,11 @@
 import { ResourceTemplate, type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import { errorMessage } from "@pr-review/logging";
 
 import type { McpEnvironment } from "#src/environment";
 import { readWorkingTreeFile } from "#src/local-git-client";
 import { readStoredReview } from "#src/review-history";
+import { jsonText } from "#src/tools/shared";
 
 const REVIEW_RESOURCE_TEMPLATE = "pr-review://review/{org}/{id}";
 const FILE_RESOURCE_TEMPLATE = "pr-review://file/{+path}";
@@ -28,7 +30,7 @@ function variable(variables: Variables, name: string, uri: URL): string {
 function jsonResource(uri: URL, value: unknown): ReadResourceResult {
   return {
     contents: [
-      { uri: uri.toString(), mimeType: "application/json", text: JSON.stringify(value, null, 2) },
+      { uri: uri.toString(), mimeType: "application/json", text: jsonText(value) },
     ],
   };
 }
@@ -75,7 +77,7 @@ export function registerContextResources(
         const { text } = await readWorkingTreeFile(environment.cwd, file);
         return { contents: [{ uri: uri.toString(), mimeType: "text/plain", text }] };
       } catch (error: unknown) {
-        throw new Error(`Cannot read ${uri.toString()}: ${(error as Error).message}`);
+        throw new Error(`Cannot read ${uri.toString()}: ${errorMessage(error)}`);
       }
     },
   );

@@ -1,8 +1,10 @@
 import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "@octokit/rest";
+import { requiredEnv } from "@pr-review/logging";
 import { z } from "zod";
 
-import { httpStatus } from "#src/errors";
+import { notFoundAs } from "#src/errors";
+import { PAGE_SIZE } from "#src/paginate";
 
 export interface InstallationRepository {
   id: number;
@@ -179,11 +181,24 @@ const membershipSchema = z.object({
   user: memberSchema.nullable(),
 });
 
-const installationSchema = z.object({
-  id: z.number(),
-  account: z.object({ id: z.number(), login: z.string(), type: z.string() }),
-  suspended_at: z.string().nullish(),
-});
+/** An installation as GitHub sends it, in API responses and webhook payloads alike. */
+export const installationSchema = z
+  .object({
+    id: z.number(),
+    account: z.object({ id: z.number(), login: z.string(), type: z.string() }),
+    suspended_at: z.string().nullish(),
+  })
+  .transform(
+    ({ id, account, suspended_at }): AppInstallation => ({
+      id,
+      account,
+      suspendedAt: suspended_at ? new Date(suspended_at) : null,
+    }),
+  );
+
+export function parseInstallation(data: unknown): AppInstallation {
+  return installationSchema.parse(data);
+}
 
 /** Wraps per-installation Octokits in the App client; authentication is the caller's only job. */
 export function createAppClient(installation: InstallationOctokit): GithubAppClient {
@@ -192,12 +207,7 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
       const { data } = await installation(installationId).rest.apps.getInstallation({
         installation_id: installationId,
       });
-      const parsed = installationSchema.parse(data);
-      return {
-        id: parsed.id,
-        account: parsed.account,
-        suspendedAt: parsed.suspended_at ? new Date(parsed.suspended_at) : null,
-      };
+      return parseInstallation(data);
     },
 
     async createInstallationToken(installationId) {
@@ -212,7 +222,7 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
       const octokit = installation(installationId);
       const data = await octokit.paginate(
         octokit.rest.apps.listReposAccessibleToInstallation,
-        { per_page: 100 },
+        { per_page: PAGE_SIZE },
       );
       return repositoriesSchema.parse(data).map((repo) => ({
         id: repo.id,
@@ -232,7 +242,7 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
             await octokit.paginate(octokit.rest.orgs.listMembers, {
               org,
               role,
-              per_page: 100,
+              per_page: PAGE_SIZE,
             }),
           );
       const admins = new Set((await list("admin")).map((member) => member.id));
@@ -245,16 +255,11 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
     },
 
     async getOrganizationMembership(installationId, org, username) {
-      let data: unknown;
-      try {
-        ({ data } = await installation(installationId).rest.orgs.getMembershipForUser(
-          { org, username },
-        ));
-      } catch (error) {
-        if (httpStatus(error) === 404) return null;
-        throw error;
-      }
-      const membership = membershipSchema.parse(data);
+      const response = await notFoundAs(null, () =>
+        installation(installationId).rest.orgs.getMembershipForUser({ org, username }),
+      );
+      if (response === null) return null;
+      const membership = membershipSchema.parse(response.data);
       if (membership.state !== "active" || !membership.user) return null;
       return {
         id: membership.user.id,
@@ -265,16 +270,15 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
     },
 
     async getRepositoryPermission(installationId, owner, repo, username) {
-      let data: unknown;
-      try {
-        ({ data } = await installation(
-          installationId,
-        ).rest.repos.getCollaboratorPermissionLevel({ owner, repo, username }));
-      } catch (error) {
-        if (httpStatus(error) === 404) return null;
-        throw error;
-      }
-      const level = permissionLevelSchema.parse(data);
+      const response = await notFoundAs(null, () =>
+        installation(installationId).rest.repos.getCollaboratorPermissionLevel({
+          owner,
+          repo,
+          username,
+        }),
+      );
+      if (response === null) return null;
+      const level = permissionLevelSchema.parse(response.data);
       const permission =
         level.permission === "none"
           ? null
@@ -289,7 +293,7 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
         owner,
         repo,
         affiliation: "all",
-        per_page: 100,
+        per_page: PAGE_SIZE,
       });
       return z
         .array(collaboratorSchema)
@@ -324,4 +328,16 @@ export function createGithubAppClient(config: GithubAppConfig): GithubAppClient 
     }
     return octokit;
   });
+}
+
+/** GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY; a single-line key carries its newlines as literal `\\n`. */
+export function githubAppConfigFromEnv(): GithubAppConfig {
+  return {
+    appId: requiredEnv("GITHUB_APP_ID"),
+    privateKey: requiredEnv("GITHUB_APP_PRIVATE_KEY").replaceAll("\\n", "\n"),
+  };
+}
+
+export function githubAppClientFromEnv(): GithubAppClient {
+  return createGithubAppClient(githubAppConfigFromEnv());
 }

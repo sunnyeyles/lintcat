@@ -16,6 +16,11 @@ export {
   type ModelProvider,
   type ReviewModel,
 } from "#src/model";
+export {
+  modelApiKeyEnvNames,
+  modelConfigFromEnv,
+  type ModelEnvNames,
+} from "#src/model-env";
 export type {
   ReviewAgent,
   ReviewContext,

@@ -15,11 +15,11 @@ import {
   upsertAccountUser,
   upsertInstallation,
   upsertRepositories,
-  type InstallationInput,
   type Organization,
   type RepoPermission,
   type RepoReviewMode,
 } from "@pr-review/db";
+import { installationSchema } from "@pr-review/github";
 import { errorMessage } from "@pr-review/logging";
 import { z } from "zod";
 
@@ -44,30 +44,10 @@ export interface GithubWebhookDeps extends InstallationDeps {
   pingWorker: PingWorker;
 }
 
-const installationSchema = z.object({
-  id: z.number(),
-  account: z.object({
-    id: z.number(),
-    login: z.string(),
-    type: z.string(),
-  }),
-  suspended_at: z.string().nullish(),
-});
-
 const installationEventSchema = z.object({
   action: z.string(),
   installation: installationSchema,
 });
-
-function fromPayload({
-  suspended_at,
-  ...installation
-}: z.infer<typeof installationSchema>): InstallationInput | undefined {
-  return toInstallation({
-    ...installation,
-    suspendedAt: suspended_at ? new Date(suspended_at) : null,
-  });
-}
 
 const payloadRepositorySchema = z.object({
   id: z.number(),
@@ -236,7 +216,7 @@ async function onInstallation(
   payload: z.infer<typeof installationEventSchema>,
 ): Promise<boolean> {
   const { database, github } = deps;
-  const installation = fromPayload(payload.installation);
+  const installation = toInstallation(payload.installation);
   if (!installation) return false;
   const source = `installation.${payload.action}`;
   switch (payload.action) {
@@ -284,7 +264,7 @@ async function onInstallationRepositories(
   payload: z.infer<typeof installationRepositoriesEventSchema>,
 ): Promise<boolean> {
   const { database } = deps;
-  const installation = fromPayload(payload.installation);
+  const installation = toInstallation(payload.installation);
   if (!installation) return false;
   if (payload.action !== "added" && payload.action !== "removed") return false;
   // Only `created` brings an uninstalled organization back, so a late delivery cannot.

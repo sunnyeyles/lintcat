@@ -8,22 +8,11 @@ import {
 } from "@pr-review/reviewer";
 import { z } from "zod";
 
-import { resolveCheckoutPath } from "#src/checkout-path";
+import { checkoutRoot } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
-import { repositoryRoot } from "#src/local-git-client";
 import { openLocalMemoryStore } from "#src/local-memory-store";
-import { repoPathSchema } from "#src/tools/shared";
-
-/** No base branch is resolved here: suppressing needs the checkout, not a diff. */
-async function checkoutRoot(
-  environment: McpEnvironment,
-  client: ConnectedClient,
-  repoPath: string | undefined,
-): Promise<string> {
-  const from = await resolveCheckoutPath(environment, client, repoPath);
-  return repositoryRoot(from);
-}
+import { jsonContent, repoPathSchema } from "#src/tools/shared";
 
 export function registerMemoryTools(
   server: McpServer,
@@ -85,7 +74,7 @@ export function registerMemoryTools(
               `Suppressed ${category} findings shaped like "${titleShape(title)}" in ${root}. ` +
               `${updated.suppressions.length} suppression(s) now live in ${store.path}.`,
           },
-          { type: "text", text: JSON.stringify(updated.suppressions, null, 2) },
+          jsonContent(updated.suppressions),
         ],
       };
     },

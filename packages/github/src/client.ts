@@ -13,6 +13,23 @@ export interface PullRequestRef {
   pullRequestNumber: number;
 }
 
+export interface ReviewCorrelation {
+  repository: string;
+  pullRequestNumber: number;
+  headSha: string;
+}
+
+/** The correlation fields every event of one review carries. */
+export function reviewCorrelation(
+  target: PullRequestRef & { headSha: string },
+): ReviewCorrelation {
+  return {
+    repository: `${target.owner}/${target.repo}`,
+    pullRequestNumber: target.pullRequestNumber,
+    headSha: target.headSha,
+  };
+}
+
 /** PR title, description, and metadata the review pipeline consumes. */
 export interface PullRequestDetails {
   number: number;
