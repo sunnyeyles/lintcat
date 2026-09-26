@@ -8,6 +8,8 @@ import {
 import { MODEL_PROVIDERS, type ModelProvider } from "@pr-review/schemas";
 import { z } from "zod";
 
+import { firstIssue } from "@/lib/forms";
+
 /** Display names for the providers a hosted review can run on. */
 export const MODEL_KEY_PROVIDERS = {
   anthropic: "Anthropic",
@@ -59,7 +61,7 @@ export async function saveModelKeyForm(
     apiKey: form.get("apiKey") ?? undefined,
   });
   if (!parsed.success) {
-    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { status: "error", message: firstIssue(parsed) };
   }
   const saved = await saveModelKey(database, organization.id, parsed.data, encryptionKey);
   return { status: "saved", provider: saved.provider, last4: saved.last4 };

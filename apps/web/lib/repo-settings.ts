@@ -2,6 +2,7 @@ import { saveRepoSettings, type Database, type RepoReviewMode } from "@pr-review
 import { MODEL_CHOICES } from "@pr-review/schemas";
 import { z } from "zod";
 
+import { firstIssue } from "@/lib/forms";
 import type { ModelKeyProvider } from "@/lib/model-key";
 
 /** The three modes a repository's hosted reviews can run in, labelled for the form. */
@@ -61,7 +62,7 @@ export async function saveRepoSettingsForm(
     fixes: form.get("fixes") ?? undefined,
   });
   if (!parsed.success) {
-    return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { status: "error", message: firstIssue(parsed) };
   }
   const saved = await saveRepoSettings(database, access.repoId, {
     mode: parsed.data.mode,

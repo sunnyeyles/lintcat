@@ -4,17 +4,13 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/shell";
 import { RepoName } from "@/components/ui";
 import { toOptions } from "@/lib/forms";
-import { MODEL_KEY_PROVIDERS, type ModelKeyProvider } from "@/lib/model-key";
+import { isModelKeyProvider, MODEL_KEY_PROVIDERS } from "@/lib/model-key";
 import { DEFAULT_MODEL_VALUE, REPO_REVIEW_MODES, repoModelOptions } from "@/lib/repo-settings";
 import { requireRepo } from "@/lib/session";
 
 import { RepoSettingsForm } from "./repo-settings-form";
 
 export const metadata: Metadata = { title: "Repository settings" };
-
-function isProvider(value: string | undefined): value is ModelKeyProvider {
-  return value !== undefined && value in MODEL_KEY_PROVIDERS;
-}
 
 export default async function RepoSettingsPage({
   params,
@@ -27,7 +23,7 @@ export default async function RepoSettingsPage({
     effectiveRepoSettings(db(), repo.id),
     findModelKeySummary(db(), organization.id),
   ]);
-  const provider = isProvider(key?.provider) ? key.provider : undefined;
+  const provider = isModelKeyProvider(key?.provider) ? key.provider : undefined;
 
   return (
     <>
