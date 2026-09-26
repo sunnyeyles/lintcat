@@ -8,7 +8,12 @@ import {
   type PackageManifest,
   type PathAlias,
 } from "#src/manifests";
-import { ancestorDirectories, basenameOf, directoryOf } from "#src/paths";
+import {
+  ancestorDirectories,
+  basenameOf,
+  directoryOf,
+  globSource,
+} from "#src/paths";
 
 /** A package the workspace config claims, as the repository overview lists it. */
 export interface WorkspacePackage {
@@ -39,25 +44,7 @@ function isIgnored(path: string): boolean {
 
 /** One workspace pattern as a regular expression over a package directory. */
 function patternToRegExp(pattern: string): RegExp {
-  let source = "";
-  for (let at = 0; at < pattern.length; at += 1) {
-    const char = pattern[at]!;
-    if (char === "*" && pattern[at + 1] === "*") {
-      source += pattern[at + 2] === "/" ? "(?:.*/)?" : ".*";
-      at += pattern[at + 2] === "/" ? 2 : 1;
-      continue;
-    }
-    if (char === "*") {
-      source += "[^/]*";
-      continue;
-    }
-    if (char === "?") {
-      source += "[^/]";
-      continue;
-    }
-    source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-  }
-  return new RegExp(`^${source}$`);
+  return new RegExp(`^${globSource(pattern)}$`);
 }
 
 /** Matches a directory against pnpm's include/exclude pattern list. */

@@ -6,13 +6,10 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
-import { bundle } from "./lib/bundle.mjs";
+import { appBundlePaths, bundle } from "./lib/bundle.mjs";
 
-const appDir = process.cwd();
+const paths = appBundlePaths(process.cwd());
 
-await rm(path.join(appDir, "dist"), { recursive: true, force: true });
+await rm(path.dirname(paths.outfile), { recursive: true, force: true });
 
-await bundle({
-  entryPoint: path.join(appDir, "src", "index.ts"),
-  outfile: path.join(appDir, "dist", "index.mjs"),
-});
+await bundle(paths);

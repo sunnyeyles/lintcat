@@ -8,7 +8,7 @@
             "type": "command",
             "statusMessage": "Installing worktree dependencies",
             "timeout": 600,
-            "command": "r=\".claude/hooks/install-worktree-deps.sh\"; s=\"${CLAUDE_PROJECT_DIR:-.}/$r\"; [ -f \"$s\" ] || { g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); s=\"${g%/.git}/$r\"; }; [ -f \"$s\" ] && bash \"$s\" || true"
+            "command": "s=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/run.sh\"; [ -f \"$s\" ] || exit 0; bash \"$s\" install-worktree-deps || true"
           }
         ]
       }
@@ -21,7 +21,7 @@
             "type": "command",
             "statusMessage": "Checking comment length",
             "timeout": 20,
-            "command": "r=\".claude/hooks/comment-length.sh\"; s=\"${CLAUDE_PROJECT_DIR:-.}/$r\"; [ -f \"$s\" ] || { g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null </dev/null); s=\"${g%/.git}/$r\"; }; [ -f \"$s\" ] || exit 0; bash \"$s\""
+            "command": "s=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/run.sh\"; [ -f \"$s\" ] || exit 0; bash \"$s\" comment-length"
           }
         ]
       }
@@ -33,7 +33,7 @@
             "type": "command",
             "statusMessage": "Removing worktrees whose PR is finished",
             "timeout": 60,
-            "command": "r=\".claude/hooks/cleanup-merged-worktrees.sh\"; s=\"${CLAUDE_PROJECT_DIR:-.}/$r\"; [ -f \"$s\" ] || { g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); s=\"${g%/.git}/$r\"; }; [ -f \"$s\" ] && bash \"$s\" || true"
+            "command": "s=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/run.sh\"; [ -f \"$s\" ] || exit 0; bash \"$s\" cleanup-merged-worktrees || true"
           }
         ]
       }

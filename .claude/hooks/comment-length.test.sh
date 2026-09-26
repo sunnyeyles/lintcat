@@ -209,7 +209,7 @@ if [ -f "$settings" ] && command -v node >/dev/null 2>&1; then
   wrapper=$(node -e '
     const s = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))
     const h = (s.hooks?.PostToolUse ?? []).flatMap((e) => e.hooks ?? [])
-      .find((x) => (x.command ?? "").includes("comment-length.sh"))
+      .find((x) => (x.command ?? "").includes("comment-length"))
     process.stdout.write(h?.command ?? "")
   ' "$settings")
   if [ -n "$wrapper" ]; then

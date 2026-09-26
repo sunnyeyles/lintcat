@@ -4,8 +4,32 @@ import { describe, expect, it } from "vitest";
 import {
   baseRangesFromPatch,
   buildChangedLineIndex,
+  buildDiffLineIndex,
   changedLinesFromPatch,
 } from "#src/diff-lines";
+
+describe("buildDiffLineIndex", () => {
+  it("indexes added and context lines, never removed lines or the preamble", () => {
+    const patch = [
+      "diff --git a/src/a.ts b/src/a.ts",
+      "@@ -1,3 +1,3 @@",
+      " context 1",
+      "-removed",
+      "+added 2",
+      "\\ No newline at end of file",
+      "@@ -20,1 +20,2 @@",
+      " context 20",
+      "+added 21",
+    ].join("\n");
+    const index = buildDiffLineIndex([
+      { filename: "src/a.ts", status: "modified", additions: 2, deletions: 1, patch },
+      { filename: "logo.png", status: "added", additions: 0, deletions: 0 },
+    ]);
+
+    expect(index.get("src/a.ts")).toEqual(new Set([1, 2, 20, 21]));
+    expect(index.get("logo.png")).toEqual(new Set());
+  });
+});
 
 describe("changedLinesFromPatch", () => {
   it("returns the new-side line numbers of added lines in a single hunk", () => {

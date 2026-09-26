@@ -36,10 +36,17 @@ export function bundle({ entryPoint, outfile, logLevel = "info" }) {
   });
 }
 
+/** An app's entry point and the bundle built from it. */
+export function appBundlePaths(appDir) {
+  return {
+    entryPoint: path.join(appDir, "src", "index.ts"),
+    outfile: path.join(appDir, "dist", "index.mjs"),
+  };
+}
+
 /** An app's `start.mjs`: bundles its `src/index.ts` and runs the result. */
 export async function bundleAndRun(appUrl) {
-  const appDir = path.dirname(fileURLToPath(appUrl));
-  const outfile = path.join(appDir, "dist", "index.mjs");
-  await bundle({ entryPoint: path.join(appDir, "src", "index.ts"), outfile, logLevel: "error" });
-  await import(pathToFileURL(outfile).href);
+  const paths = appBundlePaths(path.dirname(fileURLToPath(appUrl)));
+  await bundle({ ...paths, logLevel: "error" });
+  await import(pathToFileURL(paths.outfile).href);
 }

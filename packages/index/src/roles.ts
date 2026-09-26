@@ -2,7 +2,12 @@
  * What each path in a repository is. Path conventions only: nothing here
  * reads a file's contents.
  */
-import { basenameOf, extensionOf } from "#src/paths";
+import {
+  basenameOf,
+  directorySegments,
+  extensionOf,
+  stemOf,
+} from "#src/paths";
 import { isTestBasename } from "#src/test-names";
 
 export type FileRole =
@@ -145,19 +150,9 @@ const GENERATED_BASENAME = /(\.generated\.|\.min\.[cm]?js$|\.d\.[cm]?ts$)/;
 
 const CONFIG_BASENAME = /\.config\.[cm]?[jt]sx?$/;
 
-function directories(path: string): string[] {
-  return path.split("/").slice(0, -1);
-}
-
-/** The base name with every extension stripped, lowercased. */
-function stem(base: string): string {
-  const dot = base.indexOf(".", 1);
-  return (dot < 0 ? base : base.slice(0, dot)).toLowerCase();
-}
-
 /** The role of one repository-relative path, by ROLE_PRECEDENCE. */
 export function classifyFileRole(path: string): FileRole {
-  const segments = directories(path);
+  const segments = directorySegments(path);
   const lowered = basenameOf(path).toLowerCase();
   const ext = extensionOf(path).toLowerCase();
   const inside = (names: ReadonlySet<string>): boolean =>
@@ -190,7 +185,7 @@ export function classifyFileRole(path: string): FileRole {
   if (
     inside(DOC_DIRECTORIES) ||
     DOC_EXTENSIONS.has(ext) ||
-    DOC_FILES.has(stem(lowered))
+    DOC_FILES.has(stemOf(lowered, "all"))
   ) {
     return "docs";
   }

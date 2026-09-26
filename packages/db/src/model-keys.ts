@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import type { Database } from "./client";
 import { modelKeys } from "./schema";
@@ -44,7 +44,7 @@ export async function saveModelKey(
     .values(values)
     .onConflictDoUpdate({
       target: modelKeys.organizationId,
-      set: { ...values, updatedAt: sql`now()` },
+      set: values,
     })
     .returning(summaryColumns);
   if (!row) throw new Error("model key upsert returned no row");

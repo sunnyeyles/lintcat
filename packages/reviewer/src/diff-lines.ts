@@ -5,36 +5,51 @@
 import type { ChangedFile } from "@pr-review/github";
 
 /** Matches `@@ -oldStart[,oldCount] +newStart[,newCount] @@ ...`. */
-const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,\d+)? @@/;
 
-/** Returns the new-side line numbers of a patch's added lines. */
-export function changedLinesFromPatch(patch: string): Set<number> {
-  const changed = new Set<number>();
+type PatchLine =
+  | { kind: "hunk"; oldStart: number; oldCount: number }
+  | { kind: "added" | "context"; newLine: number };
+
+// Removed lines and the no-newline marker take no new-side number, so are not yielded.
+function* walkPatch(patch: string): Generator<PatchLine> {
   let newLine: number | undefined;
-
   for (const line of patch.split("\n")) {
     const hunk = HUNK_HEADER.exec(line);
     if (hunk) {
-      newLine = Number(hunk[1] ?? "0");
+      newLine = Number(hunk[3]);
+      yield {
+        kind: "hunk",
+        oldStart: Number(hunk[1]),
+        oldCount: Number(hunk[2] ?? "1"),
+      };
       continue;
     }
-    if (newLine === undefined) {
-      // Preamble before the first hunk header; nothing to count.
+    if (newLine === undefined || line.startsWith("-") || line.startsWith("\\")) {
       continue;
     }
-    if (line.startsWith("+")) {
-      changed.add(newLine);
-      newLine += 1;
-    } else if (line.startsWith("-") || line.startsWith("\\")) {
-      // Neither a removed line nor the no-newline marker consumes a
-      // new-side line number.
-    } else {
-      // Context line (or the trailing empty split segment).
-      newLine += 1;
-    }
+    yield { kind: line.startsWith("+") ? "added" : "context", newLine };
+    newLine += 1;
   }
+}
 
-  return changed;
+function newSideLines(
+  patch: string,
+  kinds: ReadonlySet<PatchLine["kind"]>,
+): Set<number> {
+  const lines = new Set<number>();
+  for (const line of walkPatch(patch)) {
+    if (line.kind !== "hunk" && kinds.has(line.kind)) lines.add(line.newLine);
+  }
+  return lines;
+}
+
+const ADDED = new Set(["added"] as const);
+const SHOWN = new Set(["added", "context"] as const);
+
+/** Returns the new-side line numbers of a patch's added lines. */
+export function changedLinesFromPatch(patch: string): Set<number> {
+  return newSideLines(patch, ADDED);
 }
 
 /**
@@ -42,23 +57,7 @@ export function changedLinesFromPatch(patch: string): Set<number> {
  * comment only on these, which is a wider set than the added lines alone.
  */
 function diffLinesFromPatch(patch: string): Set<number> {
-  const shown = new Set<number>();
-  let newLine: number | undefined;
-
-  for (const line of patch.split("\n")) {
-    const hunk = HUNK_HEADER.exec(line);
-    if (hunk) {
-      newLine = Number(hunk[1] ?? "0");
-      continue;
-    }
-    if (newLine === undefined || line.startsWith("-") || line.startsWith("\\")) {
-      continue;
-    }
-    shown.add(newLine);
-    newLine += 1;
-  }
-
-  return shown;
+  return newSideLines(patch, SHOWN);
 }
 
 /** A run of lines, 1-based and inclusive. */
@@ -67,17 +66,13 @@ export interface LineRange {
   readonly endLine: number;
 }
 
-const BASE_HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@/;
-
 /** The base-side lines each hunk header spans, context included; a pure insertion spans none. */
 export function baseRangesFromPatch(patch: string): LineRange[] {
   const ranges: LineRange[] = [];
-  for (const line of patch.split("\n")) {
-    const hunk = BASE_HUNK_HEADER.exec(line);
-    const count = Number(hunk?.[2] ?? "1");
-    if (hunk && count > 0) {
-      const startLine = Number(hunk[1]);
-      ranges.push({ startLine, endLine: startLine + count - 1 });
+  for (const line of walkPatch(patch)) {
+    if (line.kind === "hunk" && line.oldCount > 0) {
+      const startLine = line.oldStart;
+      ranges.push({ startLine, endLine: startLine + line.oldCount - 1 });
     }
   }
   return ranges;

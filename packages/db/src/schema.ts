@@ -48,8 +48,23 @@ export const repoReviewModeEnum = pgEnum("repo_review_mode", [
   "every_pr",
 ]);
 
-const createdAt = () =>
-  timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
+const tstz = (name: string) => timestamp(name, { withTimezone: true });
+const createdAt = () => tstz("created_at").notNull().defaultNow();
+const syncedAt = () => tstz("synced_at").notNull().defaultNow();
+const updatedAt = () =>
+  tstz("updated_at").notNull().defaultNow().$onUpdate(() => new Date());
+const orgFk = () =>
+  integer("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" });
+const userFk = () =>
+  integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" });
+const repoFk = () =>
+  integer("repo_id")
+    .notNull()
+    .references(() => repos.id, { onDelete: "cascade" });
 
 // One GitHub account; `slug` is its lowercased login and its subdomain.
 export const organizations = pgTable("organizations", {
@@ -59,18 +74,16 @@ export const organizations = pgTable("organizations", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   installationId: bigint("installation_id", { mode: "number" }).unique(),
-  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  suspendedAt: tstz("suspended_at"),
   // Set on uninstall, which also clears installationId; the rows and history stay.
-  uninstalledAt: timestamp("uninstalled_at", { withTimezone: true }),
+  uninstalledAt: tstz("uninstalled_at"),
   createdAt: createdAt(),
 });
 
 // A slug the organization used before a GitHub rename; never also a live slug.
 export const organizationSlugRedirects = pgTable("organization_slug_redirects", {
   slug: text("slug").primaryKey(),
-  organizationId: integer("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
+  organizationId: orgFk(),
   createdAt: createdAt(),
 });
 
@@ -88,16 +101,10 @@ export const memberships = pgTable(
   "memberships",
   {
     id: serial("id").primaryKey(),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    organizationId: integer("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: userFk(),
+    organizationId: orgFk(),
     role: membershipRoleEnum("role").notNull(),
-    syncedAt: timestamp("synced_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    syncedAt: syncedAt(),
   },
   (t) => [
     uniqueIndex("memberships_user_organization_idx").on(
@@ -111,16 +118,14 @@ export const repos = pgTable(
   "repos",
   {
     id: serial("id").primaryKey(),
-    organizationId: integer("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+    organizationId: orgFk(),
     // Null for a repo only ingest has seen; the installation webhook fills it in.
     githubRepoId: bigint("github_repo_id", { mode: "number" }).unique(),
     owner: text("owner").notNull(),
     name: text("name").notNull(),
     private: boolean("private").notNull().default(false),
     // Set when the installation stops covering the repo; its reviews stay but are hidden.
-    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedAt: tstz("removed_at"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -137,16 +142,10 @@ export const repoAccess = pgTable(
   "repo_access",
   {
     id: serial("id").primaryKey(),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    repoId: integer("repo_id")
-      .notNull()
-      .references(() => repos.id, { onDelete: "cascade" }),
+    userId: userFk(),
+    repoId: repoFk(),
     permission: repoPermissionEnum("permission").notNull(),
-    syncedAt: timestamp("synced_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    syncedAt: syncedAt(),
   },
   (t) => [uniqueIndex("repo_access_user_repo_idx").on(t.userId, t.repoId)],
 );
@@ -156,9 +155,7 @@ export const reviews = pgTable(
   "reviews",
   {
     id: serial("id").primaryKey(),
-    repoId: integer("repo_id")
-      .notNull()
-      .references(() => repos.id, { onDelete: "cascade" }),
+    repoId: repoFk(),
     prNumber: integer("pr_number").notNull(),
     headSha: text("head_sha").notNull(),
     // The pull request's base: which repository_graphs row this review reads.
@@ -189,9 +186,7 @@ export const repositoryGraphs = pgTable(
   "repository_graphs",
   {
     id: serial("id").primaryKey(),
-    repoId: integer("repo_id")
-      .notNull()
-      .references(() => repos.id, { onDelete: "cascade" }),
+    repoId: repoFk(),
     baseSha: text("base_sha").notNull(),
     snapshot: bytea("snapshot").notNull(),
     fileCount: integer("file_count").notNull(),
@@ -206,15 +201,12 @@ export const repositoryGraphs = pgTable(
 // The organization's own model key, sealed by secret-box; only `last4` is ever shown.
 export const modelKeys = pgTable("model_keys", {
   id: serial("id").primaryKey(),
-  organizationId: integer("organization_id")
-    .notNull()
-    .unique()
-    .references(() => organizations.id, { onDelete: "cascade" }),
+  organizationId: orgFk().unique(),
   provider: text("provider").notNull(),
   sealedKey: bytea("sealed_key").notNull(),
   last4: text("last4").notNull(),
   createdAt: createdAt(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: updatedAt(),
 });
 
 // One hosted review of a pull request at one head; the worker claims queued rows.
@@ -222,20 +214,18 @@ export const reviewJobs = pgTable(
   "review_jobs",
   {
     id: serial("id").primaryKey(),
-    repoId: integer("repo_id")
-      .notNull()
-      .references(() => repos.id, { onDelete: "cascade" }),
+    repoId: repoFk(),
     prNumber: integer("pr_number").notNull(),
     headSha: text("head_sha").notNull(),
     // X-GitHub-Delivery: a redelivered webhook carries the same id.
     deliveryId: text("delivery_id").unique(),
     status: reviewJobStatusEnum("status").notNull().default("queued"),
     attempts: integer("attempts").notNull().default(0),
-    runAfter: timestamp("run_after", { withTimezone: true }).notNull().defaultNow(),
+    runAfter: tstz("run_after").notNull().defaultNow(),
     // A running job whose lease lapsed belongs to a dead worker and is claimable again.
-    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    leaseExpiresAt: tstz("lease_expires_at"),
     lastError: text("last_error"),
-    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    finishedAt: tstz("finished_at"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -249,16 +239,13 @@ export const reviewJobs = pgTable(
 // A repo without a row reviews every pull request, on no model override, with fixes off.
 export const repoSettings = pgTable("repo_settings", {
   id: serial("id").primaryKey(),
-  repoId: integer("repo_id")
-    .notNull()
-    .unique()
-    .references(() => repos.id, { onDelete: "cascade" }),
+  repoId: repoFk().unique(),
   mode: repoReviewModeEnum("mode").notNull().default("every_pr"),
   // Model id override for the organization's key's provider; null uses the provider's default.
   model: text("model"),
   fixes: boolean("fixes").notNull().default(false),
   createdAt: createdAt(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: updatedAt(),
 });
 
 // Requests per key per fixed window; the key is a hash, never a raw address.
@@ -266,7 +253,7 @@ export const rateLimits = pgTable(
   "rate_limits",
   {
     key: text("key").notNull(),
-    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowStart: tstz("window_start").notNull(),
     count: integer("count").notNull().default(0),
   },
   (t) => [
