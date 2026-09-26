@@ -20,10 +20,10 @@ import { cache, Suspense } from "react";
 
 import {
   DurationCell,
-  FindingsCell,
   HeadCell,
   RowLink,
   Section,
+  SeverityMix,
   Sparkline,
   WhenCell,
 } from "@/components/overview";
@@ -185,7 +185,9 @@ async function ReviewHistory({
                         </RowLink>
                       </TableCell>
                       <HeadCell sha={review.headSha} />
-                      <FindingsCell bySeverity={review.bySeverity} />
+                      <TableCell>
+                        <SeverityMix bySeverity={review.bySeverity} />
+                      </TableCell>
                       <DurationCell ms={review.durationMs} />
                       <WhenCell date={review.createdAt} />
                     </TableRow>

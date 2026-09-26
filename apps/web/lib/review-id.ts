@@ -1,7 +1,5 @@
-const MAX_SERIAL = 2 ** 31 - 1;
-
-/** A review id from the URL, or null when it cannot name a row (positive int4). */
+// Null unless the URL segment can name a row: a positive int4.
 export function parseReviewId(raw: string): number | null {
   const id = Number(raw);
-  return Number.isInteger(id) && id > 0 && id <= MAX_SERIAL ? id : null;
+  return Number.isInteger(id) && id > 0 && id <= 2 ** 31 - 1 ? id : null;
 }

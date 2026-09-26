@@ -25,7 +25,7 @@ export interface MapHover {
 const NO_PATHS: readonly string[] = [];
 const SHUT = { focusedPath: null, query: "", expandedGroups: new Set<string>() };
 
-export interface MapExplorerOptions {
+interface MapExplorerOptions {
   input: MapGraph;
   heat: FindingHeat;
   adapter?: MapAdapter;

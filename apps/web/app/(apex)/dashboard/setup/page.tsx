@@ -14,7 +14,7 @@ import { githubApp, INSTALL_APP_URL } from "@/lib/github-app";
 import { appDomain } from "@/lib/host";
 import { completeSetup, setupRequest, type SetupResult } from "@/lib/installation";
 import { DASHBOARD_PATH, organizationPath, signInUrl } from "@/lib/paths";
-import type { SearchParams, SearchParamValues } from "@/lib/search-params";
+import type { SearchParams } from "@/lib/search-params";
 import { currentSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Setting up" };
@@ -157,10 +157,7 @@ function State({
 }
 
 // Rebuilt from parsed values only, so nothing from the query is reflected as-is.
-function selfUrl(
-  request: ReturnType<typeof setupRequest>,
-  params: SearchParamValues,
-): string {
+function selfUrl(request: ReturnType<typeof setupRequest>, params: Awaited<SearchParams>): string {
   const query = new URLSearchParams();
   if (request.kind === "sync") query.set("installation_id", String(request.installationId));
   if (request.kind === "request") query.set("setup_action", "request");

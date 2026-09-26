@@ -1,5 +1,4 @@
 import {
-  cn,
   Table,
   TableBody,
   TableCaption,
@@ -25,39 +24,8 @@ export function HeadCell({ sha }: { sha: string }) {
   );
 }
 
-export function RiskCell({ risk }: { risk: ReviewSummary["risk"] }) {
-  return (
-    <TableCell>
-      {risk ? (
-        <RiskBadge band={risk.band} score={risk.score} />
-      ) : (
-        <span className="text-muted-foreground">
-          <span aria-hidden>—</span>
-          <span className="sr-only">not scored</span>
-        </span>
-      )}
-    </TableCell>
-  );
-}
-
-export function FindingsCell({ bySeverity }: Pick<ReviewSummary, "bySeverity">) {
-  return (
-    <TableCell>
-      <SeverityMix bySeverity={bySeverity} />
-    </TableCell>
-  );
-}
-
 export function DurationCell({ ms }: { ms: number }) {
-  return (
-    <TableCell className="text-right tabular-nums whitespace-nowrap">
-      {formatDuration(ms)}
-    </TableCell>
-  );
-}
-
-export function CostCell({ usd }: { usd: number }) {
-  return <TableCell className="text-right tabular-nums">{formatUsd(usd)}</TableCell>;
+  return <TableCell className="text-right tabular-nums whitespace-nowrap">{formatDuration(ms)}</TableCell>;
 }
 
 export function WhenCell({ date }: { date: Date }) {
@@ -68,21 +36,12 @@ export function WhenCell({ date }: { date: Date }) {
   );
 }
 
-function NumericHead({ children }: { children: string }) {
-  return (
-    <TableHead scope="col" className="text-right">
-      {children}
-    </TableHead>
-  );
-}
+type ReviewColumn = "head" | "risk" | "cost";
 
-export type ReviewColumn = "head" | "risk" | "cost";
-
-export type ReviewsTableProps = {
+type ReviewsTableProps = {
   slug: string;
   reviews: ReviewSummary[];
   caption: string;
-  /** Columns beyond repository, pull request, findings, duration and when. */
   columns?: readonly ReviewColumn[];
 };
 
@@ -90,7 +49,7 @@ export function ReviewsTable({ slug, reviews, caption, columns = [] }: ReviewsTa
   const show = (column: ReviewColumn) => columns.includes(column);
 
   return (
-    <Table className={cn(columns.length > 0 ? "min-w-[54rem]" : "min-w-[38rem]")}>
+    <Table className={columns.length > 0 ? "min-w-[54rem]" : "min-w-[38rem]"}>
       <TableCaption className="sr-only">{caption}</TableCaption>
       <TableHeader>
         <TableRow>
@@ -103,9 +62,9 @@ export function ReviewsTable({ slug, reviews, caption, columns = [] }: ReviewsTa
             </TableHead>
           ) : null}
           <TableHead scope="col">Findings</TableHead>
-          <NumericHead>Duration</NumericHead>
-          {show("cost") ? <NumericHead>Cost</NumericHead> : null}
-          <NumericHead>When</NumericHead>
+          <TableHead scope="col" className="text-right">Duration</TableHead>
+          {show("cost") ? <TableHead scope="col" className="text-right">Cost</TableHead> : null}
+          <TableHead scope="col" className="text-right">When</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -123,10 +82,25 @@ export function ReviewsTable({ slug, reviews, caption, columns = [] }: ReviewsTa
               </RowLink>
             </TableCell>
             {show("head") ? <HeadCell sha={review.headSha} /> : null}
-            {show("risk") ? <RiskCell risk={review.risk} /> : null}
-            <FindingsCell bySeverity={review.bySeverity} />
+            {show("risk") ? (
+              <TableCell>
+                {review.risk ? (
+                  <RiskBadge band={review.risk.band} score={review.risk.score} />
+                ) : (
+                  <span className="text-muted-foreground">
+                    <span aria-hidden>—</span>
+                    <span className="sr-only">not scored</span>
+                  </span>
+                )}
+              </TableCell>
+            ) : null}
+            <TableCell>
+              <SeverityMix bySeverity={review.bySeverity} />
+            </TableCell>
             <DurationCell ms={review.durationMs} />
-            {show("cost") ? <CostCell usd={review.costUsd} /> : null}
+            {show("cost") ? (
+              <TableCell className="text-right tabular-nums">{formatUsd(review.costUsd)}</TableCell>
+            ) : null}
             <WhenCell date={review.createdAt} />
           </TableRow>
         ))}

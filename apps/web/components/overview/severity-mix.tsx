@@ -8,7 +8,6 @@ import type { Severity } from "@pr-review/db/dashboard";
 export type SeverityMixProps = {
   bySeverity: Record<Severity, number>;
   className?: string;
-  /** Shown in place of the badges when every count is zero. */
   empty?: ReactNode;
 };
 
