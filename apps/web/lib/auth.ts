@@ -22,10 +22,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     redirect({ url, baseUrl }) {
       return authRedirect(url, baseUrl, appDomain());
     },
-    // `profile` is set only on the sign-in pass; that is when the row is mirrored.
-    async jwt({ token, profile }) {
+    // `profile` is set only on the sign-in pass; the user token is used then and never stored.
+    async jwt({ token, profile, account }) {
       if (!profile) return token;
-      const user = await signInUser(profile as unknown as GitHubProfile);
+      const user = await signInUser(profile as unknown as GitHubProfile, account?.access_token);
       return { ...token, githubId: user.githubId, login: user.login };
     },
     session({ session, token }) {

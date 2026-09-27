@@ -10,16 +10,19 @@ import {
   type RepoPermission,
 } from "./schema";
 
+// Derived, never stored: no membership, but a `repo_access` row on a live repo of the account.
+export type AccessRole = MembershipRole | "collaborator";
+
 export interface ReadableRepo {
   id: number;
   /** Organization owner, or `admin`/`maintain` on the repo. */
   isOwner: boolean;
 }
 
-/** The live repos a member of the organization may read, by the visibility rule. */
+/** The live repos the user may read: owners all, members public plus granted, collaborators granted only. */
 export async function readableRepos(
   database: Database,
-  { organizationId, userId, role }: { organizationId: number; userId: number; role: MembershipRole },
+  { organizationId, userId, role }: { organizationId: number; userId: number; role: AccessRole },
 ): Promise<ReadableRepo[]> {
   const rows = await database
     .select({ id: repos.id, private: repos.private, permission: repoAccess.permission })
@@ -32,7 +35,11 @@ export async function readableRepos(
       and(
         eq(repos.organizationId, organizationId),
         isNull(repos.removedAt),
-        role === "owner" ? undefined : or(eq(repos.private, false), isNotNull(repoAccess.id)),
+        role === "owner"
+          ? undefined
+          : role === "collaborator"
+            ? isNotNull(repoAccess.id)
+            : or(eq(repos.private, false), isNotNull(repoAccess.id)),
       ),
     )
     .orderBy(asc(repos.id));
@@ -149,4 +156,75 @@ export async function listUserMemberships(
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(eq(users.githubId, githubUserId))
     .orderBy(asc(memberships.organizationId));
+}
+
+/** Makes the user's rows in one account exactly `grants`; repos not mirrored yet are skipped. */
+export async function replaceUserRepoAccess(
+  database: Database,
+  {
+    userId,
+    organizationId,
+    grants,
+  }: {
+    userId: number;
+    organizationId: number;
+    grants: readonly { githubRepoId: number; permission: RepoPermission }[];
+  },
+): Promise<void> {
+  const known =
+    grants.length === 0
+      ? []
+      : await database
+          .select({ id: repos.id, githubRepoId: repos.githubRepoId })
+          .from(repos)
+          .where(
+            and(
+              eq(repos.organizationId, organizationId),
+              isNull(repos.removedAt),
+              inArray(repos.githubRepoId, grants.map((grant) => grant.githubRepoId)),
+            ),
+          );
+  const byGithubRepoId = new Map(known.map((repo) => [repo.githubRepoId, repo.id]));
+  const kept: number[] = [];
+  for (const grant of grants) {
+    const repoId = byGithubRepoId.get(grant.githubRepoId);
+    if (repoId === undefined) continue;
+    kept.push(repoId);
+    await setRepoAccess(database, { userId, repoId, permission: grant.permission });
+  }
+  const accountRepos = database
+    .select({ id: repos.id })
+    .from(repos)
+    .where(eq(repos.organizationId, organizationId));
+  await database
+    .delete(repoAccess)
+    .where(
+      and(
+        eq(repoAccess.userId, userId),
+        inArray(repoAccess.repoId, accountRepos),
+        kept.length === 0 ? undefined : notInArray(repoAccess.repoId, kept),
+      ),
+    );
+}
+
+/** Accounts where the user holds repo rows but no membership: where they are a collaborator. */
+export async function listCollaboratorOrganizationIds(
+  database: Database,
+  githubUserId: number,
+): Promise<number[]> {
+  const rows = await database
+    .selectDistinct({ organizationId: repos.organizationId })
+    .from(repoAccess)
+    .innerJoin(users, eq(users.id, repoAccess.userId))
+    .innerJoin(repos, eq(repos.id, repoAccess.repoId))
+    .leftJoin(
+      memberships,
+      and(
+        eq(memberships.userId, users.id),
+        eq(memberships.organizationId, repos.organizationId),
+      ),
+    )
+    .where(and(eq(users.githubId, githubUserId), isNull(memberships.id)))
+    .orderBy(asc(repos.organizationId));
+  return rows.map((row) => row.organizationId);
 }

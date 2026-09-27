@@ -148,7 +148,9 @@ erDiagram
 - `repo_access` is a user's GitHub permission on one repo, unique on
   `(user_id, repo_id)`. A member reads a public repo without a row and a
   private one only with a row; organization owners read every repo
-  (`src/repo-access.ts`).
+  (`src/repo-access.ts`). A user with rows but no membership is a
+  collaborator there and reads exactly those repos; `authorize` derives the
+  role, so no membership row exists for it.
 - `repos.github_repo_id` is the key the installation webhook upserts on
   (`src/installations.ts`); a repo ingest recorded first is claimed by owner
   and name, so its reviews stay.

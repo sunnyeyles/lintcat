@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { clusterGraph } from "./clustering";
-import { expandGroup, mergeGraphs } from "./merge";
+import { expandGroup } from "./merge";
 import { normaliseGraph } from "./normalise";
 import type { MapGraph, MapViewState } from "./types";
 
@@ -32,26 +32,26 @@ const slice: MapGraph = {
   ],
 };
 
-describe("mergeGraphs", () => {
+describe("expandGroup merging", () => {
   it("adds the arriving files and edges", () => {
-    const merged = mergeGraphs(base, slice);
+    const merged = expandGroup(base, "web::lib", slice);
 
-    expect(merged.files.map((f) => f.path)).toEqual([
-      "src/a.ts",
-      "src/b.ts",
+    expect(merged.files.map((f) => f.path).sort()).toEqual([
       "lib/one.ts",
       "lib/two.ts",
+      "src/a.ts",
+      "src/b.ts",
     ]);
     expect(merged.imports).toHaveLength(3);
   });
 
   it("changes nothing the second time", () => {
-    const once = mergeGraphs(base, slice);
-    expect(mergeGraphs(once, slice)).toEqual(once);
+    const once = expandGroup(base, "web::lib", slice);
+    expect(expandGroup(once, "web::lib", slice)).toEqual(once);
   });
 
   it("drops an edge it already has", () => {
-    const merged = mergeGraphs(base, {
+    const merged = expandGroup(base, "web::lib", {
       files: [],
       imports: [{ from: "src/a.ts", to: "src/b.ts" }],
     });
@@ -59,7 +59,7 @@ describe("mergeGraphs", () => {
   });
 
   it("keeps a flag the map already had rather than the arriving one", () => {
-    const merged = mergeGraphs(base, {
+    const merged = expandGroup(base, "web::lib", {
       files: [{ path: "src/a.ts", changed: false, dead: true }],
       imports: [],
     });
@@ -70,7 +70,7 @@ describe("mergeGraphs", () => {
   });
 
   it("brings an arriving file's impacted flag in", () => {
-    const merged = mergeGraphs(base, {
+    const merged = expandGroup(base, "web::lib", {
       files: [
         { path: "src/b.ts", impacted: true },
         { path: "lib/one.ts", package: "web", impacted: true },
@@ -82,23 +82,25 @@ describe("mergeGraphs", () => {
     expect(impacted.map((f) => f.path)).toEqual(["lib/one.ts", "src/b.ts"]);
   });
 
-  it("retires a summary once every one of its files is present", () => {
-    const merged = mergeGraphs(base, slice);
+  it("retires another summary once every one of its files is present", () => {
+    const merged = expandGroup(base, "db::store", slice);
 
-    expect(merged.summaries!.map((s) => s.id)).toEqual(["db::store"]);
+    expect(merged.summaries!.map((s) => s.id)).toEqual([]);
   });
 
-  it("keeps a summary that is only partly filled", () => {
-    const merged = mergeGraphs(base, {
+  it("keeps another summary that is only partly filled", () => {
+    const merged = expandGroup(base, "db::store", {
       files: [{ path: "lib/one.ts", package: "web" }],
       imports: [],
     });
-    expect(merged.summaries!.map((s) => s.id)).toContain("web::lib");
+    expect(merged.summaries!.map((s) => s.id)).toEqual(["web::lib"]);
   });
 
   it("leaves a full payload without summaries alone", () => {
     const full: MapGraph = { files: [{ path: "a.ts" }], imports: [] };
-    expect(mergeGraphs(full, { files: [{ path: "b.ts" }], imports: [] }).summaries).toBeUndefined();
+    expect(
+      expandGroup(full, "::", { files: [{ path: "b.ts" }], imports: [] }).summaries,
+    ).toBeUndefined();
   });
 });
 

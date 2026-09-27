@@ -1,9 +1,11 @@
 import {
   memberships,
   organizations,
+  repoAccess,
+  repos,
   users,
+  type AccessRole,
   type Database,
-  type MembershipRole,
   type Organization,
 } from "@pr-review/db";
 import { and, asc, eq, isNull } from "drizzle-orm";
@@ -12,7 +14,7 @@ import { organizationPath } from "@/lib/paths";
 
 export type OrganizationMembership = {
   organization: Organization;
-  role: MembershipRole;
+  role: AccessRole;
 };
 
 /** Where the picker sends a user with exactly one organization; the picker itself otherwise. */
@@ -29,22 +31,33 @@ export function ownsPersonalAccount(
   return list.some(({ organization }) => organization.githubAccountId === githubId);
 }
 
-/** Every live organization the user belongs to, oldest membership first. */
+/** Every live account the user belongs to, oldest membership first, then those they only collaborate in. */
 export async function membershipsForUser(
   database: Database,
   githubId: number,
 ): Promise<OrganizationMembership[]> {
-  return database
+  const live = and(isNull(organizations.suspendedAt), isNull(organizations.uninstalledAt));
+  const member = await database
     .select({ organization: organizations, role: memberships.role })
     .from(users)
     .innerJoin(memberships, eq(memberships.userId, users.id))
     .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
-    .where(
-      and(
-        eq(users.githubId, githubId),
-        isNull(organizations.suspendedAt),
-        isNull(organizations.uninstalledAt),
-      ),
-    )
+    .where(and(eq(users.githubId, githubId), live))
     .orderBy(asc(memberships.id));
+  const collaborator = await database
+    .selectDistinct({ organization: organizations })
+    .from(users)
+    .innerJoin(repoAccess, eq(repoAccess.userId, users.id))
+    .innerJoin(repos, and(eq(repos.id, repoAccess.repoId), isNull(repos.removedAt)))
+    .innerJoin(organizations, eq(organizations.id, repos.organizationId))
+    .leftJoin(
+      memberships,
+      and(eq(memberships.userId, users.id), eq(memberships.organizationId, organizations.id)),
+    )
+    .where(and(eq(users.githubId, githubId), isNull(memberships.id), live))
+    .orderBy(asc(organizations.id));
+  return [
+    ...member,
+    ...collaborator.map(({ organization }) => ({ organization, role: "collaborator" as const })),
+  ];
 }

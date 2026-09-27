@@ -3,8 +3,8 @@
 import { Badge, Button, Empty, EmptyDescription, EmptyHeader, EmptyTitle, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
 
 import { SEVERITIES } from "@/components/review/sort";
-import { heatOf, neighbourhood } from "@/lib/codebase-map";
-import type { FindingHeat, NormalisedGraph } from "@/lib/codebase-map";
+import { heatOf } from "@/lib/codebase-map";
+import type { FindingHeat, Neighbourhood, NormalisedGraph } from "@/lib/codebase-map";
 import { SeverityBadge } from "@/components/ui";
 
 const SHOWN = 12;
@@ -12,6 +12,7 @@ const SHOWN = 12;
 export interface FileDetailsProps {
   graph: NormalisedGraph;
   focusedPath: string | null;
+  neighbourhood: Neighbourhood;
   groupId: string | null;
   groupCollapsed: boolean;
   onSelect: (path: string) => void;
@@ -135,6 +136,7 @@ function Findings({
 export function FileDetails({
   graph,
   focusedPath,
+  neighbourhood: hood,
   groupId,
   groupCollapsed,
   onSelect,
@@ -155,8 +157,6 @@ export function FileDetails({
       </Empty>
     );
   }
-
-  const hood = neighbourhood(graph, file.path, 1);
 
   return (
     <div className="space-y-3">

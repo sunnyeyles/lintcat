@@ -3,7 +3,13 @@ import { createDbSource, type DataSource } from "@pr-review/db/dashboard";
 import type { RepositoryGraphSnapshot } from "@pr-review/index";
 import { cache } from "react";
 
-import { mapFromSnapshot, type MapSource, type MapSourceFinding } from "@/lib/codebase-map";
+import {
+  mapFromSnapshot,
+  normaliseGraph,
+  type MapSource,
+  type MapSourceFinding,
+  type NormalisedGraph,
+} from "@/lib/codebase-map";
 import { requireOrganization } from "@/lib/session";
 
 /** The organization's data, only once `requireOrganization` has let the user in. */
@@ -16,26 +22,33 @@ export const data = cache(async (slug: string): Promise<DataSource> => {
   );
 });
 
-/** Decoding a 50k-file snapshot is not free, and expanding a group asks again. */
+/** Decoding and normalising a 50k-file snapshot is not free, and expanding a group asks again. */
 const SNAPSHOTS_HELD = 2;
-const snapshots = new Map<string, RepositoryGraphSnapshot | undefined>();
+
+interface HeldGraph {
+  snapshot: RepositoryGraphSnapshot | undefined;
+  /** Keyed by the changed files and blast radius the graph was also built from. */
+  normalised?: { inputs: string; graph: NormalisedGraph };
+}
+
+const snapshots = new Map<string, HeldGraph>();
 
 async function cachedGraph(
   key: string,
   load: () => Promise<RepositoryGraphSnapshot | undefined>,
-): Promise<RepositoryGraphSnapshot | undefined> {
-  if (snapshots.has(key)) {
-    const held = snapshots.get(key);
+): Promise<HeldGraph> {
+  const held = snapshots.get(key);
+  if (held) {
     snapshots.delete(key);
     snapshots.set(key, held);
     return held;
   }
-  const snapshot = await load();
-  snapshots.set(key, snapshot);
+  const entry: HeldGraph = { snapshot: await load() };
+  snapshots.set(key, entry);
   while (snapshots.size > SNAPSHOTS_HELD) {
     snapshots.delete(snapshots.keys().next().value!);
   }
-  return snapshot;
+  return entry;
 }
 
 /**
@@ -60,9 +73,16 @@ export async function reviewMapSource(
   dependents?: readonly string[],
 ): Promise<MapSource> {
   const source = await data(slug);
-  const [snapshot, changedFiles] = await Promise.all([
+  const [held, changedFiles] = await Promise.all([
     cachedGraph(`${slug}\u0000${reviewId}`, () => source.getRepositoryGraph(reviewId)),
     source.getChangedFiles(reviewId),
   ]);
-  return mapFromSnapshot(snapshot, changedFiles, findings, dependents);
+  const map = mapFromSnapshot(held.snapshot, changedFiles, findings, dependents);
+  if (!map.graph) return map;
+
+  const inputs = JSON.stringify([changedFiles.map((f) => [f.path, f.status]), dependents ?? []]);
+  if (held.normalised?.inputs !== inputs) {
+    held.normalised = { inputs, graph: normaliseGraph(map.graph) };
+  }
+  return { ...map, normalised: held.normalised.graph };
 }

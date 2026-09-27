@@ -1,4 +1,7 @@
-import { findingHeat, mapPayload, sampleRepo } from "@/lib/codebase-map";
+import type { ImportEdge, IndexedFile, RepositoryIndex } from "@pr-review/index";
+import { computeImpact } from "@pr-review/index/impact";
+
+import { findingHeat, mapQuery, sampleRepo } from "@/lib/codebase-map";
 import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
 
 import { localMapAdapter, type MapAdapter } from "@/components/codebase-map/adapter";
@@ -43,33 +46,50 @@ function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
   };
 }
 
-/** The stored blast radius keeps this many dependents, and reaches this far. */
-const IMPACT_CAP = 200;
-const IMPACT_STEPS = 2;
+// Shaped like a stored index just enough for the blast radius; every sample file is source.
+function fixtureIndex(graph: MapGraph): RepositoryIndex {
+  const files = new Map<string, IndexedFile>();
+  for (const file of graph.files) {
+    files.set(file.path, {
+      path: file.path,
+      role: "source",
+      language: "typescript",
+      importerCount: 0,
+      inCycle: file.inCycle === true,
+      dead: file.dead === true,
+    });
+  }
+  const edges: ImportEdge[] = graph.imports.map((edge) => ({
+    from: edge.from,
+    to: edge.to,
+    specifier: edge.to,
+    line: 1,
+    names: [],
+  }));
+  const importers = new Map<string, ImportEdge[]>();
+  for (const edge of edges) {
+    const list = importers.get(edge.to!);
+    if (list) list.push(edge);
+    else importers.set(edge.to!, [edge]);
+  }
+  return {
+    sha: "fixture",
+    truncated: false,
+    files,
+    packages: [],
+    coverage: [],
+    edges,
+    importers,
+    workspace: { manifests: new Map(), byName: new Map(), packages: [], aliases: new Map() },
+  };
+}
 
 /** Marks what imports the change, the way a stored `risk.dependents` would. */
 function withImpact(graph: MapGraph): MapGraph {
-  const importers = new Map<string, string[]>();
-  for (const edge of graph.imports) {
-    const list = importers.get(edge.to);
-    if (list) list.push(edge.from);
-    else importers.set(edge.to, [edge.from]);
-  }
-
-  const changed = new Set(graph.files.filter((f) => f.changed === true).map((f) => f.path));
-  const impacted = new Set<string>();
-  let frontier = [...changed];
-  for (let step = 0; step < IMPACT_STEPS; step += 1) {
-    const next: string[] = [];
-    for (const path of frontier) {
-      for (const from of importers.get(path) ?? []) {
-        if (impacted.size >= IMPACT_CAP || changed.has(from) || impacted.has(from)) continue;
-        impacted.add(from);
-        next.push(from);
-      }
-    }
-    frontier = next;
-  }
+  const changes = graph.files
+    .filter((file) => file.changed === true)
+    .map((file) => ({ path: file.path, status: "modified" as const }));
+  const impacted = new Set(computeImpact(fixtureIndex(graph), changes).transitive);
 
   if (impacted.size === 0) return graph;
   return {
@@ -97,7 +117,7 @@ export interface FixtureSource {
   graph: MapGraph;
   heat: FindingHeat;
   changedPaths: readonly string[];
-  /** Set above the threshold: the same slices the route serves, computed here. */
+  /** Set above the threshold, as the review page sets its endpoint. */
   adapter: MapAdapter | undefined;
 }
 
@@ -108,12 +128,13 @@ export function fixtureSource(kind: FixtureKind, files: number): FixtureSource {
     heat: fixtureHeat(graph),
     changedPaths: graph.files.filter((f) => f.changed === true).map((f) => f.path),
   };
-  const payload = mapPayload(source, { threshold: DEV_LOD_THRESHOLD });
+  const query = mapQuery(source);
+  const payload = query.first({ threshold: DEV_LOD_THRESHOLD });
 
   return {
     graph: payload.graph,
     heat: payload.heat,
     changedPaths: payload.changedPaths,
-    adapter: payload.mode === "lod" ? localMapAdapter(source) : undefined,
+    adapter: payload.mode === "lod" ? localMapAdapter(query) : undefined,
   };
 }
