@@ -4,6 +4,7 @@ import {
   type CategoryCount,
   type Range,
   type ReviewDetail,
+  type ReviewStat,
   type Severity,
   type TokenCounts,
   type Trends,
@@ -93,7 +94,7 @@ export function categoryCounts(scoped: ReviewDetail[]): CategoryCount[] {
 
 /** Reviews must already be scoped to the range and repo; findings need not be loaded. */
 export function computeTrends(
-  scoped: ReviewDetail[],
+  scoped: ReviewStat[],
   range: Range,
   byCategory: CategoryCount[],
 ): Trends {
@@ -132,7 +133,7 @@ export function computeTrends(
 
 /** Reviews must already be scoped to the range and repo. */
 export function computeUsage(
-  scoped: ReviewDetail[],
+  scoped: ReviewStat[],
   repos: Repo[],
   range: Range,
 ): Usage {

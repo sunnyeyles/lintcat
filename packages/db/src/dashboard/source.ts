@@ -37,6 +37,7 @@ import type {
   DataSource,
   RepoSummary,
   ReviewDetail,
+  ReviewStat,
   ReviewSummary,
   Severity,
 } from "./types";
@@ -56,6 +57,12 @@ type CategoryRow = {
 };
 
 const subqueries = new QueryBuilder();
+
+function severityCount(severity: Severity) {
+  return sql<number>`count(${findings.id}) filter (where ${findings.severity} = ${severity})`.mapWith(
+    Number,
+  );
+}
 
 const tokenSums = {
   inputTokens: sql<number>`coalesce(sum(${reviews.inputTokens}), 0)`.mapWith(Number),
@@ -135,6 +142,7 @@ export function createDbSource(
   // Per-instance, so one request's source shares reads and no state outlives it.
   const reviewReads = new Map<string, Promise<ReviewDetail[]>>();
   const categoryReads = new Map<string, Promise<CategoryCount[]>>();
+  const statReads = new Map<string, Promise<ReviewStat[]>>();
   let repoRead: Promise<Repo[]> | undefined;
 
   function scopeOf(filter: ReviewFilter): SQL[] {
@@ -238,6 +246,45 @@ export function createDbSource(
     const pending = fetchReviews(filter, withFindings);
     reviewReads.set(key, pending);
     pending.catch(() => reviewReads.delete(key));
+    return pending;
+  }
+
+  // One round trip carrying only the columns the trend and usage rollups read.
+  async function fetchReviewStats(filter: ReviewFilter): Promise<ReviewStat[]> {
+    const rows = await database
+      .select({
+        id: reviews.id,
+        repoId: reviews.repoId,
+        createdAt: reviews.createdAt,
+        durationMs: reviews.durationMs,
+        inputTokens: reviews.inputTokens,
+        cacheCreationInputTokens: reviews.cacheCreationInputTokens,
+        cacheReadInputTokens: reviews.cacheReadInputTokens,
+        outputTokens: reviews.outputTokens,
+        low: severityCount("low"),
+        medium: severityCount("medium"),
+        high: severityCount("high"),
+      })
+      .from(reviews)
+      .innerJoin(repos, eq(repos.id, reviews.repoId))
+      .leftJoin(findings, eq(findings.reviewId, reviews.id))
+      .where(and(...scopeOf(filter)))
+      .groupBy(reviews.id);
+    return rows.map(({ low, medium, high, ...stat }) => ({
+      ...stat,
+      bySeverity: { low, medium, high },
+      costUsd: costOf(stat),
+    }));
+  }
+
+  function loadReviewStats(filter: ReviewFilter): Promise<ReviewStat[]> {
+    const key = filterKey(filter);
+    const hit = statReads.get(key);
+    if (hit) return hit;
+
+    const pending = fetchReviewStats(filter);
+    statReads.set(key, pending);
+    pending.catch(() => statReads.delete(key));
     return pending;
   }
 
@@ -388,7 +435,7 @@ export function createDbSource(
       const since = new Date(windowStart(range));
       const filter = { since, ...(repoId === undefined ? {} : { repoId }) };
       const [scoped, byCategory] = await Promise.all([
-        loadReviews(filter, false),
+        loadReviewStats(filter),
         loadCategoryCounts(filter),
       ]);
       return computeTrends(scoped, range, byCategory);
@@ -397,7 +444,7 @@ export function createDbSource(
     async getUsage(range, repoId) {
       const since = new Date(windowStart(range));
       const [scoped, repoRows] = await Promise.all([
-        loadReviews({ since, ...(repoId === undefined ? {} : { repoId }) }, false),
+        loadReviewStats({ since, ...(repoId === undefined ? {} : { repoId }) }),
         organizationRepos(),
       ]);
       return computeUsage(scoped, repoRows, range);
