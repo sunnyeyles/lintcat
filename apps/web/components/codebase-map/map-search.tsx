@@ -4,7 +4,7 @@ import { Badge, Input } from "@pr-review/design";
 import { useEffect, useId, useState, type RefObject } from "react";
 
 import { searchFiles } from "@/lib/codebase-map";
-import type { LodSearchResult, MapFile, SearchResult } from "@/lib/codebase-map";
+import type { LodSearchResult, MapFile, MapSearchAnswer, SearchResult } from "@/lib/codebase-map";
 
 const SHOWN = 12;
 const DEBOUNCE_MS = 200;
@@ -16,7 +16,7 @@ export interface MapSearchProps {
   onSelect: (path: string, groupId?: string) => void;
   inputRef?: RefObject<HTMLInputElement | null>;
   /** Set when the map holds only part of the repo: the server does the ranking. */
-  searcher?: ((query: string) => Promise<LodSearchResult[]>) | undefined;
+  searcher?: ((query: string) => Promise<MapSearchAnswer>) | undefined;
   fileCount?: number | undefined;
 }
 
@@ -53,7 +53,7 @@ export function MapSearch({
     setSearching(true);
     const id = setTimeout(() => {
       searcher(query)
-        .then((results) => live && setRemote(results))
+        .then((answer) => live && setRemote(answer.results))
         .catch(() => live && setRemote([]))
         .finally(() => live && setSearching(false));
     }, DEBOUNCE_MS);
