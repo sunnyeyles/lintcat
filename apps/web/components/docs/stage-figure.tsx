@@ -104,7 +104,7 @@ export function StageFigure({ id, n, title }: StageFigureProps) {
         ref={canvas}
         role="img"
         aria-label={`Stage ${n}: ${title}, drawn step by step`}
-        className="block aspect-video w-full rounded-sm border border-border bg-background [image-rendering:pixelated]"
+        className="block aspect-video w-full bg-background [image-rendering:pixelated]"
       />
       <figcaption className="text-label text-muted-foreground">
         <span className="eyebrow">Stage {n}</span>
