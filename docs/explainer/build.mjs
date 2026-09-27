@@ -63,6 +63,8 @@ for (const stage of wanted) {
   if (STILLS) continue;
   run("node", ["tools/render.mjs", stage, "--scale", SCALE, "--out", join(OUT, `${id}.mp4`)]);
   run("node", ["tools/gate.mjs", stage, "--scale", SCALE, "--mp4", join(OUT, `${id}.mp4`)]);
+  // VP9 for browsers built without H.264 (Chromium on some Linux distributions).
+  run("node", ["tools/render.mjs", stage, "--scale", SCALE, "--out", join(OUT, `${id}.webm`)]);
   run("node", ["tools/emit.mjs", stage, "--out", join(OUT, `${id}.html`)]);
 }
 console.log(`\ndone: ${wanted.length} stage(s) in ${OUT}`);

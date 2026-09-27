@@ -9,8 +9,8 @@ every frame, so the same source gives the same pixels on any machine.
   rasterised from `apps/web/public/brand/lintcat-mark-colour.svg`, a 3x5 pixel hand for captions,
   and the grid marks (box, arrow, dial, dither) recorded as strokes.
 - `src/canvas-core/stage0N*.ts`: one film per stage, `meta.kind: "drawing"`, 192 x 108 cells.
-- `build.mjs`: renders everything into `apps/web/public/explainer/` (poster PNG, MP4, offline
-  HTML player per stage).
+- `build.mjs`: renders everything into `apps/web/public/explainer/` (poster PNG, MP4, WebM
+  fallback, offline HTML player per stage).
 
 ## Brief
 

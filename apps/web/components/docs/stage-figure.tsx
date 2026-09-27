@@ -27,7 +27,6 @@ export function StageFigure({ id, n, title }: StageFigureProps) {
       <video
         ref={video}
         className="block w-full rounded-sm border border-border bg-card"
-        src={`${base}.mp4`}
         poster={`${base}.png`}
         width={960}
         height={540}
@@ -37,7 +36,10 @@ export function StageFigure({ id, n, title }: StageFigureProps) {
         playsInline
         preload="metadata"
         aria-label={`Stage ${n}: ${title}, drawn step by step`}
-      />
+      >
+        <source src={`${base}.mp4`} type="video/mp4" />
+        <source src={`${base}.webm`} type="video/webm" />
+      </video>
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-label text-muted-foreground">
         <span>
           <span className="eyebrow">Stage {n}</span>
