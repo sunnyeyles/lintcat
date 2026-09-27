@@ -7,7 +7,6 @@ import {
   ModelProviderError,
   resolveModelId,
   resolveModelProvider,
-  ReviewCancelledError,
   toolLoopEngine,
   type LanguageModelConfig,
   type ReviewModel,
@@ -38,8 +37,6 @@ import {
   isFixCommit,
   reviewCorrelation,
   runReview,
-  type PublishFixes,
-  type ReviewDelivery,
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
@@ -94,32 +91,6 @@ function unknownModelOutput(message: string): CheckRunOutput {
     summary:
       `${message} A repository owner can change the model in the repository's settings, ` +
       "then push a commit or re-add the `ai-review` label.",
-  };
-}
-
-/** Throws before each publish once the job stops running, so a superseded run writes nothing. */
-function guardedDelivery(to: ReviewDelivery, stillRunning: () => Promise<boolean>): ReviewDelivery {
-  const guard = async () => {
-    if (!(await stillRunning())) throw new ReviewCancelledError();
-  };
-  return {
-    publishCheckRun: async (target, rendered) => {
-      await guard();
-      await to.publishCheckRun(target, rendered);
-    },
-    publishComments: async (target, rendered) => {
-      await guard();
-      return to.publishComments(target, rendered);
-    },
-    ...(to.publishFixes === undefined
-      ? {}
-      : {
-          publishFixes: (async (target, input) => {
-            await guard();
-            return to.publishFixes!(target, input);
-          }) satisfies PublishFixes,
-        }),
-    ...(to.publishRun === undefined ? {} : { publishRun: to.publishRun }),
   };
 }
 
@@ -235,15 +206,17 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
     const delivery = dashboardDelivery(
       githubDelivery({ client, logger, commitFixes }),
       createDatabaseReviewPublisher(database, organization.id, logger),
+      logger,
     );
     await runReview({
       client,
       target,
-      delivery: guardedDelivery(delivery, stillRunning),
+      delivery,
       engine: toolLoopEngine({ model }),
       policy: { incremental: deps.incremental ?? true },
       logger,
       signal: controller.signal,
+      stillRunning,
     });
     if (!(await completeReviewJob(database, job.id))) return "superseded";
     logger.info("review_job.succeeded", correlation);

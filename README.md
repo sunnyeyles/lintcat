@@ -194,10 +194,10 @@ scripts/      esbuild bundler for the cli, mcp and worker, and their
 
 ### Failure
 
-The review pipeline (`packages/reviewer/src/review-pipeline.ts`) runs the one
-agent, then `validate`. The agent's tool-calling loop is one `generateText`
+A review run (`packages/reviewer/src/review-run.ts`) runs the one agent,
+then `validate`. The agent's tool-calling loop is one `generateText`
 call (`packages/ai/src/agents/runtime.ts`), capped at 12 steps. If the agent
-fails the pipeline throws, which fails the job; the worker retries it up to
+fails the run throws, which fails the job; the worker retries it up to
 three times before publishing a `failure` check run.
 
 ### Review memory

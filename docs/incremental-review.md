@@ -56,7 +56,7 @@ type ReviewScope =
 one value serves both readers: the agent gets the narrowed pair, publishing
 gets the whole pair.
 
-`reviewWithDelivery` calls it in place of the `getDiff` / `listChangedFiles`
+`runReview` calls it in place of the `getDiff` / `listChangedFiles`
 pair, and reads `scope.diff` and `scope.changedFiles` from then on. A run asks
 for it with `policy.incremental` on the `runReview` spec.
 

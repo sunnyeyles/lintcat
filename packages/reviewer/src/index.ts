@@ -1,16 +1,4 @@
-/**
- * The review pipeline: one agent, deterministic validation, and check-run
- * rendering.
- */
-export {
-  runReviewPipeline,
-  type ReviewPipelineResult,
-} from "#src/review-pipeline";
-export {
-  type ReviewClient,
-  type ReviewPipelineRun,
-  type RunReviewPipeline,
-} from "#src/pipeline-runner";
+/** One review run: one agent, deterministic validation, and delivery. */
 export { validateFindings } from "#src/validate-findings";
 export type { RenderedCheckRun } from "#src/render-check-run";
 export {
@@ -19,10 +7,6 @@ export {
   type PublishReview,
   type PublishReviewComments,
 } from "#src/publish-review";
-export {
-  type DashboardReview,
-  type PublishToDashboard,
-} from "#src/publish-dashboard";
 export {
   FIX_COMMIT_MARKER,
   isFixCommit,
@@ -38,25 +22,22 @@ export {
   type PatchedFile,
 } from "#src/validate-patches";
 export {
-  reviewWithDelivery,
-  type ReviewOutcome,
-  type ReviewWithDeliveryDeps,
-} from "#src/review-pull-request";
-export {
   dashboardDelivery,
-  dashboardReview,
   githubDelivery,
   recordingDelivery,
   type FinishedReviewRun,
   type GithubDeliveryConfig,
   type PublishReviewRun,
+  type PublishToDashboard,
   type RecordedDelivery,
   type RecordingDelivery,
   type ReviewDelivery,
 } from "#src/review-delivery";
 export {
   runReview,
+  type ReviewClient,
   type ReviewMemory,
+  type ReviewOutcome,
   type ReviewPolicy,
   type ReviewRunSpec,
 } from "#src/review-run";
