@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/evals",
   "version": "0.1.0",
+  "description": "Runs the real pipeline over fixture repositories with known answers",
   "private": true,
   "type": "module",
   "imports": {

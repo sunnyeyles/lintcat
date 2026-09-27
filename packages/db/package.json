@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/db",
   "version": "0.1.0",
+  "description": "Postgres through Drizzle: tenants, repository settings and the review job queue",
   "private": true,
   "type": "module",
   "exports": {

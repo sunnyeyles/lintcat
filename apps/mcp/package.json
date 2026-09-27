@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/mcp",
   "version": "0.1.0",
+  "description": "Local stdio MCP server that exposes the reviewer to coding agents",
   "private": true,
   "type": "module",
   "imports": {

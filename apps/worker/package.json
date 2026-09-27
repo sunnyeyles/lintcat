@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/worker",
   "version": "0.1.0",
+  "description": "Claims queued review jobs and runs hosted reviews through the GitHub App",
   "private": true,
   "type": "module",
   "imports": {

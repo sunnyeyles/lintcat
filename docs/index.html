@@ -43,6 +43,7 @@ h1, h2, h3 { text-wrap: balance; line-height: 1.15; font-weight: 600; }
 /* mono utility face — every label, path, number, and code sample */
 .mono, code, pre, th, .rail, .eyebrow, .chip, .stat-n, .stat-l, .badge, .node,
 .agent, .agents-note, .diagram-note, .loop-note, .flow-replay, .stage-num, .code-head,
+.mm-node, .mm-now, .bp text,
 ol.rules li::before, .foot {
   font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   font-feature-settings: "ss01", "cv02";
@@ -65,14 +66,15 @@ ol.rules li::before, .foot {
 
 @media (min-width: 1060px) {
   .shell { grid-template-columns: 13rem minmax(0, 1fr); }
-  .rail { display: block; }
   .col { grid-column: 2; }
 }
 
 .rail {
   display: none; grid-column: 1; position: sticky; top: 0; align-self: start;
-  padding-top: 5.2rem; font-size: .7rem; line-height: 1.5;
+  max-height: 100vh; overflow-y: auto; scrollbar-width: none;
+  padding: 5.2rem 0 1.5rem; font-size: .7rem; line-height: 1.5;
 }
+@media (min-width: 1060px) { .rail { display: block; } }
 .rail-title {
   letter-spacing: .16em; text-transform: uppercase; color: var(--slate-dim);
   padding-bottom: .7rem; border-bottom: 1px solid var(--rule); margin-bottom: .9rem;
@@ -82,8 +84,30 @@ ol.rules li::before, .foot {
   color: var(--slate); text-decoration: none;
   display: grid; grid-template-columns: 1.6rem 1fr; gap: .35rem; align-items: baseline;
 }
-.rail a:hover { color: var(--accent); }
+.rail a:hover, .rail a[aria-current] { color: var(--accent); }
+.rail a[aria-current] .n { color: var(--brand); }
 .rail .n { color: var(--slate-dim); font-variant-numeric: tabular-nums; }
+
+/* mini-map: architecture.js lights the packages the stage in view touches */
+.minimap { margin-top: 2.2rem; }
+.mm {
+  display: grid; gap: .35rem; padding: .55rem .45rem;
+  background: var(--bp-ground); border-radius: 3px;
+}
+.mm-row {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: .25rem;
+  padding-bottom: .35rem; border-bottom: 1px dashed color-mix(in srgb, var(--bp-dim) 45%, transparent);
+}
+.mm-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.mm-node {
+  font-size: .6rem; font-style: italic; line-height: 1.45; color: var(--bp-cyan);
+  border: 1px solid color-mix(in srgb, var(--bp-dim) 55%, transparent);
+  border-radius: 2px; padding: 0 .28rem;
+  transition: background .25s, color .25s, border-color .25s;
+}
+.mm-node.is-on { background: var(--bp-mark); border-color: var(--bp-mark); color: var(--bp-ground); }
+.mm-now { margin-top: .6rem; color: var(--slate); min-height: 3em; }
+.mm-now b { display: block; color: var(--ink); font-weight: 500; }
 
 .prose { max-width: var(--measure); }
 .prose p + p { margin-top: .85rem; }
@@ -203,6 +227,49 @@ ol.rules li::before, .foot {
   .is-flowing [data-step] { opacity: 1; transform: none; }
   .flow-bar { display: none; }
 }
+
+/* ============================================================
+   ARCHITECTURE SHEET — after anidoodle's cyanotype blueprint plate
+   ============================================================ */
+.sheet-wrap { max-width: 820px; margin: 0 auto; }
+.bp {
+  width: 100%; min-width: 640px; height: auto; display: block; border-radius: 2px;
+  background:
+    radial-gradient(90% 70% at 28% 22%, rgb(255 255 255 / .09), transparent 70%),
+    radial-gradient(60% 50% at 82% 88%, rgb(0 0 0 / .16), transparent 70%),
+    linear-gradient(90deg, transparent calc(50% - 1px), rgb(255 255 255 / .05) 50%, transparent calc(50% + 1px)),
+    linear-gradient(0deg, transparent calc(46% - 1px), rgb(255 255 255 / .04) 46%, transparent calc(46% + 1px)),
+    var(--bp-ground);
+}
+.bp text { fill: var(--bp-ink); font-style: italic; letter-spacing: .04em; }
+.bp .nm { font-size: 11.5px; font-weight: 600; text-transform: uppercase; }
+.bp .pt { font-size: 8px; fill: var(--bp-cyan); }
+.bp .lbl { font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; }
+.bp .lbl-sub, .bp .note { font-size: 7.5px; fill: var(--bp-cyan); text-transform: uppercase; letter-spacing: .08em; }
+.bp .dim-t { font-size: 8.5px; fill: var(--bp-cyan); text-transform: uppercase; letter-spacing: .12em; }
+.bp .ttl { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; }
+.bp .knock { paint-order: stroke; stroke: var(--bp-ground); stroke-width: 3.5px; stroke-linejoin: round; }
+
+.bp .ink, .bp .lead, .bp .cons, .bp .hatch, .bp .fine {
+  fill: none; stroke-linecap: round; stroke-linejoin: round;
+}
+.bp .ink { stroke: var(--bp-ink); stroke-width: 1.5; }
+.bp .fine { stroke: var(--bp-ink); stroke-width: .8; }
+.bp .lead { stroke: var(--bp-cyan); stroke-width: 1; }
+.bp .cons { stroke: var(--bp-dim); stroke-width: .6; stroke-dasharray: 16 3 2 3; opacity: .7; }
+.bp .hatch { stroke: var(--bp-cyan); stroke-width: .6; opacity: .45; }
+.bp .head { fill: var(--bp-cyan); }
+.bp .fill { fill: var(--bp-ground); }
+.bp .nib { fill: var(--bp-ink); stroke: var(--bp-cyan); stroke-width: 1; }
+
+.bp .node { cursor: default; outline: none; transition: opacity .2s; }
+.bp .node:focus-visible .ink { stroke-width: 2.6; }
+.bp .edge { transition: opacity .2s; }
+.bp.is-tracing .node:not(.is-focus, .is-dep, .is-user) { opacity: .3; }
+.bp.is-tracing .edge:not(.is-hot) { opacity: .15; }
+.bp .node.is-dep .ink, .bp .node.is-user .ink, .bp .edge.is-hot .lead { stroke: var(--bp-mark); }
+.bp .node.is-user .ink { stroke-dasharray: 5 3; }
+.bp .edge.is-hot .head { fill: var(--bp-mark); }
 
 /* ============================================================
    SECTIONS
@@ -331,6 +398,7 @@ html { scroll-behavior: smooth; }
   <nav class="rail" aria-label="Pipeline stages">
     <div class="rail-title">Stages</div>
     <ol>
+      <li><a href="#arch"><span class="n">00</span><span>The codebase</span></a></li>
       <li><a href="#s1"><span class="n">01</span><span>Webhook</span></a></li>
       <li><a href="#s2"><span class="n">02</span><span>Boot</span></a></li>
       <li><a href="#s3"><span class="n">03</span><span>Load</span></a></li>
@@ -342,6 +410,11 @@ html { scroll-behavior: smooth; }
       <li><a href="#map"><span class="n">—</span><span>File map</span></a></li>
       <li><a href="#run"><span class="n">—</span><span>Run it yourself</span></a></li>
     </ol>
+    <div class="minimap" data-minimap hidden>
+      <div class="rail-title">Packages in view</div>
+      <div class="mm" aria-hidden="true"></div>
+      <p class="mm-now" aria-live="polite"></p>
+    </div>
   </nav>
 
   <main class="col">
@@ -369,7 +442,46 @@ html { scroll-behavior: smooth; }
       </div>
     </header>
 
-    <!-- ========== DIAGRAM ========== -->
+    <!-- ========== 0 · THE CODEBASE ========== -->
+    <section class="stage" id="arch">
+      <div class="stage-head">
+        <span class="stage-num">00</span>
+        <h2>The codebase, on one sheet</h2>
+      </div>
+      <div class="paths">
+        <span class="chip">scripts/<b>docs-architecture.mjs</b> · pnpm docs:map</span>
+      </div>
+      <div class="prose">
+        <p>
+          Every workspace package, drafted in the order it could be built: the
+          foundations that import nothing else in the workspace, each layer on
+          top of them, and last the entry points that actually run. The sheet
+          is drawn from each package's own <code>package.json</code>, and
+          <code>pnpm test</code> fails when it falls behind them.
+        </p>
+      </div>
+
+      <figure class="diagram" data-architecture>
+        <div class="sheet-wrap">
+          <svg class="bp" role="group" aria-labelledby="bp-title"><title id="bp-title">Architecture map</title></svg>
+          <figcaption class="flow-caption" data-sheet-caption aria-hidden="true"></figcaption>
+        </div>
+        <p class="diagram-note">
+          An arrow points at what a package imports. One already implied by
+          another arrow is left off:<br><b>hover, tap or tab to a box</b> for
+          every import it has.
+        </p>
+      </figure>
+
+      <h3>One review, through those packages</h3>
+      <div class="prose">
+        <p>
+          The rest of this page follows one pull request from webhook to check
+          run. On a wide screen, the map in the margin lights up the packages
+          each stage runs in.
+        </p>
+      </div>
+
     <section class="diagram" aria-label="Pipeline diagram" data-flow>
       <div class="diagram-inner">
         <svg class="pipe" viewBox="0 0 720 608" role="img" aria-labelledby="pipe-title">
@@ -473,6 +585,7 @@ html { scroll-behavior: smooth; }
           Nothing above it can reach the GitHub API.
         </p>
       </div>
+    </section>
     </section>
 
     <!-- ========== 1 · WEBHOOK ========== -->
@@ -1247,6 +1360,28 @@ ANTHROPIC_API_KEY=... pnpm eval</pre>
 
   </main>
 </div>
+<!-- Written by `pnpm docs:map` from every workspace package.json; do not edit by hand. -->
+<script type="application/json" id="architecture">
+{
+  "source": "package.json of every pnpm workspace package",
+  "nodes": [
+    {"id":"cli","name":"@pr-review/cli","path":"apps/cli","kind":"entry","layer":4,"description":"pr-review: the reviewer over a local checkout, and a pre-push hook","imports":["ai","db","logging","mcp","schemas"],"importedBy":[]},
+    {"id":"mcp","name":"@pr-review/mcp","path":"apps/mcp","kind":"entry","layer":3,"description":"Local stdio MCP server that exposes the reviewer to coding agents","imports":["ai","db","github","index","logging","reviewer"],"importedBy":["cli"]},
+    {"id":"web","name":"@pr-review/web","path":"apps/web","kind":"entry","layer":2,"description":"The GitHub App webhook, the public docs and the review dashboard (Next.js)","imports":["db","design","github","index","logging","schemas"],"importedBy":[]},
+    {"id":"worker","name":"@pr-review/worker","path":"apps/worker","kind":"entry","layer":3,"description":"Claims queued review jobs and runs hosted reviews through the GitHub App","imports":["ai","db","github","logging","reviewer","schemas"],"importedBy":[]},
+    {"id":"evals","name":"@pr-review/evals","path":"evals","kind":"entry","layer":3,"description":"Runs the real pipeline over fixture repositories with known answers","imports":["ai","github","logging","reviewer","schemas"],"importedBy":[]},
+    {"id":"ai","name":"@pr-review/ai","path":"packages/ai","kind":"package","layer":1,"description":"Model registry, the review agent runtime and its eight read-only tools","imports":["github","index","logging","schemas"],"importedBy":["cli","mcp","worker","evals","reviewer"]},
+    {"id":"db","name":"@pr-review/db","path":"packages/db","kind":"package","layer":1,"description":"Postgres through Drizzle: tenants, repository settings and the review job queue","imports":["index","schemas"],"importedBy":["cli","mcp","web","worker"]},
+    {"id":"design","name":"@pr-review/design","path":"packages/design","kind":"package","layer":0,"description":"shadcn/ui components on Primer tokens, with Iconsax icons","imports":[],"importedBy":["web"]},
+    {"id":"github","name":"@pr-review/github","path":"packages/github","kind":"package","layer":0,"description":"GitHub App auth and the typed, Zod-parsed GitHub client","imports":[],"importedBy":["mcp","web","worker","evals","ai","reviewer"]},
+    {"id":"index","name":"@pr-review/index","path":"packages/index","kind":"package","layer":0,"description":"In-memory repository index: file roles, test pairing, the import graph","imports":[],"importedBy":["mcp","web","ai","db","reviewer"]},
+    {"id":"logging","name":"@pr-review/logging","path":"packages/logging","kind":"package","layer":0,"description":"Structured loggers: one JSON line per lifecycle event","imports":[],"importedBy":["cli","mcp","web","worker","evals","ai","reviewer"]},
+    {"id":"reviewer","name":"@pr-review/reviewer","path":"packages/reviewer","kind":"package","layer":2,"description":"One review end to end: load, run the agent, validate, render, publish","imports":["ai","github","index","logging","schemas"],"importedBy":["mcp","worker","evals"]},
+    {"id":"schemas","name":"@pr-review/schemas","path":"packages/schemas","kind":"package","layer":0,"description":"Shared Zod contracts for the review trigger and review findings","imports":[],"importedBy":["cli","web","worker","evals","ai","db","reviewer"]}
+  ]
+}
+</script>
 <script src="diagram.js" defer></script>
+<script src="architecture.js" defer></script>
 </body>
 </html>

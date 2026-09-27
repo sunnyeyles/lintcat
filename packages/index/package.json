@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/index",
   "version": "0.1.0",
+  "description": "In-memory repository index: file roles, test pairing, the import graph",
   "private": true,
   "type": "module",
   "imports": {

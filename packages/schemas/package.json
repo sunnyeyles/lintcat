@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/schemas",
   "version": "0.1.0",
+  "description": "Shared Zod contracts for the review trigger and review findings",
   "private": true,
   "type": "module",
   "imports": {

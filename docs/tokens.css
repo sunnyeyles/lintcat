@@ -6,6 +6,13 @@
   --step-1: clamp(1.24rem, 1.17rem + .34vw, 1.45rem);
   --step-2: clamp(1.55rem, 1.4rem + .72vw, 2.05rem);
   --step-3: clamp(2.1rem, 1.7rem + 1.9vw, 3.5rem);
+
+  /* Cyanotype sheet for the architecture map, the same in both modes. */
+  --bp-ground: #123a63;
+  --bp-ink: #f1f7fb;
+  --bp-cyan: #a7d8ec;
+  --bp-dim: #7fbcd8;
+  --bp-mark: #ffd27a;
 }
 
 :root {

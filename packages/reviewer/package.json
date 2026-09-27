@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/reviewer",
   "version": "0.1.0",
+  "description": "One review end to end: load, run the agent, validate, render, publish",
   "private": true,
   "type": "module",
   "imports": {

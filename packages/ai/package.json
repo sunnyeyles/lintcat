@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/ai",
   "version": "0.1.0",
+  "description": "Model registry, the review agent runtime and its eight read-only tools",
   "private": true,
   "type": "module",
   "imports": {

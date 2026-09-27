@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/github",
   "version": "0.1.0",
+  "description": "GitHub App auth and the typed, Zod-parsed GitHub client",
   "private": true,
   "type": "module",
   "imports": {

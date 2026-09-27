@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/cli",
   "version": "0.1.0",
+  "description": "pr-review: the reviewer over a local checkout, and a pre-push hook",
   "private": true,
   "type": "module",
   "bin": {

@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/logging",
   "version": "0.1.0",
+  "description": "Structured loggers: one JSON line per lifecycle event",
   "private": true,
   "type": "module",
   "imports": {

@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/web",
   "version": "0.1.0",
+  "description": "The GitHub App webhook, the public docs and the review dashboard (Next.js)",
   "private": true,
   "type": "module",
   "scripts": {

@@ -127,7 +127,13 @@ pnpm test          # vitest run
 pnpm typecheck     # pnpm -r typecheck
 pnpm build         # pnpm -r build
 pnpm eval          # vitest run --config evals/vitest.eval.config.ts
+pnpm docs:map      # redraw the architecture map in docs/index.html
 ```
+
+The architecture map in `docs/index.html` is drawn from every workspace
+`package.json`: its `description` labels the box and its `@pr-review/*`
+dependencies are the arrows. `pnpm test` fails until `pnpm docs:map` is re-run
+after you add a package or change what one imports.
 
 ## Agent skills
 

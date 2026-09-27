@@ -1,6 +1,7 @@
 {
   "name": "@pr-review/design",
   "version": "0.1.0",
+  "description": "shadcn/ui components on Primer tokens, with Iconsax icons",
   "private": true,
   "type": "module",
   "sideEffects": [
