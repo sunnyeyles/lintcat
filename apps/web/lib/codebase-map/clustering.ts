@@ -31,6 +31,9 @@ export interface Clustering {
   groupOfFile: ReadonlyMap<string, string>;
 }
 
+/** Nothing focused, searched or opened: the view a map starts from. */
+export const CLOSED_VIEW: MapViewState = { focusedPath: null, query: "", expandedGroups: new Set() };
+
 export function baseName(path: string): string {
   const cut = path.lastIndexOf("/");
   return cut === -1 ? path : path.slice(cut + 1);

@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@pr-review/design";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { httpMapAdapter, type MapAdapter } from "@/components/codebase-map/adapter";
+import { httpMapAdapter } from "@/components/codebase-map/adapter";
 import { FileDetails } from "@/components/codebase-map/file-details";
 import { GroupList } from "@/components/codebase-map/group-list";
 import { MapCanvas } from "@/components/codebase-map/map-canvas";
@@ -12,9 +12,7 @@ import { MapLegend } from "@/components/codebase-map/map-legend";
 import { MapSearch } from "@/components/codebase-map/map-search";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
 import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
-import { useMapExplorer } from "@/components/codebase-map/use-map-explorer";
-import { initialBounds } from "@/components/codebase-map/view";
-import { buildScene, mapStatus, normaliseGraph } from "@/lib/codebase-map";
+import { useMapSession } from "@/components/codebase-map/use-map-session";
 import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
 
 import { useFindingsFocus } from "./findings-focus";
@@ -35,30 +33,22 @@ export function ReviewMap({ graph: input, heat: inputHeat, changedPaths, endpoin
   const reducedMotion = usePrefersReducedMotion();
   const { showFile } = useFindingsFocus();
 
-  const adapter: MapAdapter | undefined = useMemo(
-    () => (endpoint ? httpMapAdapter(endpoint) : undefined),
-    [endpoint],
+  const source = useMemo(
+    () => ({
+      graph: input,
+      heat: inputHeat,
+      changedPaths,
+      adapter: endpoint ? httpMapAdapter(endpoint) : undefined,
+    }),
+    [input, inputHeat, changedPaths, endpoint],
   );
-  const map = useMapExplorer(input, inputHeat, adapter, changedPaths[0]);
-  const { graph, heat, scene, handleRef, focusedGroupId, toggleGroup } = map;
-
-  const status = useMemo(() => mapStatus(graph), [graph]);
-
-  // Built from the payload the page shipped, so expanding never moves the camera.
-  const opening = useMemo(() => {
-    const shut = { focusedPath: null, query: "", expandedGroups: new Set<string>() };
-    const first = normaliseGraph(input);
-    return initialBounds(buildScene(first, shut), first, changedPaths);
-  }, [input, changedPaths]);
-
-  useEffect(() => {
-    const id = setTimeout(() => handleRef.current?.fitBounds?.(opening), 0);
-    return () => clearTimeout(id);
-  }, [handleRef, opening, palette]);
+  const map = useMapSession(source);
+  const { state, actions, camera } = map;
+  const { graph, scene, focusedGroupId } = state;
 
   return (
     <div className="space-y-4">
-      <MapStatusBanner status={status} />
+      <MapStatusBanner status={state.status} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div ref={setHost} className="relative">
@@ -75,8 +65,8 @@ export function ReviewMap({ graph: input, heat: inputHeat, changedPaths, endpoin
                 scene={scene}
                 palette={palette}
                 reducedMotion={reducedMotion}
-                handleRef={handleRef}
-                onSelect={map.onNodeSelect}
+                handleRef={camera.ref}
+                onSelect={actions.select}
                 onHover={map.onNodeHover}
                 className={`${SURFACE} block`}
               />
@@ -86,19 +76,15 @@ export function ReviewMap({ graph: input, heat: inputHeat, changedPaths, endpoin
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => handleRef.current?.fit()}>
+            <Button size="sm" variant="secondary" onClick={camera.fitAll}>
               Show the whole repo
             </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => handleRef.current?.fitBounds?.(opening)}
-            >
+            <Button size="sm" variant="secondary" onClick={camera.fitOpening}>
               Back to the change
             </Button>
-            {map.pending.size > 0 ? (
+            {state.pending.size > 0 ? (
               <span className="text-muted-foreground text-xs" role="status">
-                Loading {map.pending.size} group{map.pending.size === 1 ? "" : "s"}
+                Loading {state.pending.size} group{state.pending.size === 1 ? "" : "s"}
               </span>
             ) : null}
           </div>
@@ -106,35 +92,35 @@ export function ReviewMap({ graph: input, heat: inputHeat, changedPaths, endpoin
           <MapHoverCard hover={map.hover} />
 
           <p className="sr-only" role="status" aria-live="polite">
-            {map.announcement}
+            {state.announcement}
           </p>
         </div>
 
         <aside className="max-h-[60vh] space-y-6 overflow-y-auto pr-1">
           <MapSearch
             files={graph.files}
-            query={map.query}
-            onQueryChange={map.setQuery}
-            onSelect={map.focusFile}
-                        searcher={map.lod && adapter ? adapter.search : undefined}
+            query={state.view.query}
+            onQueryChange={actions.setQuery}
+            onSelect={actions.focusFile}
+            searcher={state.lod ? source.adapter?.search : undefined}
             fileCount={graph.totalFileCount}
           />
           <FileDetails
             graph={graph}
-            focusedPath={map.focusedPath}
+            focusedPath={state.view.focusedPath}
             neighbourhood={scene.neighbourhood}
             groupId={focusedGroupId}
-            groupCollapsed={map.focusedGroupCollapsed}
-            onSelect={map.setFocusedPath}
-            onToggleGroup={() => focusedGroupId && toggleGroup(focusedGroupId)}
-            heat={heat}
+            groupCollapsed={state.focusedGroupCollapsed}
+            onSelect={actions.focus}
+            onToggleGroup={actions.toggleFocusedGroup}
+            heat={state.heat}
             onShowFindings={showFile}
           />
-          <GroupList clustering={scene.clustering} onToggle={toggleGroup} />
+          <GroupList clustering={scene.clustering} onToggle={actions.toggleGroup} />
           <MapLegend
             impacted={
-              map.hasImpacted
-                ? { shown: map.showImpacted, onShownChange: map.setShowImpacted }
+              state.hasImpacted
+                ? { shown: state.view.showImpacted, onShownChange: actions.setShowImpacted }
                 : undefined
             }
           />

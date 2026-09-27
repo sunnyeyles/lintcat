@@ -1,15 +1,10 @@
-import { clusterGraph, groupIdFor, type MapGroup } from "@/lib/codebase-map/clustering";
+import { CLOSED_VIEW, clusterGraph, groupIdFor, type MapGroup } from "@/lib/codebase-map/clustering";
 import type { FindingHeat } from "@/lib/codebase-map/from-snapshot";
 import { sumHeat } from "@/lib/codebase-map/heat";
 import { neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 import { searchFiles, type SearchResult } from "@/lib/codebase-map/search";
-import type {
-  GroupImport,
-  GroupSummary,
-  MapGraph,
-  MapViewState,
-} from "@/lib/codebase-map/types";
+import type { GroupImport, GroupSummary, MapGraph } from "@/lib/codebase-map/types";
 
 /** Above this many files the payload becomes summaries plus the change. */
 export const DEFAULT_LOD_THRESHOLD = 5000;
@@ -32,8 +27,6 @@ export function resolveLodThreshold(raw: string | undefined, override?: number):
   }
   return DEFAULT_LOD_THRESHOLD;
 }
-
-const SHUT: MapViewState = { focusedPath: null, query: "", expandedGroups: new Set() };
 
 /**
  * Groups worth sending whole: the ones holding a changed file first, then the
@@ -88,7 +81,7 @@ export function lodGraph(
   const budget = options.openFiles ?? DEFAULT_LOD_BUDGET.openFiles;
   const edgeBudget = options.groupImports ?? DEFAULT_LOD_BUDGET.groupImports;
 
-  const clustering = clusterGraph(graph, SHUT);
+  const clustering = clusterGraph(graph, CLOSED_VIEW);
   const reached = neighbourhoodOf(graph, changedPaths, 1);
   const open = openGroups(clustering.groups, changedPaths, reached, budget);
 
