@@ -79,6 +79,8 @@ It never merges and never approves.
 
 ## How a review happens
 
+![A pull request rides a belt past the LintCat mascot: it reads, proposes findings, a gate with no model drops the weak ones, and the rest land as comments and a check run.](docs/assets/lintcat-how-it-works.gif)
+
 ```text
 GitHub PR event (pull_request webhook → apps/web → review_jobs)
    │

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Bullet, Bullets, DocsArticle, P, Section } from "@/components/docs";
+import { Bullet, Bullets, DocsArticle, HowItWorksLoop, P, Section } from "@/components/docs";
 import type { Heading } from "@/lib/docs";
 
 export const metadata: Metadata = {
@@ -26,6 +26,7 @@ export default function HowItWorksPage() {
       headings={HEADINGS}
     >
       <Section id="review" title="How a review works">
+        <HowItWorksLoop />
         <Bullets>
           <Bullet>
             <strong>Read.</strong> The reviewer starts from the diff, then opens the surrounding
