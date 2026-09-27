@@ -11,10 +11,13 @@ const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 /** Never walked: not part of the tree, or not this repository's source. */
 const SKIPPED = new Set([
   ".claude",
+  ".engine",
   ".git",
   ".next",
+  ".tools",
   ".turbo",
   ".vercel",
+  ".work",
   "dist",
   "next-env.d.ts",
   "node_modules",

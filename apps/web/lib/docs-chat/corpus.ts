@@ -139,6 +139,10 @@ GitHub shows these when you install the App. It never approves or merges a pull 
 LintCat reads a pull request the way a careful reviewer would: the diff, the code around it, and the parts of the repository it touches.
 
 ## How a review works {#review}
+
+[](/how-it-works/lintcat-review.html)
+
+Read, propose, check, post, in 35 seconds. [Open full size](/how-it-works/lintcat-review.html) (click to play, arrow keys step frames). Drawn in code with [anidoodle](https://github.com/alexgreensh/anidoodle).:
 - **Read.** The reviewer starts from the diff, then opens the surrounding code, the previous version of each file, the files that import it and the tests that cover it.
 - **Propose.** It returns candidate findings, each tied to a file, a line and, where it can, a fix.
 - **Check.** LintCat drops anything that doesn’t point at a line you changed, isn’t confident enough or repeats another finding, and checks every fix against the current file.

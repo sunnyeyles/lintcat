@@ -187,7 +187,8 @@ evals/        Fixture repositories and the harness that runs the real
 docs/         index.html — the architecture walkthrough, published to
               Pages and now also served by apps/web at /docs/walkthrough;
               claude/ — how the agent skills read this repo
-              (.nojekyll beside it, so Pages serves the file as written)
+              (.nojekyll beside it, so Pages serves the file as written);
+              anidoodle/ — source of the pixel-art film on /docs/how-it-works
 scripts/      esbuild bundler for the cli, mcp and worker, and their
               smoke tests
 ```

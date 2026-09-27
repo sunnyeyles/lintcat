@@ -119,6 +119,9 @@ draws the same mark from the `--brand-*` tokens for inline use, with
 `animate="hover"` (the topbar) or `animate="always"` (a loading state).
 Terminal spinners are in `packages/design/brand/cli/`; `pnpm spinner` demos them. `docs/tokens.css` is a separate,
 unrelated palette for the standalone `docs/index.html` explainer page.
+`docs/anidoodle/` is the source of the pixel-art film on `/docs/how-it-works`;
+`bash docs/anidoodle/build.sh` rebuilds it by hand (never in CI) and its outputs in
+`apps/web/public/how-it-works/` are committed.
 
 ## Commands
 

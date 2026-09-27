@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, P, Section } from "@/components/docs";
@@ -16,6 +17,10 @@ const HEADINGS: Heading[] = [
   { id: "different", title: "How it's different" },
 ];
 
+const FILM = "/how-it-works/lintcat-review";
+const FILM_ALT =
+  "A pixel-art film of one review. A pull request opens and LintCat queues a job. Read: LintCat reads the diff, the surrounding code, the previous version, the importers and the tests. Propose: six candidate findings appear, each pointing at a line. Check: three are dropped, for not being on a changed line, low confidence and duplication; the three that pass have their lines proven against the file. Post: the survivors become inline comments with fix buttons, and the AI PR Review check run reports neutral. Nothing unchecked reaches your pull request.";
+
 export default function HowItWorksPage() {
   return (
     <DocsArticle
@@ -26,6 +31,43 @@ export default function HowItWorksPage() {
       headings={HEADINGS}
     >
       <Section id="review" title="How a review works">
+        <figure className="flex flex-col gap-2">
+          <a
+            href={`${FILM}.html`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open the film full size"
+            className="block overflow-hidden rounded-sm border border-border bg-card"
+          >
+            <Image
+              src={`${FILM}.gif`}
+              alt={FILM_ALT}
+              width={768}
+              height={432}
+              unoptimized
+              className="h-auto w-full [image-rendering:pixelated] motion-reduce:hidden"
+            />
+            <Image
+              src={`${FILM}-poster.png`}
+              alt={FILM_ALT}
+              width={768}
+              height={432}
+              unoptimized
+              className="hidden h-auto w-full [image-rendering:pixelated] motion-reduce:block"
+            />
+          </a>
+          <figcaption className="max-w-measure text-label text-muted-foreground">
+            Read, propose, check, post, in 35 seconds.{" "}
+            <a href={`${FILM}.html`} target="_blank" rel="noopener noreferrer">
+              Open full size
+            </a>{" "}
+            (click to play, arrow keys step frames). Drawn in code with{" "}
+            <a href="https://github.com/alexgreensh/anidoodle" rel="noopener noreferrer">
+              anidoodle
+            </a>
+            .
+          </figcaption>
+        </figure>
         <Bullets>
           <Bullet>
             <strong>Read.</strong> The reviewer starts from the diff, then opens the surrounding

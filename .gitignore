@@ -9,3 +9,6 @@ next-env.d.ts
 *.tsbuildinfo
 .vercel
 .env*
+docs/anidoodle/.engine/
+docs/anidoodle/.work/
+docs/anidoodle/.tools/
