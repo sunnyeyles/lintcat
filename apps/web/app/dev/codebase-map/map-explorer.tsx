@@ -18,10 +18,9 @@ import { MapLegend } from "@/components/codebase-map/map-legend";
 import { MapSearch } from "@/components/codebase-map/map-search";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
 import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
-import { buildScene } from "@/components/codebase-map/scene";
 import { useMapExplorer } from "@/components/codebase-map/use-map-explorer";
 import { initialBounds } from "@/components/codebase-map/view";
-import { mapStatus, normaliseGraph } from "@/lib/codebase-map";
+import { buildScene, mapStatus, normaliseGraph } from "@/lib/codebase-map";
 import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
 
 const FIXTURES: FixtureKind[] = ["ready", "partial", "no-changes", "empty"];
@@ -235,6 +234,7 @@ export function MapExplorer() {
               <FileDetails
                 graph={graph}
                 focusedPath={map.focusedPath}
+                neighbourhood={scene.neighbourhood}
                 groupId={focusedGroupId}
                 groupCollapsed={map.focusedGroupCollapsed}
                 onSelect={setFocusedPath}

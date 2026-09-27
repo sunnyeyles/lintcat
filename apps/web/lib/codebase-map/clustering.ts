@@ -36,6 +36,11 @@ export function baseName(path: string): string {
   return cut === -1 ? path : path.slice(cut + 1);
 }
 
+/** Impact is only worth showing on a file the change did not already touch. */
+export function isImpacted(file: MapFile): boolean {
+  return file.impacted === true && file.changed !== true;
+}
+
 export function directoryOf(path: string): string {
   const cut = path.lastIndexOf("/");
   return cut === -1 ? "." : path.slice(0, cut);
@@ -92,7 +97,7 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
     }
     draft.files.push(file.path);
     if (file.changed === true) draft.changedCount += 1;
-    else if (file.impacted === true) draft.impactedCount += 1;
+    if (isImpacted(file)) draft.impactedCount += 1;
     if (file.path === view.focusedPath) draft.containsFocus = true;
     groupOfFile.set(file.path, id);
   }

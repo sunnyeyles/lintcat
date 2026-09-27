@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MapAdapter } from "@/components/codebase-map/adapter";
-import { buildScene, type SceneNode } from "@/components/codebase-map/scene";
 import { useMapGraph } from "@/components/codebase-map/use-map-graph";
 import type { MapHandle } from "@/components/codebase-map/view";
-import { groupIdFor, navigate, neighbourhood } from "@/lib/codebase-map";
-import type { FindingHeat, MapGraph, NavigationAxis } from "@/lib/codebase-map";
+import { buildScene, groupIdFor, navigate } from "@/lib/codebase-map";
+import type { FindingHeat, MapGraph, NavigationAxis, SceneNode } from "@/lib/codebase-map";
 
 export interface MapHover {
   node: SceneNode;
@@ -160,10 +159,10 @@ export function useMapExplorer(
 
   const announcement = useMemo(() => {
     if (focusedPath === null) return "No file focused.";
-    const hood = neighbourhood(graph, focusedPath, 1);
+    const hood = scene.neighbourhood;
     const found = heat[focusedPath]?.total ?? 0;
     return `${focusedPath}. ${hood.dependencies.size} dependencies, ${hood.dependents.size} dependents, ${found} findings.`;
-  }, [focusedPath, graph, heat]);
+  }, [focusedPath, scene, heat]);
 
   return {
     graph,
