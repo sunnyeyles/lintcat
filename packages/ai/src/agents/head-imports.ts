@@ -73,6 +73,7 @@ function describe(entry: HeadImport): string {
 /** Third-party imports are left out: the index cannot judge them. */
 export function renderHeadImports(
   imports: ReadonlyMap<string, readonly HeadImport[]> | undefined,
+  tools = true,
 ): string[] {
   if (imports === undefined || imports.size === 0) {
     return [];
@@ -102,7 +103,7 @@ export function renderHeadImports(
   return [
     '<imports ref="head">',
     "Internal imports in the changed files, resolved against the repository with this pull request applied.",
-    "A resolved import names a file that exists: never report it missing. An unresolved one may be a case the index does not understand; check it with get_file before reporting it.",
+    `A resolved import names a file that exists: never report it missing. An unresolved one may be a case the index does not understand; ${tools ? "check it with get_file before reporting it" : "never report it missing on that alone"}.`,
     ...lines,
     "</imports>",
     "",

@@ -8,6 +8,7 @@ import {
   resolveModelId,
   resolveModelProvider,
   ReviewCancelledError,
+  toolLoopEngine,
   type LanguageModelConfig,
   type ReviewModel,
 } from "@pr-review/ai";
@@ -239,7 +240,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       client,
       target,
       delivery: guardedDelivery(delivery, stillRunning),
-      engine: { model },
+      engine: toolLoopEngine({ model }),
       policy: { incremental: deps.incremental ?? true },
       logger,
       signal: controller.signal,

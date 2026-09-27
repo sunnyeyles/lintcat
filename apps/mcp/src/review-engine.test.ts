@@ -32,7 +32,6 @@ describe("choosing how a review runs", () => {
     );
 
     expect(selected.singleShot).toBe(false);
-    expect(selected.engine).toHaveProperty("model");
   });
 
   it("falls back to one sampling agent when no key is set and the client samples", () => {
@@ -42,21 +41,18 @@ describe("choosing how a review runs", () => {
     );
 
     expect(selected.singleShot).toBe(true);
-    expect(selected.engine).toHaveProperty("createAgent");
   });
 
   it("builds a general agent over the client's sampling", () => {
     const client = staticClient({ sampling: true }, [], async () => "{}");
     const engine = selectReviewEngine(environment({}), client).engine;
-    if (!("createAgent" in engine)) {
-      throw new Error("expected the sampling engine");
-    }
 
     const agent = engine.createAgent({
-      client: {} as never,
+      github: {} as never,
       agent: GENERAL_AGENT,
       index: undefined,
       logger: createCapturingLogger().logger,
+      onUsage: () => {},
     });
 
     expect(agent).toMatchObject({ name: "general" });

@@ -26,17 +26,14 @@ export {
   throwIfCancelled,
 } from "#src/cancellation";
 export { addTokenUsage, emptyTokenUsage, type TokenUsage } from "#src/usage";
+export type { AgentUsageReport } from "#src/agents/runtime";
 export {
-  createReviewAgent,
-  type AgentUsageReport,
-  type ReviewAgentDeps,
-} from "#src/agents/runtime";
-export {
-  createSamplingAgent,
-  type SamplingAgentDeps,
-  type SamplingRequest,
-  type SampleText,
-} from "#src/agents/sampling-agent";
+  samplingEngine,
+  toolLoopEngine,
+  type AgentRequest,
+  type ReviewEngine,
+} from "#src/agents/engine";
+export type { SamplingRequest, SampleText } from "#src/agents/sampling-agent";
 export { GENERAL_AGENT } from "#src/agents/general-agent";
 export {
   renderRepository,

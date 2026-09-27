@@ -1,7 +1,5 @@
 import { neighbourhoodOf } from "@/lib/codebase-map";
-import type { NormalisedGraph } from "@/lib/codebase-map";
-
-import type { Scene } from "@/components/codebase-map/scene";
+import type { NormalisedGraph, Scene } from "@/lib/codebase-map";
 
 export interface MapView {
   x: number;

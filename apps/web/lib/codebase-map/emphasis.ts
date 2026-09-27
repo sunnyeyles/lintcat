@@ -1,7 +1,7 @@
-import { neighbourhood } from "@/lib/codebase-map/neighbourhood";
+import type { Neighbourhood } from "@/lib/codebase-map/neighbourhood";
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 import { searchFiles } from "@/lib/codebase-map/search";
-import type { MapViewState } from "@/lib/codebase-map/types";
+import type { MapFile, MapViewState } from "@/lib/codebase-map/types";
 
 export type EmphasisLevel =
   | "focus"
@@ -21,7 +21,7 @@ export const EMPHASIS_MARKERS: Record<EmphasisLevel, string> = {
   dimmed: "hairline",
 };
 
-export const EMPHASIS_RANK: Record<EmphasisLevel, number> = {
+const EMPHASIS_RANK: Record<EmphasisLevel, number> = {
   focus: 0,
   changed: 1,
   neighbour: 2,
@@ -30,43 +30,50 @@ export const EMPHASIS_RANK: Record<EmphasisLevel, number> = {
   dimmed: 5,
 };
 
-export interface FileEmphasis {
-  path: string;
-  level: EmphasisLevel;
-  marker: string;
-  rank: number;
-}
-
-function at(path: string, level: EmphasisLevel): FileEmphasis {
-  return { path, level, marker: EMPHASIS_MARKERS[level], rank: EMPHASIS_RANK[level] };
+function lowerRank(a: EmphasisLevel, b: EmphasisLevel): EmphasisLevel {
+  return EMPHASIS_RANK[a] <= EMPHASIS_RANK[b] ? a : b;
 }
 
 export function emphasise(
   graph: NormalisedGraph,
   view: MapViewState,
-  steps = 1,
-): ReadonlyMap<string, FileEmphasis> {
-  const hood = neighbourhood(graph, view.focusedPath, steps);
+  hood: Neighbourhood,
+  impacted: (file: MapFile) => boolean,
+): ReadonlyMap<string, EmphasisLevel> {
   const matches = new Set(searchFiles(graph.files, view.query).map((r) => r.path));
   const narrowed = hood.focus !== null || view.query.trim() !== "";
-  const showImpacted = view.hideImpacted !== true;
 
-  const emphasis = new Map<string, FileEmphasis>();
+  const emphasis = new Map<string, EmphasisLevel>();
   for (const file of graph.files) {
     const path = file.path;
     if (path === hood.focus) {
-      emphasis.set(path, at(path, "focus"));
+      emphasis.set(path, "focus");
     } else if (file.changed === true) {
-      emphasis.set(path, at(path, "changed"));
+      emphasis.set(path, "changed");
     } else if (hood.dependencies.has(path) || hood.dependents.has(path)) {
-      emphasis.set(path, at(path, "neighbour"));
-    } else if (showImpacted && file.impacted === true) {
-      emphasis.set(path, at(path, "impacted"));
+      emphasis.set(path, "neighbour");
+    } else if (impacted(file)) {
+      emphasis.set(path, "impacted");
     } else if (matches.has(path) || !narrowed) {
-      emphasis.set(path, at(path, "context"));
+      emphasis.set(path, "context");
     } else {
-      emphasis.set(path, at(path, "dimmed"));
+      emphasis.set(path, "dimmed");
     }
   }
   return emphasis;
+}
+
+/** A collapsed group ranks as its strongest file, or by its counts when it is a summary. */
+export function groupLevel(
+  files: readonly string[],
+  emphasis: ReadonlyMap<string, EmphasisLevel>,
+  changedCount: number,
+  impactedCount: number,
+): EmphasisLevel {
+  let level: EmphasisLevel = "dimmed";
+  for (const path of files) level = lowerRank(level, emphasis.get(path)!);
+  if (files.length === 0) level = changedCount > 0 ? "changed" : "context";
+  // A summary's count covers files not here to rank.
+  if (impactedCount > 0) level = lowerRank(level, "impacted");
+  return level;
 }

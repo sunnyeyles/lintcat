@@ -1,6 +1,8 @@
 import {
   memberships,
   organizations,
+  repoAccess,
+  repos,
   users,
   type Database,
   type MembershipRole,
@@ -135,5 +137,59 @@ describe("membershipsForUser", () => {
     expect(await membershipsForUser(database, 1)).toEqual([
       { organization: globex, role: "member" },
     ]);
+  });
+
+  describe("collaborator accounts", () => {
+    async function collaborate(userId: number, organization: Organization, removed = false) {
+      const [repo] = await database
+        .insert(repos)
+        .values({
+          organizationId: organization.id,
+          owner: organization.slug,
+          name: `repo-${organization.slug}`,
+          private: true,
+          removedAt: removed ? new Date() : null,
+        })
+        .returning({ id: repos.id });
+      await database.insert(repoAccess).values({ userId, repoId: repo!.id, permission: "write" });
+    }
+
+    it("lists them after memberships, as collaborator", async () => {
+      const acme = await insertOrganization(10, "acme");
+      const alice = await insertOrganization(20, "alice");
+      const mona = await insertUser(1, "mona");
+      await join(mona, acme, "member");
+      await collaborate(mona, alice);
+
+      expect(await membershipsForUser(database, 1)).toEqual([
+        { organization: acme, role: "member" },
+        { organization: alice, role: "collaborator" },
+      ]);
+    });
+
+    it("lists an account once, as its membership, when the user also has rows there", async () => {
+      const acme = await insertOrganization(10, "acme");
+      const mona = await insertUser(1, "mona");
+      await join(mona, acme, "member");
+      await collaborate(mona, acme);
+
+      expect(await membershipsForUser(database, 1)).toEqual([
+        { organization: acme, role: "member" },
+      ]);
+    });
+
+    it("leaves out an account whose only granted repo is removed", async () => {
+      const alice = await insertOrganization(20, "alice");
+      await collaborate(await insertUser(1, "mona"), alice, true);
+
+      expect(await membershipsForUser(database, 1)).toEqual([]);
+    });
+
+    it("forwards a user whose only account is a collaboration straight to it", async () => {
+      const alice = await insertOrganization(20, "alice");
+      await collaborate(await insertUser(1, "mona"), alice);
+
+      expect(autoForwardPath(await membershipsForUser(database, 1))).toBe("/o/alice");
+    });
   });
 });

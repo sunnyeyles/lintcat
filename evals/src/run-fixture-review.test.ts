@@ -43,7 +43,7 @@ function scriptedDeps() {
     return { name: agent.category, run: async () => [] };
   });
   const { logger } = createCapturingLogger();
-  const deps: FixtureReviewDeps = { createAgent, logger };
+  const deps: FixtureReviewDeps = { engine: { createAgent }, logger };
   return { deps, built };
 }
 

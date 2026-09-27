@@ -71,11 +71,14 @@ export {
 } from "./repository-graphs";
 export {
   deleteOrganizationRepoAccess,
+  listCollaboratorOrganizationIds,
   listPrivateRepos,
   listUserMemberships,
   readableRepos,
   replaceRepoAccess,
+  replaceUserRepoAccess,
   setRepoAccess,
+  type AccessRole,
   type ReadableRepo,
 } from "./repo-access";
 export {
