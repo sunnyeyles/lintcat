@@ -1,5 +1,5 @@
 import { cn } from "@pr-review/design";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "@pr-review/design/icons";
 import Link from "next/link";
 import type { ReactNode } from "react";
 

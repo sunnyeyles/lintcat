@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@pr-review/design";
-import { GitPullRequest } from "lucide-react";
+import { GitPullRequest } from "@pr-review/design/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cache, Suspense } from "react";

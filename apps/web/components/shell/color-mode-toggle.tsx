@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "@pr-review/design/icons";
 import { useEffect, useState } from "react";
 
 export type ColorMode = "light" | "dark" | "auto";

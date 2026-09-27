@@ -6,9 +6,9 @@ import {
   FlaskConical,
   Gauge,
   GitPullRequest,
-  type LucideIcon,
+  type IconComponent,
   ShieldCheck,
-} from "lucide-react";
+} from "@pr-review/design/icons";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -50,7 +50,7 @@ function Audience({
   lede,
   children,
 }: {
-  icon: LucideIcon;
+  icon: IconComponent;
   title: string;
   lede: string;
   children: ReactNode;
@@ -101,7 +101,7 @@ export function Audiences() {
   );
 }
 
-const CATEGORY_ICON: Record<(typeof LOOKS_FOR)[number][0], LucideIcon> = {
+const CATEGORY_ICON: Record<(typeof LOOKS_FOR)[number][0], IconComponent> = {
   Correctness: Bug,
   Security: ShieldCheck,
   Performance: Gauge,

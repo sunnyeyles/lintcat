@@ -1,5 +1,5 @@
 import { Button, Spotlight } from "@pr-review/design";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight } from "@pr-review/design/icons";
 import Link from "next/link";
 
 import { MapPreview } from "@/components/landing/map-preview";

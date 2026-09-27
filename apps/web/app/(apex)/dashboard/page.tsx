@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@pr-review/design";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
-import { FolderGit2 } from "lucide-react";
+import { FolderGit2 } from "@pr-review/design/icons";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 

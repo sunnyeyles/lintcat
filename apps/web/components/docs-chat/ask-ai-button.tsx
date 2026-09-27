@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@pr-review/design";
-import { Sparkles } from "lucide-react";
+import { Sparkles } from "@pr-review/design/icons";
 import { useRef, useState } from "react";
 
 import { ChatPanel } from "@/components/docs-chat/chat-panel";

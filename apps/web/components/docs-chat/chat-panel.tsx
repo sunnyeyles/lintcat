@@ -12,7 +12,7 @@ import {
   Label,
   Textarea,
 } from "@pr-review/design";
-import { ArrowUp, RotateCcw, Square } from "lucide-react";
+import { ArrowUp, RotateCcw, Square } from "@pr-review/design/icons";
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { Answer } from "@/components/docs-chat/answer";

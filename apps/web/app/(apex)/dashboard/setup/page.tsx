@@ -9,7 +9,7 @@ import {
   EmptyTitle,
 } from "@pr-review/design";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
-import { Clock, Link2Off, MailCheck, ShieldOff, UserX } from "lucide-react";
+import { Clock, Link2Off, MailCheck, ShieldOff, UserX } from "@pr-review/design/icons";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";

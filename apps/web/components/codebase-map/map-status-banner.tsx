@@ -1,5 +1,5 @@
 import { Alert, AlertDescription, AlertTitle, Badge } from "@pr-review/design";
-import { CircleCheck, CircleSlash, Info, TriangleAlert } from "lucide-react";
+import { CircleCheck, CircleSlash, Info, TriangleAlert } from "@pr-review/design/icons";
 
 import type { MapStatus } from "@/lib/codebase-map";
 

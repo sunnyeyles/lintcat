@@ -86,6 +86,12 @@ The CLI mis-resolves the `#src/cn` alias and emits `from "cn"` — rewrite those
 to `#src/cn` after every `add`, and drop the stray `cn` npm dependency if it
 reappears in `package.json`. Re-export anything new from `src/index.ts`.
 
+Icons are Iconsax (`iconsax-reactjs`), wrapped in `src/icons/` with a looping
+CSS motion each; apps import them from `@pr-review/design/icons`. The shadcn
+CLI still emits `lucide-react` imports: rewrite them to `#src/icons` (with
+`animate="none"` on primitive indicators) and drop the `lucide-react`
+dependency it adds. `tokens-guard.test.ts` fails on any lucide import.
+
 Colour comes from `@primer/primitives` (GitHub's tokens), in three layers
 (see `docs/adr/0002-primer-tokens-under-shadcn.md`):
 

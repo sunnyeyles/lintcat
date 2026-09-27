@@ -10,7 +10,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@pr-review/design";
-import { KeyRound } from "lucide-react";
+import { KeyRound } from "@pr-review/design/icons";
 import Link from "next/link";
 import { Suspense } from "react";
 

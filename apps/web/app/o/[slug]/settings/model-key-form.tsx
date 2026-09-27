@@ -18,7 +18,7 @@ import {
   SelectValue,
   Separator,
 } from "@pr-review/design";
-import { KeyRound } from "lucide-react";
+import { KeyRound } from "@pr-review/design/icons";
 import { useActionState } from "react";
 
 import { SubmitButton } from "@/components/ui/submit-button";

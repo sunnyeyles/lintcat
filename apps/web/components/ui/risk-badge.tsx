@@ -1,6 +1,6 @@
 import { Badge, cn } from "@pr-review/design";
 import type { RiskBand } from "@pr-review/schemas";
-import { Radius } from "lucide-react";
+import { Radius } from "@pr-review/design/icons";
 
 import { LEVEL_TONE } from "./level-tone";
 

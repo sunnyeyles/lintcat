@@ -6,7 +6,7 @@ import {
   EmptyTitle,
   Skeleton,
 } from "@pr-review/design";
-import { MapPinOff } from "lucide-react";
+import { MapPinOff } from "@pr-review/design/icons";
 
 import { mapQuery, resolveLodThreshold, type MapSource } from "@/lib/codebase-map";
 

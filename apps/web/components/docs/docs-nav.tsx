@@ -10,7 +10,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@pr-review/design";
-import { BookText } from "lucide-react";
+import { BookText } from "@pr-review/design/icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
