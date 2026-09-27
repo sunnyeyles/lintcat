@@ -31,7 +31,7 @@ import {
 } from "#src/publish-review";
 import type { RenderedCheckRun } from "#src/render-check-run";
 import type { RenderedReview } from "#src/render-review";
-import type { ReviewOutcome } from "#src/review-pull-request";
+import type { ReviewOutcome } from "#src/review-run";
 import type { ReviewTarget } from "#src/review-target";
 
 /** One finished run, for anything that mirrors runs rather than reviews. */

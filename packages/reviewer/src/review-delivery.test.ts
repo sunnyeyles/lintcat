@@ -23,7 +23,7 @@ import {
   recordingDelivery,
   type FinishedReviewRun,
 } from "#src/review-delivery";
-import type { ReviewOutcome } from "#src/review-pull-request";
+import type { ReviewOutcome } from "#src/review-run";
 import type { ReviewTarget } from "#src/review-target";
 
 const baseSha = "0000000000000000000000000000000000000000";
