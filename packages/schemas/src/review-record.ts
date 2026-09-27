@@ -39,6 +39,10 @@ export type ReviewRecordGraph = z.infer<typeof reviewRecordGraphSchema>;
 /** The index caps each impact list at this many paths; `counts` carries the true totals. */
 export const MAX_RISK_DEPENDENTS = 200;
 
+export const MAX_RISK_FACTORS = 20;
+
+export const MAX_RISK_HUBS = 20;
+
 const repositoryPath = z.string().min(1).max(4096);
 
 const riskBandSchema = z.enum(["low", "medium", "high"]);
@@ -57,10 +61,10 @@ export const reviewRecordRiskSchema = z.object({
         points: z.number().int().min(0).max(100),
       }),
     )
-    .max(20),
+    .max(MAX_RISK_FACTORS),
   hubs: z
     .array(z.object({ path: repositoryPath, dependents: count }))
-    .max(20),
+    .max(MAX_RISK_HUBS),
   counts: z.object({
     direct: count,
     transitive: count,

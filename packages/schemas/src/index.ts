@@ -17,6 +17,8 @@ export {
 export {
   MAX_REPOSITORY_GRAPH_BASE64,
   MAX_RISK_DEPENDENTS,
+  MAX_RISK_FACTORS,
+  MAX_RISK_HUBS,
   reviewRecordRiskSchema,
   reviewRecordSchema,
   type ReviewRecord,

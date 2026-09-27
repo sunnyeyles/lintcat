@@ -2,7 +2,6 @@
 import { ingestReviewRecord, type Database } from "@pr-review/db";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { reviewCorrelation, type PublishToDashboard } from "@pr-review/reviewer";
-import type { ReviewRecord } from "@pr-review/schemas";
 
 /** Never throws: a review already published to GitHub must not fail on this step. */
 export function createDatabaseReviewPublisher(
@@ -10,14 +9,7 @@ export function createDatabaseReviewPublisher(
   organizationId: number,
   logger: StructuredLogger,
 ): PublishToDashboard {
-  return async (target, review) => {
-    const record: ReviewRecord = {
-      owner: target.owner,
-      repo: target.repo,
-      prNumber: target.pullRequestNumber,
-      headSha: target.headSha,
-      ...review,
-    };
+  return async (target, record) => {
     try {
       const result = await ingestReviewRecord(database, organizationId, record);
       if (result.ok) {
