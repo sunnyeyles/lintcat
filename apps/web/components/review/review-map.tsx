@@ -26,7 +26,7 @@ export interface ReviewMapProps {
   graph: MapGraph;
   heat: FindingHeat;
   changedPaths: readonly string[];
-  /** Where the map fetches the groups it was not sent. Absent below the threshold. */
+  /** Where the map fetches the groups it was not sent; absent when it was sent them all. */
   endpoint?: string;
 }
 

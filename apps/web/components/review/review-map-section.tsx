@@ -9,7 +9,7 @@ import {
 } from "@pr-review/design";
 import { MapPinOff } from "lucide-react";
 
-import { mapPayload, resolveLodThreshold } from "@/lib/codebase-map";
+import { mapQuery, resolveLodThreshold } from "@/lib/codebase-map";
 import { reviewMapSource } from "@/lib/data/server";
 
 import { ReviewMap } from "./review-map";
@@ -55,7 +55,7 @@ export async function ReviewMapSection({
   dependents?: readonly string[];
 }) {
   const source = await reviewMapSource(slug, reviewId, findings, dependents);
-  const payload = mapPayload(source, {
+  const payload = mapQuery(source).first({
     threshold: resolveLodThreshold(process.env.CODEBASE_MAP_LOD_THRESHOLD),
   });
 
@@ -80,7 +80,11 @@ export async function ReviewMapSection({
           graph={payload.graph}
           heat={payload.heat}
           changedPaths={payload.changedPaths}
-          endpoint={`/api/codebase-map/${encodeURIComponent(slug)}/${reviewId}`}
+          endpoint={
+            payload.mode === "lod"
+              ? `/api/codebase-map/${encodeURIComponent(slug)}/${reviewId}`
+              : undefined
+          }
         />
       )}
     </Section>

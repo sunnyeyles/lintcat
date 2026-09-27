@@ -2,6 +2,7 @@ import type { Severity } from "@pr-review/db/dashboard";
 import type { RepositoryGraphSnapshot } from "@pr-review/index";
 import type { ReviewRecordChangedFile } from "@pr-review/schemas";
 
+import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 import type {
   FindingCounts,
   MapFile,
@@ -25,6 +26,8 @@ export interface MapSource {
   heat: FindingHeat;
   /** Changed files the graph actually holds, for the opening view. */
   changedPaths: readonly string[];
+  /** `graph` already normalised, when a cache holds it. */
+  normalised?: NormalisedGraph;
 }
 
 function empty(): FindingCounts {

@@ -1,14 +1,6 @@
 import { z } from "zod";
 
-import {
-  groupSlice,
-  normaliseGraph,
-  pathsInGroups,
-  searchGroups,
-  type MapSource,
-} from "@/lib/codebase-map";
-
-export const SEARCH_LIMIT = 40;
+import { mapQuery, SEARCH_LIMIT, type MapSource } from "@/lib/codebase-map";
 
 const GROUP_ID = z.string().min(1).max(1024);
 
@@ -48,17 +40,13 @@ export async function handleCodebaseMap(
     return Response.json({ error: "no repository graph for this review" }, { status: 404 });
   }
 
-  const graph = normaliseGraph(source.graph);
-
+  const query = mapQuery(source);
   if (parsed.data.action === "search") {
-    const results = searchGroups(graph, parsed.data.query, parsed.data.limit);
-    return Response.json({ results, totalFileCount: graph.files.length });
+    return Response.json(query.search(parsed.data.query, parsed.data.limit));
   }
 
   const { groupId, loadedGroups } = parsed.data;
-  const slice = groupSlice(graph, source.heat, groupId, pathsInGroups(graph, loadedGroups));
-  if (slice.graph.files.length === 0) {
-    return Response.json({ error: `no group ${groupId}` }, { status: 404 });
-  }
+  const slice = query.expand(groupId, loadedGroups);
+  if (!slice) return Response.json({ error: `no group ${groupId}` }, { status: 404 });
   return Response.json(slice);
 }
