@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@pr-review/design";
-import { Settings } from "lucide-react";
+import { Settings } from "@pr-review/design/icons";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";

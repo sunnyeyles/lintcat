@@ -8,7 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@pr-review/design";
-import { LogIn } from "lucide-react";
+import { LogIn } from "@pr-review/design/icons";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 

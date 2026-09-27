@@ -10,8 +10,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@pr-review/design";
-import { ChartLine, Coins, FolderGit2, LayoutDashboard, Menu, Settings } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import {
+  ChartLine,
+  Coins,
+  FolderGit2,
+  type IconComponent,
+  LayoutDashboard,
+  Menu,
+  Settings,
+} from "@pr-review/design/icons";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useState } from "react";
@@ -19,7 +26,7 @@ import { useState } from "react";
 import { organizationPath, withinOrganization } from "@/lib/paths";
 
 // `href` is relative to the organization, e.g. "/repos" under `/o/<slug>`.
-type NavItem = { href: string; label: string; icon: LucideIcon; ownerOnly?: boolean };
+type NavItem = { href: string; label: string; icon: IconComponent; ownerOnly?: boolean };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },

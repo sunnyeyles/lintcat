@@ -45,3 +45,10 @@ describe("app code uses semantic colour tokens only", () => {
     expect(offenders(RAW_HEX)).toEqual([]);
   });
 });
+
+// `shadcn add` still emits lucide imports; they belong on #src/icons.
+describe("icons come from @pr-review/design/icons", () => {
+  it("has no lucide-react imports", () => {
+    expect(offenders(/from ["']lucide-react["']/g)).toEqual([]);
+  });
+});

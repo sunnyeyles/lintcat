@@ -7,7 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@pr-review/design";
-import { SearchX } from "lucide-react";
+import { SearchX } from "@pr-review/design/icons";
 import Link from "next/link";
 
 import { DocsTopbar } from "@/components/shell/docs-topbar";

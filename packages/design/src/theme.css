@@ -114,6 +114,39 @@
   }
 }
 
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes icon-nudge-x {
+  from {
+    transform: translateX(-1px);
+  }
+  to {
+    transform: translateX(1px);
+  }
+}
+@keyframes icon-nudge-y {
+  from {
+    transform: translateY(-1px);
+  }
+  to {
+    transform: translateY(1px);
+  }
+}
+@keyframes icon-pulse {
+  50% {
+    transform: scale(1.06);
+    opacity: 0.8;
+  }
+}
+@keyframes icon-float {
+  to {
+    transform: translateY(-1px);
+  }
+}
+
 @theme inline {
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif,
@@ -235,6 +268,49 @@
 @utility animate-spotlight-drift {
   animation: spotlight-drift var(--spotlight-duration, 3.5s) ease-in-out infinite alternate;
   /* Stopped outright: the global 0.01ms duration would flicker an infinite loop. */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* Icon loops stop outright under reduced motion, like spotlight-drift. */
+@utility animate-icon-spin {
+  animation: icon-spin 1s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-icon-turn {
+  animation: icon-spin 3s linear infinite reverse;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-icon-nudge-x {
+  animation: icon-nudge-x 1.2s ease-in-out infinite alternate;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-icon-nudge-y {
+  animation: icon-nudge-y 1.2s ease-in-out infinite alternate;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-icon-pulse {
+  animation: icon-pulse 2s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility animate-icon-float {
+  animation: icon-float 1.8s ease-in-out infinite alternate;
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
