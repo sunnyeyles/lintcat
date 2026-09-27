@@ -2,7 +2,7 @@ import {
   authorize,
   type Authorization,
   db,
-  type MembershipRole,
+  type AccessRole,
   type Organization,
   type ReadableRepo,
   type Repo,
@@ -44,7 +44,7 @@ export async function currentSession(): Promise<AppSession | undefined> {
 export type OrganizationAccess = {
   session: AppSession;
   organization: Organization;
-  role: MembershipRole;
+  role: AccessRole;
   readableRepos: ReadableRepo[];
 };
 
@@ -78,7 +78,7 @@ export const requireOrganization = cache(
 export type RepoAccess = {
   session: AppSession;
   organization: Organization;
-  role: MembershipRole;
+  role: AccessRole;
   repo: Repo & { isOwner: boolean };
 };
 

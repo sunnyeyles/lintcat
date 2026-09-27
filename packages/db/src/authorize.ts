@@ -1,13 +1,12 @@
 import { and, eq, isNull } from "drizzle-orm";
 
 import type { Database } from "./client";
-import { readableRepos, type ReadableRepo } from "./repo-access";
+import { readableRepos, type AccessRole, type ReadableRepo } from "./repo-access";
 import {
   memberships,
   organizations,
   repos,
   users,
-  type MembershipRole,
   type Organization,
   type Repo,
 } from "./schema";
@@ -17,7 +16,7 @@ export type Authorization =
   | {
       status: "allowed";
       organization: Organization;
-      role: MembershipRole;
+      role: AccessRole;
       /** Every repo query filters by this; an absent repo is not-found. */
       readableRepos: ReadableRepo[];
       /** Set when a repo was asked for. */
@@ -37,16 +36,18 @@ export async function authorize(
   repo?: { owner: string; name: string },
 ): Promise<Authorization> {
   const [row] = await database
-    .select({ organization: organizations, role: memberships.role, userId: users.id })
+    .select({ organization: organizations, membership: memberships.role, userId: users.id })
     .from(organizations)
-    .innerJoin(memberships, eq(memberships.organizationId, organizations.id))
-    .innerJoin(users, eq(users.id, memberships.userId))
+    .innerJoin(users, eq(users.githubId, session.githubId))
+    .leftJoin(
+      memberships,
+      and(eq(memberships.organizationId, organizations.id), eq(memberships.userId, users.id)),
+    )
     .where(
       and(
         eq(organizations.slug, slug.toLowerCase()),
         isNull(organizations.suspendedAt),
         isNull(organizations.uninstalledAt),
-        eq(users.githubId, session.githubId),
       ),
     )
     .limit(1);
@@ -54,12 +55,11 @@ export async function authorize(
     const current = await findSlugRedirect(database, slug);
     return current ? { status: "redirect", slug: current } : NOT_FOUND;
   }
-  const { organization, role, userId } = row;
-  const readable = await readableRepos(database, {
-    organizationId: organization.id,
-    userId,
-    role,
-  });
+  const { organization, userId } = row;
+  const role: AccessRole = row.membership ?? "collaborator";
+  const readable = await readableRepos(database, { organizationId: organization.id, userId, role });
+  // A non-member with no granted live repo is no collaborator.
+  if (role === "collaborator" && readable.length === 0) return NOT_FOUND;
   const allowed = { status: "allowed" as const, organization, role, readableRepos: readable };
   if (!repo) return allowed;
 
