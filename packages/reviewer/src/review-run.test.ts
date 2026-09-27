@@ -3,6 +3,7 @@ import {
   type AgentDefinition,
   type ReviewAgent,
   type ReviewContext,
+  type ReviewEngine,
 } from "@pr-review/ai";
 import type {
   BlameRange,
@@ -24,10 +25,9 @@ import type {
   WriteFileRequest,
 } from "@pr-review/github";
 import { createCapturingLogger } from "@pr-review/logging";
-import { reviewMemorySchema, type ReviewFinding } from "@pr-review/schemas";
+import type { ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it, vi } from "vitest";
 
-import type { MemoryStore } from "#src/memory";
 import type { DashboardReview } from "#src/publish-dashboard";
 import {
   dashboardDelivery,
@@ -35,11 +35,7 @@ import {
   recordingDelivery,
   type ReviewDelivery,
 } from "#src/review-delivery";
-import {
-  runReview,
-  type ReviewEngine,
-  type ReviewMemory,
-} from "#src/review-run";
+import { runReview, type ReviewMemory } from "#src/review-run";
 import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
@@ -141,6 +137,13 @@ function writesOf(client: FakeClient): number {
   );
 }
 
+const spent = {
+  inputTokens: 100,
+  cacheCreationInputTokens: 0,
+  cacheReadInputTokens: 20,
+  outputTokens: 7,
+};
+
 /** An engine whose agent is scripted, so no model is built. */
 function scriptedEngine(candidates: readonly unknown[] = []): {
   engine: ReviewEngine;
@@ -150,11 +153,14 @@ function scriptedEngine(candidates: readonly unknown[] = []): {
   return {
     ran,
     engine: {
-      createAgent: ({ agent }): ReviewAgent => {
+      createAgent: ({ agent, onUsage }): ReviewAgent => {
         ran.push(agent);
         return {
           name: agent.category,
-          run: async (_context: ReviewContext) => candidates,
+          run: async (_context: ReviewContext) => {
+            onUsage({ agent: agent.category, durationMs: 1, steps: 1, salvaged: false, usage: spent });
+            return candidates;
+          },
         };
       },
     },
@@ -162,29 +168,6 @@ function scriptedEngine(candidates: readonly unknown[] = []): {
 }
 
 const NOW = new Date("2026-09-13T12:00:00.000Z");
-
-/** A memory file holding one shape the repository keeps acting on. */
-function memoryFile(): string {
-  return JSON.stringify(
-    reviewMemorySchema.parse({
-      version: 1,
-      shapes: [
-        {
-          category: "correctness",
-          shape: "assignment instead of comparison in",
-          resolved: 0,
-          ignored: 5,
-          outdated: 0,
-          lastSignalAt: NOW.toISOString(),
-        },
-      ],
-    }),
-  );
-}
-
-function readOnlyStore(content: string): MemoryStore {
-  return { read: async () => content, write: async () => {} };
-}
 
 const { logger } = createCapturingLogger();
 
@@ -203,6 +186,20 @@ describe("runReview: the agent", () => {
 
     expect(client.getFileContents).not.toHaveBeenCalled();
     expect(ran).toEqual([GENERAL_AGENT]);
+  });
+
+  it("totals the usage the engine reports onto the finished run", async () => {
+    const { engine } = scriptedEngine();
+
+    const run = await runReview({
+      client: makeClient(),
+      target,
+      delivery: recordingDelivery().delivery,
+      engine,
+      logger,
+    });
+
+    expect(run.usage).toEqual(spent);
   });
 });
 
@@ -261,39 +258,6 @@ describe("runReview: delivery", () => {
     expect(published[0]?.findings).toEqual([{ ...finding, hasPatch: false }]);
     expect(published[0]?.summary).toBe("1 finding");
     expect(recorded.runs[0]).toBe(run);
-  });
-});
-
-describe("runReview: repository memory", () => {
-  it("hands the agent the hints the store produced", async () => {
-    const { engine, ran } = scriptedEngine([finding]);
-
-    await runReview({
-      client: makeClient(),
-      target,
-      delivery: recordingDelivery().delivery,
-      engine,
-      memory: { store: readOnlyStore(memoryFile()), now: () => NOW },
-      logger,
-    });
-
-    expect(ran[0]?.repositoryHints).toEqual([
-      'Findings like "assignment instead of comparison in".',
-    ]);
-  });
-
-  it("runs the agent without hints when no store is given", async () => {
-    const { engine, ran } = scriptedEngine([finding]);
-
-    await runReview({
-      client: makeClient(),
-      target,
-      delivery: recordingDelivery().delivery,
-      engine,
-      logger,
-    });
-
-    expect(ran[0]?.repositoryHints).toBeUndefined();
   });
 });
 

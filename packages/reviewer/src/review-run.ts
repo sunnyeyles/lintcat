@@ -1,25 +1,18 @@
 /**
- * One review run, assembled: a client, a target, a delivery adapter and a
- * policy in; agent, model, pipeline and memory held here.
+ * One review run, assembled: a client, a target, an engine, a delivery adapter
+ * and a policy in; agent, pipeline and memory held here.
  */
 import {
   addTokenUsage,
   emptyTokenUsage,
   GENERAL_AGENT,
-  type AgentDefinition,
-  type ReviewAgent,
-  type ReviewModel,
-  type TokenUsage,
+  type AgentUsageReport,
+  type ReviewEngine,
 } from "@pr-review/ai";
-import type { RepositoryIndex } from "@pr-review/index";
 import { createConsoleLogger, type StructuredLogger } from "@pr-review/logging";
 
 import type { MemoryStore } from "#src/memory";
-import {
-  createPipelineRunner,
-  type ReviewClient,
-  type RunReviewPipeline,
-} from "#src/pipeline-runner";
+import type { ReviewClient, RunReviewPipeline } from "#src/pipeline-runner";
 import type { FinishedReviewRun, ReviewDelivery } from "#src/review-delivery";
 import { runReviewPipeline } from "#src/review-pipeline";
 import { reviewWithDelivery } from "#src/review-pull-request";
@@ -34,27 +27,6 @@ export interface ReviewPolicy {
   /** Suggest reviewers on the check run; on unless switched off. */
   suggestReviewers?: boolean | undefined;
 }
-
-/** What the agent is built over, once the run has resolved it. */
-export interface ReviewAgentRequest {
-  client: ReviewClient;
-  agent: AgentDefinition;
-  index: RepositoryIndex | undefined;
-  logger: StructuredLogger;
-}
-
-export type CreateReviewAgent = (request: ReviewAgentRequest) => ReviewAgent;
-
-/**
- * What runs the agent. The model form builds the runtime itself; the
- * scripted form is for harnesses that substitute it.
- */
-export type ReviewEngine =
-  | {
-      model: ReviewModel;
-      maxTurns?: number | undefined;
-    }
-  | { createAgent: CreateReviewAgent };
 
 /** Repository memory, with the clock that decides what counts as fresh. */
 export interface ReviewMemory {
@@ -80,19 +52,13 @@ export interface ReviewRunSpec {
 function pipelineRunner(
   engine: ReviewEngine,
   logger: StructuredLogger,
-  onUsage: (usage: TokenUsage) => void,
+  onUsage: (report: AgentUsageReport) => void,
 ): RunReviewPipeline {
-  if ("createAgent" in engine) {
-    const { createAgent } = engine;
-    return ({ client, context, agent, index }) =>
-      runReviewPipeline(createAgent({ client, agent, index, logger }), context);
-  }
-  return createPipelineRunner({
-    model: engine.model,
-    logger,
-    onUsage: (report) => onUsage(report.usage),
-    ...(engine.maxTurns === undefined ? {} : { maxTurns: engine.maxTurns }),
-  });
+  return ({ client, context, agent, index }) =>
+    runReviewPipeline(
+      engine.createAgent({ agent, github: client, index, logger, onUsage }),
+      context,
+    );
 }
 
 /** Assembles and runs one review. Throws what the review itself throws. */
@@ -112,8 +78,8 @@ export async function runReview({
     client,
     agent: GENERAL_AGENT,
     delivery,
-    runReviewPipeline: pipelineRunner(engine, logger, (spent) => {
-      usage = addTokenUsage(usage, spent);
+    runReviewPipeline: pipelineRunner(engine, logger, (report) => {
+      usage = addTokenUsage(usage, report.usage);
     }),
     logger,
     signal,

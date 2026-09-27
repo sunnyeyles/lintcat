@@ -4,14 +4,14 @@
  */
 import {
   createLanguageModel,
-  createReviewAgent,
+  toolLoopEngine,
   type AgentUsageReport,
+  type ReviewEngine,
 } from "@pr-review/ai";
 import type { StructuredLogger } from "@pr-review/logging";
 import {
   recordingDelivery,
   runReview,
-  type CreateReviewAgent,
   type RenderedCheckRun,
   type ReviewMemory,
   type ReviewOutcome,
@@ -21,10 +21,9 @@ import { createFixtureClient } from "#src/fixture-client";
 import type { LoadedFixture } from "#src/fixture";
 import type { ModelAccess } from "#src/model-access";
 
-/** The model-facing half of a review; the harness's own tests inject a scripted agent. */
+/** The model-facing half of a review; the harness's own tests inject a scripted engine. */
 export interface FixtureReviewDeps {
-  /** Built over the review's own logger, so every event of one fixture lands together. */
-  createAgent: CreateReviewAgent;
+  engine: ReviewEngine;
   logger: StructuredLogger;
   /** The repository memory the fixture reviews against; absent means none. */
   memory?: ReviewMemory | undefined;
@@ -39,26 +38,30 @@ export interface FixtureReview {
   rendered: RenderedCheckRun;
 }
 
-/** The production wiring: the real agent over the configured model. */
+/** The production engine, with each agent's spend also handed to `onUsage`. */
 export function modelBackedDeps(
   access: ModelAccess,
   logger: StructuredLogger,
   onUsage?: (report: AgentUsageReport) => void,
 ): FixtureReviewDeps {
-  const model = createLanguageModel({
-    provider: access.provider,
-    apiKey: access.apiKey,
-    modelId: access.model,
+  const engine = toolLoopEngine({
+    model: createLanguageModel({
+      provider: access.provider,
+      apiKey: access.apiKey,
+      modelId: access.model,
+    }),
   });
   return {
-    createAgent: ({ client, agent, index, logger: reviewLogger }) =>
-      createReviewAgent(agent, {
-        model,
-        github: client,
-        logger: reviewLogger,
-        index,
-        onUsage,
-      }),
+    engine: {
+      createAgent: (request) =>
+        engine.createAgent({
+          ...request,
+          onUsage: (report) => {
+            request.onUsage(report);
+            onUsage?.(report);
+          },
+        }),
+    },
     logger,
   };
 }
@@ -80,7 +83,7 @@ export async function runFixtureReview(
       headSha: fixture.pullRequest.headSha,
     },
     delivery,
-    engine: { createAgent: deps.createAgent },
+    engine: deps.engine,
     logger: deps.logger,
     ...(deps.memory === undefined ? {} : { memory: deps.memory }),
   });

@@ -1,19 +1,11 @@
-import {
-  createReviewAgent,
-  type AgentDefinition,
-  type ReviewAgentDeps,
-  type ReviewContext,
-} from "@pr-review/ai";
+import type { AgentDefinition, ReviewContext } from "@pr-review/ai";
 import type {
   PullRequestReadClient,
   RepositoryHistoryClient,
 } from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 
-import {
-  runReviewPipeline,
-  type ReviewPipelineResult,
-} from "#src/review-pipeline";
+import type { ReviewPipelineResult } from "#src/review-pipeline";
 
 /** What one review reads. The optional methods are absent on an adapter with no commit graph. */
 export type ReviewClient = PullRequestReadClient &
@@ -35,18 +27,3 @@ export interface ReviewPipelineRun {
 export type RunReviewPipeline = (
   run: ReviewPipelineRun,
 ) => Promise<ReviewPipelineResult>;
-
-export type PipelineRunnerDeps = Omit<ReviewAgentDeps, "github" | "index">;
-
-/** Binds the agent to each review's client and index, then runs the pipeline. */
-export function createPipelineRunner(deps: PipelineRunnerDeps): RunReviewPipeline {
-  return ({ client, context, agent, index }) =>
-    runReviewPipeline(
-      createReviewAgent(agent, {
-        ...deps,
-        github: client,
-        ...(index === undefined ? {} : { index }),
-      }),
-      context,
-    );
-}
