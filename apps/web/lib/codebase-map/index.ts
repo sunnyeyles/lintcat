@@ -26,7 +26,7 @@ export type { FindingHeat, MapSource, MapSourceFinding } from "@/lib/codebase-ma
 
 export { heatOf } from "@/lib/codebase-map/heat";
 
-export { groupIdFor } from "@/lib/codebase-map/clustering";
+export { CLOSED_VIEW, groupIdFor } from "@/lib/codebase-map/clustering";
 export type { Clustering } from "@/lib/codebase-map/clustering";
 
 export { EMPHASIS_MARKERS } from "@/lib/codebase-map/emphasis";
@@ -35,7 +35,7 @@ export { searchFiles } from "@/lib/codebase-map/search";
 export type { SearchResult } from "@/lib/codebase-map/search";
 
 export { navigate } from "@/lib/codebase-map/navigation";
-export type { NavigationAxis } from "@/lib/codebase-map/navigation";
+export type { NavigationAxis, NavigationStep } from "@/lib/codebase-map/navigation";
 
 export { mapStatus } from "@/lib/codebase-map/status";
 export type { MapStatus } from "@/lib/codebase-map/status";

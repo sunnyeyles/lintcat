@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, type Ref } from "react";
 
 import { markerParts } from "@/components/codebase-map/markers";
 import type { MapPalette } from "@/components/codebase-map/palette";
@@ -26,7 +26,7 @@ export interface MapCanvasProps {
   scene: Scene;
   palette: MapPalette;
   reducedMotion: boolean;
-  handleRef?: RefObject<MapHandle | null>;
+  handleRef?: Ref<MapHandle>;
   onSelect?: (node: SceneNode) => void;
   onHover?: (node: SceneNode | null, screenX: number, screenY: number) => void;
   className?: string;
