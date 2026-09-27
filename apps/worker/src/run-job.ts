@@ -206,6 +206,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
     const delivery = dashboardDelivery(
       githubDelivery({ client, logger, commitFixes }),
       createDatabaseReviewPublisher(database, organization.id, logger),
+      logger,
     );
     await runReview({
       client,

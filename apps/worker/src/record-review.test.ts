@@ -1,7 +1,8 @@
 import { organizations, reviews, type Database } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
 import { createCapturingLogger } from "@pr-review/logging";
-import type { DashboardReview, ReviewTarget } from "@pr-review/reviewer";
+import type { ReviewTarget } from "@pr-review/reviewer";
+import type { ReviewRecord } from "@pr-review/schemas";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createDatabaseReviewPublisher } from "#src/record-review";
@@ -13,7 +14,11 @@ const target: ReviewTarget = {
   headSha: "a".repeat(40),
 };
 
-const review: DashboardReview = {
+const review: ReviewRecord = {
+  owner: target.owner,
+  repo: target.repo,
+  prNumber: target.pullRequestNumber,
+  headSha: target.headSha,
   summary: "0 findings",
   durationMs: 1_000,
   inputTokens: 10,

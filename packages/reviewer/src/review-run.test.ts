@@ -36,11 +36,11 @@ import {
   reviewMemorySchema,
   type MemoryShape,
   type ReviewFinding,
+  type ReviewRecord,
 } from "@pr-review/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { titleShape, type MemoryStore } from "#src/memory";
-import type { DashboardReview } from "#src/publish-dashboard";
 import type { PublishReview } from "#src/publish-review";
 import { findingMarker } from "#src/render-review";
 import {
@@ -1272,15 +1272,19 @@ describe("runReview: delivery adapters", () => {
   });
 
   it("mirrors the finished run to the dashboard adapter", async () => {
-    const published: DashboardReview[] = [];
+    const published: ReviewRecord[] = [];
     const { delivery, recorded } = recordingDelivery();
     const { spec } = makeRun([finding]);
 
     const run = await runReview({
       ...spec,
-      delivery: dashboardDelivery(delivery, async (_target, review) => {
-        published.push(review);
-      }),
+      delivery: dashboardDelivery(
+        delivery,
+        async (_target, record) => {
+          published.push(record);
+        },
+        createCapturingLogger().logger,
+      ),
     });
 
     expect(published).toHaveLength(1);

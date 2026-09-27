@@ -8,10 +8,6 @@ export {
   type PublishReviewComments,
 } from "#src/publish-review";
 export {
-  type DashboardReview,
-  type PublishToDashboard,
-} from "#src/publish-dashboard";
-export {
   FIX_COMMIT_MARKER,
   isFixCommit,
   type FixOutcome,
@@ -27,12 +23,12 @@ export {
 } from "#src/validate-patches";
 export {
   dashboardDelivery,
-  dashboardReview,
   githubDelivery,
   recordingDelivery,
   type FinishedReviewRun,
   type GithubDeliveryConfig,
   type PublishReviewRun,
+  type PublishToDashboard,
   type RecordedDelivery,
   type RecordingDelivery,
   type ReviewDelivery,
