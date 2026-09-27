@@ -13,6 +13,8 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import {
+  ChangeDiagramSection,
+  ChangeDiagramSkeleton,
   FindingsFocusProvider,
   FindingsTable,
   ReviewMapSection,
@@ -21,7 +23,7 @@ import {
   ReviewSummaryPanel,
 } from "@/components/review";
 import { PageHeader } from "@/components/shell";
-import { data } from "@/lib/data/server";
+import { data, reviewMapSource } from "@/lib/data/server";
 import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 
@@ -65,6 +67,8 @@ export default async function ReviewDetailPage({ params }: PageProps) {
   if (!review) notFound();
 
   const repoHref = organizationPath(slug, `/repos/${review.repo.owner}/${review.repo.name}`);
+  // Started once, unawaited, so both sections share one graph decode.
+  const mapSource = reviewMapSource(slug, review.id, review.findings, review.risk?.dependents);
 
   return (
     <div className="flex flex-col gap-8">
@@ -101,13 +105,17 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       />
 
       <FindingsFocusProvider>
-        <Suspense fallback={<ReviewMapSkeleton />}>
-          <ReviewMapSection
-            slug={slug}
-            reviewId={review.id}
-            findings={review.findings}
-            dependents={review.risk?.dependents}
+        <Suspense fallback={<ChangeDiagramSkeleton />}>
+          <ChangeDiagramSection
+            source={mapSource}
+            title={`Review · ${review.repo.owner}/${review.repo.name} #${review.prNumber}`}
+            changedFiles={review.changedFiles}
+            findingCount={review.findings.length}
           />
+        </Suspense>
+
+        <Suspense fallback={<ReviewMapSkeleton />}>
+          <ReviewMapSection slug={slug} reviewId={review.id} source={mapSource} />
         </Suspense>
 
         {review.findings.length === 0 ? (

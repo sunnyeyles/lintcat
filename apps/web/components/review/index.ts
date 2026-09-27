@@ -1,3 +1,4 @@
+export { ChangeDiagramSection, ChangeDiagramSkeleton } from "./change-diagram-section";
 export { FindingsFocusProvider } from "./findings-focus";
 export { FindingsTable } from "./findings-table";
 export { ReviewMapSection, ReviewMapSkeleton } from "./review-map-section";
