@@ -1,10 +1,11 @@
 /** Which way a review will be run: the key-backed tool loop, or one client-sampling call. */
 import {
   apiKeyEnvFor,
-  createSamplingAgent,
   MODEL_PROVIDERS,
+  samplingEngine,
+  toolLoopEngine,
+  type ReviewEngine,
 } from "@pr-review/ai";
-import type { ReviewEngine } from "@pr-review/reviewer";
 
 import type { ConnectedClient } from "#src/client-capabilities";
 import { hasModelApiKey, resolveModel, type McpEnvironment } from "#src/environment";
@@ -26,7 +27,10 @@ function noModelAccessMessage(): string {
 
 /** The key-backed engine: the tool-calling agent over the run's model. */
 export function modelReviewEngine(environment: McpEnvironment): SelectedEngine {
-  return { engine: { model: resolveModel(environment).model }, singleShot: false };
+  return {
+    engine: toolLoopEngine({ model: resolveModel(environment).model }),
+    singleShot: false,
+  };
 }
 
 /**
@@ -44,13 +48,7 @@ export function selectReviewEngine(
     throw new Error(noModelAccessMessage());
   }
   return {
-    engine: {
-      createAgent: ({ index }) =>
-        createSamplingAgent({
-          sample: client.sample,
-          ...(index === undefined ? {} : { index }),
-        }),
-    },
+    engine: samplingEngine({ sample: client.sample }),
     singleShot: true,
   };
 }
