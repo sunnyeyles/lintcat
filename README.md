@@ -185,7 +185,8 @@ packages/
 evals/        Fixture repositories and the harness that runs the real
               pipeline against them without touching GitHub
 docs/         index.html — the architecture walkthrough, published to
-              Pages and now also served by apps/web at /docs/walkthrough;
+              Pages; explainer/ — the eight drawn stages shown at
+              /docs/how-it-works, with their storyboard;
               claude/ — how the agent skills read this repo
               (.nojekyll beside it, so Pages serves the file as written)
 scripts/      esbuild bundler for the cli, mcp and worker, and their
@@ -585,13 +586,16 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 
 ## Further reading
 
-- **Propose, refine, decide** — the pipeline traced stage by stage, with a
-  diagram, the file that owns each step, and the failure modes. It lives in the
-  dashboard's documentation at `/docs/walkthrough`
-  ([`apps/web/app/(docs)/`](apps/web/app/(docs))), and the standalone
-  [`docs/index.html`](docs/index.html) still serves the same walkthrough on
-  [Pages](https://sunnyeyles.github.io/pr-review-agents/) until that site has a
-  public URL to retire it to.
+- **How LintCat works** — the pipeline in eight drawn stages, each animated
+  from code with [anidoodle](https://github.com/alexgreensh/anidoodle), at
+  `/docs/how-it-works` ([`apps/web/app/(docs)/`](apps/web/app/(docs))). The
+  storyboard with the file that owns each step is
+  [`docs/explainer/STORYBOARD.md`](docs/explainer/STORYBOARD.md); `pnpm explainer`
+  rebuilds the drawings.
+- **Propose, refine, decide** — the older walkthrough, with a diagram and the
+  failure modes, still served from the standalone
+  [`docs/index.html`](docs/index.html) on
+  [Pages](https://sunnyeyles.github.io/pr-review-agents/).
 - **[Incremental review](docs/incremental-review.md)** — the design behind
   incremental review: where the baseline comes from, every way it widens back
   to a full review, and what recall it costs.

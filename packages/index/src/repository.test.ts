@@ -20,8 +20,8 @@ const SKIPPED = new Set([
   "node_modules",
 ]);
 
-/** The fixtures are other repositories in miniature, and would skew the rate. */
-const FIXTURES = "evals/fixtures/";
+/** Other repositories in miniature (fixtures) or compiled inside another tree (the explainer). */
+const FOREIGN = ["evals/fixtures/", "docs/explainer/src/"];
 
 function readTree(): Map<string, string> {
   const files = new Map<string, string>();
@@ -35,7 +35,7 @@ function readTree(): Map<string, string> {
         walk(`${directory}/${entry.name}`, path);
         continue;
       }
-      if (!entry.isFile() || path.startsWith(FIXTURES)) {
+      if (!entry.isFile() || FOREIGN.some((prefix) => path.startsWith(prefix))) {
         continue;
       }
       try {

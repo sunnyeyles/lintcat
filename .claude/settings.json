@@ -38,5 +38,13 @@
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "alexgreensh-anidoodle": {
+      "source": { "source": "github", "repo": "alexgreensh/anidoodle" }
+    }
+  },
+  "enabledPlugins": {
+    "anidoodle@alexgreensh-anidoodle": true
   }
 }
