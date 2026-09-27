@@ -15,28 +15,27 @@ export type { GroupSlice, LodSearchResult } from "@/lib/codebase-map/lod";
 export { normaliseGraph } from "@/lib/codebase-map/normalise";
 export type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 
-export { neighbourhood, neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
-export type { NeighbourDirection } from "@/lib/codebase-map/neighbourhood";
+export { buildScene } from "@/lib/codebase-map/scene";
+export type { Scene, SceneNode } from "@/lib/codebase-map/scene";
+
+export { neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
+export type { NeighbourDirection, Neighbourhood } from "@/lib/codebase-map/neighbourhood";
 
 export { findingHeat, mapFromSnapshot } from "@/lib/codebase-map/from-snapshot";
 export type { FindingHeat, MapSource, MapSourceFinding } from "@/lib/codebase-map/from-snapshot";
 
-export { heatOf, heatOfPaths } from "@/lib/codebase-map/heat";
-export type { Heat } from "@/lib/codebase-map/heat";
+export { heatOf } from "@/lib/codebase-map/heat";
 
-export { baseName, clusterGraph, groupIdFor } from "@/lib/codebase-map/clustering";
+export { groupIdFor } from "@/lib/codebase-map/clustering";
 export type { Clustering } from "@/lib/codebase-map/clustering";
 
-export { emphasise, EMPHASIS_MARKERS, EMPHASIS_RANK } from "@/lib/codebase-map/emphasis";
-export type { EmphasisLevel } from "@/lib/codebase-map/emphasis";
+export { EMPHASIS_MARKERS } from "@/lib/codebase-map/emphasis";
 
 export { searchFiles } from "@/lib/codebase-map/search";
 export type { SearchResult } from "@/lib/codebase-map/search";
 
 export { navigate } from "@/lib/codebase-map/navigation";
 export type { NavigationAxis } from "@/lib/codebase-map/navigation";
-
-export { groupCentre, seedLayout } from "@/lib/codebase-map/layout";
 
 export { mapStatus } from "@/lib/codebase-map/status";
 export type { MapStatus } from "@/lib/codebase-map/status";

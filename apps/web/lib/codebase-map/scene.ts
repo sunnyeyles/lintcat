@@ -1,23 +1,21 @@
 import {
   baseName,
   clusterGraph,
-  emphasise,
-  EMPHASIS_RANK,
-  heatOf,
-  heatOfPaths,
-  groupCentre,
+  isImpacted,
+  type Clustering,
+  type MapGroup,
+} from "@/lib/codebase-map/clustering";
+import { emphasise, EMPHASIS_MARKERS, groupLevel, type EmphasisLevel } from "@/lib/codebase-map/emphasis";
+import type { FindingHeat } from "@/lib/codebase-map/from-snapshot";
+import { heatOf, heatOfPaths, type Heat } from "@/lib/codebase-map/heat";
+import { groupCentre, seedLayout } from "@/lib/codebase-map/layout";
+import {
   neighbourhood,
-  seedLayout,
-} from "@/lib/codebase-map";
-import type {
-  Clustering,
-  EmphasisLevel,
-  FindingHeat,
-  Heat,
-  MapViewState,
-  NeighbourDirection,
-  NormalisedGraph,
-} from "@/lib/codebase-map";
+  type NeighbourDirection,
+  type Neighbourhood,
+} from "@/lib/codebase-map/neighbourhood";
+import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
+import type { MapFile, MapViewState } from "@/lib/codebase-map/types";
 
 type SceneNodeKind = "file" | "group";
 type EdgeRelation = "base" | "dependency" | "dependent";
@@ -56,6 +54,8 @@ export interface Scene {
   edges: readonly SceneEdge[];
   byId: ReadonlyMap<string, SceneNode>;
   representativeOf: ReadonlyMap<string, string>;
+  /** The focus's neighbourhood, so readers of the scene need not walk the graph again. */
+  neighbourhood: Neighbourhood;
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
@@ -64,8 +64,13 @@ const FILE_RADIUS = 4;
 /** Wider than the module's default so groups read as separate islands rather than one hairball. */
 const LAYOUT = { mapRadius: 3600, groupRadius: 150 } as const;
 
-function lowerRank(a: EmphasisLevel, b: EmphasisLevel): EmphasisLevel {
-  return EMPHASIS_RANK[a] <= EMPHASIS_RANK[b] ? a : b;
+// The only place the hideImpacted overlay applies.
+function impactOverlay(view: MapViewState) {
+  const shown = view.hideImpacted !== true;
+  return {
+    file: (file: MapFile | undefined) => (shown && file !== undefined && isImpacted(file) ? 1 : 0),
+    group: (group: MapGroup) => (shown ? group.impactedCount : 0),
+  };
 }
 
 export function buildScene(
@@ -76,9 +81,9 @@ export function buildScene(
 ): Scene {
   const positions = seedLayout(graph, LAYOUT);
   const clustering = clusterGraph(graph, view);
-  const emphasis = emphasise(graph, view, steps);
   const hood = neighbourhood(graph, view.focusedPath, steps);
-  const showImpacted = view.hideImpacted !== true;
+  const impact = impactOverlay(view);
+  const emphasis = emphasise(graph, view, hood, (file) => impact.file(file) > 0);
 
   const nodes: SceneNode[] = [];
   const byId = new Map<string, SceneNode>();
@@ -88,7 +93,7 @@ export function buildScene(
     if (!group.collapsed) {
       for (const path of group.files) {
         const point = positions.get(path)!;
-        const mark = emphasis.get(path)!;
+        const level = emphasis.get(path)!;
         const file = graph.byPath.get(path);
         const node: SceneNode = {
           id: path,
@@ -98,8 +103,8 @@ export function buildScene(
           x: point.x,
           y: point.y,
           radius: FILE_RADIUS,
-          level: mark.level,
-          marker: mark.marker,
+          level,
+          marker: EMPHASIS_MARKERS[level],
           direction: hood.dependencies.has(path)
             ? hood.dependents.has(path)
               ? "both"
@@ -109,8 +114,7 @@ export function buildScene(
               : null,
           fileCount: 1,
           changedCount: file?.changed === true ? 1 : 0,
-          impactedCount:
-            showImpacted && file?.impacted === true && file.changed !== true ? 1 : 0,
+          impactedCount: impact.file(file),
           heat: heatOf(heat[path]),
         };
         nodes.push(node);
@@ -122,12 +126,10 @@ export function buildScene(
 
     let x = 0;
     let y = 0;
-    let level: EmphasisLevel = "dimmed";
     for (const path of group.files) {
       const point = positions.get(path)!;
       x += point.x;
       y += point.y;
-      level = lowerRank(level, emphasis.get(path)!.level);
       representativeOf.set(path, group.id);
     }
     // A summary has no files to average, so it sits on its group's own seed.
@@ -135,9 +137,7 @@ export function buildScene(
     const centre = empty
       ? groupCentre(group.id, LAYOUT)
       : { x: x / group.files.length, y: y / group.files.length };
-    if (empty) level = group.changedCount > 0 ? "changed" : "context";
-    // A summary's count covers files not here to rank.
-    if (showImpacted && group.impactedCount > 0) level = lowerRank(level, "impacted");
+    const impactedCount = impact.group(group);
     const node: SceneNode = {
       id: group.id,
       kind: "group",
@@ -146,13 +146,13 @@ export function buildScene(
       x: centre.x,
       y: centre.y,
       radius: 7 + Math.sqrt(Math.max(1, group.fileCount)) * 1.6,
-      level,
+      level: groupLevel(group.files, emphasis, group.changedCount, impactedCount),
       // A collapsed group is structure, so it never borrows a file's marker.
       marker: "group",
       direction: null,
       fileCount: group.fileCount,
       changedCount: group.changedCount,
-      impactedCount: showImpacted ? group.impactedCount : 0,
+      impactedCount,
       heat: group.heatCounts ? heatOf(group.heatCounts) : heatOfPaths(heat, group.files),
     };
     nodes.push(node);
@@ -221,6 +221,7 @@ export function buildScene(
     edges,
     byId,
     representativeOf,
+    neighbourhood: hood,
     bounds: { minX, minY, maxX, maxY },
   };
 }

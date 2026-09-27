@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildScene } from "@/components/codebase-map/scene";
-import { initialBounds } from "@/components/codebase-map/view";
-import { EMPHASIS_MARKERS, groupIdFor, normaliseGraph } from "@/lib/codebase-map";
-import type { MapGraph, MapViewState } from "@/lib/codebase-map";
+import { EMPHASIS_MARKERS } from "@/lib/codebase-map/emphasis";
+import { groupIdFor } from "@/lib/codebase-map/clustering";
+import { normaliseGraph, type NormalisedGraph } from "@/lib/codebase-map/normalise";
+import { buildScene } from "@/lib/codebase-map/scene";
+import type { MapGraph, MapViewState } from "@/lib/codebase-map/types";
 
 const GRAPH: MapGraph = {
   files: [
@@ -98,42 +99,6 @@ describe("buildScene", () => {
 
   it("leaves every node cool when no heat is given", () => {
     expect(buildScene(graph, view()).nodes.every((n) => n.heat.band === 0)).toBe(true);
-  });
-});
-
-describe("initialBounds", () => {
-  it("fits the changed files and their neighbours, not the whole map", () => {
-    const expandedGroups = new Set(graph.files.map(groupIdFor));
-    const scene = buildScene(graph, view({ expandedGroups }));
-    const bounds = initialBounds(scene, graph, ["pkg/a/one.ts"]);
-
-    // one.ts plus three.ts and four.ts; two.ts imports nothing and is left out.
-    const inside = (path: string) => {
-      const node = scene.byId.get(path)!;
-      return (
-        node.x >= bounds.minX && node.x <= bounds.maxX && node.y >= bounds.minY && node.y <= bounds.maxY
-      );
-    };
-    expect(inside("pkg/a/one.ts")).toBe(true);
-    expect(inside("pkg/b/three.ts")).toBe(true);
-    expect(inside("pkg/b/four.ts")).toBe(true);
-    expect(bounds).not.toEqual(scene.bounds);
-  });
-
-  it("uses the collapsed group standing in for a changed file", () => {
-    const scene = buildScene(graph, view());
-    const bounds = initialBounds(scene, graph, ["pkg/b/three.ts"]);
-    const group = scene.byId.get("pkg::pkg/b")!;
-
-    expect(bounds.minX).toBeLessThanOrEqual(group.x);
-    expect(bounds.maxX).toBeGreaterThanOrEqual(group.x);
-  });
-
-  it("falls back to the whole scene when nothing changed is in the graph", () => {
-    const scene = buildScene(graph, view());
-
-    expect(initialBounds(scene, graph, [])).toEqual(scene.bounds);
-    expect(initialBounds(scene, graph, ["ghost.ts"])).toEqual(scene.bounds);
   });
 });
 
@@ -252,3 +217,106 @@ describe("buildScene with impacted files", () => {
     expect(shape(plain)).toEqual(shape(buildScene(impacted, view({ hideImpacted: true }))));
   });
 });
+
+describe("buildScene emphasis", () => {
+  const files = normaliseGraph({
+    files: [
+      { path: "src/focus.ts" },
+      { path: "src/uses-focus.ts" },
+      { path: "src/used-by-focus.ts" },
+      { path: "src/far.ts", changed: true },
+      { path: "src/elsewhere.ts" },
+    ],
+    imports: [
+      { from: "src/uses-focus.ts", to: "src/focus.ts" },
+      { from: "src/focus.ts", to: "src/used-by-focus.ts" },
+    ],
+  });
+  const levels = (target: NormalisedGraph, over: Partial<MapViewState> = {}, steps = 1) =>
+    Object.fromEntries(
+      buildScene(target, view({ expandedGroups: new Set(target.files.map(groupIdFor)), ...over }), steps)
+        .nodes.map((node) => [node.id, node.level]),
+    );
+
+  it("gives each level its own non-colour marker", () => {
+    const markers = Object.values(EMPHASIS_MARKERS);
+    const scene = buildScene(files, view({ focusedPath: "src/focus.ts" }));
+
+    expect(new Set(markers).size).toBe(markers.length);
+    expect(scene.byId.get("src/focus.ts")).toMatchObject({ level: "focus", marker: EMPHASIS_MARKERS.focus });
+    expect(scene.byId.get("src/elsewhere.ts")?.marker).toBe(EMPHASIS_MARKERS.dimmed);
+  });
+
+  it("treats an unnarrowed map as context, with changed files still standing out", () => {
+    expect(levels(files)).toEqual({
+      "src/focus.ts": "context",
+      "src/uses-focus.ts": "context",
+      "src/used-by-focus.ts": "context",
+      "src/far.ts": "changed",
+      "src/elsewhere.ts": "context",
+    });
+  });
+
+  it("marks both directions of the focus neighbourhood and dims the rest", () => {
+    expect(levels(files, { focusedPath: "src/focus.ts" })).toEqual({
+      "src/focus.ts": "focus",
+      "src/uses-focus.ts": "neighbour",
+      "src/used-by-focus.ts": "neighbour",
+      "src/far.ts": "changed",
+      "src/elsewhere.ts": "dimmed",
+    });
+  });
+
+  it("keeps search matches out of the dimmed set", () => {
+    expect(levels(files, { focusedPath: "src/focus.ts", query: "elsewhere" })).toMatchObject({
+      "src/elsewhere.ts": "context",
+    });
+  });
+
+  it("dims everything unmatched once a query is typed", () => {
+    expect(levels(files, { query: "focus" })).toEqual({
+      "src/focus.ts": "context",
+      "src/uses-focus.ts": "context",
+      "src/used-by-focus.ts": "context",
+      "src/far.ts": "changed",
+      "src/elsewhere.ts": "dimmed",
+    });
+  });
+
+  it("reaches further when given more steps", () => {
+    const chain = normaliseGraph({
+      files: [{ path: "a.ts" }, { path: "b.ts" }, { path: "c.ts" }],
+      imports: [
+        { from: "a.ts", to: "b.ts" },
+        { from: "b.ts", to: "c.ts" },
+      ],
+    });
+
+    expect(levels(chain, { focusedPath: "a.ts" }, 1)["c.ts"]).toBe("dimmed");
+    expect(levels(chain, { focusedPath: "a.ts" }, 2)["c.ts"]).toBe("neighbour");
+  });
+
+  it("falls back to an unnarrowed map when the focus is unknown", () => {
+    expect(levels(files, { focusedPath: "ghost.ts" })["src/elsewhere.ts"]).toBe("context");
+  });
+});
+
+describe("buildScene neighbourhood", () => {
+  it("exposes the focus's dependencies and dependents", () => {
+    const scene = buildScene(graph, view({ focusedPath: "pkg/a/one.ts" }));
+
+    expect(scene.neighbourhood.focus).toBe("pkg/a/one.ts");
+    expect([...scene.neighbourhood.dependencies.keys()]).toEqual(["pkg/b/three.ts"]);
+    expect([...scene.neighbourhood.dependents.keys()]).toEqual(["pkg/b/four.ts"]);
+  });
+
+  it("is empty with no focus or an unknown one", () => {
+    for (const focusedPath of [null, "ghost.ts"]) {
+      const { neighbourhood } = buildScene(graph, view({ focusedPath }));
+
+      expect(neighbourhood.focus).toBeNull();
+      expect(neighbourhood.dependencies.size + neighbourhood.dependents.size).toBe(0);
+    }
+  });
+});
+

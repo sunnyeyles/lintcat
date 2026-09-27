@@ -4,7 +4,7 @@ import { useCallback, useEffect, useImperativeHandle, useRef, type RefObject } f
 
 import { markerParts } from "@/components/codebase-map/markers";
 import type { MapPalette } from "@/components/codebase-map/palette";
-import type { Scene, SceneNode } from "@/components/codebase-map/scene";
+import type { Scene, SceneNode } from "@/lib/codebase-map";
 import { clampScale, fitView, type MapHandle, type MapView } from "@/components/codebase-map/view";
 
 const LABEL_SCALE = 0.7;
