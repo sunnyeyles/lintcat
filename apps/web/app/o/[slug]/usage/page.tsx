@@ -19,7 +19,7 @@ import {
   TokenCompositionChart,
 } from "@/components/charts";
 import { PageHeader } from "@/components/shell";
-import { ChartCardSkeleton, StatGridSkeleton } from "@/components/ui";
+import { ChartCardSkeleton, StatGridSkeleton, TableCardSkeleton } from "@/components/ui";
 import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
 import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
@@ -56,8 +56,8 @@ function UsageSkeleton() {
       <StatGridSkeleton count={4} />
       <div className="grid min-w-0 grid-cols-1 gap-5">
         <ChartCardSkeleton />
-        <ChartCardSkeleton height={280} />
-        <ChartCardSkeleton height={200} />
+        <ChartCardSkeleton height={280} legend />
+        <TableCardSkeleton rows={5} columns={5} />
       </div>
     </>
   );

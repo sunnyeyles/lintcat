@@ -31,9 +31,9 @@ function TrendsSkeleton() {
     <>
       <StatGridSkeleton count={4} />
       <div className="grid min-w-0 grid-cols-1 gap-5">
+        <ChartCardSkeleton legend />
         <ChartCardSkeleton />
-        <ChartCardSkeleton />
-        <ChartCardSkeleton height={200} />
+        <ChartCardSkeleton kind="bars" legend height={200} />
       </div>
     </>
   );
