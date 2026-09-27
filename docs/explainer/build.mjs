@@ -1,7 +1,8 @@
-// Builds every stage: scaffold the anidoodle engine into .build/, overlay src/, render, verify,
-// and copy the deliverables into apps/web/public/explainer/. Usage: pnpm explainer [stage...]
+// Builds every stage: scaffold the anidoodle engine into .build/, overlay src/, verify, and bundle
+// each drawing into apps/web/public/explainer/ for the page to draw live. Usage: pnpm explainer [stage...]
 import { execFileSync, spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,7 +41,7 @@ if (!existsSync(join(BUILD, "tools/render.mjs"))) {
 }
 cpSync(join(HERE, "src"), join(BUILD, "src"), { recursive: true });
 if (!existsSync(join(BUILD, "node_modules"))) run("npm", ["install", "--no-audit", "--no-fund", "--omit=optional"]);
-// The MP4 needs libx264; Playwright's bundled ffmpeg lacks it, so a static build is fetched into .build.
+// The gate measures dead air on an MP4, which needs libx264; Playwright's bundled ffmpeg lacks it.
 const ffmpegBin = join(BUILD, "node_modules/ffmpeg-static/ffmpeg");
 const ffprobeDir = join(BUILD, "node_modules/ffprobe-static/bin", process.platform, process.arch);
 const needFfmpeg = !process.env.FFMPEG && spawnSync("ffmpeg", ["-version"]).status !== 0;
@@ -50,21 +51,26 @@ if ((needFfmpeg && !existsSync(ffmpegBin)) || (needFfprobe && !existsSync(join(f
 }
 if (needFfmpeg) { process.env.FFMPEG = ffmpegBin; process.env.PATH = `${dirname(ffmpegBin)}:${process.env.PATH}`; }
 if (needFfprobe) process.env.PATH = `${ffprobeDir}:${process.env.PATH}`;
+const { build } = createRequire(join(BUILD, "package.json"))("esbuild");
+const CHECKS = join(BUILD, "out");
 mkdirSync(OUT, { recursive: true });
+mkdirSync(CHECKS, { recursive: true });
 
 const kebab = (s) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
 for (const stage of wanted) {
   const id = kebab(stage), frames = Number(readFileSync(join(HERE, "src/canvas-core", `${stage}.ts`), "utf8").match(/seconds:\s*(\d+)/)?.[1] ?? 8) * 30;
   console.log(`\n=== ${stage} -> ${id}`);
-  const png = STILLS ? join(BUILD, "out", `${id}.png`) : join(OUT, `${id}.png`);
-  const still = capture("node", ["tools/still.mjs", stage, "--frame", String(frames - 1), "--scale", SCALE, "--out", png]);
+  const still = capture("node", ["tools/still.mjs", stage, "--frame", String(frames - 1), "--scale", SCALE, "--out", join(CHECKS, `${id}.png`)]);
   process.stdout.write(still);
   if (!still.includes("reproducible")) throw new Error(`${stage}: still is not reproducible`);
   if (STILLS) continue;
-  run("node", ["tools/render.mjs", stage, "--scale", SCALE, "--out", join(OUT, `${id}.mp4`)]);
-  run("node", ["tools/gate.mjs", stage, "--scale", SCALE, "--mp4", join(OUT, `${id}.mp4`)]);
-  // VP9 for browsers built without H.264 (Chromium on some Linux distributions).
-  run("node", ["tools/render.mjs", stage, "--scale", SCALE, "--out", join(OUT, `${id}.webm`)]);
-  run("node", ["tools/emit.mjs", stage, "--out", join(OUT, `${id}.html`)]);
+  run("node", ["tools/render.mjs", stage, "--scale", SCALE, "--out", join(CHECKS, `${id}.mp4`)]);
+  run("node", ["tools/gate.mjs", stage, "--scale", SCALE, "--mp4", join(CHECKS, `${id}.mp4`)]);
+  const bundle = await build({
+    stdin: { contents: `import { ${stage} } from "./src/canvas-core/${stage}";\nexport default ${stage}.drawing;`, resolveDir: BUILD, loader: "ts" },
+    bundle: true, format: "esm", target: "es2020", minify: true, write: false, legalComments: "none",
+  });
+  writeFileSync(join(OUT, `${id}.js`), bundle.outputFiles[0].text);
+  console.log(`bundled ${id}.js (${(bundle.outputFiles[0].contents.length / 1024).toFixed(1)} KB)`);
 }
 console.log(`\ndone: ${wanted.length} stage(s) in ${OUT}`);

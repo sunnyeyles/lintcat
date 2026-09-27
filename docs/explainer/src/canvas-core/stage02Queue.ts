@@ -25,7 +25,7 @@ const author = (d: PixelDraft) => {
   // 4: the web app pokes the worker
   d.setPass(4);
   box(d, 96, 84, 22, 10, C.ink, C.paper); text(d, 101, 86, "WEB", C.ink);
-  arrow(d, [107, 84], [124, 69], C.teal); text(d, 104, 74, "PING", C.teal);
+  arrow(d, [107, 84], [124, 69], C.teal); text(d, 93, 74, "PING", C.teal);
   // 5: Cloud Scheduler sweeps what a ping missed
   d.setPass(5);
   box(d, 128, 84, 44, 10, C.ink, C.paper); text(d, 131, 86, "SCHEDULER", C.ink);

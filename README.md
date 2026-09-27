@@ -587,7 +587,8 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 ## Further reading
 
 - **How LintCat works** — the pipeline in eight drawn stages, each animated
-  from code with [anidoodle](https://github.com/alexgreensh/anidoodle), at
+  from code with [anidoodle](https://github.com/alexgreensh/anidoodle) and
+  drawn live in the page's light or dark theme, at
   `/docs/how-it-works` ([`apps/web/app/(docs)/`](apps/web/app/(docs))). The
   storyboard with the file that owns each step is
   [`docs/explainer/STORYBOARD.md`](docs/explainer/STORYBOARD.md); `pnpm explainer`

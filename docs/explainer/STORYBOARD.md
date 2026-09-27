@@ -6,7 +6,8 @@ for agents, with the code each stage cites. Read it top to bottom to trace a rev
 stage 5 to see how blast radius is traced.
 
 Kind: explainer. Style: anidoodle `pixelArt` in the LintCat brand palette (the mark is pixel
-art, so the guide character is the mark itself). Shape 16:9, 192 x 108 cells. Silent.
+art, so the guide character is the mark itself). Shape 16:9, 384 x 216 cells (authored in
+192 x 108 design units), in a light and a dark palette. Silent.
 30 fps at 120 bpm, cels held 3 frames, a 1.5 s hold at the end of each stage.
 
 | # | Stage | Caption | Takeaway | What draws itself | The cat | Frames | Cites |

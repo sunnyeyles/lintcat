@@ -32,8 +32,8 @@ const author = (d: PixelDraft) => {
   // 4: the org's model key comes out of the vault
   d.setPass(4);
   row(d, 3, "ORG MODEL KEY");
-  box(d, 96, 65, 14, 11, C.ink, C.shade); fill(d, 102, 68, 2, 4, C.ink); arrow(d, [112, 70], [120, 70], C.teal);
-  disc(d, 125, 70, 2, C.teal); stroke(d, [[127, 70], [136, 70], [136, 73]], C.teal);
+  box(d, 96, 63, 14, 11, C.ink, C.shade); fill(d, 102, 66, 2, 4, C.ink); arrow(d, [112, 68], [120, 68], C.teal);
+  disc(d, 125, 68, 2, C.teal); stroke(d, [[127, 68], [136, 68], [136, 71]], C.teal);
   text(d, 22, 76, "NO KEY? A NEUTRAL 'ADD A KEY' CHECK", C.amber);
   done(d, 3);
   // 5: provider and model

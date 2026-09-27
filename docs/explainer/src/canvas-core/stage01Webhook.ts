@@ -22,7 +22,7 @@ const author = (d: PixelDraft) => {
   // 3: the stencil, Zod over the payload
   d.setPass(3);
   box(d, 102, 37, 14, 13, C.ink, C.shade); fill(d, 105, 40, 3, 2, C.paper); fill(d, 110, 40, 3, 2, C.paper); fill(d, 105, 45, 8, 2, C.paper);
-  text(d, 102, 52, "ZOD", C.ink); text(d, 102, 58, "SHAPE", C.half);
+  text(d, 100, 52, "ZOD", C.ink); text(d, 100, 58, "SHAPE", C.half);
   // 4: the switch, the repo's review mode
   d.setPass(4);
   box(d, 122, 37, 14, 13, C.ink, C.paper); stroke(d, [[124, 40], [124, 47]], C.rule); stroke(d, [[128, 40], [128, 47]], C.teal); stroke(d, [[132, 40], [132, 47]], C.rule);

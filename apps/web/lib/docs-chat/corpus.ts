@@ -146,49 +146,49 @@ After the first review, a new push is reviewed from the commits added since, and
 
 ## 1. GitHub knocks {#stage01-webhook}
 
-Stage 1GitHub knocks[Open the drawing](/explainer/stage01-webhook.html):
+Stage 1GitHub knocks:
 
 GitHub sends a \`pull_request\` event to LintCat’s webhook. The request is checked three ways before anything runs: the HMAC signature over the raw body, the shape of the payload, and the repository’s review mode. A repository set to label is reviewed only when the pull request carries the \`ai-review\` label.
 
 ## 2. One job per head {#stage02-queue}
 
-Stage 2One job per head[Open the drawing](/explainer/stage02-queue.html):
+Stage 2One job per head:
 
 One job is queued per head commit. A newer push to the same pull request supersedes the older job, and a repeat delivery of the same event is a no-op. The web app pings the worker, a scheduler sweeps for anything a ping missed, and the worker claims one job at a time.
 
 ## 3. Lease, token, key {#stage03-boot}
 
-Stage 3Lease, token, key[Open the drawing](/explainer/stage03-boot.html):
+Stage 3Lease, token, key:
 
 Before the first model call the worker renews its lease on a heartbeat, mints a GitHub App installation token, confirms the head has not moved, decrypts your organisation’s model key and picks the provider and model. With no key it posts a neutral check run asking for one, and stops.
 
 ## 4. Only what changed since {#stage04-scope}
 
-Stage 4Only what changed since[Open the drawing](/explainer/stage04-scope.html):
+Stage 4Only what changed since:
 
 The pull request, its changed files and its diff are fetched in parallel. The baseline is the last commit that already carries LintCat’s check run: only files changed since then are reviewed, and any doubt widens the scope back to the whole pull request. Findings nobody resolved are carried forward.
 
 ## 5. Trace the blast radius {#stage05-blast}
 
-Stage 5Trace the blast radius[Open the drawing](/explainer/stage05-blast.html):
+Stage 5Trace the blast radius:
 
 The repository is indexed at the base commit from a single tarball: what each file is, which test covers it, the import graph, cycles and entry points. From every changed file the blast radius walks importers up to three hops out, flags untested sources, broken importers and cycles, and scores the risk from 0 to 100. The score and the graph appear on the check run and on the dashboard.
 
 ## 6. Read, then propose {#stage06-agent}
 
-Stage 6Read, then propose[Open the drawing](/explainer/stage06-agent.html):
+Stage 6Read, then propose:
 
 One reviewer agent receives the repository summary, the index, the imports and the diff, and eight read-only tools for opening files, searching, and finding references. It has at most twelve turns, and its final answer must be JSON that parses. In parallel, reviewer suggestions come from blame at the base commit and CODEOWNERS.
 
 ## 7. Every finding checked {#stage07-check}
 
-Stage 7Every finding checked[Open the drawing](/explainer/stage07-check.html):
+Stage 7Every finding checked:
 
 Everything the model proposed is untrusted until checked. A finding survives only if it has the right shape, stays in its own category, points at a file in the pull request and a line that was added, is confident enough and is not a duplicate; at most ten are kept. A fix is kept only when the lines it replaces match the file at head byte for byte.
 
 ## 8. Post, record, settle {#stage08-publish}
 
-Stage 8Post, record, settle[Open the drawing](/explainer/stage08-publish.html):
+Stage 8Post, record, settle:
 
 Rendering is a pure step with no I/O. Writes go in order: a fast-forward fix commit if fixes are on, then inline comments, then the check run, which is always neutral and never blocks a merge. The review, its findings, the risk and the graph snapshot are recorded for the dashboard, and the job is marked complete, superseded, retried or failed.
 

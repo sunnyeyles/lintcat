@@ -47,7 +47,7 @@ const author = (d: PixelDraft) => {
   d.setPass(1);
   for (const n of NODES) node(d, n, C.ink, n.role === "test" ? C.tealTint : C.paper);
   for (const [a, b] of EDGES) edge(d, a, b, C.half);
-  for (const n of NODES) if (n.role === "entry") { d.begin("pencil"); d.line(n.x + 1, n.y - 2, n.x + 1, n.y - 5, C.teal); d.line(n.x + 2, n.y - 5, n.x + 4, n.y - 4, C.teal); }
+  for (const n of NODES) if (n.role === "entry") { stroke(d, [[n.x + 1, n.y - 2], [n.x + 1, n.y - 5]], C.teal); stroke(d, [[n.x + 2, n.y - 5], [n.x + 4, n.y - 4]], C.teal); }
   // 2: the changed file lights
   d.setPass(2);
   node(d, at("REVIEW-RUN"), C.coralDeep, C.coral, C.white);

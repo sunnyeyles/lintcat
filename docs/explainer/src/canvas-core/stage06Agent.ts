@@ -28,7 +28,7 @@ const author = (d: PixelDraft) => {
   arrow(d, [94, 82], [94, 90], C.ink); card(d, 70, 92, 49, "PARSED JSON", C.ink, C.coralTint);
   // 5: meanwhile, reviewer suggestions from blame and CODEOWNERS
   d.setPass(5);
-  text(d, 6, 86, "MEANWHILE,", C.half); text(d, 6, 92, "REVIEWERS FROM", C.half); text(d, 6, 98, "BLAME+OWNERS", C.half);
+  text(d, 6, 85, "MEANWHILE,", C.half); text(d, 6, 91, "REVIEWERS FROM", C.half); text(d, 6, 97, "BLAME+OWNERS", C.half);
   // 6
   d.setPass(6);
   cat(d, 78, 40, 28, "right");
