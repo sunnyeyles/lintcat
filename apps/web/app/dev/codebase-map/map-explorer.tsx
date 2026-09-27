@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Skeleton } from "@pr-review/design";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { FileDetails } from "@/components/codebase-map/file-details";
 import {
@@ -18,16 +18,10 @@ import { MapLegend } from "@/components/codebase-map/map-legend";
 import { MapSearch } from "@/components/codebase-map/map-search";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
 import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
-import { useMapExplorer } from "@/components/codebase-map/use-map-explorer";
-import { initialBounds } from "@/components/codebase-map/view";
-import { buildScene, mapStatus, normaliseGraph } from "@/lib/codebase-map";
-import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
+import { useMapSession } from "@/components/codebase-map/use-map-session";
 
 const FIXTURES: FixtureKind[] = ["ready", "partial", "no-changes", "empty"];
 const SURFACE = "h-[68vh] min-h-[420px] w-full";
-
-const NO_GRAPH: MapGraph = { files: [], imports: [] };
-const NO_HEAT: FindingHeat = {};
 
 export function MapExplorer() {
   const [size, setSize] = useState<number>(5000);
@@ -39,53 +33,17 @@ export function MapExplorer() {
   const palette = usePalette(host);
   const reducedMotion = usePrefersReducedMotion();
 
-  const map = useMapExplorer(
-    source?.graph ?? NO_GRAPH,
-    source?.heat ?? NO_HEAT,
-    source?.adapter,
-  );
-  const {
-    graph,
-    heat,
-    scene,
-    handleRef,
-    loadedGroups,
-    lod,
-    pending,
-    focusedGroupId,
-    toggleGroup,
-    setFocusedPath,
-    setQuery,
-    setExpandedGroups,
-  } = map;
+  const map = useMapSession(source);
+  const { state, actions, camera } = map;
+  const { graph, scene, status, focusedGroupId } = state;
 
   useEffect(() => {
     setSource(null);
-    setFocusedPath(null);
-    setQuery("");
-    setExpandedGroups(new Set());
     const id = setTimeout(() => setSource(fixtureSource(fixture, size)), 0);
     return () => clearTimeout(id);
-  }, [fixture, size, setFocusedPath, setQuery, setExpandedGroups]);
+  }, [fixture, size]);
 
   const ready = source !== null;
-  const status = useMemo(() => mapStatus(graph), [graph]);
-
-  // Built from the payload the fixture handed over, so expanding never moves the camera.
-  const opening = useMemo(() => {
-    if (!source) return null;
-    const shut = { focusedPath: null, query: "", expandedGroups: new Set<string>() };
-    const first = normaliseGraph(source.graph);
-    return initialBounds(buildScene(first, shut), first, source.changedPaths);
-  }, [source]);
-
-  useEffect(() => {
-    const id = setTimeout(() => {
-      if (opening) handleRef.current?.fitBounds?.(opening);
-      else handleRef.current?.fit();
-    }, 0);
-    return () => clearTimeout(id);
-  }, [handleRef, opening, palette]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -99,13 +57,13 @@ export function MapExplorer() {
         return;
       }
       if (event.key === "Escape" && !typing) {
-        setFocusedPath(null);
-        setQuery("");
+        actions.focus(null);
+        actions.setQuery("");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setFocusedPath, setQuery]);
+  }, [actions]);
 
   return (
     <div className="space-y-4">
@@ -136,35 +94,31 @@ export function MapExplorer() {
           </Button>
         ))}
         <span className="mx-1 h-5 w-px bg-border" />
-        <Button size="sm" variant="secondary" onClick={() => handleRef.current?.fit()}>
+        <Button size="sm" variant="secondary" onClick={camera.fitAll}>
           Fit
         </Button>
         <Button
           size="sm"
           variant="secondary"
-          disabled={opening === null}
-          onClick={() => opening && handleRef.current?.fitBounds?.(opening)}
+          disabled={state.opening === null}
+          onClick={camera.fitOpening}
         >
           Open on the change
         </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => setExpandedGroups(new Set(loadedGroups))}
-        >
+        <Button size="sm" variant="secondary" onClick={actions.expandLoaded}>
           Expand loaded
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => setExpandedGroups(new Set())}>
+        <Button size="sm" variant="secondary" onClick={actions.collapseAll}>
           Reset groups
         </Button>
-        {lod ? (
+        {state.lod ? (
           <span className="text-muted-foreground text-xs" data-testid="lod-mode">
             level of detail
           </span>
         ) : null}
-        {pending.size > 0 ? (
+        {state.pending.size > 0 ? (
           <span className="text-muted-foreground text-xs" role="status">
-            Loading {pending.size} group{pending.size === 1 ? "" : "s"}
+            Loading {state.pending.size} group{state.pending.size === 1 ? "" : "s"}
           </span>
         ) : null}
       </div>
@@ -204,8 +158,8 @@ export function MapExplorer() {
                 scene={scene}
                 palette={palette}
                 reducedMotion={reducedMotion}
-                handleRef={handleRef}
-                onSelect={map.onNodeSelect}
+                handleRef={camera.ref}
+                onSelect={actions.select}
                 onHover={map.onNodeHover}
                 className={`${SURFACE} block`}
               />
@@ -215,7 +169,7 @@ export function MapExplorer() {
           <MapHoverCard hover={map.hover} />
 
           <p className="sr-only" role="status" aria-live="polite">
-            {map.announcement}
+            {state.announcement}
           </p>
         </div>
 
@@ -224,24 +178,24 @@ export function MapExplorer() {
             <>
               <MapSearch
                 files={graph.files}
-                query={map.query}
-                onQueryChange={setQuery}
-                onSelect={map.focusFile}
+                query={state.view.query}
+                onQueryChange={actions.setQuery}
+                onSelect={actions.focusFile}
                 inputRef={searchRef}
-                searcher={lod ? source?.adapter?.search : undefined}
+                searcher={state.lod ? source?.adapter?.search : undefined}
                 fileCount={graph.totalFileCount}
               />
               <FileDetails
                 graph={graph}
-                focusedPath={map.focusedPath}
+                focusedPath={state.view.focusedPath}
                 neighbourhood={scene.neighbourhood}
                 groupId={focusedGroupId}
-                groupCollapsed={map.focusedGroupCollapsed}
-                onSelect={setFocusedPath}
-                onToggleGroup={() => focusedGroupId && toggleGroup(focusedGroupId)}
-                heat={heat}
+                groupCollapsed={state.focusedGroupCollapsed}
+                onSelect={actions.focus}
+                onToggleGroup={actions.toggleFocusedGroup}
+                heat={state.heat}
               />
-              <GroupList clustering={scene.clustering} onToggle={toggleGroup} />
+              <GroupList clustering={scene.clustering} onToggle={actions.toggleGroup} />
             </>
           ) : (
             <div className="space-y-3">
@@ -251,8 +205,8 @@ export function MapExplorer() {
           )}
           <MapLegend
             impacted={
-              map.hasImpacted
-                ? { shown: map.showImpacted, onShownChange: map.setShowImpacted }
+              state.hasImpacted
+                ? { shown: state.view.showImpacted, onShownChange: actions.setShowImpacted }
                 : undefined
             }
           />

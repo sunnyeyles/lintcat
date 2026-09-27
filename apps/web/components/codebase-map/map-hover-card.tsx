@@ -1,4 +1,4 @@
-import type { MapHover } from "@/components/codebase-map/use-map-explorer";
+import type { MapHover } from "@/components/codebase-map/use-map-session";
 
 export function MapHoverCard({ hover }: { hover: MapHover | null }) {
   if (!hover) return null;
