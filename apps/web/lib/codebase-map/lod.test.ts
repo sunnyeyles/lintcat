@@ -2,24 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { clusterGraph, groupIdParts } from "./clustering";
 import { findingHeat, type FindingHeat, type MapSourceFinding } from "./from-snapshot";
-import {
-  DEFAULT_LOD_BUDGET,
-  DEFAULT_LOD_THRESHOLD,
-  groupSlice,
-  lodGraph,
-  mapPayload,
-  resolveLodThreshold,
-  searchGroups,
-} from "./lod";
+import { DEFAULT_LOD_THRESHOLD, lodGraph, resolveLodThreshold } from "./lod";
 import { normaliseGraph } from "./normalise";
+import { mapQuery } from "./query";
 import { sampleRepo } from "./sample";
 import type { MapGraph, MapViewState } from "./types";
 
 const SEED = 7;
 const SHUT: MapViewState = { focusedPath: null, query: "", expandedGroups: new Set() };
-
-/** The stated budget: the first payload at 50k files must fit in this. */
-const BYTE_BUDGET = 900_000;
 
 function heatFor(graph: MapGraph): FindingHeat {
   const findings: MapSourceFinding[] = graph.files
@@ -34,10 +24,6 @@ function sourceOf(fileCount: number) {
   return { graph, heat: heatFor(graph), changedPaths };
 }
 
-function bytesOf(value: unknown): number {
-  return Buffer.byteLength(JSON.stringify(value), "utf8");
-}
-
 describe("resolveLodThreshold", () => {
   it("falls back to the default, then env, then the caller's override", () => {
     expect(resolveLodThreshold(undefined)).toBe(DEFAULT_LOD_THRESHOLD);
@@ -45,23 +31,6 @@ describe("resolveLodThreshold", () => {
     expect(resolveLodThreshold("not a number")).toBe(DEFAULT_LOD_THRESHOLD);
     expect(resolveLodThreshold("120")).toBe(120);
     expect(resolveLodThreshold("120", 7)).toBe(7);
-  });
-});
-
-describe("mapPayload below the threshold", () => {
-  it("hands back the very same graph, heat and changed paths", () => {
-    const source = sourceOf(400);
-    const payload = mapPayload(source, { threshold: DEFAULT_LOD_THRESHOLD });
-
-    expect(payload.mode).toBe("full");
-    expect(payload.graph).toBe(source.graph);
-    expect(payload.heat).toBe(source.heat);
-    expect(payload.changedPaths).toBe(source.changedPaths);
-  });
-
-  it("stays full at exactly the threshold", () => {
-    expect(mapPayload(sourceOf(200), { threshold: 200 }).mode).toBe("full");
-    expect(mapPayload(sourceOf(201), { threshold: 200 }).mode).toBe("lod");
   });
 });
 
@@ -115,35 +84,6 @@ describe("lodGraph", () => {
   });
 });
 
-describe("the 50k payload", () => {
-  const source = sourceOf(50_000);
-  const payload = mapPayload(source, { threshold: DEFAULT_LOD_THRESHOLD });
-  const bytes = bytesOf(payload);
-
-  it("goes level-of-detail", () => {
-    expect(payload.mode).toBe("lod");
-    expect(source.changedPaths.length / 50_000).toBeGreaterThan(0.04);
-  });
-
-  it(`fits in ${BYTE_BUDGET} bytes`, () => {
-    expect(bytes).toBeLessThan(BYTE_BUDGET);
-  });
-
-  it("carries no more files than the budget allows", () => {
-    expect(payload.graph.files.length).toBeLessThanOrEqual(DEFAULT_LOD_BUDGET.openFiles);
-  });
-
-  it("holds its size when the repo doubles", () => {
-    const bigger = mapPayload(sourceOf(100_000), { threshold: DEFAULT_LOD_THRESHOLD });
-
-    expect(bigger.graph.files.length).toBeLessThanOrEqual(DEFAULT_LOD_BUDGET.openFiles);
-    expect(bigger.graph.groupImports!.length).toBe(payload.graph.groupImports!.length);
-    // Twice the repo, and only the summaries' own digits grow.
-    expect(bytesOf(bigger)).toBeLessThan(BYTE_BUDGET);
-    expect(bytesOf(bigger) / bytes).toBeLessThan(1.1);
-  });
-});
-
 describe("lodGraph with impacted files", () => {
   const plain = sourceOf(3000);
   const graph = normaliseGraph({
@@ -165,9 +105,9 @@ describe("lodGraph with impacted files", () => {
   });
 
   it("keeps the flag on the files it sends and on a group fetched later", () => {
-    const held = new Set(lod.files.map((file) => file.path));
     const target = lod.summaries!.find((s) => (s.impactedCount ?? 0) > 0)!;
-    const slice = groupSlice(graph, plain.heat, target.id, held);
+    const source = { graph: undefined, heat: plain.heat, changedPaths: [], normalised: graph };
+    const slice = mapQuery(source).expand(target.id, [])!;
 
     expect(lod.files.some((file) => file.impacted === true)).toBe(true);
     expect(slice.graph.files.filter((f) => f.impacted === true)).toHaveLength(
@@ -181,63 +121,5 @@ describe("lodGraph with impacted files", () => {
     });
 
     expect(bare.summaries!.every((s) => !("impactedCount" in s))).toBe(true);
-  });
-});
-
-describe("groupSlice", () => {
-  const source = sourceOf(3000);
-  const graph = normaliseGraph(source.graph);
-  const lod = lodGraph(graph, source.changedPaths, source.heat, { openFiles: 400 });
-  const held = new Set(lod.files.map((file) => file.path));
-  const target = lod.summaries!.find((s) => s.fileCount > 2)!;
-
-  it("returns every file of the group and nothing else", () => {
-    const slice = groupSlice(graph, source.heat, target.id, held);
-
-    expect(slice.graph.files).toHaveLength(target.fileCount);
-    expect(slice.groupId).toBe(target.id);
-  });
-
-  it("only sends edges both of whose ends the caller will have", () => {
-    const slice = groupSlice(graph, source.heat, target.id, held);
-    const after = new Set([...held, ...slice.graph.files.map((f) => f.path)]);
-
-    for (const edge of slice.graph.imports) {
-      expect(after.has(edge.from) && after.has(edge.to)).toBe(true);
-    }
-  });
-
-  it("carries the findings of the files it sends", () => {
-    const slice = groupSlice(graph, source.heat, target.id, held);
-    for (const [path, counts] of Object.entries(slice.heat)) {
-      expect(counts).toEqual(source.heat[path]);
-    }
-  });
-
-  it("is empty for a group that does not exist", () => {
-    expect(groupSlice(graph, source.heat, "nope::nowhere").graph.files).toEqual([]);
-  });
-});
-
-describe("searchGroups", () => {
-  const source = sourceOf(3000);
-  const graph = normaliseGraph(source.graph);
-
-  it("finds a file the level-of-detail payload left out, and names its group", () => {
-    const lod = lodGraph(graph, source.changedPaths, source.heat, { openFiles: 200 });
-    const sent = new Set(lod.files.map((file) => file.path));
-    const hidden = graph.files.find((file) => !sent.has(file.path))!;
-
-    const results = searchGroups(graph, hidden.path, 20);
-    const hit = results.find((r) => r.path === hidden.path)!;
-
-    expect(hit).toBeDefined();
-    expect(lod.summaries!.some((s) => s.id === hit.groupId)).toBe(true);
-  });
-
-  it("honours the limit and the shared ranking", () => {
-    const results = searchGroups(graph, "session", 5);
-    expect(results).toHaveLength(5);
-    expect(results.map((r) => r.rank)).toEqual([...results.map((r) => r.rank)].sort());
   });
 });

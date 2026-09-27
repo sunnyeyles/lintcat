@@ -100,7 +100,7 @@ const memberEventSchema = z.object({
   action: z.string(),
   organization: payloadOrganizationSchema.optional(),
   member: payloadUserSchema.nullable(),
-  repository: z.object({ id: z.number() }).optional(),
+  repository: z.object({ id: z.number(), owner: payloadOrganizationSchema.optional() }).optional(),
 });
 
 const repositoryEventSchema = z.object({
@@ -198,7 +198,8 @@ function dispatch(
             deps,
             event,
             data.action,
-            data.organization,
+            // A personal account's repo has no organization; its owner is the account.
+            event === "member" ? (data.organization ?? data.repository?.owner) : data.organization,
             data.member,
             event === "member" ? data.repository : undefined,
           ),
@@ -376,10 +377,10 @@ async function onMemberChanged(
   const decision = await lookupMembership(deps.github, installed, account);
   const repo = payloadRepository && (await findRepoByGithubId(deps.database, payloadRepository.id));
   const tracked = repo && repo.organizationId === organization.id && !repo.removedAt;
-  const permission =
-    tracked && decision.action === "grant"
-      ? await lookupRepoPermission(deps.github, organization, repo, account)
-      : undefined;
+  // Asked whatever the membership: an outside collaborator holds the repo without one.
+  const permission = tracked
+    ? await lookupRepoPermission(deps.github, organization, repo, account)
+    : undefined;
   await deps.database.transaction(async (tx) => {
     const txDeps = { ...deps, database: tx };
     await applyMembership(txDeps, organization, { account, decision }, source);
@@ -524,7 +525,7 @@ async function listReaders(
   fields: Record<string, unknown>,
 ): Promise<{ githubId: number; permission: RepoPermission }[] | undefined> {
   const installed = installedAccount(organization);
-  if (!installed || organization.suspendedAt || installed.accountType === "user") return undefined;
+  if (!installed || organization.suspendedAt) return undefined;
   try {
     const listed = await deps.github.listRepositoryCollaborators(
       installed.installationId,

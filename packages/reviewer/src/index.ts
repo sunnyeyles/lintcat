@@ -7,7 +7,6 @@ export {
   type ReviewPipelineResult,
 } from "#src/review-pipeline";
 export {
-  type PipelineRunnerDeps,
   type ReviewClient,
   type ReviewPipelineRun,
   type RunReviewPipeline,
@@ -57,9 +56,6 @@ export {
 } from "#src/review-delivery";
 export {
   runReview,
-  type CreateReviewAgent,
-  type ReviewAgentRequest,
-  type ReviewEngine,
   type ReviewMemory,
   type ReviewPolicy,
   type ReviewRunSpec,

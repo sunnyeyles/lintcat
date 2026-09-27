@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { MapAdapter } from "@/components/codebase-map/adapter";
 import { MapSession, type MapSessionSource } from "@/components/codebase-map/map-session";
-import { groupSlice, mapPayload, normaliseGraph } from "@/lib/codebase-map";
+import { mapQuery } from "@/lib/codebase-map";
 import type { GroupSlice, MapGraph } from "@/lib/codebase-map";
 
 const B = "pkg::pkg/b";
@@ -34,22 +34,22 @@ interface Deferred {
 
 // Serves real slices of REPO, but only when the test says so.
 function heldAdapter() {
-  const whole = normaliseGraph(REPO);
+  const query = mapQuery(FULL);
   const requests: Deferred[] = [];
   const adapter: MapAdapter = {
     expandGroup: vi.fn(
       (groupId: string) =>
         new Promise<GroupSlice>((resolve, reject) => {
-          requests.push({ groupId, resolve: () => resolve(groupSlice(whole, {}, groupId)), reject });
+          requests.push({ groupId, resolve: () => resolve(query.expand(groupId, []) as GroupSlice), reject });
         }),
     ),
-    search: async () => [],
+    search: async () => ({ results: [], totalFileCount: 0 }),
   };
   return { adapter, requests };
 }
 
 function lodSource(adapter: MapAdapter): MapSessionSource {
-  const payload = mapPayload(FULL, { threshold: 0 });
+  const payload = mapQuery(FULL).first({ threshold: 0 });
   return { graph: payload.graph, heat: payload.heat, changedPaths: payload.changedPaths, adapter };
 }
 

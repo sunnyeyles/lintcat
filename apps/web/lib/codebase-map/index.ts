@@ -2,15 +2,11 @@ export type { MapFile, MapGraph, MapViewState } from "@/lib/codebase-map/types";
 
 export { expandGroup } from "@/lib/codebase-map/merge";
 
-export {
-  groupSlice,
-  lodGraph,
-  mapPayload,
-  pathsInGroups,
-  resolveLodThreshold,
-  searchGroups,
-} from "@/lib/codebase-map/lod";
+export { resolveLodThreshold } from "@/lib/codebase-map/lod";
 export type { GroupSlice, LodSearchResult } from "@/lib/codebase-map/lod";
+
+export { mapQuery, SEARCH_LIMIT } from "@/lib/codebase-map/query";
+export type { MapQuery, MapSearchAnswer } from "@/lib/codebase-map/query";
 
 export { normaliseGraph } from "@/lib/codebase-map/normalise";
 export type { NormalisedGraph } from "@/lib/codebase-map/normalise";
@@ -41,3 +37,11 @@ export { mapStatus } from "@/lib/codebase-map/status";
 export type { MapStatus } from "@/lib/codebase-map/status";
 
 export { sampleRepo } from "@/lib/codebase-map/sample";
+
+export { changeDiagram } from "@/lib/codebase-map/change-diagram";
+export type {
+  ChangeDiagram,
+  DiagramBox,
+  DiagramEdge,
+  DiagramNode,
+} from "@/lib/codebase-map/change-diagram";

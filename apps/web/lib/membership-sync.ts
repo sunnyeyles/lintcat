@@ -143,7 +143,8 @@ export async function applyMembership(
     return;
   }
   const removed = await deleteMembership(database, organization.id, account.githubId);
-  await deleteOrganizationRepoAccess(database, organization.id, account.githubId);
+  // A non-member's rows are collaborator grants, which the membership never gave.
+  if (removed) await deleteOrganizationRepoAccess(database, organization.id, account.githubId);
   logger.info("membership.revoked", { ...fields, removed });
 }
 

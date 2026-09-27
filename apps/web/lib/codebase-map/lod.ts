@@ -1,8 +1,8 @@
 import { CLOSED_VIEW, clusterGraph, groupIdFor, type MapGroup } from "@/lib/codebase-map/clustering";
-import type { FindingHeat, MapSource } from "@/lib/codebase-map/from-snapshot";
+import type { FindingHeat } from "@/lib/codebase-map/from-snapshot";
 import { sumHeat } from "@/lib/codebase-map/heat";
 import { neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
-import { normaliseGraph, type NormalisedGraph } from "@/lib/codebase-map/normalise";
+import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 import { searchFiles, type SearchResult } from "@/lib/codebase-map/search";
 import type { GroupImport, GroupSummary, MapGraph } from "@/lib/codebase-map/types";
 
@@ -16,15 +16,6 @@ export interface LodOptions {
   threshold?: number;
   openFiles?: number;
   groupImports?: number;
-}
-
-type MapMode = "full" | "lod";
-
-export interface MapPayload {
-  mode: MapMode;
-  graph: MapGraph;
-  heat: FindingHeat;
-  changedPaths: readonly string[];
 }
 
 /** Env wins over the default; an option wins over both. */
@@ -129,36 +120,6 @@ export function lodGraph(
     summaries,
     groupImports,
     totalFileCount: graph.files.length,
-  };
-}
-
-/** Below the threshold the source is passed through untouched. */
-export function mapPayload(source: MapSource, options: LodOptions = {}): MapPayload {
-  const threshold = options.threshold ?? DEFAULT_LOD_THRESHOLD;
-  if (!source.graph || source.graph.files.length <= threshold) {
-    return {
-      mode: "full",
-      graph: source.graph ?? { files: [], imports: [] },
-      heat: source.heat,
-      changedPaths: source.changedPaths,
-    };
-  }
-
-  const graph = normaliseGraph(source.graph);
-  const lod = lodGraph(graph, source.changedPaths, source.heat, options);
-  const kept = new Set(lod.files.map((file) => file.path));
-
-  const heat: FindingHeat = {};
-  for (const path of kept) {
-    const counts = source.heat[path];
-    if (counts) heat[path] = counts;
-  }
-
-  return {
-    mode: "lod",
-    graph: lod,
-    heat,
-    changedPaths: source.changedPaths.filter((path) => kept.has(path)),
   };
 }
 
