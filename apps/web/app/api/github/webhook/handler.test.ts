@@ -75,6 +75,9 @@ const github: GithubAppClient = {
   async createInstallationToken() {
     throw new Error("the webhook never mints a token");
   },
+  async findUserInstallation() {
+    throw new Error("the webhook never looks up an installation");
+  },
   async getInstallation() {
     throw new Error("the webhook never reads the installation");
   },

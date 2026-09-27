@@ -38,6 +38,8 @@ export interface AppInstallation {
 export interface GithubAppClient {
   /** The installation as GitHub records it; read with the App's JWT, not an installation token. */
   getInstallation(installationId: number): Promise<AppInstallation>;
+  /** The App's installation on `username`'s personal account, or null when there is none. */
+  findUserInstallation(username: string): Promise<AppInstallation | null>;
   /** A newly minted installation token; the caller holds it in memory for one job only. */
   createInstallationToken(installationId: number): Promise<string>;
   listInstallationRepositories(
@@ -80,6 +82,7 @@ export interface AppOctokitLike {
     apps: {
       listReposAccessibleToInstallation: unknown;
       getInstallation(params: { installation_id: number }): Promise<{ data: unknown }>;
+      getUserInstallation(params: { username: string }): Promise<{ data: unknown }>;
     };
     orgs: {
       listMembers: unknown;
@@ -99,8 +102,8 @@ export interface AppOctokitLike {
   };
 }
 
-/** Resolves the Octokit authenticated for one installation. */
-export type InstallationOctokit = (installationId: number) => AppOctokitLike;
+/** Resolves the Octokit authenticated for one installation, or as the App itself when omitted. */
+export type InstallationOctokit = (installationId?: number) => AppOctokitLike;
 
 const PERMISSIONS: readonly RepositoryPermission[] = [
   "admin",
@@ -185,6 +188,15 @@ const installationSchema = z.object({
   suspended_at: z.string().nullish(),
 });
 
+function toAppInstallation(data: unknown): AppInstallation {
+  const parsed = installationSchema.parse(data);
+  return {
+    id: parsed.id,
+    account: parsed.account,
+    suspendedAt: parsed.suspended_at ? new Date(parsed.suspended_at) : null,
+  };
+}
+
 /** Wraps per-installation Octokits in the App client; authentication is the caller's only job. */
 export function createAppClient(installation: InstallationOctokit): GithubAppClient {
   return {
@@ -192,12 +204,18 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
       const { data } = await installation(installationId).rest.apps.getInstallation({
         installation_id: installationId,
       });
-      const parsed = installationSchema.parse(data);
-      return {
-        id: parsed.id,
-        account: parsed.account,
-        suspendedAt: parsed.suspended_at ? new Date(parsed.suspended_at) : null,
-      };
+      return toAppInstallation(data);
+    },
+
+    async findUserInstallation(username) {
+      let data: unknown;
+      try {
+        ({ data } = await installation().rest.apps.getUserInstallation({ username }));
+      } catch (error) {
+        if (httpStatus(error) === 404) return null;
+        throw error;
+      }
+      return toAppInstallation(data);
     },
 
     async createInstallationToken(installationId) {
@@ -308,7 +326,7 @@ export function createAppClient(installation: InstallationOctokit): GithubAppCli
 
 /** Signs a JWT as the App; each installation's token is cached and refreshed by its Octokit. */
 export function createGithubAppClient(config: GithubAppConfig): GithubAppClient {
-  const clients = new Map<number, AppOctokitLike>();
+  const clients = new Map<number | undefined, AppOctokitLike>();
   return createAppClient((installationId) => {
     let octokit = clients.get(installationId);
     if (!octokit) {

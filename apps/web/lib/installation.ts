@@ -135,3 +135,14 @@ export async function completeSetup(
     ? { status: "member", slug: organization.slug }
     : { status: "not_member", slug: organization.slug, accountType: organization.accountType };
 }
+
+/** Mirrors the user's personal installation when both the webhook and the setup redirect missed it. */
+export async function recoverPersonalInstallation(
+  deps: InstallationDeps,
+  account: GithubAccount,
+): Promise<SetupResult | undefined> {
+  const found = await deps.github.findUserInstallation(account.login);
+  // A login can have changed hands; only the id identifies the user.
+  if (!found || found.account.id !== account.githubId) return undefined;
+  return completeSetup(deps, found.id, account);
+}

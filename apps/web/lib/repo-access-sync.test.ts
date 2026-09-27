@@ -52,6 +52,9 @@ const github: GithubAppClient = {
   async listRepositoryCollaborators() {
     throw new Error("sign-in never lists collaborators");
   },
+  async findUserInstallation() {
+    throw new Error("sign-in never looks up an installation");
+  },
   async getInstallation() {
     throw new Error("sign-in never reads the installation");
   },

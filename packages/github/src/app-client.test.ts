@@ -13,6 +13,7 @@ const installationId = 4242;
 
 interface StubRoutes {
   installation?: unknown;
+  userInstallation?: unknown;
   repositories?: unknown[];
   members?: Record<"admin" | "all", unknown[]>;
   membership?: unknown;
@@ -50,6 +51,10 @@ function stub(routes: StubRoutes) {
     if (routes.installation === undefined) throw notFound();
     return { data: routes.installation };
   });
+  const getUserInstallation = vi.fn(async (_params: { username: string }) => {
+    if (routes.userInstallation === undefined) throw notFound();
+    return { data: routes.userInstallation };
+  });
   const auth = vi.fn(async (_options: { type: "installation"; refresh?: boolean }) => {
     if (routes.token === undefined) throw notFound();
     return { type: "token", tokenType: "installation", token: routes.token };
@@ -58,13 +63,19 @@ function stub(routes: StubRoutes) {
     auth,
     paginate,
     rest: {
-      apps: { listReposAccessibleToInstallation: listRepos, getInstallation },
+      apps: { listReposAccessibleToInstallation: listRepos, getInstallation, getUserInstallation },
       orgs: { listMembers, getMembershipForUser },
       repos: { listCollaborators, getCollaboratorPermissionLevel },
     },
   };
   const installation = vi.fn(() => octokit);
-  return { client: createAppClient(installation), installation, paginate, auth };
+  return {
+    client: createAppClient(installation),
+    installation,
+    paginate,
+    auth,
+    getUserInstallation,
+  };
 }
 
 function collaborator(
@@ -93,6 +104,29 @@ describe("getInstallation", () => {
   it("rejects a response without an account", async () => {
     const { client } = stub({ installation: { id: installationId } });
     await expect(client.getInstallation(installationId)).rejects.toThrow();
+  });
+});
+
+describe("findUserInstallation", () => {
+  it("returns the personal account's installation, asked as the App", async () => {
+    const { client, installation, getUserInstallation } = stub({
+      userInstallation: {
+        id: installationId,
+        account: { id: 9, login: "octocat", type: "User" },
+        suspended_at: null,
+      },
+    });
+    await expect(client.findUserInstallation("octocat")).resolves.toEqual({
+      id: installationId,
+      account: { id: 9, login: "octocat", type: "User" },
+      suspendedAt: null,
+    });
+    expect(installation).toHaveBeenCalledWith();
+    expect(getUserInstallation).toHaveBeenCalledWith({ username: "octocat" });
+  });
+
+  it("returns null when the App is not installed there", async () => {
+    await expect(stub({}).client.findUserInstallation("stranger")).resolves.toBeNull();
   });
 });
 
@@ -226,7 +260,11 @@ describe("getOrganizationMembership", () => {
       auth: async () => ({}),
       paginate: async () => [],
       rest: {
-        apps: { listReposAccessibleToInstallation: null, getInstallation: async () => ({ data: null }) },
+        apps: {
+          listReposAccessibleToInstallation: null,
+          getInstallation: async () => ({ data: null }),
+          getUserInstallation: async () => ({ data: null }),
+        },
         orgs: {
           listMembers: null,
           getMembershipForUser: async () => {

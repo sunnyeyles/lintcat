@@ -10,7 +10,12 @@ import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging
 import { asc, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { completeSetup, installOrganization, setupRequest } from "@/lib/installation";
+import {
+  completeSetup,
+  installOrganization,
+  recoverPersonalInstallation,
+  setupRequest,
+} from "@/lib/installation";
 
 const INSTALLATION_ID = 555;
 const ACCOUNT_ID = 1_000;
@@ -37,6 +42,7 @@ const hubot: OrganizationMember = {
 
 let database: Database;
 let installation: AppInstallation;
+let userInstallation: AppInstallation | null;
 let members: OrganizationMember[];
 let repoLookupFails: boolean;
 let log: CapturedLogEvent[];
@@ -44,6 +50,9 @@ let log: CapturedLogEvent[];
 const github: GithubAppClient = {
   async createInstallationToken() {
     throw new Error("installing never mints a token");
+  },
+  async findUserInstallation() {
+    return userInstallation;
   },
   async getInstallation(installationId) {
     expect(installationId).toBe(INSTALLATION_ID);
@@ -75,6 +84,7 @@ beforeEach(async () => {
     suspendedAt: null,
   };
   members = [octocat, hubot];
+  userInstallation = null;
   repoLookupFails = false;
   log = [];
 });
@@ -191,5 +201,35 @@ describe("completeSetup", () => {
     const result = await completeSetup(deps(), INSTALLATION_ID, account(hubot));
 
     expect(result).toEqual({ status: "member", slug: "acme" });
+  });
+});
+
+describe("recoverPersonalInstallation", () => {
+  beforeEach(() => {
+    installation = {
+      id: INSTALLATION_ID,
+      account: { id: octocat.id, login: "octocat", type: "User" },
+      suspendedAt: null,
+    };
+  });
+
+  it("mirrors a personal installation that no webhook or redirect delivered", async () => {
+    userInstallation = installation;
+    await expect(recoverPersonalInstallation(deps(), account(octocat))).resolves.toEqual({
+      status: "member",
+      slug: "octocat",
+    });
+    expect(await counts()).toEqual({ organizations: 1, repos: 1, memberships: 1 });
+  });
+
+  it("does nothing when the App is not installed on the user", async () => {
+    await expect(recoverPersonalInstallation(deps(), account(octocat))).resolves.toBeUndefined();
+    expect(await counts()).toEqual({ organizations: 0, repos: 0, memberships: 0 });
+  });
+
+  it("ignores an installation on an account that now belongs to someone else", async () => {
+    userInstallation = { ...installation, account: { ...installation.account, id: 42 } };
+    await expect(recoverPersonalInstallation(deps(), account(octocat))).resolves.toBeUndefined();
+    expect(await counts()).toEqual({ organizations: 0, repos: 0, memberships: 0 });
   });
 });
