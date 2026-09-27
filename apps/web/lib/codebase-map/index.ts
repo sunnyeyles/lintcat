@@ -42,3 +42,11 @@ export { mapStatus } from "@/lib/codebase-map/status";
 export type { MapStatus } from "@/lib/codebase-map/status";
 
 export { sampleRepo } from "@/lib/codebase-map/sample";
+
+export { changeDiagram } from "@/lib/codebase-map/change-diagram";
+export type {
+  ChangeDiagram,
+  DiagramBox,
+  DiagramEdge,
+  DiagramNode,
+} from "@/lib/codebase-map/change-diagram";
