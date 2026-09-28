@@ -2,7 +2,7 @@
  * What each fixture must produce: category and location, never wording.
  * Locations anchor to source markers, which must match exactly one line.
  */
-import type { ReviewFinding } from "@pr-review/schemas";
+import { evidenceLabel, isConventionCount, type ReviewFinding } from "@pr-review/schemas";
 
 import type { LoadedFixture } from "#src/fixture";
 import type { FixtureReview } from "#src/run-fixture-review";
@@ -112,7 +112,9 @@ export function resolveCitation(
 
 function cites(finding: ReviewFinding, lines: readonly { file: string; line: number }[]): boolean {
   return (finding.evidence ?? []).some((entry) =>
-    lines.some((cited) => cited.file === entry.file && cited.line === entry.line),
+    lines.some(
+      (cited) => !isConventionCount(entry) && cited.file === entry.file && cited.line === entry.line,
+    ),
   );
 }
 
@@ -130,7 +132,7 @@ function inAnchor(finding: ReviewFinding, anchor: ResolvedAnchor): boolean {
 /** One finding rendered for a failure message. */
 function describeFinding(finding: ReviewFinding): string {
   const at = finding.line === undefined ? finding.file : `${finding.file}:${finding.line}`;
-  const evidence = (finding.evidence ?? []).map((entry) => `${entry.file}:${entry.line}`);
+  const evidence = (finding.evidence ?? []).map(evidenceLabel);
   return (
     `- [${finding.category}/${finding.severity}/confidence ${finding.confidence}] ` +
     `${at} — ${finding.title}` +
