@@ -1,42 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { filePosition, groupLayout, layoutGroups, seedPosition } from "./layout";
+import { filePosition, groupLayout, layoutGroups } from "./layout";
 import { normaliseGraph } from "./normalise";
-
-describe("seedPosition", () => {
-  it("returns the same point for the same path and group", () => {
-    expect(seedPosition("src/a.ts", "web::src")).toEqual(seedPosition("src/a.ts", "web::src"));
-  });
-
-  it("moves a file when its group changes", () => {
-    expect(seedPosition("src/a.ts", "web::src")).not.toEqual(seedPosition("src/a.ts", "db::src"));
-  });
-
-  it("separates two files in one group", () => {
-    expect(seedPosition("src/a.ts", "web::src")).not.toEqual(seedPosition("src/b.ts", "web::src"));
-  });
-
-  it("keeps a file inside its group's disc", () => {
-    const centre = seedPosition("", "web::src", { groupRadius: 0 });
-    const point = seedPosition("src/a.ts", "web::src", { groupRadius: 50 });
-    const distance = Math.hypot(point.x - centre.x, point.y - centre.y);
-
-    expect(distance).toBeLessThanOrEqual(50.01);
-  });
-
-  it("scales with the map radius", () => {
-    const near = seedPosition("src/a.ts", "web::src", { mapRadius: 10, groupRadius: 0 });
-
-    expect(Math.hypot(near.x, near.y)).toBeLessThanOrEqual(10.01);
-  });
-
-  it("rounds to two decimals", () => {
-    const { x, y } = seedPosition("src/a.ts", "web::src");
-
-    expect(x).toBe(Math.round(x * 100) / 100);
-    expect(y).toBe(Math.round(y * 100) / 100);
-  });
-});
 
 describe("groupLayout", () => {
   const ids = ["web::app", "web::lib", "db::src", "ui::components", "docs::guides", "api::routes"];

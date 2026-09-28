@@ -86,12 +86,13 @@ describe("lodGraph", () => {
 
 describe("lodGraph with impacted files", () => {
   const plain = sourceOf(3000);
-  const graph = normaliseGraph({
+  const flagged = {
     ...plain.graph,
     files: plain.graph.files.map((file, i) =>
       i % 9 === 0 && file.changed !== true ? { ...file, impacted: true } : file,
     ),
-  });
+  };
+  const graph = normaliseGraph(flagged);
   const lod = lodGraph(graph, plain.changedPaths, plain.heat, { openFiles: 400 });
 
   it("gives each summary the group's impacted count", () => {
@@ -106,7 +107,7 @@ describe("lodGraph with impacted files", () => {
 
   it("keeps the flag on the files it sends and on a group fetched later", () => {
     const target = lod.summaries!.find((s) => (s.impactedCount ?? 0) > 0)!;
-    const source = { graph: undefined, heat: plain.heat, changedPaths: [], normalised: graph };
+    const source = { graph: flagged, heat: plain.heat, changedPaths: [] };
     const slice = mapQuery(source).expand(target.id, [])!;
 
     expect(lod.files.some((file) => file.impacted === true)).toBe(true);

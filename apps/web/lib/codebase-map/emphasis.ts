@@ -81,7 +81,7 @@ export function groupLevel(
 ): EmphasisLevel {
   let level: EmphasisLevel = "dimmed";
   for (const path of files) level = lowerRank(level, emphasis.get(path)!);
-  if (files.length === 0) level = changedCount > 0 ? "changed" : "context";
+  if (files.length === 0) level = "context";
   // A summary's counts cover files not here to rank.
   if (changedCount > 0) level = lowerRank(level, "changed");
   if (reachedCount > 0) level = lowerRank(level, "reached");

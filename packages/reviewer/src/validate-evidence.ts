@@ -7,6 +7,7 @@ import {
   type RepositoryIndex,
 } from "@pr-review/index";
 import {
+  evidenceLabel,
   isConventionCount,
   type ConventionCountEvidence,
   type FindingEvidence,
@@ -40,14 +41,11 @@ function countFor(
   );
 }
 
-/** Why an entry cannot stand as evidence, or undefined when it can. */
+/** Why a line entry cannot stand as evidence, or undefined when it can. */
 export function evidenceProblem(
-  entry: FindingEvidence,
+  entry: Exclude<FindingEvidence, ConventionCountEvidence>,
   base: EvidenceBase,
-): "changed-file" | "missing-file" | "line-out-of-range" | "not-counted" | undefined {
-  if (isConventionCount(entry)) {
-    return countFor(entry, base) === undefined ? "not-counted" : undefined;
-  }
+): "changed-file" | "missing-file" | "line-out-of-range" | undefined {
   if (base.changedPaths.has(entry.file)) {
     return "changed-file";
   }
@@ -75,9 +73,9 @@ function verifiedEntry(entry: FindingEvidence, base: EvidenceBase): FindingEvide
 }
 
 function evidenceKey(entry: FindingEvidence): string {
-  return isConventionCount(entry)
-    ? `${entry.convention} count for ${entry.file}`
-    : `${entry.file}:${entry.line}`;
+  return evidenceLabel(
+    isConventionCount(entry) ? { convention: entry.convention, file: entry.file } : entry,
+  );
 }
 
 /** The finding with only its checkable, distinct evidence, capped at MAX_EVIDENCE. */

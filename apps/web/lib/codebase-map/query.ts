@@ -41,7 +41,7 @@ const NO_GRAPH: MapGraph = { files: [], imports: [] };
 
 /** Every answer a map asks of its source; the graph is normalised once, on first use. */
 export function mapQuery(source: MapSource): MapQuery {
-  let normalised = source.normalised;
+  let normalised: NormalisedGraph | undefined;
   let reach: ReadonlyMap<string, number> | undefined;
   const graph = (): NormalisedGraph => (normalised ??= normaliseGraph(source.graph ?? NO_GRAPH));
 

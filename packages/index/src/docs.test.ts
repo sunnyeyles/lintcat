@@ -29,11 +29,12 @@ describe("readDoc", () => {
   const doc = readDoc("docs/runbook.md", RUNBOOK);
 
   it("records headings with GitHub's anchors, duplicates suffixed", () => {
-    expect(doc.headings).toEqual([
-      { text: "Runbook — notify-worker", anchor: "runbook--notify-worker", line: 1 },
-      { text: "The endpoint is flapping", anchor: "the-endpoint-is-flapping", line: 3 },
-      { text: "The endpoint is flapping", anchor: "the-endpoint-is-flapping-1", line: 13 },
-      { text: "Setext heading", anchor: "setext-heading", line: 15 },
+    expect(doc.anchors).toEqual([
+      "runbook--notify-worker",
+      "the-endpoint-is-flapping",
+      "the-endpoint-is-flapping-1",
+      "setext-heading",
+      "manual-anchor",
     ]);
   });
 

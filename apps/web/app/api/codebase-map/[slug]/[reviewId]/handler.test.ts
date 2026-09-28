@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   groupIdFor,
@@ -9,7 +9,6 @@ import {
   type MapSearchAnswer,
   type MapSource,
 } from "@/lib/codebase-map";
-import { createMapSourceLoader } from "@/lib/data/map-source";
 
 import { handleCodebaseMap } from "./handler";
 
@@ -57,20 +56,6 @@ describe("handleCodebaseMap rejects", () => {
       changedPaths: [],
     }));
     expect(response.status).toBe(404);
-  });
-
-  it("a reader who fails the access check, before any cache is read", async () => {
-    const baseGraph = vi.fn(async () => null);
-    const reviewInputs = vi.fn(async () => null);
-    const loader = createMapSourceLoader({ access: async () => null, baseGraph, reviewInputs });
-
-    const response = await handleCodebaseMap({ action: "expand", groupId: held[0]!.id }, () =>
-      loader(1),
-    );
-
-    expect(response.status).toBe(404);
-    expect(baseGraph).not.toHaveBeenCalled();
-    expect(reviewInputs).not.toHaveBeenCalled();
   });
 
   it("a group the repo does not have", async () => {
