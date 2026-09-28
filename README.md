@@ -19,7 +19,7 @@ one of these categories:
 | **pattern** | a re-implemented helper, a bypassed layer, a hand-rolled version of an established construct |
 | **docs** | documentation or a code comment this change made false, and a doc link the change adds to a file or heading that does not exist |
 | **style** | a structural habit the neighbouring files share and no formatter or linter enforces: export style, error shape, module layout |
-| **config** | a setting, env var or dependency added differently from the ones already there |
+| **config** | a setting, env var or dependency added differently from the ones already there: an env var the code starts reading that neither `.env.example` nor the docs list, or a dependency doing a job one already in use does |
 
 Every finding the agent makes cites **evidence**: at least two places in files
 the pull request does not change that show the convention. The opening message
@@ -27,7 +27,11 @@ lists each changed file's siblings — the unchanged files in its directory with
 the same role — as the local convention to read first. It also quotes the lines
 of unchanged Markdown docs that name something the diff's code edits or
 removes, so a doc the change made false can be cited as the evidence. Rewording
-that leaves a doc less specific is not drift.
+that leaves a doc less specific is not drift. Config drift is found in code
+first ([`config-drift.ts`](packages/index/src/config-drift.ts)) and handed to the
+agent as facts, each with the lines to cite: a new env var read that no env
+example or doc names, beside where the others are documented, and a new
+dependency whose job another already does, beside where that one is imported.
 
 A finding may carry a **patch**: a replacement for a range of lines, quoted
 alongside the exact text it expects to replace. With [fixes](#fixes) on, the

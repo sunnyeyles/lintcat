@@ -144,6 +144,42 @@ export const evalCases: EvalCase[] = [
     ],
   },
   {
+    fixture: "config-undocumented-env-var",
+    expectations: [
+      {
+        kind: "finding",
+        description:
+          "reports that the worker reads NOTIFY_SIGNING_SECRET, which neither .env.example nor the README lists beside the other variables",
+        anchors: [
+          { file: "src/config.ts", startMarker: "const signingSecret = env.NOTIFY_SIGNING_SECRET" },
+        ],
+      },
+    ],
+  },
+  {
+    fixture: "config-duplicate-dependency",
+    expectations: [
+      {
+        kind: "finding",
+        description: "reports that dayjs joins a worker that already does its date work with date-fns",
+        anchors: [
+          { file: "package.json", startMarker: '"dayjs": "^1.11.13"' },
+          { file: "src/delivery/quiet-hours.ts", startMarker: 'import dayjs from "dayjs";' },
+        ],
+      },
+    ],
+  },
+  {
+    fixture: "clean-config-env-var-documented",
+    expectations: [
+      {
+        kind: "no-findings",
+        description:
+          "reports nothing on a new env var that lands in .env.example and the README with the code that reads it",
+      },
+    ],
+  },
+  {
     fixture: "correctness-admin-check",
     expectations: [
       outOfScope(

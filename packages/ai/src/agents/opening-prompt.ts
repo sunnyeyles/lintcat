@@ -2,6 +2,7 @@
 import type { RepositoryIndex } from "@pr-review/index";
 
 import type { ReviewContext } from "#src/agent-contract";
+import { renderConfigDrift } from "#src/agents/config-drift";
 import { renderDocMentions } from "#src/agents/doc-mentions";
 import {
   buildOpeningDiff,
@@ -98,6 +99,7 @@ export function buildOpeningPrompt(
     "",
     ...renderSiblingFiles(index, context, maxListedFiles),
     ...renderDocMentions(index, context),
+    ...renderConfigDrift(index, context),
     "<diff>",
     opening.diff,
     "</diff>",

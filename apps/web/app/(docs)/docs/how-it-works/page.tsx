@@ -81,7 +81,8 @@ export default function HowItWorksPage() {
           </Bullet>
           <Bullet>
             <strong>Config:</strong> a setting or dependency added differently from the ones
-            already there.
+            already there, such as an environment variable your <code>.env.example</code> and docs
+            don&rsquo;t list, or a second library for a job one you already use does.
           </Bullet>
         </Bullets>
         <P>
@@ -113,7 +114,11 @@ export default function HowItWorksPage() {
             is compared against;
           </Bullet>
           <Bullet>
-            which lines of your Markdown docs name something the change edits or removes.
+            which lines of your Markdown docs name something the change edits or removes;
+          </Bullet>
+          <Bullet>
+            which new environment variables nothing documents, and which new dependencies
+            duplicate one you already use.
           </Bullet>
         </Bullets>
         <P>

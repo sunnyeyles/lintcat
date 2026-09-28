@@ -12,14 +12,15 @@ project; `vitest.eval.config.ts` still matches only `*.eval.ts`.
 ## What is evaluated
 
 Codebase drift: a change that names or does something differently from how the
-rest of the repository already does it. Thirteen fixtures, sixteen assertions.
-Five are recall signals, one per planted drift; the rest are precision signals.
+rest of the repository already does it. Sixteen fixtures, nineteen assertions.
+Seven are recall signals, one per planted drift; the rest are precision signals.
 
 Five fixtures are the same small billing API (`ledgerly/billing-api`): routes,
 services, data and db layers, with the boundaries written down in its
-`ARCHITECTURE.md`. Four are a notification worker (`harbourline/notify-worker`)
-whose README and runbook document its configuration. The other four are small
-services of their own.
+`ARCHITECTURE.md`. Seven are a notification worker (`harbourline/notify-worker`)
+whose README and runbook document its configuration; the three config fixtures
+add a `package.json` and a `.env.example`. The other four are small services of
+their own.
 
 | Fixture | Planted problem | Assertion | Signal |
 | --- | --- | --- | --- |
@@ -35,6 +36,9 @@ services of their own.
 | `docs-broken-anchor` | a new README link names a runbook heading that does not exist | a finding lands on the link | recall |
 | `clean-docs-valid-anchor` | none: a new README link lands on a runbook heading outside the diff | zero findings | precision |
 | `clean-docs-reword` | none: the README's delivery section is reworded to say less, and stays true | zero findings | precision |
+| `config-undocumented-env-var` | signed deliveries read `NOTIFY_SIGNING_SECRET`, which neither `.env.example` nor the README lists beside the other variables | a finding lands on the read | recall |
+| `config-duplicate-dependency` | quiet hours add `dayjs` to a worker that does its date work with `date-fns` | a finding lands on the manifest entry or the import | recall |
+| `clean-config-env-var-documented` | none: the same signing secret, added to `.env.example` and the README with the code | zero findings | precision |
 | `correctness-admin-check` | a `since` filter keeps the events before the timestamp; the route otherwise follows its siblings | zero findings | precision |
 | `correctness-cross-file-caller` | a quote's total becomes `Money`, as the pricing code already uses, and an untouched caller still renders it as a string | zero findings | precision |
 | `security-open-redirect` | a new route redirects wherever its query string says; no other route redirects | zero findings | precision |
@@ -63,6 +67,12 @@ runs `docs-broken-anchor`, `clean-docs-valid-anchor` and `clean-docs-reword`
 through the pipeline with an agent that reports nothing, and holds each to its
 expectations. In the paid run they measure only that the model does not add a
 finding of its own.
+
+The config fixtures are found in code and reported by the model: the opening
+message states each undocumented env var and duplicate dependency with the lines
+to cite. `drift-fixtures.test.ts` checks that both recall fixtures produce that
+fact, that a finding citing it survives validation, and that the documented
+variable produces none.
 
 `patches-verify` is precision only: proposing no patch passes it. What fails is
 a patch whose quoted `expected` lines do not match the file, which is the one
@@ -123,12 +133,12 @@ when a run is meant as evidence, so a cost change has a before and an after.
 
 ## Known gaps
 
-- **No fixture has reached a model.** The thirteen fixtures load, diff and resolve
+- **No fixture has reached a model.** The sixteen fixtures load, diff and resolve
   their anchors in `pnpm test`, but none has been reviewed by a model yet, so
   whether each planted problem is findable, and each out-of-scope bug left
   alone, is unproven.
-- **Style and config drift are unmeasured.** Naming, pattern and docs drift have
-  fixtures; the reviewer's style and config categories do not yet.
+- **Style drift is unmeasured.** Naming, pattern, docs and config drift have
+  fixtures; the reviewer's style category does not yet.
 - **No fixture requires a patch.** `patches-verify` catches a wrong patch but
   cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
 - **`claude-haiku-4-5` does not clear the suite**, which is why the Anthropic

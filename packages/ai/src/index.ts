@@ -39,6 +39,7 @@ export {
   renderRepository,
   INDEX_ABSENT_LINE,
 } from "#src/agents/repository-index";
+export { renderConfigDrift } from "#src/agents/config-drift";
 export { renderDocMentions } from "#src/agents/doc-mentions";
 export {
   categorySlugs,

@@ -15,6 +15,15 @@ export {
   parseCodeowners,
   type CodeownersRule,
 } from "#src/codeowners";
+export {
+  findConfigDrift,
+  type ConfigDrift,
+  type DeclaredDependency,
+  type DuplicateDependency,
+  type EnvExampleEntry,
+  type SourceLine,
+  type UndocumentedEnvVar,
+} from "#src/config-drift";
 export { nodesInCycles } from "#src/cycles";
 export {
   changedNames,
