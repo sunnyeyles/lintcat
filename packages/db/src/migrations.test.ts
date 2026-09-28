@@ -46,6 +46,7 @@ describe("migrations applied in order to an empty database", () => {
       "id",
       "input_tokens",
       "output_tokens",
+      "overlay",
       "pr_number",
       "repo_id",
       "risk",

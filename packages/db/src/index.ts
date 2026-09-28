@@ -69,6 +69,7 @@ export {
   saveRepositoryGraph,
   REPOSITORY_GRAPH_RETENTION,
 } from "./repository-graphs";
+export { findReviewMapInputs, type ReviewMapInputs } from "./review-map";
 export {
   deleteOrganizationRepoAccess,
   listCollaboratorOrganizationIds,

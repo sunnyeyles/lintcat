@@ -85,6 +85,8 @@ export type DataSource = {
   /** undefined when the review is unreadable, or its index was off or failed. */
   getRepositoryGraph(id: number): Promise<RepositoryGraphSnapshot | undefined>;
   getChangedFiles(id: number): Promise<ReviewRecordChangedFile[]>;
+  /** The access check a map runs before any cache read; null when the review is unreadable. */
+  getMapAccess(id: number): Promise<{ repoId: number; baseSha: string | null } | null>;
   getTrends(range: Range, repoId?: number): Promise<Trends>;
   getUsage(range: Range, repoId?: number): Promise<Usage>;
 };
