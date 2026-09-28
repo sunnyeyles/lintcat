@@ -17,12 +17,20 @@ interface FindingAnchor {
   endMarker?: string;
 }
 
+/** One line of a file at base, found by a marker that must match exactly one line. */
+interface CitationAnchor {
+  file: string;
+  marker: string;
+}
+
 export type FixtureExpectation =
   | {
       kind: "finding";
       description: string;
       /** The finding must land inside at least one of these regions. */
       anchors: FindingAnchor[];
+      /** When set, the finding must also cite one of these lines as evidence. */
+      cites?: CitationAnchor[];
     }
   | { kind: "no-findings"; description: string }
   | { kind: "patches-verify"; description: string };
@@ -82,6 +90,26 @@ export function resolveAnchor(
   return { file: anchor.file, from, to };
 }
 
+/** Resolves a citation's marker to its line in the fixture's base tree. */
+export function resolveCitation(
+  fixture: LoadedFixture,
+  citation: CitationAnchor,
+): { file: string; line: number } {
+  const contents = fixture.baseFiles.get(citation.file);
+  if (contents === undefined) {
+    throw new Error(
+      `expectation cites ${citation.file}, which fixture ${fixture.name} does not have at base`,
+    );
+  }
+  return { file: citation.file, line: lineOf(contents.split("\n"), citation.marker, citation.file) };
+}
+
+function cites(finding: ReviewFinding, lines: readonly { file: string; line: number }[]): boolean {
+  return (finding.evidence ?? []).some((entry) =>
+    lines.some((cited) => cited.file === entry.file && cited.line === entry.line),
+  );
+}
+
 function inAnchor(finding: ReviewFinding, anchor: ResolvedAnchor): boolean {
   if (finding.file !== anchor.file) {
     return false;
@@ -96,9 +124,11 @@ function inAnchor(finding: ReviewFinding, anchor: ResolvedAnchor): boolean {
 /** One finding rendered for a failure message. */
 function describeFinding(finding: ReviewFinding): string {
   const at = finding.line === undefined ? finding.file : `${finding.file}:${finding.line}`;
+  const evidence = (finding.evidence ?? []).map((entry) => `${entry.file}:${entry.line}`);
   return (
     `- [${finding.category}/${finding.severity}/confidence ${finding.confidence}] ` +
-    `${at} — ${finding.title}`
+    `${at} — ${finding.title}` +
+    (evidence.length === 0 ? "" : ` (evidence: ${evidence.join(", ")})`)
   );
 }
 
@@ -145,9 +175,14 @@ export function evaluateExpectation(
   const anchors = expectation.anchors.map((anchor) =>
     resolveAnchor(review.fixture, anchor),
   );
-  const matched = findings.filter((finding) =>
+  const located = findings.filter((finding) =>
     anchors.some((anchor) => inAnchor(finding, anchor)),
   );
+  const citations = (expectation.cites ?? []).map((citation) =>
+    resolveCitation(review.fixture, citation),
+  );
+  const matched =
+    citations.length === 0 ? located : located.filter((finding) => cites(finding, citations));
   if (matched.length > 0) {
     return {
       passed: true,
@@ -155,6 +190,15 @@ export function evaluateExpectation(
     };
   }
 
+  if (located.length > 0) {
+    const lines = citations.map((cited) => `  ${cited.file}:${cited.line}`).join("\n");
+    return {
+      passed: false,
+      detail:
+        "A finding landed on the planted problem, but none cited the rule it breaks.\n" +
+        `Expected evidence at one of:\n${lines}\n\n${rendered}`,
+    };
+  }
   const where = anchors
     .map((anchor) => `  ${anchor.file}:${anchor.from}-${anchor.to}`)
     .join("\n");

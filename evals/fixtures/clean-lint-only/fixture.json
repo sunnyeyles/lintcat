@@ -1,0 +1,22 @@
+{
+  "name": "clean-lint-only",
+  "title": "Clean — the only problems in a change are ones the repository's ESLint and Prettier already catch",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "a2c64f0e9b17d58e3c0a4f61b28d97e5c3f0a186",
+  "headSha": "0f7e3b92c5d14a68e1b0c9f37a25d86e4c1b0a53",
+  "pullRequest": {
+    "number": 238,
+    "title": "Show an invoice's due date in the customer portal",
+    "body": "The portal shows the amount but not when it's due. This formats the due date with the existing date helper.",
+    "author": "sam-whitfield",
+    "baseRef": "main",
+    "headRef": "feature/invoice-due-date"
+  },
+  "changedFiles": [
+    {
+      "path": "src/routes/invoices.ts",
+      "status": "modified"
+    }
+  ]
+}
