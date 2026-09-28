@@ -44,7 +44,7 @@ export function registerMemoryTools(
         category: z
           .string()
           .min(1)
-          .describe('The finding\'s category, as the review reported it, e.g. "security".'),
+          .describe('The finding\'s category, as the review reported it, e.g. "naming".'),
         title: z
           .string()
           .min(1)
