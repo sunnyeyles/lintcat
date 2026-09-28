@@ -50,11 +50,10 @@ export function samplingEngine(options: {
   maxTokens?: number | undefined;
 }): ReviewEngine {
   return {
-    createAgent: ({ agent, github, index, onUsage }) =>
+    createAgent: ({ agent, index, onUsage }) =>
       createSamplingAgent({
         sample: options.sample,
         agent,
-        github,
         index,
         onUsage,
         maxTokens: options.maxTokens,

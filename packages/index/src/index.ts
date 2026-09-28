@@ -36,11 +36,6 @@ export {
   type UnknownReferences,
 } from "#src/find-references";
 export {
-  resolveHeadImports,
-  type HeadImport,
-  type HeadTree,
-} from "#src/head-imports";
-export {
   computeImpact,
   MAX_IMPACT_FILES,
   type BrokenImport,
@@ -56,8 +51,6 @@ export {
   type ParsedImport,
 } from "#src/imports";
 export {
-  INDEXED_LANGUAGES,
-  languageOf,
   type ImportResolution,
   type LanguageCoverage,
 } from "#src/languages";

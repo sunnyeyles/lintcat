@@ -172,8 +172,7 @@ export function createReviewAgent(
             };
             const opening: ModelMessage = {
               role: "user",
-              content: await buildOpeningPrompt(context, {
-                github: deps.github,
+              content: buildOpeningPrompt(context, {
                 index: deps.index,
                 budget: OPENING_BUDGET,
               }),

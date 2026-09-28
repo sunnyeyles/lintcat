@@ -173,25 +173,16 @@ describe("validateFindings", () => {
     ]);
   });
 
-  it("drops a finding whose explanation admits it never checked the claim", () => {
-    const unverified = finding({
+  it("keeps a finding whatever its explanation says about verification", () => {
+    const aboutVerification = finding({
+      title: "Session token is trusted unchecked",
       explanation:
-        "The link assumes a '#permissions' anchor exists, which cannot be verified from the changes provided.",
-    });
-    const couldNot = finding({
-      line: 11,
-      title: "Import target missing",
-      explanation: "I could not confirm that src/cn.ts exists.",
-    });
-    const verified = finding({
-      line: 12,
-      title: "Stale anchor",
-      explanation: "configuration/page.tsx has no section with id 'permissions'.",
+        "The handler cannot verify the token: it decodes the JWT without checking the signature.",
     });
 
-    expect(
-      validateFindings([unverified, couldNot, verified], changedFiles, CATEGORIES),
-    ).toEqual([verified]);
+    expect(validateFindings([aboutVerification], changedFiles, CATEGORIES)).toEqual([
+      aboutVerification,
+    ]);
   });
 
   it("truncates more than 10 surviving findings to the strongest 10", () => {
