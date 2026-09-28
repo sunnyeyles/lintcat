@@ -34,7 +34,7 @@ export {
   type ReviewEngine,
 } from "#src/agents/engine";
 export type { SamplingRequest, SampleText } from "#src/agents/sampling-agent";
-export { DRIFT_CATEGORIES, GENERAL_AGENT } from "#src/agents/general-agent";
+export { GENERAL_AGENT } from "#src/agents/general-agent";
 export { renderConventionCounts } from "#src/agents/convention-counts";
 export {
   renderRepository,
@@ -46,5 +46,4 @@ export {
   categorySlugs,
   withRepositoryHints,
   type AgentDefinition,
-  type CategoryDefinition,
 } from "#src/agents/definition";

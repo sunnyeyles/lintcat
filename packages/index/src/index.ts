@@ -17,46 +17,27 @@ export {
 } from "#src/codeowners";
 export {
   findConfigDrift,
-  type ConfigDrift,
-  type DeclaredDependency,
-  type DuplicateDependency,
-  type EnvExampleEntry,
   type SourceLine,
-  type UndocumentedEnvVar,
 } from "#src/config-drift";
 export {
   conventionCounts,
   conventionSentence,
-  CONVENTIONS,
   MIN_MAJORITY,
-  MIN_MEASURED_SIBLINGS,
-  type Convention,
   type ConventionCount,
 } from "#src/conventions";
 export { nodesInCycles } from "#src/cycles";
-export {
-  changedNames,
-  docLinesMentioning,
-  type ChangedNames,
-  type DocLineMention,
-} from "#src/doc-mentions";
+export { changedNames, docLinesMentioning } from "#src/doc-mentions";
 export {
   isDocPath,
   readDoc,
   resolveDocLink,
-  type DocHeading,
-  type DocLink,
-  type DocMention,
   type IndexedDoc,
-  type LinkDestination,
-  type MentionKind,
 } from "#src/docs";
 export {
   collectEntryPoints,
   isEntryPoint,
   type EntryPoints,
 } from "#src/entry-points";
-export { exportStyleOf, type ExportStyle } from "#src/exports";
 export {
   findReferences,
   findReferencesDescription,
@@ -92,26 +73,14 @@ export {
   type ImportResolution,
   type LanguageCoverage,
 } from "#src/languages";
-export { findLintConfigs, type LintConfig } from "#src/lint-config";
+export { type LintConfig } from "#src/lint-config";
 export {
   parseWorkspaceYamlPackages,
   type PackageManifest,
   type PathAlias,
 } from "#src/manifests";
-export {
-  buildChangeOverlay,
-  type ChangeOverlay,
-  type ChangeOverlayInput,
-  type OverlayEdge,
-  type OverlayFile,
-} from "#src/overlay";
+export { buildChangeOverlay, type ChangeOverlay } from "#src/overlay";
 export { coveredSourcePaths } from "#src/pairing";
-export {
-  patchLines,
-  type PatchedFile,
-  type PatchLine,
-  type PatchLines,
-} from "#src/patch-lines";
 export {
   referencesTo,
   type Reference,
@@ -129,7 +98,6 @@ export {
 } from "#src/resolve";
 export { classifyFileRole, ROLE_PRECEDENCE, type FileRole } from "#src/roles";
 export {
-  findRuleDocs,
   governs,
   isRuleDoc,
   type RuleDoc,

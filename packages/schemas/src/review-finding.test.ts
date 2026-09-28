@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   evidenceLabel,
-  MAX_EVIDENCE_ENTRIES,
   reviewFindingSchema,
   type ReviewFinding,
 } from "#src/index";
+import { MAX_EVIDENCE_ENTRIES } from "#src/review-finding";
 
 const validFinding: ReviewFinding = {
   file: "src/auth/session.ts",
