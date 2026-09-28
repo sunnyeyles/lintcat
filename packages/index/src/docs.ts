@@ -1,4 +1,4 @@
-/** Markdown docs: their headings, the links they make, and the names they mention. */
+/** Markdown docs: their anchors, the links they make, and the names they mention. */
 import { directoryOf, extensionOf, joinPath } from "#src/paths";
 
 const DOC_EXTENSIONS = new Set(["md", "mdx", "markdown"]);
@@ -18,13 +18,6 @@ export interface DocMention {
   readonly text: string;
 }
 
-export interface DocHeading {
-  readonly text: string;
-  /** The fragment GitHub gives it, duplicates suffixed `-1`, `-2`. */
-  readonly anchor: string;
-  readonly line: number;
-}
-
 export interface DocLink {
   /** The destination exactly as written. */
   readonly target: string;
@@ -33,8 +26,7 @@ export interface DocLink {
 
 export interface IndexedDoc {
   readonly path: string;
-  readonly headings: readonly DocHeading[];
-  /** Every fragment a link can land on: heading anchors and explicit HTML ids. */
+  /** Every fragment a link can land on: GitHub's heading anchors, duplicates suffixed, and HTML ids. */
   readonly anchors: readonly string[];
   readonly links: readonly DocLink[];
   readonly mentions: readonly DocMention[];
@@ -124,21 +116,21 @@ function quoted(text: string): string {
 
 /** Reads one Markdown file. Never throws; anything unrecognised is ordinary text. */
 export function readDoc(path: string, contents: string): IndexedDoc {
-  const headings: DocHeading[] = [];
+  const headings: string[] = [];
   const explicit: string[] = [];
   const links: DocLink[] = [];
   const mentions: DocMention[] = [];
   const slugCounts = new Map<string, number>();
-  const addHeading = (text: string, line: number): void => {
+  const addHeading = (text: string): void => {
     const slug = headingSlug(text);
     const seen = slugCounts.get(slug) ?? 0;
     slugCounts.set(slug, seen + 1);
-    headings.push({ text: plainHeading(text), anchor: seen === 0 ? slug : `${slug}-${seen}`, line });
+    headings.push(seen === 0 ? slug : `${slug}-${seen}`);
   };
 
   const lines = contents.split("\n");
   let fence: string | undefined;
-  let paragraph: { text: string; line: number } | undefined;
+  let paragraph: string | undefined;
   lines.forEach((raw, at) => {
     const line = at + 1;
     const opener = FENCE.exec(raw);
@@ -159,11 +151,11 @@ export function readDoc(path: string, contents: string): IndexedDoc {
     }
     const atx = ATX_HEADING.exec(raw);
     if (atx !== null) {
-      addHeading(atx[1]!, line);
+      addHeading(atx[1]!);
     } else if (paragraph !== undefined && SETEXT_UNDERLINE.test(raw)) {
-      addHeading(paragraph.text, paragraph.line);
+      addHeading(paragraph);
     }
-    paragraph = raw.trim() === "" || atx !== null ? undefined : { text: raw, line };
+    paragraph = raw.trim() === "" || atx !== null ? undefined : raw;
     for (const match of raw.matchAll(HTML_ID)) {
       explicit.push(match[1]!);
     }
@@ -177,8 +169,7 @@ export function readDoc(path: string, contents: string): IndexedDoc {
 
   return {
     path,
-    headings,
-    anchors: [...new Set([...headings.map((heading) => heading.anchor), ...explicit])],
+    anchors: [...new Set([...headings, ...explicit])],
     links,
     mentions,
   };

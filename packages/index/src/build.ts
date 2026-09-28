@@ -78,7 +78,7 @@ export interface RepositoryIndex {
   readonly importers: ReadonlyMap<string, readonly ImportEdge[]>;
   /** Manifests and aliases, read again for entry points and package ownership. */
   readonly workspace: WorkspaceModel;
-  /** Every Markdown file, by path: headings, links and mentions. */
+  /** Every Markdown file, by path: anchors, links and mentions. */
   readonly docs: ReadonlyMap<string, IndexedDoc>;
   /** Variables declared in `.env.example` and its equivalents. */
   readonly envExamples: readonly EnvExampleEntry[];

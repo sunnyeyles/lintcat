@@ -1,4 +1,4 @@
-/** The opening user message every engine sends: scope, pull request, files, index, siblings, diff. */
+/** The opening user message every engine sends: scope, pull request, files, index, siblings, doc_mentions, config_drift, diff. */
 import type { RepositoryIndex } from "@pr-review/index";
 
 import type { ReviewContext } from "#src/agent-contract";

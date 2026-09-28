@@ -11,7 +11,7 @@ import type { ReviewFinding } from "@pr-review/schemas";
 
 import { MAX_FINDINGS } from "#src/validate-findings";
 
-export interface DocLinkCheck {
+interface DocLinkCheck {
   /** The base index; without one, only targets the pull request itself touches are checked. */
   index: RepositoryIndex | undefined;
   /** The files whose added lines are checked. */

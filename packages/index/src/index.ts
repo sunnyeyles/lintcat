@@ -35,7 +35,6 @@ export {
   isDocPath,
   readDoc,
   resolveDocLink,
-  type DocHeading,
   type DocLink,
   type DocMention,
   type IndexedDoc,
