@@ -79,7 +79,7 @@ export {
   type ImportResolution,
   type LanguageCoverage,
 } from "#src/languages";
-export { findLintConfigs, type LintConfig } from "#src/lint-config";
+export { type LintConfig } from "#src/lint-config";
 export {
   parseWorkspaceYamlPackages,
   type PackageManifest,
@@ -109,7 +109,6 @@ export {
 } from "#src/resolve";
 export { classifyFileRole, ROLE_PRECEDENCE, type FileRole } from "#src/roles";
 export {
-  findRuleDocs,
   governs,
   isRuleDoc,
   type RuleDoc,

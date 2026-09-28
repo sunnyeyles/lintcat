@@ -22,7 +22,7 @@ export function isRuleDoc(path: string): boolean {
 }
 
 /** The directory whose files a rule doc or config file governs. */
-export function scopeOf(path: string): string {
+function scopeOf(path: string): string {
   const directory = directoryOf(path);
   const contributing = basenameOf(path).toLowerCase() === "contributing.md";
   return contributing && ROOT_EQUIVALENT_DIRECTORIES.has(directory) ? "" : directory;
