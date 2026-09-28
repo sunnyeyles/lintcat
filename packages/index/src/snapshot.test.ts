@@ -71,6 +71,15 @@ describe("snapshotRepositoryIndex", () => {
     ]);
   });
 
+  it("counts internal imports that resolved to nothing, not third-party ones", () => {
+    expect(snapshotOf().unresolvedImports).toBe(0);
+    const broken = new Map(files).set("src/broken.ts", "import { gone } from './gone';\n");
+    expect(
+      snapshotRepositoryIndex(buildRepositoryIndex({ sha, files: broken }))
+        .unresolvedImports,
+    ).toBe(1);
+  });
+
   it("carries the workspace's own packages", () => {
     expect(snapshotOf().packages).toEqual(
       buildRepositoryIndex({ sha, files }).packages,

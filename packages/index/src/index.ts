@@ -82,6 +82,8 @@ export {
   type ParsedImport,
 } from "#src/imports";
 export {
+  INDEXED_LANGUAGES,
+  languageOf,
   type ImportResolution,
   type LanguageCoverage,
 } from "#src/languages";
@@ -91,6 +93,13 @@ export {
   type PackageManifest,
   type PathAlias,
 } from "#src/manifests";
+export {
+  buildChangeOverlay,
+  type ChangeOverlay,
+  type ChangeOverlayInput,
+  type OverlayEdge,
+  type OverlayFile,
+} from "#src/overlay";
 export { coveredSourcePaths } from "#src/pairing";
 export {
   patchLines,

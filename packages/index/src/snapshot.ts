@@ -22,6 +22,8 @@ export interface RepositoryGraphSnapshot {
   readonly files: readonly IndexedFile[];
   readonly edges: readonly SnapshotEdge[];
   readonly packages: readonly WorkspacePackage[];
+  /** Internal imports that resolved to nothing; absent from a snapshot that predates it. */
+  readonly unresolvedImports?: number;
 }
 
 /** Serialises the index. Files keep their insertion order, which is sorted by path. */
@@ -40,6 +42,11 @@ export function snapshotRepositoryIndex(
     packages: index.packages.map((workspacePackage) => ({
       ...workspacePackage,
     })),
+    unresolvedImports: index.coverage.reduce(
+      (sum, { resolution }) =>
+        sum + (resolution === undefined ? 0 : resolution.internal - resolution.resolved),
+      0,
+    ),
   };
 }
 
