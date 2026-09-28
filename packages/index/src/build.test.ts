@@ -345,3 +345,24 @@ describe("dead files", () => {
     expect(built.files.get("src/a.ts")?.dead).toBe(false);
   });
 });
+
+describe("rule docs and lint config", () => {
+  it("keeps the rule docs' text and the lint configs from the indexed tree", () => {
+    const built = buildRepositoryIndex({
+      sha,
+      files: new Map([
+        ["AGENTS.md", "- Reads are named find*.\n"],
+        ["eslint.config.js", "export default [];\n"],
+        ["src/a.ts", "export {};\n"],
+      ]),
+    });
+
+    expect(built.ruleDocs).toEqual([
+      { path: "AGENTS.md", text: "- Reads are named find*.\n", truncated: false },
+    ]);
+    expect(built.lintConfigs).toEqual([
+      { tool: "ESLint", path: "eslint.config.js", excerpt: "export default [];" },
+    ]);
+    expect(built.files.has("AGENTS.md")).toBe(true);
+  });
+});

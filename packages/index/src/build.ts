@@ -13,6 +13,7 @@ import { nodesInCycles } from "#src/cycles";
 import { isDocPath, readDoc, type IndexedDoc } from "#src/docs";
 import { collectEntryPoints, isEntryPoint } from "#src/entry-points";
 import { parseImports, type ImportedName } from "#src/imports";
+import { findLintConfigs, type LintConfig } from "#src/lint-config";
 import {
   INDEXED_LANGUAGES,
   summariseLanguages,
@@ -23,6 +24,7 @@ import { coveredSourcePaths } from "#src/pairing";
 import { basenameOf } from "#src/paths";
 import { createImportResolver } from "#src/resolve";
 import { classifyFileRole, type FileRole } from "#src/roles";
+import { findRuleDocs, type RuleDoc } from "#src/rule-docs";
 import {
   packageOf,
   readWorkspace,
@@ -84,6 +86,10 @@ export interface RepositoryIndex {
   readonly envExamples: readonly EnvExampleEntry[];
   /** Every dependency entry of every package.json outside vendored and generated trees. */
   readonly dependencies: readonly DeclaredDependency[];
+  /** CLAUDE.md, AGENTS.md and CONTRIBUTING.md files, shallowest first. */
+  readonly ruleDocs: readonly RuleDoc[];
+  /** Linter, formatter and typecheck configuration, shallowest first. */
+  readonly lintConfigs: readonly LintConfig[];
 }
 
 export interface RepositoryIndexInput {
@@ -288,5 +294,7 @@ export function buildRepositoryIndex(
     docs,
     envExamples,
     dependencies,
+    ruleDocs: findRuleDocs(input.files),
+    lintConfigs: findLintConfigs(input.files),
   };
 }
