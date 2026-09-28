@@ -1,5 +1,5 @@
 /** The drift fixtures are solvable under validation: the evidence a reviewer would cite survives it. */
-import { renderDocMentions, type ReviewEngine } from "@pr-review/ai";
+import { renderConfigDrift, renderDocMentions, type ReviewEngine } from "@pr-review/ai";
 import { changedPaths } from "@pr-review/github";
 import { createSilentLogger } from "@pr-review/logging";
 import { buildReviewIndex, validateFindings } from "@pr-review/reviewer";
@@ -141,3 +141,76 @@ describe.each(["docs-broken-anchor", "clean-docs-valid-anchor", "clean-docs-rewo
     });
   },
 );
+
+describe("config-undocumented-env-var", () => {
+  const fixture = loadFixture("config-undocumented-env-var");
+  const read = lineOf(fixture.headFiles, "src/config.ts", "env.NOTIFY_SIGNING_SECRET");
+  const example = lineOf(fixture.baseFiles, ".env.example", "NOTIFY_QUEUE_URL=");
+  const readme = lineOf(fixture.baseFiles, "README.md", "| `NOTIFY_QUEUE_URL`");
+
+  it("hands the reviewer the unread variable and where the others are documented", async () => {
+    const block = renderConfigDrift(await indexOf(fixture), fixture.context).join("\n");
+
+    expect(block).toContain(`src/config.ts:${read} reads NOTIFY_SIGNING_SECRET`);
+    expect(block).toContain(`.env.example:${example}`);
+  });
+
+  it("keeps a finding that cites the example and the README", async () => {
+    const finding: ReviewFinding = {
+      file: "src/config.ts",
+      line: read,
+      category: "config",
+      severity: "medium",
+      title: "NOTIFY_SIGNING_SECRET is read but not listed in .env.example or the README",
+      explanation: "Every other variable the worker reads is listed in .env.example and the README's configuration table.",
+      evidence: [
+        { file: ".env.example", line: example },
+        { file: "README.md", line: readme },
+      ],
+      confidence: 0.9,
+    };
+
+    expect(await survivors(fixture, finding)).toEqual([finding]);
+  });
+});
+
+describe("config-duplicate-dependency", () => {
+  const fixture = loadFixture("config-duplicate-dependency");
+  const added = lineOf(fixture.headFiles, "package.json", '"dayjs"');
+  const expiry = lineOf(fixture.baseFiles, "src/delivery/expiry.ts", 'from "date-fns"');
+  const queue = lineOf(fixture.baseFiles, "src/queue.ts", 'from "date-fns"');
+
+  it("hands the reviewer the duplicate and where date-fns is already used", async () => {
+    const block = renderConfigDrift(await indexOf(fixture), fixture.context).join("\n");
+
+    expect(block).toContain(
+      `package.json:${added} adds dayjs for dates, a job date-fns already does here: src/delivery/expiry.ts:${expiry}, src/queue.ts:${queue}`,
+    );
+  });
+
+  it("keeps a finding that cites the date-fns imports", async () => {
+    const finding: ReviewFinding = {
+      file: "package.json",
+      line: added,
+      category: "config",
+      severity: "low",
+      title: "dayjs duplicates date-fns, which the worker already uses for dates",
+      explanation: "The expiry check and the queue poll both use date-fns.",
+      evidence: [
+        { file: "src/delivery/expiry.ts", line: expiry },
+        { file: "src/queue.ts", line: queue },
+      ],
+      confidence: 0.85,
+    };
+
+    expect(await survivors(fixture, finding)).toEqual([finding]);
+  });
+});
+
+describe("clean-config-env-var-documented", () => {
+  it("hands the reviewer no config fact", async () => {
+    const fixture = loadFixture("clean-config-env-var-documented");
+
+    expect(renderConfigDrift(await indexOf(fixture), fixture.context)).toEqual([]);
+  });
+});

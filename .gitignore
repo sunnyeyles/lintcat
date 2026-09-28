@@ -9,4 +9,5 @@ next-env.d.ts
 *.tsbuildinfo
 .vercel
 .env*
+!evals/fixtures/**/.env.example
 docs/anidoodle/.engine/

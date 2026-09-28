@@ -1,0 +1,34 @@
+{
+  "name": "config-duplicate-dependency",
+  "title": "Config drift \u2014 quiet hours pull in dayjs where the worker already does dates with date-fns",
+  "owner": "harbourline",
+  "repo": "notify-worker",
+  "baseSha": "71d3c0e9a5b24f8e6d1a0c9b3e7f25d48a6c1e03",
+  "headSha": "a94e0c7d25b1f83e6c0d4a9b7f12e5c38d6a0b71",
+  "pullRequest": {
+    "number": 281,
+    "title": "Hold notifications during a subscriber's quiet hours",
+    "body": "Subscribers on the overnight plan asked not to be paged between 22:00 and 07:00. Notifications for them now wait in the queue until morning.",
+    "author": "j-okafor",
+    "baseRef": "main",
+    "headRef": "feature/quiet-hours"
+  },
+  "changedFiles": [
+    {
+      "path": "package.json",
+      "status": "modified"
+    },
+    {
+      "path": "src/delivery/quiet-hours.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/delivery/transport.ts",
+      "status": "modified"
+    },
+    {
+      "path": "src/worker.ts",
+      "status": "modified"
+    }
+  ]
+}

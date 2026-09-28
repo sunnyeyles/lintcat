@@ -83,6 +83,8 @@ function fixtureIndex(graph: MapGraph): RepositoryIndex {
     importers,
     workspace: { manifests: new Map(), byName: new Map(), packages: [], aliases: new Map() },
     docs: new Map(),
+    envExamples: [],
+    dependencies: [],
   };
 }
 

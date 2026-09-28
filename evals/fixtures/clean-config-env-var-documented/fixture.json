@@ -1,0 +1,38 @@
+{
+  "name": "clean-config-env-var-documented",
+  "title": "Clean \u2014 a new signing-secret env var lands in .env.example and the README with the code that reads it",
+  "owner": "harbourline",
+  "repo": "notify-worker",
+  "baseSha": "71d3c0e9a5b24f8e6d1a0c9b3e7f25d48a6c1e03",
+  "headSha": "9b2d6e0f4a18c73e5d0b2a9f6c41e8d37a5b0c92",
+  "pullRequest": {
+    "number": 283,
+    "title": "Sign every delivery",
+    "body": "Subscribers can't tell our deliveries from anyone else's POSTs. Every delivery now carries an HMAC-SHA256 signature of its body in `x-notify-signature`, keyed by a secret the worker reads at boot.",
+    "author": "j-okafor",
+    "baseRef": "main",
+    "headRef": "feature/signed-deliveries"
+  },
+  "changedFiles": [
+    {
+      "path": "src/config.ts",
+      "status": "modified"
+    },
+    {
+      "path": "src/delivery/send.ts",
+      "status": "modified"
+    },
+    {
+      "path": "src/delivery/transport.ts",
+      "status": "modified"
+    },
+    {
+      "path": ".env.example",
+      "status": "modified"
+    },
+    {
+      "path": "README.md",
+      "status": "modified"
+    }
+  ]
+}
