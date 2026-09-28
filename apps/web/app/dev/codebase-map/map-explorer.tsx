@@ -15,6 +15,7 @@ import { GroupList } from "@/components/codebase-map/group-list";
 import { MapCanvas } from "@/components/codebase-map/map-canvas";
 import { MapHoverCard } from "@/components/codebase-map/map-hover-card";
 import { MapLegend } from "@/components/codebase-map/map-legend";
+import { MapReachControls } from "@/components/codebase-map/map-reach-controls";
 import { MapSearch } from "@/components/codebase-map/map-search";
 import { MapStatusBanner } from "@/components/codebase-map/map-status-banner";
 import { usePalette, usePrefersReducedMotion } from "@/components/codebase-map/palette";
@@ -111,6 +112,16 @@ export function MapExplorer() {
         <Button size="sm" variant="secondary" onClick={actions.collapseAll}>
           Reset groups
         </Button>
+        <MapReachControls
+          depth={state.view.reachDepth}
+          reachedCount={state.reachedCount}
+          onDepthChange={actions.setReachDepth}
+          tests={
+            state.hasTests
+              ? { shown: state.view.showTests, onShownChange: actions.setShowTests }
+              : undefined
+          }
+        />
         {state.lod ? (
           <span className="text-muted-foreground text-xs" data-testid="lod-mode">
             level of detail
@@ -194,8 +205,12 @@ export function MapExplorer() {
                 onSelect={actions.focus}
                 onToggleGroup={actions.toggleFocusedGroup}
                 heat={state.heat}
+                reach={{
+                  depth: state.view.focusedPath === null ? undefined : scene.reach.files.get(state.view.focusedPath),
+                  steps: state.view.reachDepth,
+                }}
               />
-              <GroupList clustering={scene.clustering} onToggle={actions.toggleGroup} />
+              <GroupList clustering={scene.clustering} reached={scene.reach.byGroup} onToggle={actions.toggleGroup} />
             </>
           ) : (
             <div className="space-y-3">

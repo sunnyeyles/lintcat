@@ -54,20 +54,45 @@ export function neighbourhoodOf(
   focuses: readonly string[],
   steps = 1,
 ): ReadonlySet<string> {
-  const seen = new Set<string>();
+  return new Set(spread(graph, focuses, steps, [graph.outgoing, graph.incoming]).keys());
+}
+
+/** The largest reach the map offers; the server walks this far so any choice is answered. */
+export const MAX_REACH = 3;
+
+export const DEFAULT_REACH = 2;
+
+/** Files importing the change within `steps`, by depth; the change itself is not listed. */
+export function reachOf(
+  graph: NormalisedGraph,
+  changed: readonly string[],
+  steps = DEFAULT_REACH,
+): ReadonlyMap<string, number> {
+  const depths = spread(graph, changed, steps, [graph.incoming]);
+  for (const path of changed) depths.delete(path);
+  return depths;
+}
+
+function spread(
+  graph: NormalisedGraph,
+  focuses: readonly string[],
+  steps: number,
+  directions: readonly ReadonlyMap<string, readonly string[]>[],
+): Map<string, number> {
+  const seen = new Map<string, number>();
   let frontier: string[] = [];
   for (const path of focuses) {
     if (!graph.byPath.has(path) || seen.has(path)) continue;
-    seen.add(path);
+    seen.set(path, 0);
     frontier.push(path);
   }
   for (let depth = 1; depth <= steps && frontier.length > 0; depth += 1) {
     const next: string[] = [];
     for (const path of frontier) {
-      for (const edges of [graph.outgoing, graph.incoming]) {
+      for (const edges of directions) {
         for (const other of edges.get(path) ?? []) {
           if (seen.has(other)) continue;
-          seen.add(other);
+          seen.set(other, depth);
           next.push(other);
         }
       }

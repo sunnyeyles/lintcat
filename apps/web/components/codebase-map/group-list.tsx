@@ -8,12 +8,19 @@ const SHOWN = 12;
 
 export interface GroupListProps {
   clustering: Clustering;
+  /** Files the change reaches, per group, so the list carries what the canvas shows. */
+  reached?: ReadonlyMap<string, number>;
   onToggle: (groupId: string) => void;
 }
 
-export function GroupList({ clustering, onToggle }: GroupListProps) {
+export function GroupList({ clustering, reached, onToggle }: GroupListProps) {
   const groups = [...clustering.groups]
-    .sort((a, b) => b.fileCount - a.fileCount)
+    .sort(
+      (a, b) =>
+        b.changedCount - a.changedCount ||
+        (reached?.get(b.id) ?? 0) - (reached?.get(a.id) ?? 0) ||
+        b.fileCount - a.fileCount,
+    )
     .slice(0, SHOWN);
 
   return (
@@ -32,8 +39,13 @@ export function GroupList({ clustering, onToggle }: GroupListProps) {
             >
               <span className="min-w-0 flex-1 truncate font-mono text-xs">{group.directory}</span>
               {group.changedCount > 0 ? (
-                <Badge variant="attention" className="shrink-0">
+                <Badge variant="attention" className="shrink-0" aria-label={`${group.changedCount} changed`}>
                   {group.changedCount}
+                </Badge>
+              ) : null}
+              {(reached?.get(group.id) ?? 0) > 0 ? (
+                <Badge variant="secondary" className="shrink-0">
+                  {reached!.get(group.id)} reached
                 </Badge>
               ) : null}
               <Badge variant="outline" className="shrink-0">

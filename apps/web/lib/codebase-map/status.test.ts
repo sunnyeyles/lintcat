@@ -52,23 +52,78 @@ describe("mapStatus", () => {
     expect(result.reasons[0]?.message).not.toMatch(/no dead/i);
   });
 
-  it("counts unresolved imports as a partial reason", () => {
+  it("reads unresolved imports from the index's count, not from dropped edges", () => {
     const result = status({
       files: [known("a.ts")],
       imports: [
         { from: "a.ts", to: "ghost.ts" },
         { from: "ghost.ts", to: "a.ts" },
       ],
+      unresolvedImportCount: 7,
     });
 
     expect(result.kind).toBe("partial");
     expect(result.reasons).toEqual([
       {
         code: "unresolved-imports",
-        count: 2,
-        message: "2 imports point at files this map doesn't have.",
+        count: 7,
+        message: "7 imports the indexer could not resolve, so those edges are missing.",
       },
     ]);
+  });
+
+  it("stays quiet about unresolved imports nothing counted", () => {
+    expect(codes({ files: [known("a.ts")], imports: [{ from: "a.ts", to: "ghost.ts" }] })).toEqual([]);
+  });
+
+  it("says when the PR overlay is missing or covers only part of the change", () => {
+    expect(codes({ files: [known("a.ts")], imports: [], overlay: "absent" })).toEqual([
+      "overlay-missing",
+    ]);
+    const partial = status({
+      files: [known("a.ts", { changed: true, change: "added" }), known("b.ts", { changed: true })],
+      imports: [],
+      overlay: "partial",
+    });
+    expect(partial.reasons).toEqual([
+      {
+        code: "overlay-partial",
+        count: 1,
+        message: "The PR overlay covers only some of the changed files (1 drawn as merged).",
+      },
+    ]);
+    expect(codes({ files: [known("a.ts")], imports: [], overlay: "complete" })).toEqual([]);
+  });
+
+  it("says how many group edges the payload budget left out", () => {
+    const result = status({ files: [known("a.ts")], imports: [], groupImportsDropped: 12 });
+
+    expect(result.reasons).toEqual([
+      {
+        code: "group-imports-capped",
+        count: 12,
+        message: "12 group edges left out to keep the map small, so some coupling is not drawn.",
+      },
+    ]);
+  });
+
+  it("counts the test files the view hid", () => {
+    const result = mapStatus(normaliseGraph({ files: [known("a.ts")], imports: [] }), 3);
+
+    expect(result.kind).toBe("partial");
+    expect(result.reasons).toEqual([
+      { code: "tests-hidden", count: 3, message: '3 test files hidden. Turn on "Show tests" to see them.' },
+    ]);
+  });
+
+  it("counts a partial group's changed files once", () => {
+    const result = status({
+      files: [known("lib/a.ts", { changed: true })],
+      imports: [],
+      summaries: [{ id: "-::lib", fileCount: 900, changedCount: 4 }],
+    });
+
+    expect(result.changedCount).toBe(4);
   });
 
   it("flags a truncated index", () => {
@@ -85,8 +140,17 @@ describe("mapStatus", () => {
 
   it("lists every reason it has", () => {
     expect(
-      codes({ files: [{ path: "a.ts" }], imports: [{ from: "a.ts", to: "x.ts" }], truncated: true }),
+      codes({
+        files: [{ path: "a.ts" }],
+        imports: [],
+        truncated: true,
+        overlay: "absent",
+        groupImportsDropped: 1,
+        unresolvedImportCount: 2,
+      }),
     ).toEqual([
+      "overlay-missing",
+      "group-imports-capped",
       "unresolved-imports",
       "truncated",
       "unknown-changed-flags",

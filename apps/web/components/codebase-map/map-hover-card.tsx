@@ -12,6 +12,11 @@ export function MapHoverCard({ hover }: { hover: MapHover | null }) {
       {node.sublabel}
       {group ? ` · ${node.fileCount} files, ${node.changedCount} changed` : ""}
       {group && node.impactedCount > 0 ? `, ${node.impactedCount} impacted` : ""}
+      {group && node.reachedCount > 0 ? `, ${node.reachedCount} reached` : ""}
+      {node.change ? ` · ${node.change}` : ""}
+      {node.depth !== null ? ` · reached in ${node.depth}` : ""}
+      {node.dead ? " · dead" : ""}
+      {node.quiet ? " · test" : ""}
       {node.heat.counts.total > 0 ? ` · ${node.heat.counts.total} findings` : ""}
     </div>
   );

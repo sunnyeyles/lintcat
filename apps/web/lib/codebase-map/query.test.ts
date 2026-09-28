@@ -7,12 +7,23 @@ import { expandGroup } from "./merge";
 import { normaliseGraph } from "./normalise";
 import { mapQuery, SEARCH_LIMIT } from "./query";
 import { sampleRepo } from "./sample";
+import type { MapGraph } from "./types";
 
 /** The stated budget: the first payload at 50k files must fit in this. */
 const BYTE_BUDGET = 900_000;
 
-function sourceOf(fileCount: number): MapSource {
-  const graph = sampleRepo(7, fileCount);
+const PR_SIZE = 150;
+
+// Changed files always ship, so a budget test holds the PR's size fixed as the repo grows.
+function sourceOf(fileCount: number, changedCap = Infinity): MapSource {
+  const sample = sampleRepo(7, fileCount);
+  let kept = 0;
+  const graph = {
+    ...sample,
+    files: sample.files.map((file) =>
+      file.changed === true && (kept += 1) > changedCap ? { ...file, changed: false } : file,
+    ),
+  };
   const heat = findingHeat(
     graph.files
       .filter((_, i) => i % 13 === 0)
@@ -56,19 +67,28 @@ describe("the first payload below the threshold", () => {
 });
 
 describe("the 50k payload", () => {
-  const big = mapQuery(sourceOf(50_000)).first({ threshold: DEFAULT_LOD_THRESHOLD });
+  const big = mapQuery(sourceOf(50_000, PR_SIZE)).first({ threshold: DEFAULT_LOD_THRESHOLD });
   const bytes = bytesOf(big);
+  const unchanged = (graph: MapGraph) => graph.files.filter((f) => f.changed !== true).length;
 
   it("goes level-of-detail, within its byte and file budgets", () => {
     expect(big.mode).toBe("lod");
     expect(bytes).toBeLessThan(BYTE_BUDGET);
-    expect(big.graph.files.length).toBeLessThanOrEqual(DEFAULT_LOD_BUDGET.openFiles);
+    expect(unchanged(big.graph)).toBeLessThanOrEqual(DEFAULT_LOD_BUDGET.openFiles);
+  });
+
+  it("ships every changed file, however many there are", () => {
+    const huge = sourceOf(50_000);
+    const first = mapQuery(huge).first({ threshold: DEFAULT_LOD_THRESHOLD });
+
+    expect(first.changedPaths).toEqual(huge.changedPaths);
+    expect(unchanged(first.graph)).toBeLessThanOrEqual(DEFAULT_LOD_BUDGET.openFiles);
   });
 
   it("holds its size when the repo doubles", () => {
-    const bigger = mapQuery(sourceOf(100_000)).first({ threshold: DEFAULT_LOD_THRESHOLD });
+    const bigger = mapQuery(sourceOf(100_000, PR_SIZE)).first({ threshold: DEFAULT_LOD_THRESHOLD });
 
-    expect(bigger.graph.files.length).toBeLessThanOrEqual(DEFAULT_LOD_BUDGET.openFiles);
+    expect(unchanged(bigger.graph)).toBeLessThanOrEqual(DEFAULT_LOD_BUDGET.openFiles);
     expect(bigger.graph.groupImports!.length).toBe(big.graph.groupImports!.length);
     // Twice the repo, and only the summaries' own digits grow.
     expect(bytesOf(bigger) / bytes).toBeLessThan(1.1);
@@ -90,7 +110,7 @@ describe("expand", () => {
     const slice = query.expand(target.id, openGroupIds)!;
     const merged = normaliseGraph(expandGroup(payload.graph, target.id, slice.graph));
 
-    expect(merged.dropped.unresolvedImports).toBe(0);
+    expect(merged.dropped.missingEndpoints).toBe(0);
     expect(merged.summaries.some((s) => s.id === target.id)).toBe(false);
     expect(merged.totalFileCount).toBe(6_000);
   });
@@ -154,7 +174,7 @@ describe("expand", () => {
       merged = expandGroup(merged, summary.id, query.expand(summary.id, loaded)!.graph);
     }
 
-    expect(normaliseGraph(merged).dropped.unresolvedImports).toBe(0);
+    expect(normaliseGraph(merged).dropped.missingEndpoints).toBe(0);
     expect(merged.summaries!.length).toBe(lod.summaries!.length - 5);
   });
 });

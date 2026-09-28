@@ -44,6 +44,13 @@ export function isImpacted(file: MapFile): boolean {
   return file.impacted === true && file.changed !== true;
 }
 
+const FIXTURE = /(^|\/)(__fixtures__|fixtures?)(\/|\.[^/]+$)/;
+
+/** Tests and fixtures, which the map draws quieter and can hide. */
+export function isTest(file: MapFile | undefined): boolean {
+  return file !== undefined && (file.role === "test" || FIXTURE.test(file.path));
+}
+
 export function directoryOf(path: string): string {
   const cut = path.lastIndexOf("/");
   return cut === -1 ? "." : path.slice(0, cut);
@@ -107,6 +114,7 @@ export function clusterGraph(graph: NormalisedGraph, view: MapViewState): Cluste
 
   const merged = new Map<string, GroupImport>();
   for (const edge of graph.imports) {
+    if (edge.change === "removed") continue;
     const from = groupOfFile.get(edge.from);
     const to = groupOfFile.get(edge.to);
     if (from === undefined || to === undefined) continue;

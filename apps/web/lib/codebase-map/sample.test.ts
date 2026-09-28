@@ -35,7 +35,7 @@ describe("sampleRepo", () => {
     const graph = sampleRepo(5, 300);
     const normalised = normaliseGraph(graph);
 
-    expect(normalised.dropped.unresolvedImports).toBe(0);
+    expect(normalised.dropped.missingEndpoints).toBe(0);
     expect(normalised.dropped.selfImports).toBe(0);
     expect(normalised.imports.length).toBeGreaterThan(graph.files.length / 2);
   });

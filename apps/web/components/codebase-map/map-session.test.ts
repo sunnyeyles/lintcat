@@ -64,6 +64,8 @@ describe("MapSession", () => {
       query: "",
       expandedGroups: new Set(),
       showImpacted: true,
+      reachDepth: 2,
+      showTests: true,
     });
     expect(state.scene.byId.has("pkg/a/one.ts")).toBe(true);
     expect(state.scene.byId.has(C)).toBe(true);
@@ -192,7 +194,76 @@ describe("MapSession", () => {
       query: "",
       expandedGroups: new Set(),
       showImpacted: true,
+      reachDepth: 2,
+      showTests: true,
     });
+  });
+
+  it("never moves a group when another one expands", async () => {
+    const { adapter, requests } = heldAdapter();
+    const session = new MapSession(lodSource(adapter));
+    const before = session.getSnapshot().scene;
+    const centreOfC = before.byId.get(C)!;
+
+    const done = session.toggleGroup(C);
+    requests[0]!.resolve();
+    await done;
+    const after = session.getSnapshot().scene;
+
+    for (const node of before.nodes) {
+      const same = after.byId.get(node.id);
+      if (same) expect([same.x, same.y]).toEqual([node.x, node.y]);
+    }
+    const five = after.byId.get("pkg/c/five.ts")!;
+    expect(Math.hypot(five.x - centreOfC.x, five.y - centreOfC.y)).toBeLessThanOrEqual(150.01);
+  });
+
+  it("reaches as far as asked, and counts what it reaches", () => {
+    const chain: MapGraph = {
+      files: [
+        { path: "src/core.ts", changed: true },
+        { path: "src/one.ts" },
+        { path: "src/two.ts" },
+        { path: "src/three.ts" },
+      ],
+      imports: [
+        { from: "src/one.ts", to: "src/core.ts" },
+        { from: "src/two.ts", to: "src/one.ts" },
+        { from: "src/three.ts", to: "src/two.ts" },
+      ],
+    };
+    const session = new MapSession({ graph: chain, heat: {}, changedPaths: ["src/core.ts"] });
+
+    expect(session.getSnapshot().reachedCount).toBe(2);
+    session.setReachDepth(3);
+    expect(session.getSnapshot().reachedCount).toBe(3);
+    expect(session.getSnapshot().scene.byId.get("src/three.ts")).toMatchObject({
+      level: "reached",
+      depth: 3,
+      marker: "triangle-3",
+    });
+    session.setReachDepth(9);
+    expect(session.getSnapshot().view.reachDepth).toBe(3);
+  });
+
+  it("hides tests on request and says how many it hid", () => {
+    const withTests: MapGraph = {
+      files: [
+        { path: "src/a.ts", changed: true, dead: false, inCycle: false },
+        { path: "src/a.test.ts", role: "test", changed: false, dead: false, inCycle: false },
+      ],
+      imports: [{ from: "src/a.test.ts", to: "src/a.ts" }],
+    };
+    const session = new MapSession({ graph: withTests, heat: {}, changedPaths: ["src/a.ts"] });
+
+    expect(session.getSnapshot().hasTests).toBe(true);
+    expect(session.getSnapshot().scene.byId.get("src/a.test.ts")?.quiet).toBe(true);
+    session.setShowTests(false);
+
+    const state = session.getSnapshot();
+    expect(state.scene.byId.has("src/a.test.ts")).toBe(false);
+    expect(state.scene.edges).toEqual([]);
+    expect(state.status.reasons.map((reason) => reason.code)).toEqual(["tests-hidden"]);
   });
 
   it("discards a slice that resolves after the source changed", async () => {
