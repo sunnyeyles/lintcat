@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-/**
- * A category names one review agent, and the agent set is configurable — the
- * shape is constrained here, membership against the run's agents.
- */
+/** A kebab-case slug; membership is checked against the run's configurable agents. */
 export const findingCategorySchema = z
   .string()
   .regex(/^[a-z][a-z0-9-]*$/, "must be a lowercase kebab-case slug")
@@ -30,7 +27,7 @@ const findingPatchSchema = z
 export type FindingPatch = z.infer<typeof findingPatchSchema>;
 
 /** A pre-existing line showing the convention a finding says the change departs from. */
-export const findingEvidenceSchema = z.object({
+const findingEvidenceSchema = z.object({
   file: z.string().min(1),
   line: z.number().int().positive(),
 });

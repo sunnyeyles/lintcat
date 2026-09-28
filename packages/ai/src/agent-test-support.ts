@@ -68,7 +68,7 @@ export const context: ReviewContext = {
 };
 
 /** Two archive files no test pull request changes, so validation keeps them. */
-export const TEST_EVIDENCE = [
+const TEST_EVIDENCE = [
   { file: "src/api.ts", line: 1 },
   { file: "src/boot.ts", line: 1 },
 ];

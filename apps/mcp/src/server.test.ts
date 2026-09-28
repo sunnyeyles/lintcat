@@ -848,7 +848,7 @@ describe("suppress_finding", () => {
     const client = await connect(environment());
 
     const { isError, texts } = await call(client, "suppress_finding", {
-      category: "general",
+      category: "naming",
       title: TITLE,
       reason: "the flag is deliberate here",
     });
@@ -858,7 +858,7 @@ describe("suppress_finding", () => {
     expect(texts[0]).toContain(path.join(repo.root, ".git", "pr-review-agents", "memory.json"));
     expect(JSON.parse(texts[1]!)).toEqual([
       {
-        category: "general",
+        category: "naming",
         shape: "admin is always on",
         title: TITLE,
         reason: "the flag is deliberate here",
@@ -868,7 +868,7 @@ describe("suppress_finding", () => {
   });
 
   it("excludes the finding from a later review and says how many it hid", async () => {
-    await call(await connect(environment()), "suppress_finding", { category: "general", title: TITLE });
+    await call(await connect(environment()), "suppress_finding", { category: "naming", title: TITLE });
 
     const { heading, details } = await review(await connect(reviewing(TITLE)));
 
@@ -879,7 +879,7 @@ describe("suppress_finding", () => {
 
   it("suppresses the same problem under another identifier", async () => {
     await call(await connect(environment()), "suppress_finding", {
-      category: "general",
+      category: "naming",
       title: "Admin is always on in adminFlag",
     });
 
@@ -891,7 +891,7 @@ describe("suppress_finding", () => {
 
   it("leaves a finding the suppression no longer matches alone", async () => {
     await call(await connect(environment()), "suppress_finding", {
-      category: "general",
+      category: "naming",
       title: "Unbounded query in the session list",
     });
 

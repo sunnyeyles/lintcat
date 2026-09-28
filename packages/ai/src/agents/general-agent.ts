@@ -1,7 +1,7 @@
 import type { AgentDefinition, CategoryDefinition } from "#src/agents/definition";
 
 /** The kinds of drift the reviewer reports, one finding category each. */
-export const DRIFT_CATEGORIES = [
+const DRIFT_CATEGORIES = [
   {
     slug: "naming",
     covers:

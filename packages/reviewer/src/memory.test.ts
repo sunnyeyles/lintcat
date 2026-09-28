@@ -204,7 +204,7 @@ describe("suppressions", () => {
   it("matches a shape whatever its category, and leaves another shape alone", () => {
     const suppressed = addSuppression(emptyMemory(), finding, NOW);
 
-    expect(isSuppressed(suppressed, { ...finding, category: "general" })).toBe(true);
+    expect(isSuppressed(suppressed, { ...finding, category: "naming" })).toBe(true);
     expect(isSuppressed(suppressed, { ...finding, title: "Unbounded query in getCustomer" })).toBe(
       false,
     );

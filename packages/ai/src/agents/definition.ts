@@ -12,7 +12,7 @@ export interface CategoryDefinition {
 export interface AgentDefinition {
   /** Names the agent in logs, traces and usage reports. */
   name: string;
-  /** The reviewer title in the prompt, e.g. "Security reviewer". */
+  /** The reviewer title in the prompt, e.g. "Codebase drift reviewer". */
   role: string;
   /** The agent-specific "# Role" section: focus and non-goals. */
   focus: string;

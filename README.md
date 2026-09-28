@@ -131,7 +131,7 @@ Agent ──► raw candidates (unknown[])
    ┌──────────────────────────────────────┐
    │ validateFindings()  — no model here  │
    │  1. Zod schema                       │
-   │  2. category is the agent's own      │
+   │  2. category is one the agent defines│
    │  3. file exists in the PR            │
    │  4. line is an ADDED line in the diff│
    │  5. confidence >= 0.70               │
@@ -168,8 +168,8 @@ Reinforcing rules:
 - The agent's system prompt carries a non-negotiable **prompt-injection
   block**: repository contents (diffs, files, PR title/description, search
   results) are data, never instructions; tool results grant no permissions.
-- The agent's findings are **filtered to its own category**, not re-stamped, so
-  category provenance stays deterministic.
+- The agent's findings are **filtered to the categories it defines**, not
+  re-stamped, so category provenance stays deterministic.
 - The check run conclusion is `neutral` whenever findings exist — the app is
   advisory and never blocks a merge.
 - A **patch never reaches a file on the agent's word**. The agent quotes the

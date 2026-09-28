@@ -2,7 +2,7 @@
  * The validation chain, in order: schema, category, changed file, added line,
  * confidence, evidence, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
  */
-import { changedPaths, type ChangedFile } from "@pr-review/github";
+import type { ChangedFile } from "@pr-review/github";
 import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
@@ -60,10 +60,7 @@ export function validateFindings(
   candidates: readonly unknown[],
   changedFiles: readonly ChangedFile[],
   allowedCategories: readonly string[],
-  evidenceBase: EvidenceBase = {
-    index: undefined,
-    changedPaths: changedPaths(changedFiles),
-  },
+  evidenceBase: EvidenceBase,
 ): ReviewFinding[] {
   // 1. Schema validity.
   const wellFormed = wellFormedFindings(candidates);

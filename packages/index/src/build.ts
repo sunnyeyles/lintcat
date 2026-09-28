@@ -67,7 +67,7 @@ export interface RepositoryIndex {
   readonly edges: readonly ImportEdge[];
   /** Resolved target path to the edges pointing at it. */
   readonly importers: ReadonlyMap<string, readonly ImportEdge[]>;
-  /** Manifests and aliases, kept so imports written at HEAD resolve alike. */
+  /** Manifests and aliases, read again for entry points and package ownership. */
   readonly workspace: WorkspaceModel;
 }
 

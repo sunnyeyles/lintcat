@@ -20,7 +20,6 @@ import {
   Login as IsxLogin,
   MagicStar as IsxMagicStar,
   MessageTick as IsxMessageTick,
-  Microscope as IsxMicroscope,
   Monitor as IsxMonitor,
   Moon as IsxMoon,
   Radar as IsxRadar,
@@ -30,7 +29,6 @@ import {
   ShieldCross as IsxShieldCross,
   ShieldTick as IsxShieldTick,
   Slash as IsxSlash,
-  Speedometer as IsxSpeedometer,
   Stop as IsxStop,
   Sun1 as IsxSun1,
   TickCircle as IsxTickCircle,
@@ -41,7 +39,6 @@ import { forwardRef, type ComponentType, type ForwardRefExoticComponent, type Re
 
 import { cn } from "#src/cn";
 import {
-  BugGlyph,
   CheckGlyph,
   CloseGlyph,
   DotGlyph,
@@ -108,14 +105,11 @@ export const UserX = icon("UserX", IsxUserRemove, "pulse");
 export const BookOpen = icon("BookOpen", IsxBook1, "float");
 export const BookText = icon("BookText", IsxDocumentText, "float");
 export const Bot = icon("Bot", IsxCpu, "float");
-export const Bug = icon("Bug", BugGlyph, "float");
 export const ChartLine = icon("ChartLine", IsxChart, "float");
 export const Check = icon("Check", CheckGlyph, "float");
 export const Circle = icon("Circle", DotGlyph, "float");
 export const Coins = icon("Coins", IsxCoin1, "float");
-export const FlaskConical = icon("FlaskConical", IsxMicroscope, "float");
 export const FolderGit2 = icon("FolderGit2", IsxFolder2, "float");
-export const Gauge = icon("Gauge", IsxSpeedometer, "float");
 export const GitPullRequest = icon("GitPullRequest", GitPullRequestGlyph, "float");
 export const KeyRound = icon("KeyRound", IsxKey, "float");
 export const LayoutDashboard = icon("LayoutDashboard", IsxCategory, "float");

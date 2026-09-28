@@ -4,7 +4,7 @@ import {
   MAX_EVIDENCE_ENTRIES,
   reviewFindingSchema,
   type ReviewFinding,
-} from "#src/index";
+} from "#src/review-finding";
 
 const validFinding: ReviewFinding = {
   file: "src/auth/session.ts",

@@ -20,7 +20,7 @@ function memoryFile(): string {
       version: 1,
       shapes: [
         {
-          category: "general",
+          category: "pattern",
           shape: "assignment instead of comparison in",
           resolved: 0,
           ignored: 5,

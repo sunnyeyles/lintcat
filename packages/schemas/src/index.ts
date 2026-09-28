@@ -2,8 +2,6 @@
 export {
   categoryLabel,
   findingCategorySchema,
-  findingEvidenceSchema,
-  MAX_EVIDENCE_ENTRIES,
   reviewFindingSchema,
   wellFormedFindings,
   type FindingCategory,
