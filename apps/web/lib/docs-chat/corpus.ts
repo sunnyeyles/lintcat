@@ -168,7 +168,7 @@ A diff only shows what changed. Before the reviewer starts, LintCat maps the rep
 - whether it is dead, with nothing importing it and no entry point reaching it;
 - whether it sits in an import cycle;
 - which unchanged files sit beside it and play the same role: the local convention it is compared against;
-- which lines of your Markdown docs name something the change adds, removes or edits.
+- which lines of your Markdown docs name something the change edits or removes.
 
 It can also look up which files use a name, and which files have historically changed alongside this one. That is how it finds the helper the change wrote again, the convention three other files follow, and the doc that now describes something else.
 

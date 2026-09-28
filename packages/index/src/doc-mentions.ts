@@ -1,4 +1,4 @@
-/** Doc lines that mention a name, key, env var or flag a pull request's code changes touch. */
+/** Doc lines that mention a name, key, env var or flag a pull request's code edits or removes. */
 import type { RepositoryIndex } from "#src/build";
 import { isDocPath } from "#src/docs";
 import { patchLines, type PatchedFile } from "#src/patch-lines";
@@ -38,7 +38,7 @@ export function namesOnLine(text: string): string[] {
 }
 
 export interface ChangedNames {
-  /** Every name on an added or removed line of a changed non-doc file. */
+  /** Every name on a removed line of a changed non-doc file; a pure addition makes no doc false. */
   readonly all: ReadonlySet<string>;
   /** Names on removed lines that no added line writes again. */
   readonly removed: ReadonlySet<string>;
@@ -56,7 +56,7 @@ export function changedNames(files: readonly PatchedFile[]): ChangedNames {
     for (const { text } of lines.removed) namesOnLine(text).forEach((name) => removed.add(name));
   }
   return {
-    all: new Set([...added, ...removed]),
+    all: removed,
     removed: new Set([...removed].filter((name) => !added.has(name))),
   };
 }

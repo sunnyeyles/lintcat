@@ -81,6 +81,12 @@ describe("docLinesMentioning", () => {
     ]);
   });
 
+  it("ignores a name the change only adds a use of", () => {
+    const addition = [{ filename: "src/boot.ts", status: "added", patch: "@@ -0,0 +1 @@\n+loadConfig(process.env);" }];
+
+    expect(docLinesMentioning(index, changedNames(addition), new Set(["src/boot.ts"]))).toEqual([]);
+  });
+
   it("ignores names a doc change touches", () => {
     const docOnly = [{ filename: "docs/changed.md", status: "modified", patch: "@@ -1 +1 @@\n-`loadConfig`\n+`loadConfig()`" }];
 
