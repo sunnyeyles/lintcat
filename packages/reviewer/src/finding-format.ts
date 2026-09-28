@@ -4,6 +4,8 @@
  */
 import {
   categoryLabel,
+  evidenceLabel,
+  isConventionCount,
   type FindingEvidence,
   type ReviewFinding,
 } from "@pr-review/schemas";
@@ -28,6 +30,9 @@ export function heading(finding: ReviewFinding): string {
 }
 
 function evidenceLink(entry: FindingEvidence, source: EvidenceSource | undefined): string {
+  if (isConventionCount(entry)) {
+    return evidenceLabel(entry);
+  }
   const label = `\`${entry.file}:${entry.line}\``;
   if (source === undefined) {
     return label;

@@ -154,3 +154,59 @@ describe("hasEnoughEvidence", () => {
     }
   });
 });
+
+describe("convention counts as evidence", () => {
+  const counted = buildRepositoryIndex({
+    sha: "0".repeat(40),
+    files: new Map(
+      ["credit-notes", "customer-accounts", "payment-methods", "tax-rates"].map((name) => [
+        `src/data/${name}.ts`,
+        "export const x = 1;\n",
+      ]),
+    ),
+  });
+  const added: ChangedFile[] = [
+    { filename: "src/data/refundRequests.ts", status: "added", additions: 1, deletions: 0 },
+  ];
+  const countedBase: EvidenceBase = { index: counted, changedPaths: changedPaths(added) };
+  const casing = { convention: "file-name-casing", file: "src/data/refundRequests.ts" };
+
+  it("accepts a count the index measures for a changed file", () => {
+    expect(evidenceProblem(casing, countedBase)).toBeUndefined();
+  });
+
+  it("rejects a convention with no clear majority, an unchanged file, or no index", () => {
+    expect(evidenceProblem({ ...casing, convention: "test-file-naming" }, countedBase)).toBe(
+      "not-counted",
+    );
+    expect(evidenceProblem({ ...casing, convention: "made-up" }, countedBase)).toBe(
+      "not-counted",
+    );
+    expect(evidenceProblem({ ...casing, file: "src/data/tax-rates.ts" }, countedBase)).toBe(
+      "not-counted",
+    );
+    expect(evidenceProblem(casing, { ...countedBase, index: undefined })).toBe("not-counted");
+  });
+
+  it("writes the measured summary over whatever the model said, once per count", () => {
+    const checked = withVerifiedEvidence(
+      finding([
+        { ...casing, summary: "every file in the repository" },
+        casing,
+        { ...casing, convention: "test-file-naming" },
+      ]),
+      countedBase,
+    );
+
+    expect(checked.evidence).toEqual([
+      {
+        ...casing,
+        summary: "all 4 siblings of src/data/refundRequests.ts use kebab-case file names",
+      },
+    ]);
+  });
+
+  it("is enough evidence on its own", () => {
+    expect(hasEnoughEvidence(finding([casing]))).toBe(true);
+  });
+});

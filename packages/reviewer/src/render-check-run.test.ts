@@ -180,6 +180,17 @@ describe("renderCheckRun with findings", () => {
     );
   });
 
+  it("names a convention count by its measured sentence in the annotation", () => {
+    const summary = "all 5 siblings of src/orders/list.ts use named exports only";
+    const evidenced = finding({
+      evidence: [{ convention: "export-style", file: "src/orders/list.ts", summary }],
+    });
+
+    const { output } = renderCheckRun([evidenced], { annotate: true });
+
+    expect(output.annotations?.[0]?.message).toContain(`Convention seen in: ${summary}`);
+  });
+
   it("caps annotations at 50 per request, keeping the strongest findings", () => {
     expect(MAX_ANNOTATIONS_PER_REQUEST).toBe(50);
     const many = Array.from({ length: 55 }, (_, i) =>

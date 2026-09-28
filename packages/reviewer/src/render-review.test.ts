@@ -79,6 +79,26 @@ describe("renderReview", () => {
     expect(rendered?.body).toContain("**Convention seen in:** `src/auth/roles.ts:4`");
   });
 
+  it("shows a convention count as its measured sentence, unlinked", () => {
+    const summary = "all 4 siblings of src/data/refundRequests.ts use kebab-case file names";
+    const rendered = renderReview(
+      [
+        finding({
+          evidence: [
+            { convention: "file-name-casing", file: "src/data/refundRequests.ts", summary },
+            { file: "src/auth/roles.ts", line: 4 },
+          ],
+        }),
+      ],
+      { evidenceSource: { owner: "octo-org", repo: "api", sha: "abc123" } },
+    );
+
+    expect(rendered?.comments[0]?.body).toContain(
+      `**Convention seen in:** ${summary}, ` +
+        "[`src/auth/roles.ts:4`](https://github.com/octo-org/api/blob/abc123/src/auth/roles.ts#L4)",
+    );
+  });
+
   it("says nothing about conventions for a finding without evidence", () => {
     expect(renderReview([finding()])?.comments[0]?.body).not.toContain("Convention seen in");
   });

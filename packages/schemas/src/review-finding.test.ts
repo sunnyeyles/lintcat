@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  evidenceLabel,
   MAX_EVIDENCE_ENTRIES,
   reviewFindingSchema,
   type ReviewFinding,
@@ -152,6 +153,33 @@ describe("reviewFindingSchema", () => {
     expect(
       reviewFindingSchema.safeParse({ ...validFinding, evidence: tooMany }).success,
     ).toBe(false);
+  });
+
+  it("accepts a convention count as evidence, beside line references", () => {
+    const evidence = [
+      { convention: "file-name-casing", file: "src/data/refundRequests.ts" },
+      { file: "src/data/credit-notes.ts", line: 1 },
+    ];
+    const result = reviewFindingSchema.safeParse({ ...validFinding, evidence });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.evidence).toEqual(evidence);
+      expect(result.data.evidence?.map(evidenceLabel)).toEqual([
+        "file-name-casing count for src/data/refundRequests.ts",
+        "src/data/credit-notes.ts:1",
+      ]);
+    }
+  });
+
+  it("rejects a count with no file or a convention that is not a slug", () => {
+    for (const entry of [
+      { convention: "file-name-casing" },
+      { convention: "File Casing", file: "src/a.ts" },
+    ]) {
+      expect(
+        reviewFindingSchema.safeParse({ ...validFinding, evidence: [entry] }).success,
+      ).toBe(false);
+    }
   });
 
   it("rejects non-object input", () => {

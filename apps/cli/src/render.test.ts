@@ -49,6 +49,17 @@ describe("a finding in a terminal", () => {
     );
   });
 
+  it("names a convention count by its measured sentence", () => {
+    const summary = "all 4 siblings of src/data/a.ts use kebab-case file names";
+    const finding = makeFinding("naming", {
+      evidence: [{ convention: "file-name-casing", file: "src/data/a.ts", summary }],
+    });
+
+    expect(renderFinding(finding, plain).split("\n")).toContain(
+      `  Convention seen in: ${summary}`,
+    );
+  });
+
   it("colours the severity only when colour is on", () => {
     const finding = makeFinding("naming");
 

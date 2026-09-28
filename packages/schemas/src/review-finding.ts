@@ -27,12 +27,37 @@ const findingPatchSchema = z
 export type FindingPatch = z.infer<typeof findingPatchSchema>;
 
 /** A pre-existing line showing the convention a finding says the change departs from. */
-const findingEvidenceSchema = z.object({
+const lineEvidenceSchema = z.object({
   file: z.string().min(1),
   line: z.number().int().positive(),
 });
 
+/** A convention counted over changed `file`'s siblings; validation writes `summary`. */
+const countEvidenceSchema = z.object({
+  convention: findingCategorySchema,
+  file: z.string().min(1),
+  summary: z.string().min(1).max(300).optional(),
+});
+
+const findingEvidenceSchema = z.union([lineEvidenceSchema, countEvidenceSchema]);
+
 export type FindingEvidence = z.infer<typeof findingEvidenceSchema>;
+
+export type ConventionCountEvidence = z.infer<typeof countEvidenceSchema>;
+
+export function isConventionCount(
+  entry: FindingEvidence,
+): entry is ConventionCountEvidence {
+  return "convention" in entry;
+}
+
+/** `file:line`, or the count's summary. */
+export function evidenceLabel(entry: FindingEvidence): string {
+  if (isConventionCount(entry)) {
+    return entry.summary ?? `${entry.convention} count for ${entry.file}`;
+  }
+  return `${entry.file}:${entry.line}`;
+}
 
 /** Past this, a finding is malformed rather than well evidenced. */
 export const MAX_EVIDENCE_ENTRIES = 20;

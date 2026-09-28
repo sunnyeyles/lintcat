@@ -87,10 +87,10 @@ export default function HowItWorksPage() {
         </Bullets>
         <P>
           Every finding cites at least two places in your existing code that show the
-          convention, or one line of your CLAUDE.md, AGENTS.md or CONTRIBUTING.md that states
-          it, and each is checked before the finding posts. Where the existing files disagree
-          among themselves and no rule doc settles it, there is no convention, and nothing is
-          reported.
+          convention, one line of your CLAUDE.md, AGENTS.md or CONTRIBUTING.md that states it,
+          or a count of the neighbouring files that follow it, and each is checked before the
+          finding posts. Where the existing files disagree among themselves and no rule doc
+          settles it, there is no convention, and nothing is reported.
         </P>
         <P>
           Bugs, security holes and performance problems are outside its scope, and so is
@@ -115,6 +115,10 @@ export default function HowItWorksPage() {
           <Bullet>
             which unchanged files sit beside it and play the same role: the local convention it
             is compared against;
+          </Bullet>
+          <Bullet>
+            which conventions those files clearly share, counted rather than guessed: how they
+            name files and tests, how they export, and how they import;
           </Bullet>
           <Bullet>
             which lines of your Markdown docs name something the change edits or removes;
