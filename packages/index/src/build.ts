@@ -12,6 +12,7 @@ import {
 import { nodesInCycles } from "#src/cycles";
 import { isDocPath, readDoc, type IndexedDoc } from "#src/docs";
 import { collectEntryPoints, isEntryPoint } from "#src/entry-points";
+import { exportStyleOf, type ExportStyle } from "#src/exports";
 import { parseImports, type ImportedName } from "#src/imports";
 import { findLintConfigs, type LintConfig } from "#src/lint-config";
 import {
@@ -50,6 +51,8 @@ export interface IndexedFile {
   readonly coveredBy?: string;
   /** The source file this test covers, when one matches a convention. */
   readonly covers?: string;
+  /** Absent outside the indexed languages and for a module exporting nothing. */
+  readonly exportStyle?: ExportStyle;
 }
 
 /** One import statement, resolved to a file in the tree or to nothing. */
@@ -238,15 +241,18 @@ export function buildRepositoryIndex(
     a < b ? -1 : a > b ? 1 : 0,
   )) {
     const owner = packageOf(workspace, path);
+    const language = languageOf(path);
+    const exportStyle = INDEXED_LANGUAGES.has(language) ? exportStyleOf(contents) : undefined;
     files.set(path, {
       path,
       role: classifyFileRole(path),
-      language: languageOf(path),
+      language,
       lineCount: countLines(contents),
       importerCount: 0,
       inCycle: false,
       dead: false,
       ...(owner === undefined ? {} : { package: owner }),
+      ...(exportStyle === undefined ? {} : { exportStyle }),
     });
   }
   pairTestsWithSources(files);
