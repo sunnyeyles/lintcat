@@ -34,12 +34,14 @@ export {
   type ReviewEngine,
 } from "#src/agents/engine";
 export type { SamplingRequest, SampleText } from "#src/agents/sampling-agent";
-export { GENERAL_AGENT } from "#src/agents/general-agent";
+export { DRIFT_CATEGORIES, GENERAL_AGENT } from "#src/agents/general-agent";
 export {
   renderRepository,
   INDEX_ABSENT_LINE,
 } from "#src/agents/repository-index";
 export {
+  categorySlugs,
   withRepositoryHints,
   type AgentDefinition,
+  type CategoryDefinition,
 } from "#src/agents/definition";

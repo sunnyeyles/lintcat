@@ -76,6 +76,7 @@ export {
   type ResolvedImport,
 } from "#src/resolve";
 export { classifyFileRole, ROLE_PRECEDENCE, type FileRole } from "#src/roles";
+export { siblingsOf } from "#src/siblings";
 export {
   readWorkspace,
   type WorkspaceModel,

@@ -110,10 +110,14 @@ function toolResultsOf(call: Call | undefined): ToolResultPart[] {
 const finding = {
   file: "src/sessions.ts",
   line: 42,
-  category: "general" as const,
+  category: "naming" as const,
   severity: "high" as const,
   title: "Assignment instead of comparison in admin check",
   explanation: "The if condition assigns instead of comparing, so every user passes.",
+  evidence: [
+    { file: "src/conventions/first.ts", line: 1 },
+    { file: "src/conventions/second.ts", line: 1 },
+  ],
   confidence: 0.95,
 };
 
@@ -237,6 +241,21 @@ describe("the review agent", () => {
     expect(system).toMatch(/final JSON/i);
     expect(system).toMatch(/security/i);
     expect(system).toMatch(/(not|never).*(formatting|style)/is);
+  });
+
+  it("briefs a drift-only reviewer whose findings carry evidence", async () => {
+    const { agent, calls } = makeAgent([message([textBlock(finalJson)], "end_turn")]);
+
+    await agent.run(context);
+
+    const system = systemOf(calls[0]);
+    for (const slug of ["naming", "pattern", "docs", "style", "config"]) {
+      expect(system).toContain(`  - "${slug}": `);
+    }
+    expect(system).not.toContain('"general"');
+    expect(system).not.toMatch(/do not report style, formatting, naming/i);
+    expect(system).toMatch(/at least two places/);
+    expect(system).toMatch(/correctness bugs, security holes, performance problems/);
   });
 
   it("round-trips a tool call through the github client and replays the result", async () => {
@@ -451,7 +470,7 @@ describe("category integrity", () => {
   // The runtime filters rather than re-stamps: relabelling would
   // fabricate a claim the model never made.
   it("drops findings outside the agent's own category and keeps its own", async () => {
-    const own = makeFinding("general");
+    const own = makeFinding("naming");
     const leakedOther = makeFinding("docs-drift", { line: 43 });
     const leakedThird = makeFinding("performance", { line: 44 });
     const { agent } = makeAgent([
@@ -952,6 +971,69 @@ describe("the repository index block", () => {
     await agent.run({ ...context, changedFiles });
 
     expect(openingOf(calls[0])).toContain("- [... 2 more files]");
+  });
+});
+
+describe("the sibling files block", () => {
+  const scripted = [message([textBlock(finalJson)], "end_turn")];
+
+  async function openingFor(reviewContext: typeof context, index = fakeIndex()) {
+    const { agent, calls } = makeAgent(scripted, { index });
+    await agent.run(reviewContext);
+    return openingOf(calls[0]);
+  }
+
+  it("lists each changed file's unchanged siblings of the same role, before the diff", async () => {
+    const opening = await openingFor({
+      ...context,
+      changedFiles: [
+        ...context.changedFiles,
+        { filename: "src/api.ts", status: "modified", additions: 1, deletions: 0 },
+      ],
+    });
+
+    expect(opening).toContain(
+      "<sibling_files>\nUnchanged files in the same directory, with the same role, as each changed file: the local convention to compare it against.\n" +
+        "- src/sessions.ts: src/admin.ts, src/boot.ts, src/untested.ts\n" +
+        "- src/api.ts: src/admin.ts, src/boot.ts, src/untested.ts\n" +
+        "</sibling_files>",
+    );
+    expect(opening.indexOf("</sibling_files>")).toBeLessThan(opening.indexOf("<diff>"));
+  });
+
+  it("names siblings for an added file, and counts those past the cap", async () => {
+    const crowded = buildRepositoryIndex({
+      sha: baseSha,
+      files: new Map(
+        Array.from({ length: 8 }, (_unused, at) => [`src/data/table-${at}.ts`, "export {};\n"]),
+      ),
+    });
+
+    const opening = await openingFor(
+      {
+        ...context,
+        changedFiles: [
+          { filename: "src/data/refunds.ts", status: "added", additions: 9, deletions: 0 },
+        ],
+      },
+      crowded,
+    );
+
+    expect(opening).toContain(
+      "- src/data/refunds.ts: src/data/table-0.ts, src/data/table-1.ts, src/data/table-2.ts, src/data/table-3.ts, src/data/table-4.ts (+3 more)",
+    );
+  });
+
+  it("is left out without an index, or when no file has a sibling", async () => {
+    const { agent, calls } = makeAgent(scripted);
+    await agent.run(context);
+    expect(openingOf(calls[0])).not.toContain("<sibling_files>");
+
+    const lonely = buildRepositoryIndex({
+      sha: baseSha,
+      files: new Map([["src/sessions.ts", "export {};\n"]]),
+    });
+    expect(await openingFor(context, lonely)).not.toContain("<sibling_files>");
   });
 });
 

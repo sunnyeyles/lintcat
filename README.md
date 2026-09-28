@@ -6,18 +6,25 @@ organization's own model key. It publishes inline review comments and an
 
 ## What it finds
 
-One **general** agent reviews the whole pull request in a single pass, with no
+One agent reviews the whole pull request in a single pass, with no
 configuration and nothing to choose. Its brief
-([`general-agent.ts`](packages/ai/src/agents/general-agent.ts)) is the problems
-a careful senior reviewer would block a merge on:
+([`general-agent.ts`](packages/ai/src/agents/general-agent.ts)) is **codebase
+drift**: places where the change departs from how the rest of the repository
+already does the same thing — naming first, then patterns. Each finding carries
+one of these categories:
 
 | | |
 | --- | --- |
-| **Correctness** | logic errors, wrong conditions or bounds, unhandled null or empty input, wrong return values, swallowed errors, missing awaits, ordering bugs |
-| **Security** | missing or bypassable authn/authz, cross-tenant access, injection, leaked secrets, sensitive data in logs, unsafely trusted input |
-| **Performance** | N+1 queries, unbounded reads on a per-request path, quadratic scans over growing data, blocking I/O on a request path |
-| **Tests** | a new or changed branch no existing test file exercises, or a test still asserting the old behaviour |
-| **Documentation** | README, docs, or code comments this change made wrong |
+| **naming** | a function, type, file, export, route or flag named differently from how the repository names the same kind of thing |
+| **pattern** | a re-implemented helper, a bypassed layer, a hand-rolled version of an established construct |
+| **docs** | documentation, a code comment or a doc link this change made wrong |
+| **style** | a structural habit the neighbouring files share and no formatter or linter enforces: export style, error shape, module layout |
+| **config** | a setting, env var or dependency added differently from the ones already there |
+
+Every finding cites **evidence**: at least two places in files the pull request
+does not change that show the convention. The opening message lists each
+changed file's siblings — the unchanged files in its directory with the same
+role — as the local convention to read first.
 
 A finding may carry a **patch**: a replacement for a range of lines, quoted
 alongside the exact text it expects to replace. With [fixes](#fixes) on, the
@@ -29,13 +36,13 @@ decides what actually gets published.
 
 ## How noisy it is
 
-**What it deliberately stays silent about.** The agent is told not to report
-style, formatting, naming, micro-optimisations, missing documentation for new
-work, or design opinions it cannot tie to a caller, an existing helper or a
-documented rule — those categories are discarded rather than ranked down. It
-does report dead files and exports, duplicated helpers, and imports that cross
-a documented layer boundary. It is told to report a problem only after reading the code,
-and to prefer a few serious findings over many small ones.
+**What it deliberately stays silent about.** Correctness bugs, security holes,
+performance problems and missing tests are out of scope, and so is anything a
+formatter, linter, typecheck or build already catches — including whether an
+import resolves. A directory whose files disagree among themselves has no
+convention to drift from, so nothing in it is reported. The agent is told to
+cite only lines it has read, and to prefer a few well-evidenced findings over
+many small ones.
 
 **What the code enforces, with no model in the path**
 ([`validate-findings.ts`](packages/reviewer/src/validate-findings.ts)):
@@ -43,12 +50,13 @@ and to prefer a few serious findings over many small ones.
 - a finding whose `confidence` is below **0.70** is dropped
 - a finding must land on a line the diff actually **added**, in a file the pull
   request touches
-- a finding must carry the agent's own category (`general`); any other is
-  dropped, never re-stamped
+- a finding must carry one of the agent's categories; any other is dropped,
+  never re-stamped
 - a finding's **evidence** — the `file:line` references it cites for the
   convention the change departs from — is checked against the repository index
   at the base commit: an entry naming a file that does not exist, a file the
-  pull request changes, or a line past the file's end is removed
+  pull request changes, or a line past the file's end is removed, and a finding
+  left with fewer than **two** entries is dropped
   ([`validate-evidence.ts`](packages/reviewer/src/validate-evidence.ts)). What
   survives is shown as "Convention seen in" links on the comment and the
   dashboard
@@ -363,11 +371,14 @@ does not exist. The query lives in `@pr-review/index`; the agent tool and the
 MCP tool of the same name both render what it returns, so there is one cap, one
 header and one unknown-path answer.
 
-The opening message carries two blocks. `<repository>` gives bearings in a
+The opening message carries three blocks. `<repository>` gives bearings in a
 monorepo: every workspace package with its root, the indexed commit, and what
 each language contributed, resolution rate included. `<repository_index>` is
 one line per changed file — its package, its role, its covering test and its
-importer count.
+importer count. `<sibling_files>` names, for each changed file, up to five
+unchanged files in the same directory with the same role
+([`siblingsOf`](packages/index/src/siblings.ts)): the local convention the
+reviewer reads before calling anything drift.
 
 Reading the archive is capped at 50 MB, 20 000 files and 512 KB per file, and
 `node_modules`, `vendor`, `dist`, `.git` and similar are dropped as it reads.

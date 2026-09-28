@@ -1,12 +1,13 @@
-import type { ChangedFile } from "@pr-review/github";
+import { changedPaths, type ChangedFile } from "@pr-review/github";
 import { buildRepositoryIndex } from "@pr-review/index";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
 import {
-  changedPathsOf,
   evidenceProblem,
+  hasEnoughEvidence,
   MAX_EVIDENCE,
+  MIN_EVIDENCE,
   withVerifiedEvidence,
   type EvidenceBase,
 } from "#src/validate-evidence";
@@ -32,7 +33,7 @@ const changedFiles: ChangedFile[] = [
   },
 ];
 
-const base: EvidenceBase = { index, changedPaths: changedPathsOf(changedFiles) };
+const base: EvidenceBase = { index, changedPaths: changedPaths(changedFiles) };
 
 function finding(evidence?: ReviewFinding["evidence"]): ReviewFinding {
   return {
@@ -46,16 +47,6 @@ function finding(evidence?: ReviewFinding["evidence"]): ReviewFinding {
     ...(evidence === undefined ? {} : { evidence }),
   };
 }
-
-describe("changedPathsOf", () => {
-  it("names both sides of a rename", () => {
-    expect([...changedPathsOf(changedFiles)].sort()).toEqual([
-      "src/data/charges.ts",
-      "src/data/payments.ts",
-      "src/data/refunds.ts",
-    ]);
-  });
-});
 
 describe("evidenceProblem", () => {
   it("accepts an unchanged file's line within its length", () => {
@@ -128,5 +119,21 @@ describe("withVerifiedEvidence", () => {
     expect(withVerifiedEvidence(finding(many), base).evidence).toEqual(
       many.slice(0, MAX_EVIDENCE),
     );
+  });
+});
+
+describe("hasEnoughEvidence", () => {
+  it("asks for MIN_EVIDENCE entries, and a finding with none has too few", () => {
+    expect(MIN_EVIDENCE).toBe(2);
+    expect(hasEnoughEvidence(finding())).toBe(false);
+    expect(hasEnoughEvidence(finding([{ file: "src/data/long.ts", line: 1 }]))).toBe(false);
+    expect(
+      hasEnoughEvidence(
+        finding([
+          { file: "src/data/long.ts", line: 1 },
+          { file: "src/data/long.ts", line: 2 },
+        ]),
+      ),
+    ).toBe(true);
   });
 });

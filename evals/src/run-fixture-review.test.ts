@@ -40,7 +40,7 @@ function scriptedDeps() {
   const built: AgentDefinition[] = [];
   const createAgent = vi.fn(({ agent }: { agent: AgentDefinition }): ReviewAgent => {
     built.push(agent);
-    return { name: agent.category, run: async () => [] };
+    return { name: agent.name, run: async () => [] };
   });
   const { logger } = createCapturingLogger();
   const deps: FixtureReviewDeps = { engine: { createAgent }, logger };

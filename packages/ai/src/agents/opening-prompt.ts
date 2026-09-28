@@ -1,4 +1,4 @@
-/** The opening user message every engine sends: scope, pull request, files, index, diff. */
+/** The opening user message every engine sends: scope, pull request, files, index, siblings, diff. */
 import type { RepositoryIndex } from "@pr-review/index";
 
 import type { ReviewContext } from "#src/agent-contract";
@@ -10,6 +10,7 @@ import {
 import {
   renderRepository,
   renderRepositoryIndex,
+  renderSiblingFiles,
 } from "#src/agents/repository-index";
 import { truncateWithMarker } from "#src/agents/truncate";
 
@@ -94,6 +95,7 @@ export function buildOpeningPrompt(
     ...renderRepository(index),
     ...renderRepositoryIndex(index, changedFiles, maxListedFiles),
     "",
+    ...renderSiblingFiles(index, context, maxListedFiles),
     "<diff>",
     opening.diff,
     "</diff>",

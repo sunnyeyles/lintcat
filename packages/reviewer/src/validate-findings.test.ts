@@ -57,6 +57,10 @@ function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
     severity: "medium",
     title: "Off-by-one in pagination",
     explanation: "The page offset is computed from a 1-based index.",
+    evidence: [
+      { file: "src/pagination.ts", line: 4 },
+      { file: "src/cursor.ts", line: 9 },
+    ],
     confidence: 0.9,
     ...overrides,
   };
@@ -400,6 +404,7 @@ describe("validateFindings", () => {
         { file: "src/service.ts", line: 1 },
         { file: "src/absent.ts", line: 1 },
         { file: "src/conventions.ts", line: 40 },
+        { file: "src/conventions.ts", line: 3 },
       ],
     });
 
@@ -408,6 +413,53 @@ describe("validateFindings", () => {
         index,
         changedPaths: new Set(["src/service.ts", "src/other.ts"]),
       }),
-    ).toEqual([{ ...evidenced, evidence: [{ file: "src/conventions.ts", line: 2 }] }]);
+    ).toEqual([
+      {
+        ...evidenced,
+        evidence: [
+          { file: "src/conventions.ts", line: 2 },
+          { file: "src/conventions.ts", line: 3 },
+        ],
+      },
+    ]);
+  });
+
+  it("drops a finding left with fewer than two valid evidence entries", () => {
+    const index = buildRepositoryIndex({
+      sha: "0".repeat(40),
+      files: new Map([
+        ["src/a.ts", "a\nb\n"],
+        ["src/b.ts", "a\n"],
+      ]),
+    });
+    const base = { index, changedPaths: new Set(["src/service.ts", "src/other.ts"]) };
+    const withTwo = finding({
+      evidence: [
+        { file: "src/a.ts", line: 1 },
+        { file: "src/b.ts", line: 1 },
+      ],
+    });
+    const leftWithOne = finding({
+      line: 11,
+      title: "One real example",
+      evidence: [
+        { file: "src/a.ts", line: 2 },
+        { file: "src/service.ts", line: 1 },
+        { file: "src/ghost.ts", line: 1 },
+      ],
+    });
+    const repeatedOne = finding({
+      line: 12,
+      title: "The same example twice",
+      evidence: [
+        { file: "src/a.ts", line: 1 },
+        { file: "src/a.ts", line: 1 },
+      ],
+    });
+    const { evidence: _none, ...unevidenced } = finding({ file: "src/other.ts", line: 5 });
+
+    expect(
+      validateFindings([withTwo, leftWithOne, repeatedOne, unevidenced], changedFiles, CATEGORIES, base),
+    ).toEqual([withTwo]);
   });
 });

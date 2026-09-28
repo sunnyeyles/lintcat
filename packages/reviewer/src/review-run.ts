@@ -2,6 +2,7 @@
 // patch verification and delivery. Cancellation is decided here.
 import {
   addTokenUsage,
+  categorySlugs,
   emptyTokenUsage,
   GENERAL_AGENT,
   isCancellation,
@@ -10,11 +11,12 @@ import {
   type AgentDefinition,
   type ReviewEngine,
 } from "@pr-review/ai";
-import type {
-  ChangedFile,
-  ExistingReviewComment,
-  PullRequestReadClient,
-  RepositoryHistoryClient,
+import {
+  changedPaths,
+  type ChangedFile,
+  type ExistingReviewComment,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
 } from "@pr-review/github";
 import {
   snapshotRepositoryIndex,
@@ -53,7 +55,6 @@ import type { FinishedReviewRun, ReviewDelivery } from "#src/review-delivery";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { suggestReviewers } from "#src/suggest-reviewers";
-import { changedPathsOf } from "#src/validate-evidence";
 import { validateFindings } from "#src/validate-findings";
 import { verifyPatches, type PatchSummary } from "#src/validate-patches";
 
@@ -419,8 +420,8 @@ async function review(
   const findings = validateFindings(
     candidates,
     scope.changedFiles,
-    [agent.name],
-    { index: repositoryIndex, changedPaths: changedPathsOf(changedFiles) },
+    categorySlugs(hinted),
+    { index: repositoryIndex, changedPaths: changedPaths(changedFiles) },
   );
   logger.info("findings.validated", {
     ...fields,

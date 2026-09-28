@@ -70,8 +70,9 @@ export default function SecurityPage() {
           <Bullet>It points at a line this pull request added or changed.</Bullet>
           <Bullet>The reviewer is confident in it.</Bullet>
           <Bullet>
-            Any code it cites as the convention your change departs from exists, and sits outside
-            this pull request. A reference that doesn&rsquo;t check out is removed.
+            It cites at least two places in your existing code that show the convention your
+            change departs from. Each must exist and sit outside this pull request; a reference
+            that doesn&rsquo;t check out is removed, and so is a finding left with fewer than two.
           </Bullet>
           <Bullet>It doesn&rsquo;t repeat another finding.</Bullet>
           <Bullet>It makes the cut of at most 10 per review, most important first.</Bullet>

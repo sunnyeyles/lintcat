@@ -2,12 +2,12 @@
  * The validation chain, in order: schema, category, changed file, added line,
  * confidence, evidence, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
  */
-import type { ChangedFile } from "@pr-review/github";
+import { changedPaths, type ChangedFile } from "@pr-review/github";
 import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
 import {
-  changedPathsOf,
+  hasEnoughEvidence,
   withVerifiedEvidence,
   type EvidenceBase,
 } from "#src/validate-evidence";
@@ -62,7 +62,7 @@ export function validateFindings(
   allowedCategories: readonly string[],
   evidenceBase: EvidenceBase = {
     index: undefined,
-    changedPaths: changedPathsOf(changedFiles),
+    changedPaths: changedPaths(changedFiles),
   },
 ): ReviewFinding[] {
   // 1. Schema validity.
@@ -91,10 +91,11 @@ export function validateFindings(
     (finding) => finding.confidence >= CONFIDENCE_THRESHOLD,
   );
 
-  // 6. Evidence entries the base commit cannot vouch for are removed.
-  const evidenced = confident.map((finding) =>
-    withVerifiedEvidence(finding, evidenceBase),
-  );
+  // 6. Evidence entries the base commit cannot vouch for are removed,
+  // then a finding left without enough evidence goes with them.
+  const evidenced = confident
+    .map((finding) => withVerifiedEvidence(finding, evidenceBase))
+    .filter(hasEnoughEvidence);
 
   // 7. Duplicate removal. Sorted first, so the strongest of each group
   // is the one that survives.

@@ -42,9 +42,9 @@ export default function IntroductionPage() {
 
       <Section id="what-it-does" title="What it does">
         <P>
-          One reviewer reads each pull request in a single pass, looking for correctness,
-          security, performance, test and documentation problems. You don&rsquo;t need to
-          configure anything to get that.
+          One reviewer reads each pull request in a single pass, looking for drift: places
+          where the change names or does something differently from how the rest of your
+          repository already does it. You don&rsquo;t need to configure anything to get that.
         </P>
         <P>
           A finding can include a <strong>suggested fix</strong>. LintCat checks the fix

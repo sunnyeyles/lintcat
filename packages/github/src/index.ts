@@ -1,3 +1,4 @@
+export { changedPaths } from "#src/changed-paths";
 export {
   ArchiveTooLargeError,
   DEFAULT_ARCHIVE_LIMITS,

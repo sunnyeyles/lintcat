@@ -268,8 +268,8 @@ describe("review_local_changes", () => {
     const env = environment({
       createLanguageModel: () =>
         scriptedModel([
-          makeFinding("general", { file: "src/sessions.ts", line: 3, title: "Admin is always on" }),
-          makeFinding("general", { file: "src/sessions.ts", line: 1, title: "On an untouched line" }),
+          makeFinding("naming", { file: "src/sessions.ts", line: 3, title: "Admin is always on" }),
+          makeFinding("naming", { file: "src/sessions.ts", line: 1, title: "On an untouched line" }),
         ]),
     });
     const client = await connect(env);
@@ -313,7 +313,7 @@ describe("review_local_changes", () => {
 });
 
 describe("review scopes", () => {
-  const admin = makeFinding("general", { file: "src/sessions.ts", line: 3, title: "Admin is always on" });
+  const admin = makeFinding("naming", { file: "src/sessions.ts", line: 3, title: "Admin is always on" });
 
   it("reviews only the index, leaving unstaged work out", async () => {
     repo.git("add", "src/sessions.ts");
@@ -397,7 +397,7 @@ describe("review_pull_request", () => {
     const client = github();
     const createTokenClient = vi.fn(() => client);
     const mcp = await connect(
-      environment({ createTokenClient, createLanguageModel: () => scriptedModel([makeFinding("general")]) }),
+      environment({ createTokenClient, createLanguageModel: () => scriptedModel([makeFinding("naming")]) }),
     );
 
     const { isError, texts } = await call(mcp, "review_pull_request", {
@@ -776,7 +776,7 @@ describe("a review through client sampling", () => {
   it("reviews with no provider key at all, and says the review was reduced", async () => {
     const { client, asked } = await samplingClient(
       environment({ env: {} }),
-      finalFindingsJson([makeFinding("general", { file: "src/sessions.ts", line: 3, title: "Admin is always on" })]),
+      finalFindingsJson([makeFinding("naming", { file: "src/sessions.ts", line: 3, title: "Admin is always on" })]),
     );
 
     const { isError, texts } = await call(client, "review_local_changes", { base: "main", index: false });
@@ -795,8 +795,8 @@ describe("a review through client sampling", () => {
     const { client } = await samplingClient(
       environment({ env: {} }),
       finalFindingsJson([
-        makeFinding("general", { file: "src/sessions.ts", line: 1, title: "On an untouched line" }),
-        makeFinding("general", { file: "src/nowhere.ts", line: 3, title: "In an unchanged file" }),
+        makeFinding("naming", { file: "src/sessions.ts", line: 1, title: "On an untouched line" }),
+        makeFinding("naming", { file: "src/nowhere.ts", line: 3, title: "In an unchanged file" }),
       ]),
     );
 
@@ -835,7 +835,7 @@ describe("suppress_finding", () => {
   function reviewing(title: string) {
     return environment({
       createLanguageModel: () =>
-        scriptedModel([makeFinding("general", { file: "src/sessions.ts", line: 3, title })]),
+        scriptedModel([makeFinding("naming", { file: "src/sessions.ts", line: 3, title })]),
     });
   }
 

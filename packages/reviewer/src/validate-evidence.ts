@@ -1,10 +1,12 @@
 /** Checks a finding's evidence against the repository at the pull request's base. */
-import type { ChangedFile } from "@pr-review/github";
 import type { RepositoryIndex } from "@pr-review/index";
 import type { FindingEvidence, ReviewFinding } from "@pr-review/schemas";
 
 /** Entries kept per finding once the invalid ones are gone. */
 export const MAX_EVIDENCE = 5;
+
+/** Valid entries a finding needs to stand: a convention seen once is not one. */
+export const MIN_EVIDENCE = 2;
 
 /** What an evidence entry is checked against. */
 export interface EvidenceBase {
@@ -12,16 +14,6 @@ export interface EvidenceBase {
   index: RepositoryIndex | undefined;
   /** Every path the whole pull request touches, renames on both sides. */
   changedPaths: ReadonlySet<string>;
-}
-
-export function changedPathsOf(changedFiles: readonly ChangedFile[]): Set<string> {
-  return new Set(
-    changedFiles.flatMap((file) =>
-      file.previous_filename === undefined
-        ? [file.filename]
-        : [file.filename, file.previous_filename],
-    ),
-  );
 }
 
 /** Why an entry cannot stand as evidence, or undefined when it can. */
@@ -62,4 +54,8 @@ export function withVerifiedEvidence(
   }
   const { evidence: _dropped, ...rest } = finding;
   return kept.length === 0 ? rest : { ...rest, evidence: kept.slice(0, MAX_EVIDENCE) };
+}
+
+export function hasEnoughEvidence(finding: ReviewFinding): boolean {
+  return (finding.evidence?.length ?? 0) >= MIN_EVIDENCE;
 }

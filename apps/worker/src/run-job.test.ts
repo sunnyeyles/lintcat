@@ -77,7 +77,7 @@ beforeEach(async () => {
   log = [];
 });
 
-function answering(findings = [makeFinding("general", { line: 41 })]): ReviewModel {
+function answering(findings = [makeFinding("naming", { line: 41 })]): ReviewModel {
   return makeModel([message([textBlock(finalFindingsJson(findings))], "end_turn")]).model;
 }
 
@@ -375,7 +375,7 @@ describe("runReviewJob repo settings", () => {
   ).join("\n");
 
   function answeringWithFix(): ReviewModel {
-    const finding = makeFinding("general", {
+    const finding = makeFinding("naming", {
       line: 41,
       patch: {
         startLine: 41,
@@ -443,7 +443,7 @@ describe("runReviewJob dashboard recording", () => {
   it("records findings without the patch's expected or replacement text", async () => {
     await withKey();
     const job = await claim();
-    const finding = makeFinding("general", {
+    const finding = makeFinding("naming", {
       line: 41,
       patch: {
         startLine: 41,
@@ -473,12 +473,12 @@ describe("runReviewJob dashboard recording", () => {
 
   it("replaces the review's findings when the same commit is reviewed again", async () => {
     await withKey();
-    const first = [makeFinding("general", { line: 41, title: "First problem" })];
+    const first = [makeFinding("naming", { line: 41, title: "First problem" })];
     const { deps: d1 } = deps({ createLanguageModel: () => answering(first) });
     expect(await runReviewJob(d1, await claim())).toBe("succeeded");
     expect(await database.select().from(findings)).toMatchObject([{ title: "First problem" }]);
 
-    const rerun = [makeFinding("general", { line: 41, title: "Only problem left" })];
+    const rerun = [makeFinding("naming", { line: 41, title: "Only problem left" })];
     const { deps: d2 } = deps({ createLanguageModel: () => answering(rerun) });
     expect(await runReviewJob(d2, await claim())).toBe("succeeded");
 

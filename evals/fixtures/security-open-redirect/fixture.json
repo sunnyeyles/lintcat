@@ -1,0 +1,26 @@
+{
+  "name": "security-open-redirect",
+  "title": "Security — the inbox deep-link route redirects wherever it is told",
+  "owner": "acme-cloud",
+  "repo": "support-console",
+  "baseSha": "4c09e2b7a15d8f36e0b1c9a7d52f4e8103b6c7a9",
+  "headSha": "e81f3a6c0d294b57a1e6c3f08b7d95a24c1e6f30",
+  "pullRequest": {
+    "number": 241,
+    "title": "Land support inbox deep links on the console",
+    "body": "Links in the support inbox point at console pages, but agents who are signed out get bounced to the home page and lose the link.\n\nAdds GET /open?to=<path>, which the inbox links through: it checks the session and then sends the agent on to the page the link names.",
+    "author": "tom-veldhuis",
+    "baseRef": "main",
+    "headRef": "feature/inbox-deep-links"
+  },
+  "changedFiles": [
+    {
+      "path": "src/routes/open-link.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/index.ts",
+      "status": "modified"
+    }
+  ]
+}
