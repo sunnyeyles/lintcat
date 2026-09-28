@@ -33,7 +33,13 @@ export type FixtureExpectation =
       cites?: CitationAnchor[];
     }
   | { kind: "no-findings"; description: string }
-  | { kind: "patches-verify"; description: string };
+  | { kind: "patches-verify"; description: string }
+  | {
+      kind: "files-unread";
+      description: string;
+      /** No agent may read any of these, at either commit. */
+      files: readonly string[];
+    };
 
 /** The judgement of one expectation against one fixture review. */
 interface ExpectationOutcome {
@@ -159,6 +165,21 @@ export function evaluateExpectation(
           ? `${verified} of ${proposed} proposed patch(es) matched the file`
           : `${proposed - verified} of ${proposed} proposed patch(es) did not match the ` +
             `file at head and were discarded.\n\n${rendered}`,
+    };
+  }
+
+  if (expectation.kind === "files-unread") {
+    const read = review.calls
+      .filter((call) => call.method === "getFileContents")
+      .map((call) => call.detail)
+      .filter((detail) => expectation.files.some((file) => detail.startsWith(`${file} @ `)));
+    return {
+      passed: read.length === 0,
+      detail:
+        read.length === 0
+          ? `none of the ${expectation.files.length} file(s) was read`
+          : "the review read files the convention counts already stood for:\n" +
+            read.map((detail) => `  ${detail}`).join("\n"),
     };
   }
 

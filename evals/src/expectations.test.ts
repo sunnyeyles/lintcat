@@ -85,7 +85,10 @@ function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   };
 }
 
-function review(result: Partial<ReviewOutcome> = {}): FixtureReview {
+function review(
+  result: Partial<ReviewOutcome> = {},
+  calls: FixtureReview["calls"] = [],
+): FixtureReview {
   return {
     fixture,
     result: {
@@ -98,6 +101,7 @@ function review(result: Partial<ReviewOutcome> = {}): FixtureReview {
       ...result,
     },
     rendered: { conclusion: "success", output: { title: "Review", summary: "" } },
+    calls,
   };
 }
 
@@ -208,6 +212,29 @@ describe("evaluateExpectation", () => {
     );
     expect(mismatched.passed).toBe(false);
     expect(mismatched.detail).toContain("2 of 3 proposed patch(es) did not match");
+  });
+
+  it("judges files-unread by the reads the review made, at either commit", () => {
+    const unread = {
+      kind: "files-unread",
+      description: "siblings unread",
+      files: ["src/data/a.ts", "src/data/b.ts"],
+    } as const;
+    const pipeline = { method: "getFileContents", detail: "src/services/x.ts @ head" };
+
+    expect(evaluateExpectation(review({}, [pipeline]), unread).passed).toBe(true);
+    const read = evaluateExpectation(
+      review({}, [pipeline, { method: "getFileContents", detail: "src/data/b.ts @ base" }]),
+      unread,
+    );
+    expect(read.passed).toBe(false);
+    expect(read.detail).toContain("src/data/b.ts @ base");
+    expect(
+      evaluateExpectation(
+        review({}, [{ method: "getFileContents", detail: "src/data/a.tsx @ head" }]),
+        unread,
+      ).passed,
+    ).toBe(true);
   });
 });
 

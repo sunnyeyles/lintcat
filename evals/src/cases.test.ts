@@ -24,6 +24,22 @@ describe("evalCases", () => {
     },
   );
 
+  it.each(evalCases.map((evalCase) => [evalCase.fixture, evalCase] as const))(
+    "names only unchanged base files in %s's files-unread expectations",
+    (_name, evalCase) => {
+      const fixture = loadFixture(evalCase.fixture);
+      const changed = new Set(fixture.changedFiles.map((file) => file.filename));
+
+      for (const expectation of evalCase.expectations) {
+        if (expectation.kind !== "files-unread") continue;
+        for (const file of expectation.files) {
+          expect(fixture.baseFiles.has(file), file).toBe(true);
+          expect(changed.has(file), file).toBe(false);
+        }
+      }
+    },
+  );
+
   it("keeps a precision fixture that must come back clean", () => {
     expect(
       evalCases.some((evalCase) =>
