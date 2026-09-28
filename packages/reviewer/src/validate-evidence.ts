@@ -42,12 +42,9 @@ function countFor(
 
 /** Why an entry cannot stand as evidence, or undefined when it can. */
 export function evidenceProblem(
-  entry: FindingEvidence,
+  entry: Exclude<FindingEvidence, ConventionCountEvidence>,
   base: EvidenceBase,
-): "changed-file" | "missing-file" | "line-out-of-range" | "not-counted" | undefined {
-  if (isConventionCount(entry)) {
-    return countFor(entry, base) === undefined ? "not-counted" : undefined;
-  }
+): "changed-file" | "missing-file" | "line-out-of-range" | undefined {
   if (base.changedPaths.has(entry.file)) {
     return "changed-file";
   }

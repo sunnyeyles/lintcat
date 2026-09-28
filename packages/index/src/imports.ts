@@ -43,7 +43,7 @@ const OPERAND_KEYWORDS = new Set([
 
 const WORD_CHARACTER = /[\w$]/;
 
-export interface MaskedSource {
+interface MaskedSource {
   text: string;
   /** Each literal's body, by the index of its opening quote. */
   values: Map<number, string>;

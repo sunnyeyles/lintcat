@@ -4,7 +4,7 @@ import { INDEXED_LANGUAGES } from "#src/languages";
 import { basenameOf, extensionOf, MODULE_EXTENSIONS } from "#src/paths";
 import { siblingsOf } from "#src/siblings";
 
-export const CONVENTIONS = [
+const CONVENTIONS = [
   "file-name-casing",
   "test-file-naming",
   "export-style",
@@ -23,7 +23,7 @@ export interface ConventionCount {
 }
 
 /** Fewer measurable siblings than this is too few to call a convention. */
-export const MIN_MEASURED_SIBLINGS = 3;
+const MIN_MEASURED_SIBLINGS = 3;
 
 /** The share the commonest value needs before it is a convention. */
 export const MIN_MAJORITY = 0.8;

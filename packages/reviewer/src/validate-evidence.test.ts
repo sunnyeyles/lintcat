@@ -171,21 +171,15 @@ describe("convention counts as evidence", () => {
   const countedBase: EvidenceBase = { index: counted, changedPaths: changedPaths(added) };
   const casing = { convention: "file-name-casing", file: "src/data/refundRequests.ts" };
 
-  it("accepts a count the index measures for a changed file", () => {
-    expect(evidenceProblem(casing, countedBase)).toBeUndefined();
-  });
-
-  it("rejects a convention with no clear majority, an unchanged file, or no index", () => {
-    expect(evidenceProblem({ ...casing, convention: "test-file-naming" }, countedBase)).toBe(
-      "not-counted",
-    );
-    expect(evidenceProblem({ ...casing, convention: "made-up" }, countedBase)).toBe(
-      "not-counted",
-    );
-    expect(evidenceProblem({ ...casing, file: "src/data/tax-rates.ts" }, countedBase)).toBe(
-      "not-counted",
-    );
-    expect(evidenceProblem(casing, { ...countedBase, index: undefined })).toBe("not-counted");
+  it("drops a convention with no clear majority, an unchanged file, or no index", () => {
+    for (const [entry, checkedAgainst] of [
+      [{ ...casing, convention: "test-file-naming" }, countedBase],
+      [{ ...casing, convention: "made-up" }, countedBase],
+      [{ ...casing, file: "src/data/tax-rates.ts" }, countedBase],
+      [casing, { ...countedBase, index: undefined }],
+    ] as const) {
+      expect(withVerifiedEvidence(finding([entry]), checkedAgainst).evidence).toBeUndefined();
+    }
   });
 
   it("writes the measured summary over whatever the model said, once per count", () => {

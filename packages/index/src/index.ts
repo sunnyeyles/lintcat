@@ -27,10 +27,7 @@ export {
 export {
   conventionCounts,
   conventionSentence,
-  CONVENTIONS,
   MIN_MAJORITY,
-  MIN_MEASURED_SIBLINGS,
-  type Convention,
   type ConventionCount,
 } from "#src/conventions";
 export { nodesInCycles } from "#src/cycles";
@@ -55,7 +52,6 @@ export {
   isEntryPoint,
   type EntryPoints,
 } from "#src/entry-points";
-export { exportStyleOf, type ExportStyle } from "#src/exports";
 export {
   findReferences,
   findReferencesDescription,
