@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  MAX_OVERLAY_EDGES,
+  MAX_OVERLAY_FILES,
   MAX_REPOSITORY_GRAPH_BASE64,
   MAX_RISK_DEPENDENTS,
   reviewRecordSchema,
@@ -204,6 +206,56 @@ describe("reviewRecordSchema, with a repository graph", () => {
           ...withGraph,
           graph: { ...withGraph.graph, gzip },
         }).success,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("reviewRecordSchema, with a change overlay", () => {
+  const overlay = {
+    headSha: "0f1e2d3c4b5a69788796a5b4c3d2e1f001234567",
+    files: [
+      { path: "src/new.ts", status: "added" },
+      { path: "src/utils.ts", status: "renamed", previousPath: "src/util.ts" },
+    ],
+    added: [{ from: "src/new.ts", to: "src/utils.ts" }],
+    removed: [{ from: "src/old.ts", to: "src/utils.ts" }],
+    unresolvedImportCount: 1,
+    partial: false,
+  };
+
+  it("accepts an overlay and a renamed file's previous path", () => {
+    const record = {
+      ...validRecord,
+      changedFiles: [
+        {
+          path: "src/utils.ts",
+          status: "renamed",
+          additions: 0,
+          deletions: 0,
+          previousPath: "src/util.ts",
+        },
+      ],
+      overlay,
+    };
+    const result = reviewRecordSchema.safeParse(record);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual(record);
+    }
+  });
+
+  it("rejects an overlay past its caps or with an unknown status", () => {
+    const edge = { from: "a.ts", to: "b.ts" };
+    const file = { path: "a.ts", status: "added" };
+    for (const bad of [
+      { ...overlay, added: Array.from({ length: MAX_OVERLAY_EDGES + 1 }, () => edge) },
+      { ...overlay, files: Array.from({ length: MAX_OVERLAY_FILES + 1 }, () => file) },
+      { ...overlay, files: [{ path: "a.ts", status: "copied" }] },
+      { ...overlay, unresolvedImportCount: -1 },
+    ]) {
+      expect(
+        reviewRecordSchema.safeParse({ ...validRecord, overlay: bad }).success,
       ).toBe(false);
     }
   });

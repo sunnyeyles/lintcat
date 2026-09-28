@@ -9,12 +9,18 @@ const reviewRecordFindingSchema = reviewFindingSchema
   .omit({ patch: true })
   .extend({ hasPatch: z.boolean().optional() });
 
+const repositoryPath = z.string().min(1).max(4096);
+
+const changeStatusSchema = z.enum(["added", "modified", "removed", "renamed"]);
+
 /** One file the pull request touched, with its line counts. */
 const reviewRecordChangedFileSchema = z.object({
   path: z.string().min(1),
-  status: z.enum(["added", "modified", "removed", "renamed"]),
+  status: changeStatusSchema,
   additions: count,
   deletions: count,
+  /** The base path of a renamed file. */
+  previousPath: repositoryPath.optional(),
 });
 
 export type ReviewRecordChangedFile = z.infer<
@@ -42,8 +48,6 @@ export const MAX_RISK_DEPENDENTS = 200;
 export const MAX_RISK_FACTORS = 20;
 
 export const MAX_RISK_HUBS = 20;
-
-const repositoryPath = z.string().min(1).max(4096);
 
 const riskBandSchema = z.enum(["low", "medium", "high"]);
 
@@ -81,6 +85,33 @@ export const reviewRecordRiskSchema = z.object({
 
 export type ReviewRecordRisk = z.infer<typeof reviewRecordRiskSchema>;
 
+export const MAX_OVERLAY_FILES = 300;
+
+export const MAX_OVERLAY_EDGES = 5000;
+
+const overlayEdgeSchema = z.object({ from: repositoryPath, to: repositoryPath });
+
+/** The pull request at HEAD against the base graph: which files and imports it adds or removes. */
+export const reviewRecordOverlaySchema = z.object({
+  headSha: z.string().min(1).max(64),
+  files: z
+    .array(
+      z.object({
+        path: repositoryPath,
+        status: changeStatusSchema,
+        previousPath: repositoryPath.optional(),
+      }),
+    )
+    .max(MAX_OVERLAY_FILES),
+  added: z.array(overlayEdgeSchema).max(MAX_OVERLAY_EDGES),
+  removed: z.array(overlayEdgeSchema).max(MAX_OVERLAY_EDGES),
+  unresolvedImportCount: count,
+  /** True when a cap stopped it before every changed file was read. */
+  partial: z.boolean(),
+});
+
+export type ReviewRecordOverlay = z.infer<typeof reviewRecordOverlaySchema>;
+
 /** One review as the dashboard stores it; a rerun of the same `headSha` replaces it. */
 export const reviewRecordSchema = z
   .object({
@@ -102,6 +133,8 @@ export const reviewRecordSchema = z
     graph: reviewRecordGraphSchema.optional(),
     /** Absent from an older sender, or when the index was off or scoring failed. */
     risk: reviewRecordRiskSchema.optional(),
+    /** Absent from an older sender, or when building the overlay failed. */
+    overlay: reviewRecordOverlaySchema.optional(),
   })
   .refine(
     (record) => record.graph === undefined || record.baseSha !== undefined,
