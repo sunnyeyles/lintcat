@@ -1,7 +1,7 @@
 import { CLOSED_VIEW, clusterGraph, groupIdFor, type MapGroup } from "@/lib/codebase-map/clustering";
 import type { FindingHeat } from "@/lib/codebase-map/from-snapshot";
 import { sumHeat } from "@/lib/codebase-map/heat";
-import { groupLayout, MAP_LAYOUT } from "@/lib/codebase-map/layout";
+import { layoutClustering } from "@/lib/codebase-map/layout";
 import { MAX_REACH, neighbourhoodOf, reachOf } from "@/lib/codebase-map/neighbourhood";
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 import { searchFiles, type SearchResult } from "@/lib/codebase-map/search";
@@ -131,11 +131,7 @@ export function lodGraph(
   const reach = reachOf(graph, changedPaths, MAX_REACH);
   const { open, partial } = openGroups(clustering.groups, changedPaths, touching, reach, budget);
 
-  const positions = groupLayout(
-    clustering.groups.map((group) => group.id),
-    clustering.imports,
-    MAP_LAYOUT,
-  );
+  const positions = layoutClustering(clustering);
   const openPositions: Record<string, LayoutPoint> = {};
 
   const kept = new Set<string>();

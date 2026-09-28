@@ -16,7 +16,7 @@ import {
   type ReviewRecordRisk,
 } from "@pr-review/schemas";
 
-import { changeStatus, type BlastRadius } from "#src/blast-radius";
+import { impactChange, type BlastRadius } from "#src/blast-radius";
 import type { FinishedReviewRun } from "#src/review-delivery";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
@@ -107,13 +107,9 @@ export function buildReviewRecord(
   const changedFiles = checked(
     "changedFiles",
     outcome.changedFiles.map((file) => ({
-      path: file.filename,
-      status: changeStatus(file.status),
+      ...impactChange(file),
       additions: file.additions,
       deletions: file.deletions,
-      ...(file.previous_filename === undefined
-        ? {}
-        : { previousPath: file.previous_filename }),
     })),
   );
   let graph = checked(

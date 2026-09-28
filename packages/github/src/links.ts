@@ -1,3 +1,5 @@
+/** Links into github.com; dependency-free so client components can import it. */
+
 /** A repository at one commit, which file links point into. */
 export type CommitRef = { owner: string; repo: string; sha: string };
 
