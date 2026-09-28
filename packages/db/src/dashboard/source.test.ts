@@ -250,6 +250,10 @@ describe("createDbSource", () => {
 
     expect(await source.getRepositoryGraph(id)).toEqual(snapshot);
     expect(await source.getChangedFiles(id)).toEqual(changedFiles);
+    expect(await source.getMapAccess(id)).toEqual({
+      repoId: expect.any(Number),
+      baseSha: snapshot.sha,
+    });
   });
 
   it("has no graph for a review whose index was off, or one it may not read", async () => {
@@ -262,6 +266,9 @@ describe("createDbSource", () => {
     expect(await source.getRepositoryGraph(theirs)).toBeUndefined();
     expect(await source.getChangedFiles(theirs)).toEqual([]);
     expect(await source.getRepositoryGraph(999_999)).toBeUndefined();
+    expect(await source.getMapAccess(mine)).toMatchObject({ baseSha: null });
+    expect(await source.getMapAccess(theirs)).toBeNull();
+    expect(await source.getMapAccess(999_999)).toBeNull();
   });
 
   it("carries each review's risk on lists and on the review, null for one stored without", async () => {

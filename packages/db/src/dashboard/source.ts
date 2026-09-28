@@ -421,6 +421,16 @@ export function createDbSource(
       return findRepositoryGraph(database, row.repoId, row.baseSha);
     },
 
+    async getMapAccess(id) {
+      const [row] = await database
+        .select({ repoId: reviews.repoId, baseSha: reviews.baseSha })
+        .from(reviews)
+        .innerJoin(repos, eq(repos.id, reviews.repoId))
+        .where(and(...scopeOf({ id })))
+        .limit(1);
+      return row ?? null;
+    },
+
     async getChangedFiles(id) {
       const [row] = await database
         .select({ changedFiles: reviews.changedFiles })
