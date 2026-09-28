@@ -1,5 +1,5 @@
 /** Checks a finding's evidence against the repository at the pull request's base. */
-import type { RepositoryIndex } from "@pr-review/index";
+import { isRuleDoc, type RepositoryIndex } from "@pr-review/index";
 import type { FindingEvidence, ReviewFinding } from "@pr-review/schemas";
 
 /** Entries kept per finding once the invalid ones are gone. */
@@ -56,6 +56,8 @@ export function withVerifiedEvidence(
   return kept.length === 0 ? rest : { ...rest, evidence: kept.slice(0, MAX_EVIDENCE) };
 }
 
+/** A rule-doc line is the convention stated, so one is enough on its own. */
 export function hasEnoughEvidence(finding: ReviewFinding): boolean {
-  return (finding.evidence?.length ?? 0) >= MIN_EVIDENCE;
+  const evidence = finding.evidence ?? [];
+  return evidence.length >= MIN_EVIDENCE || evidence.some((entry) => isRuleDoc(entry.file));
 }

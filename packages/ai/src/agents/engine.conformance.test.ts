@@ -169,6 +169,22 @@ function runEngineConformance(name: string, make: MakeHarness): void {
       expect(opening).toContain("- src/sessions.ts — ");
     });
 
+    it("carries the base commit's rule docs and lint config ahead of the diff", async () => {
+      const files = new Map(archiveFiles);
+      files.set("AGENTS.md", "- Sessions are created only in src/sessions.ts.\n");
+      files.set(".prettierrc.json", '{ "semi": true }\n');
+      const index = buildRepositoryIndex({ sha: baseSha, files });
+
+      const { opening } = await review(context, { index });
+
+      expect(opening).toContain(
+        '<rule_doc path="AGENTS.md">\n1| - Sessions are created only in src/sessions.ts.\n</rule_doc>',
+      );
+      expect(opening).toContain('- Prettier (.prettierrc.json):\n    { "semi": true }');
+      expect(opening.indexOf("</rule_docs>")).toBeLessThan(opening.indexOf("<lint_config>"));
+      expect(opening.indexOf("</lint_config>")).toBeLessThan(opening.indexOf("<diff>"));
+    });
+
     it("reports the run's token usage once", async () => {
       const { reports } = await review(context);
 

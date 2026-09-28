@@ -19,6 +19,8 @@ const index = buildRepositoryIndex({
     ["src/data/customers.ts", "line 1\nline 2\n"],
     ["src/data/refunds.ts", "line 1\n"],
     ["src/data/long.ts", "x\n".repeat(20)],
+    ["CLAUDE.md", "# Rules\n\n- Data reads are named find*.\n"],
+    ["src/data/AGENTS.md", "- Lists are named list*For*.\n"],
   ]),
 });
 
@@ -135,5 +137,20 @@ describe("hasEnoughEvidence", () => {
         ]),
       ),
     ).toBe(true);
+  });
+
+  it("takes one rule-doc line as enough, at any depth", () => {
+    expect(hasEnoughEvidence(finding([{ file: "CLAUDE.md", line: 3 }]))).toBe(true);
+    expect(hasEnoughEvidence(finding([{ file: "src/data/AGENTS.md", line: 1 }]))).toBe(true);
+  });
+
+  it("counts a rule-doc line only once it survives the base checks", () => {
+    const edited: EvidenceBase = { index, changedPaths: new Set(["CLAUDE.md"]) };
+    for (const [entry, checkedAgainst] of [
+      [{ file: "CLAUDE.md", line: 3 }, edited],
+      [{ file: "CLAUDE.md", line: 9 }, base],
+    ] as const) {
+      expect(hasEnoughEvidence(withVerifiedEvidence(finding([entry]), checkedAgainst))).toBe(false);
+    }
   });
 });

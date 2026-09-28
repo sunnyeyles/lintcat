@@ -85,6 +85,8 @@ function fixtureIndex(graph: MapGraph): RepositoryIndex {
     docs: new Map(),
     envExamples: [],
     dependencies: [],
+    ruleDocs: [],
+    lintConfigs: [],
   };
 }
 

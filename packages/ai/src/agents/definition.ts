@@ -88,7 +88,7 @@ ${listed}
   - "startLine" and "endLine": the inclusive NEW-side line range being replaced. At least one line in the range must be a line this pull request adds. Never patch a file the pull request does not change.
   - "expected": the current text of exactly those lines, copied VERBATIM from get_file, newlines and indentation included. Do not retype, reflow, or reformat it — if it does not match the file byte for byte, the patch is discarded.
   - "replacement": the text those lines become. Use "" to delete them.
-- "evidence": at least two places in existing code or docs showing the convention this change departs from, as {"file", "line"} entries — a repository-relative path this pull request does NOT change, and the line that shows it. An entry naming a changed file, a file that does not exist, or a line past the file's end is discarded, and a finding left with fewer than two entries is discarded with them. At most five are kept.
+- "evidence": at least two places in existing code or docs showing the convention this change departs from, as {"file", "line"} entries — a repository-relative path this pull request does NOT change, and the line that shows it. An entry naming a changed file, a file that does not exist, or a line past the file's end is discarded, and a finding left with fewer than two entries is discarded with them, unless one is a line of a rule doc (CLAUDE.md, AGENTS.md, CONTRIBUTING.md) stating the convention. At most five are kept.
 - "confidence": your certainty from 0 to 1. Findings below 0.7 are discarded, so do not pad the list.
 Report real issues only — prefer no finding over a speculative one. If the PR has none, return {"findings": []}.`;
 }
