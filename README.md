@@ -25,8 +25,8 @@ Every finding the agent makes cites **evidence**: at least two places in files
 the pull request does not change that show the convention. The opening message
 lists each changed file's siblings — the unchanged files in its directory with
 the same role — as the local convention to read first. It also quotes the lines
-of unchanged Markdown docs that name something the diff's code adds, removes or
-edits, so a doc the change made false can be cited as the evidence. Rewording
+of unchanged Markdown docs that name something the diff's code edits or
+removes, so a doc the change made false can be cited as the evidence. Rewording
 that leaves a doc less specific is not drift.
 
 A finding may carry a **patch**: a replacement for a range of lines, quoted

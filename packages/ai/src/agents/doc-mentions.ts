@@ -1,4 +1,4 @@
-/** The `<doc_mentions>` block: unchanged doc lines naming something the diff's code changes. */
+/** The `<doc_mentions>` block: unchanged doc lines naming something the diff's code edits or removes. */
 import { changedPaths } from "@pr-review/github";
 import {
   changedNames,
@@ -26,7 +26,7 @@ export function renderDocMentions(
   const more = mentions.length - MAX_LISTED_DOC_LINES;
   return [
     "<doc_mentions>",
-    "Lines in docs this pull request does not change that name something its code adds, removes or edits. Report one only if the change made it false, and cite it as evidence.",
+    "Lines in docs this pull request does not change that name something its code edits or removes. Report one only if the change made it false, and cite it as evidence.",
     ...mentions
       .slice(0, MAX_LISTED_DOC_LINES)
       .map((mention) => `- ${mention.file}:${mention.line} (${mention.terms.join(", ")}): ${mention.text}`),

@@ -113,7 +113,7 @@ export default function HowItWorksPage() {
             is compared against;
           </Bullet>
           <Bullet>
-            which lines of your Markdown docs name something the change adds, removes or edits.
+            which lines of your Markdown docs name something the change edits or removes.
           </Bullet>
         </Bullets>
         <P>
