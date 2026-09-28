@@ -87,12 +87,15 @@ export default function HowItWorksPage() {
         </Bullets>
         <P>
           Every finding cites at least two places in your existing code that show the
-          convention, and each is checked before the finding posts. Where the existing files
-          disagree among themselves there is no convention, and nothing is reported.
+          convention, or one line of your CLAUDE.md, AGENTS.md or CONTRIBUTING.md that states
+          it, and each is checked before the finding posts. Where the existing files disagree
+          among themselves and no rule doc settles it, there is no convention, and nothing is
+          reported.
         </P>
         <P>
           Bugs, security holes and performance problems are outside its scope, and so is
-          anything your formatter, linter, typecheck or build already catches.
+          anything your formatter, linter, typecheck or build already catches. The reviewer
+          reads your lint and format configuration to know what that is.
         </P>
       </Section>
 
@@ -118,7 +121,11 @@ export default function HowItWorksPage() {
           </Bullet>
           <Bullet>
             which new environment variables nothing documents, and which new dependencies
-            duplicate one you already use.
+            duplicate one you already use;
+          </Bullet>
+          <Bullet>
+            what your CLAUDE.md, AGENTS.md and CONTRIBUTING.md say, and which linter, formatter
+            and typecheck settings apply to it, as they stand on your base branch.
           </Bullet>
         </Bullets>
         <P>
