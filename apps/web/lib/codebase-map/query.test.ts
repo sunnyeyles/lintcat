@@ -7,7 +7,7 @@ import { expandGroup } from "./merge";
 import { normaliseGraph } from "./normalise";
 import { mapQuery, SEARCH_LIMIT } from "./query";
 import { sampleRepo } from "./sample";
-import type { MapGraph } from "./types";
+import type { MapGraph, MapImport } from "./types";
 
 /** The stated budget: the first payload at 50k files must fit in this. */
 const BYTE_BUDGET = 900_000;
@@ -35,6 +35,11 @@ function sourceOf(fileCount: number, changedCap = Infinity): MapSource {
 
 function bytesOf(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), "utf8");
+}
+
+function danglingEdges(graph: MapGraph): MapImport[] {
+  const paths = new Set(graph.files.map((file) => file.path));
+  return graph.imports.filter((edge) => !paths.has(edge.from) || !paths.has(edge.to));
 }
 
 const source = sourceOf(6_000);
@@ -108,9 +113,10 @@ describe("expand", () => {
 
   it("merges into the first payload without leaving a dangling edge", () => {
     const slice = query.expand(target.id, openGroupIds)!;
-    const merged = normaliseGraph(expandGroup(payload.graph, target.id, slice.graph));
+    const raw = expandGroup(payload.graph, target.id, slice.graph);
+    const merged = normaliseGraph(raw);
 
-    expect(merged.dropped.missingEndpoints).toBe(0);
+    expect(danglingEdges(raw)).toEqual([]);
     expect(merged.summaries.some((s) => s.id === target.id)).toBe(false);
     expect(merged.totalFileCount).toBe(6_000);
   });
@@ -174,7 +180,7 @@ describe("expand", () => {
       merged = expandGroup(merged, summary.id, query.expand(summary.id, loaded)!.graph);
     }
 
-    expect(normaliseGraph(merged).dropped.missingEndpoints).toBe(0);
+    expect(danglingEdges(merged)).toEqual([]);
     expect(merged.summaries!.length).toBe(lod.summaries!.length - 5);
   });
 });

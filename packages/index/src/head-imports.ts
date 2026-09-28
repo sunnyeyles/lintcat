@@ -4,16 +4,14 @@ import { parseImports } from "#src/imports";
 import { INDEXED_LANGUAGES, languageOf } from "#src/languages";
 import { createImportResolver } from "#src/resolve";
 
-export interface HeadImport {
-  readonly specifier: string;
-  readonly line: number;
+interface HeadImport {
   /** The file it names, absent when nothing in the tree matches. */
   readonly path?: string;
   /** False for a third-party package or an asset outside the source tree. */
   readonly internal: boolean;
 }
 
-export interface HeadTree {
+interface HeadTree {
   /** HEAD contents of the changed files to resolve, by path. */
   readonly contents: ReadonlyMap<string, string>;
   /** Paths the pull request adds or renames into place. */
@@ -37,9 +35,9 @@ export function resolveHeadImports(
     }
     result.set(
       from,
-      parseImports(contents).map(({ specifier, line }) => {
+      parseImports(contents).map(({ specifier }) => {
         const { path, internal } = resolve(from, specifier);
-        return { specifier, line, internal, ...(path === undefined ? {} : { path }) };
+        return { internal, ...(path === undefined ? {} : { path }) };
       }),
     );
   }

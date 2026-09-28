@@ -1,13 +1,4 @@
-import {
-  buildRepositoryIndex,
-  encodeRepositoryGraph,
-  snapshotRepositoryIndex,
-} from "@pr-review/index";
-import type {
-  ReviewRecord,
-  ReviewRecordChangedFile,
-  ReviewRecordRisk,
-} from "@pr-review/schemas";
+import type { ReviewRecord, ReviewRecordRisk } from "@pr-review/schemas";
 import { eq, inArray } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -221,51 +212,19 @@ describe("createDbSource", () => {
     expect(usage.byRepo.map((row) => row.repo.name)).toEqual(["widgets"]);
   });
 
-  it("returns the review's graph snapshot and changed files, decompressed", async () => {
-    const snapshot = snapshotRepositoryIndex(
-      buildRepositoryIndex({
-        sha: "b".repeat(40),
-        files: new Map([
-          ["src/session.ts", "export const session = 1;\n"],
-          ["src/login.ts", "import { session } from './session';\n"],
-        ]),
-      }),
-    );
-    const changedFiles: ReviewRecordChangedFile[] = [
-      { path: "src/login.ts", status: "modified", additions: 4, deletions: 1 },
-    ];
-    const id = await ingest(
-      acme,
-      record({
-        baseSha: snapshot.sha,
-        changedFiles,
-        graph: {
-          gzip: Buffer.from(encodeRepositoryGraph(snapshot)).toString("base64"),
-          fileCount: snapshot.files.length,
-          edgeCount: snapshot.edges.length,
-        },
-      }),
-    );
+  it("gives the map's access check the review's repo and base", async () => {
+    const baseSha = "b".repeat(40);
+    const id = await ingest(acme, record({ baseSha }));
     const source = await sourceFor(acme);
 
-    expect(await source.getRepositoryGraph(id)).toEqual(snapshot);
-    expect(await source.getChangedFiles(id)).toEqual(changedFiles);
-    expect(await source.getMapAccess(id)).toEqual({
-      repoId: expect.any(Number),
-      baseSha: snapshot.sha,
-    });
+    expect(await source.getMapAccess(id)).toEqual({ repoId: expect.any(Number), baseSha });
   });
 
-  it("has no graph for a review whose index was off, or one it may not read", async () => {
+  it("has no base for a review whose index was off, and no access to one it may not read", async () => {
     const mine = await ingest(acme, record());
     const theirs = await ingest(globex, record({ owner: "globex", repo: "secret" }));
     const source = await sourceFor(acme);
 
-    expect(await source.getRepositoryGraph(mine)).toBeUndefined();
-    expect(await source.getChangedFiles(mine)).toEqual([]);
-    expect(await source.getRepositoryGraph(theirs)).toBeUndefined();
-    expect(await source.getChangedFiles(theirs)).toEqual([]);
-    expect(await source.getRepositoryGraph(999_999)).toBeUndefined();
     expect(await source.getMapAccess(mine)).toMatchObject({ baseSha: null });
     expect(await source.getMapAccess(theirs)).toBeNull();
     expect(await source.getMapAccess(999_999)).toBeNull();

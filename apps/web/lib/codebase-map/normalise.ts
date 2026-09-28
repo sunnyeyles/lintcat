@@ -9,15 +9,6 @@ import type {
   OverlayCoverage,
 } from "@/lib/codebase-map/types";
 
-interface DroppedCounts {
-  invalidFiles: number;
-  duplicateFiles: number;
-  duplicateImports: number;
-  selfImports: number;
-  /** Edges pointing at a file this map does not hold. */
-  missingEndpoints: number;
-}
-
 export interface NormalisedGraph {
   files: readonly MapFile[];
   imports: readonly MapImport[];
@@ -26,7 +17,6 @@ export interface NormalisedGraph {
   outgoing: ReadonlyMap<string, readonly string[]>;
   incoming: ReadonlyMap<string, readonly string[]>;
   truncated: boolean;
-  dropped: DroppedCounts;
   /** Empty unless the payload was level-of-detail. */
   summaries: readonly GroupSummary[];
   groupImports: readonly GroupImport[];
@@ -78,24 +68,12 @@ function byPathAscending(a: string, b: string): number {
 }
 
 export function normaliseGraph(graph: MapGraph): NormalisedGraph {
-  const dropped: DroppedCounts = {
-    invalidFiles: 0,
-    duplicateFiles: 0,
-    duplicateImports: 0,
-    selfImports: 0,
-    missingEndpoints: 0,
-  };
-
   const byPath = new Map<string, MapFile>();
   for (const file of graph.files ?? []) {
     const path = text(file?.path);
-    if (!path) {
-      dropped.invalidFiles += 1;
-      continue;
-    }
+    if (!path) continue;
     const existing = byPath.get(path);
     if (existing) {
-      dropped.duplicateFiles += 1;
       byPath.set(path, fillUnknown(existing, file));
       continue;
     }
@@ -107,18 +85,10 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
   for (const edge of graph.imports ?? []) {
     const from = text(edge?.from);
     const to = text(edge?.to);
-    if (from && from === to) {
-      dropped.selfImports += 1;
-      continue;
-    }
-    if (!byPath.has(from) || !byPath.has(to)) {
-      dropped.missingEndpoints += 1;
-      continue;
-    }
+    if (from === to || !byPath.has(from) || !byPath.has(to)) continue;
     const key = `${from}\u0000${to}`;
     const held = seen.get(key);
     if (held) {
-      dropped.duplicateImports += 1;
       if (held.change === undefined && edge.change !== undefined) held.change = edge.change;
       continue;
     }
@@ -160,7 +130,6 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
     outgoing,
     incoming,
     truncated: graph.truncated === true,
-    dropped,
     summaries,
     groupImports: graph.groupImports ?? [],
     groupImportsDropped: graph.groupImportsDropped ?? 0,

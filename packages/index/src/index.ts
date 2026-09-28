@@ -96,9 +96,6 @@ export {
 export {
   buildChangeOverlay,
   type ChangeOverlay,
-  type ChangeOverlayInput,
-  type OverlayEdge,
-  type OverlayFile,
 } from "#src/overlay";
 export { coveredSourcePaths } from "#src/pairing";
 export {

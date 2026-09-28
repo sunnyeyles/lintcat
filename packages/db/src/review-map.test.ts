@@ -9,7 +9,7 @@ import { createTestDatabase } from "./test-database";
 
 const finding = {
   line: 3,
-  category: "general" as const,
+  category: "naming" as const,
   title: "A finding",
   explanation: "Worth a look.",
   confidence: 0.8,

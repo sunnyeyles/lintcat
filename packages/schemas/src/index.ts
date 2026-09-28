@@ -25,7 +25,6 @@ export {
   MAX_RISK_DEPENDENTS,
   MAX_RISK_FACTORS,
   MAX_RISK_HUBS,
-  reviewRecordOverlaySchema,
   reviewRecordRiskSchema,
   reviewRecordSchema,
   type ReviewRecord,

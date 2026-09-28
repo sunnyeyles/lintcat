@@ -92,7 +92,7 @@ export const MAX_OVERLAY_EDGES = 5000;
 const overlayEdgeSchema = z.object({ from: repositoryPath, to: repositoryPath });
 
 /** The pull request at HEAD against the base graph: which files and imports it adds or removes. */
-export const reviewRecordOverlaySchema = z.object({
+const reviewRecordOverlaySchema = z.object({
   headSha: z.string().min(1).max(64),
   files: z
     .array(

@@ -61,15 +61,6 @@ export function filePosition(
   return { x: round(centre.x + offset.x), y: round(centre.y + offset.y) };
 }
 
-export function seedPosition(
-  path: string,
-  groupId: string,
-  options: LayoutOptions = {},
-): LayoutPoint {
-  const { mapRadius = DEFAULTS.mapRadius, groupRadius = DEFAULTS.groupRadius } = options;
-  return filePosition(path, onDisc(groupId, mapRadius), groupRadius);
-}
-
 interface Body {
   x: number;
   y: number;

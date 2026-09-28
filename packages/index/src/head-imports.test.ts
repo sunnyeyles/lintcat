@@ -32,8 +32,8 @@ describe("resolveHeadImports", () => {
     );
 
     expect(imports.get("src/page.ts")).toEqual([
-      { specifier: "#src/cn", line: 1, path: "src/cn.ts", internal: true },
-      { specifier: "react", line: 2, internal: false },
+      { path: "src/cn.ts", internal: true },
+      { internal: false },
     ]);
   });
 
@@ -48,8 +48,8 @@ describe("resolveHeadImports", () => {
     );
 
     expect(imports.get("src/page.ts")).toEqual([
-      { specifier: "./fresh", line: 1, path: "src/fresh.ts", internal: true },
-      { specifier: "./old", line: 2, internal: true },
+      { path: "src/fresh.ts", internal: true },
+      { internal: true },
     ]);
   });
 

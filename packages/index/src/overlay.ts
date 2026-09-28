@@ -3,12 +3,12 @@ import type { RepositoryIndex } from "#src/build";
 import { resolveHeadImports } from "#src/head-imports";
 import type { ImpactChange } from "#src/impact";
 
-export interface OverlayEdge {
+interface OverlayEdge {
   readonly from: string;
   readonly to: string;
 }
 
-export interface OverlayFile {
+interface OverlayFile {
   readonly path: string;
   readonly status: ImpactChange["status"];
   readonly previousPath?: string;
