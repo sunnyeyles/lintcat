@@ -214,3 +214,59 @@ describe("clean-config-env-var-documented", () => {
     expect(renderConfigDrift(await indexOf(fixture), fixture.context)).toEqual([]);
   });
 });
+
+describe("rule-doc-service-not-found", () => {
+  const fixture = loadFixture("rule-doc-service-not-found");
+  const file = "src/services/payments.ts";
+
+  function finding(evidence: ReviewFinding["evidence"]): ReviewFinding {
+    return {
+      file,
+      line: lineOf(fixture.headFiles, file, "return undefined;"),
+      category: "pattern",
+      severity: "medium",
+      title: "The payment service returns undefined instead of throwing HttpError(404)",
+      explanation: "AGENTS.md says a service reports a hidden record by throwing HttpError(404).",
+      evidence,
+      confidence: 0.9,
+    };
+  }
+
+  it("keeps a finding whose only evidence is the AGENTS.md rule line", async () => {
+    const cited = finding([
+      { file: "AGENTS.md", line: lineOf(fixture.baseFiles, "AGENTS.md", "It never returns `undefined`") },
+    ]);
+
+    expect(await survivors(fixture, cited)).toEqual([cited]);
+  });
+
+  it("drops one resting on the single sibling service that throws", async () => {
+    const sibling = finding([
+      {
+        file: "src/services/invoices.ts",
+        line: lineOf(fixture.baseFiles, "src/services/invoices.ts", "throw new HttpError(404"),
+      },
+    ]);
+
+    expect(await survivors(fixture, sibling)).toEqual([]);
+  });
+
+  it("holds the rule doc in the base index", async () => {
+    const index = await indexOf(fixture);
+    expect(index?.ruleDocs.map((doc) => doc.path)).toEqual(["AGENTS.md"]);
+  });
+});
+
+describe("clean-lint-only", () => {
+  const fixture = loadFixture("clean-lint-only");
+
+  it("gives the reviewer the ESLint and Prettier config that catch its problems", async () => {
+    const index = await indexOf(fixture);
+    const configs = new Map(index?.lintConfigs.map((config) => [config.tool, config.excerpt]));
+
+    expect(configs.get("ESLint")).toContain('"prefer-const": "error"');
+    expect(configs.get("ESLint")).toContain('"@typescript-eslint/no-unused-vars": "error"');
+    expect(configs.get("Prettier")).toContain('"singleQuote": false');
+    expect(configs.get("package.json scripts")).toContain("lint: eslint .");
+  });
+});

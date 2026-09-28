@@ -12,10 +12,11 @@ project; `vitest.eval.config.ts` still matches only `*.eval.ts`.
 ## What is evaluated
 
 Codebase drift: a change that names or does something differently from how the
-rest of the repository already does it. Sixteen fixtures, nineteen assertions.
-Seven are recall signals, one per planted drift; the rest are precision signals.
+rest of the repository already does it, or from what its rule docs write
+down. Eighteen fixtures, twenty-one assertions. Eight are recall signals, one
+per planted drift; the rest are precision signals.
 
-Five fixtures are the same small billing API (`ledgerly/billing-api`): routes,
+Seven fixtures are the same small billing API (`ledgerly/billing-api`): routes,
 services, data and db layers, with the boundaries written down in its
 `ARCHITECTURE.md`. Seven are a notification worker (`harbourline/notify-worker`)
 whose README and runbook document its configuration; the three config fixtures
@@ -25,10 +26,12 @@ their own.
 | Fixture | Planted problem | Assertion | Signal |
 | --- | --- | --- | --- |
 | `naming-drift-data-reads` | new credit-note reads are named `getCreditNoteById` and `fetchCreditNotesByInvoice`, where every other data module names them `find*` and `list*For*` | a finding lands on the new reads or the service that calls them | recall |
+| `rule-doc-service-not-found` | a new payment service returns `undefined` for a hidden payment and its route sets the 404 itself, where `AGENTS.md` says services throw `HttpError(404)` | a finding lands on the service or the route's 404, citing the `AGENTS.md` rule line | recall |
 | `architecture-duplicate-helper` | a new reminder email builds its own `formatAmount`, a copy of `formatMoney` in `src/lib/money.ts` | a finding lands on `formatAmount` | recall |
 | `architecture-duplicate-helper` | | every proposed patch matches the file at head | precision |
 | `architecture-layer-bypass` | a new CSV route imports `db` directly, past the service layer every other route goes through | a finding lands on the import or the query | recall |
 | `clean-no-convention-lib` | none: a helper joins `src/lib`, whose files share no naming or export convention | zero findings | precision |
+| `clean-lint-only` | only what the repository's ESLint and Prettier catch: an unused import, a `let` never reassigned, single quotes, missing semicolons | zero findings | precision |
 | `clean-no-convention-lib` | | every proposed patch matches the file at head | precision |
 | `clean-shared-money-format` | none: two drifted formatters become one shared helper that imports from a file outside the diff | zero findings | precision |
 | `clean-shared-money-format` | | every proposed patch matches the file at head | precision |
@@ -56,9 +59,12 @@ batch lookup to reuse, and the security fixture has no other redirect.
 None of the recall fixtures can be solved from the diff alone. A convention is
 only a convention once the reviewer has read the files that follow it, and a
 finding survives validation only with two pieces of evidence in files the pull
-request does not change. `drift-fixtures.test.ts` checks, in `pnpm test`, that
-the naming and retry-budget fixtures' evidence is citable that way, and that the
-retry-budget doc lines reach the opening message.
+request does not change, or one line of a rule doc (`CLAUDE.md`, `AGENTS.md`,
+`CONTRIBUTING.md`) stating it. `drift-fixtures.test.ts` checks, in `pnpm test`,
+that the naming and retry-budget fixtures' evidence is citable that way, that
+the retry-budget doc lines reach the opening message, that the rule-doc
+fixture's rule line stands alone where its one sibling does not, and that the
+lint-only fixture's ESLint and Prettier config reach the base index.
 
 The link fixtures are decided in code, not by the model: a doc link the pull
 request adds is resolved against head, and one pointing at a missing file or
@@ -86,7 +92,14 @@ reports everything passes every recall assertion and fails them.
 disagree with each other, so there is nothing to drift from.
 `clean-shared-money-format` is built around a false positive the reviewer has
 actually produced: calling an import missing because the module it names sits
-outside the diff.
+outside the diff. `clean-lint-only` holds the line on tooling: what the
+repository's own linter and formatter catch is not the reviewer's to report.
+Its source is left out of this package's `eslint .`, since its planted problems
+are lint errors.
+
+A `finding` expectation may also name `cites`: marker lines at base, one of
+which a located finding must list as evidence. The rule-doc fixture uses it, so
+a finding that lands in the right place for the wrong reason does not pass.
 
 Assertions match on location, never wording — see `expectations.ts`. Anchors
 must match exactly one line of a changed file, and `cases.test.ts` resolves
@@ -102,12 +115,13 @@ The index is kept only if it is measured to help, and this is where that is
 decided.
 
 **The fixtures.** The recall fixtures. With the index, the opening message
-lists each changed file's siblings and the doc lines naming what the diff
-changes, and validation checks every piece of evidence against the base commit.
-Without it, the reviewer has to find the convention with `search_repository`
-alone, validation can only reject evidence that names a changed file, and a
-link into a file the diff does not show goes unchecked — so
-`docs-broken-anchor` is expected to fail the control arm.
+lists each changed file's siblings, the doc lines naming what the diff changes,
+and the rule docs and lint config that govern it, and validation checks every
+piece of evidence against the base commit. Without it, the reviewer has to find
+the convention with `search_repository` alone, validation can only reject
+evidence that names a changed file, and a link into a file the diff does not
+show goes unchecked — so `docs-broken-anchor` is expected to fail the control
+arm.
 
 **The control switch.** `EVAL_INDEX=off` makes the fixture client report the
 archive unavailable. `buildReviewIndex` then logs `index.failed` and returns
@@ -133,12 +147,12 @@ when a run is meant as evidence, so a cost change has a before and an after.
 
 ## Known gaps
 
-- **No fixture has reached a model.** The sixteen fixtures load, diff and resolve
-  their anchors in `pnpm test`, but none has been reviewed by a model yet, so
-  whether each planted problem is findable, and each out-of-scope bug left
-  alone, is unproven.
-- **Style drift is unmeasured.** Naming, pattern, docs and config drift have
-  fixtures; the reviewer's style category does not yet.
+- **No fixture has reached a model.** The eighteen fixtures load, diff and
+  resolve their anchors in `pnpm test`, but none has been reviewed by a model
+  yet, so whether each planted problem is findable, and each out-of-scope bug
+  left alone, is unproven.
+- **Style drift is unmeasured.** Naming, pattern, docs and config drift, and a
+  written rule, have fixtures; the reviewer's style category does not yet.
 - **No fixture requires a patch.** `patches-verify` catches a wrong patch but
   cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
 - **`claude-haiku-4-5` does not clear the suite**, which is why the Anthropic
@@ -151,8 +165,8 @@ when a run is meant as evidence, so a cost change has a before and an after.
 
 ```
 cases.ts               the spec: fixtures and their expectations
-drift-fixtures.test.ts the naming fixture's evidence survives validation
-expectations.ts        the judge: anchored location
+drift-fixtures.test.ts each fixture's evidence and index inputs survive validation
+expectations.ts        the judge: anchored location, and cited evidence
 fixture.ts             loads repo/ (head) and base/ into the pipeline's inputs
 fixture-client.ts      the reads a fixture can serve; publishing is undeclared,
                        and EVAL_INDEX=off withholds the archive

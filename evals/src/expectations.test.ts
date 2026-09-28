@@ -5,7 +5,12 @@ import type { ChangedFile, PullRequestDetails } from "@pr-review/github";
 import type { ReviewOutcome } from "@pr-review/reviewer";
 import type { ReviewFinding } from "@pr-review/schemas";
 
-import { evaluateExpectation, resolveAnchor } from "#src/expectations";
+import {
+  evaluateExpectation,
+  resolveAnchor,
+  resolveCitation,
+  type FixtureExpectation,
+} from "#src/expectations";
 import type { LoadedFixture } from "#src/fixture";
 import type { FixtureReview } from "#src/run-fixture-review";
 
@@ -203,5 +208,49 @@ describe("evaluateExpectation", () => {
     );
     expect(mismatched.passed).toBe(false);
     expect(mismatched.detail).toContain("2 of 3 proposed patch(es) did not match");
+  });
+});
+
+describe("citation expectations", () => {
+  const ruled: LoadedFixture = {
+    ...fixture,
+    baseFiles: new Map([
+      ...fixture.baseFiles,
+      ["AGENTS.md", "# Rules\n\n- Look products up in one batch.\n"],
+    ]),
+  };
+  const expectation: FixtureExpectation = {
+    kind: "finding",
+    description: "reports the N+1, citing the rule",
+    anchors: [{ file: FILE, startMarker: "// START", endMarker: "// END" }],
+    cites: [{ file: "AGENTS.md", marker: "one batch" }],
+  };
+
+  function reviewOf(findings: ReviewFinding[]): FixtureReview {
+    return { ...review({ findings }), fixture: ruled };
+  }
+
+  it("resolves a citation against the base tree", () => {
+    expect(resolveCitation(ruled, { file: "AGENTS.md", marker: "one batch" })).toEqual({
+      file: "AGENTS.md",
+      line: 3,
+    });
+    expect(() => resolveCitation(ruled, { file: "CLAUDE.md", marker: "x" })).toThrow(
+      "does not have at base",
+    );
+  });
+
+  it("passes only a located finding that cites the rule line", () => {
+    const citing = finding({ evidence: [{ file: "AGENTS.md", line: 3 }] });
+    expect(evaluateExpectation(reviewOf([citing]), expectation).passed).toBe(true);
+
+    const uncited = evaluateExpectation(
+      reviewOf([finding({ evidence: [{ file: "AGENTS.md", line: 1 }] })]),
+      expectation,
+    );
+    expect(uncited.passed).toBe(false);
+    expect(uncited.detail).toContain("none cited the rule it breaks");
+    expect(uncited.detail).toContain("AGENTS.md:3");
+    expect(uncited.detail).toContain("(evidence: AGENTS.md:1)");
   });
 });

@@ -1,0 +1,30 @@
+{
+  "name": "rule-doc-service-not-found",
+  "title": "Rule doc — a new service returns undefined for a hidden payment, where AGENTS.md says services throw HttpError(404)",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "5d18c3a90e7f42b6c1a09e3f7d25b84c6e0a1f37",
+  "headSha": "e94b07c21f5a3d86b0c7e2a41f9d53c8b6a0e215",
+  "pullRequest": {
+    "number": 236,
+    "title": "Show a single payment in the customer portal",
+    "body": "Customers want to open a payment from their invoice history. This adds a payment service that hides payments on voided invoices, and a GET /payments/:id endpoint.",
+    "author": "priya-raman",
+    "baseRef": "main",
+    "headRef": "feature/payment-detail"
+  },
+  "changedFiles": [
+    {
+      "path": "src/services/payments.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/payments.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/index.ts",
+      "status": "modified"
+    }
+  ]
+}
