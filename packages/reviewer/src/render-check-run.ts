@@ -8,7 +8,7 @@ import type {
   CheckRunConclusion,
   CheckRunOutput,
 } from "@pr-review/github";
-import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
+import { categoryLabel, evidenceLabel, type ReviewFinding } from "@pr-review/schemas";
 
 import type { BlastRadius } from "#src/blast-radius";
 import { countLabel, summarise, type EvidenceSource } from "#src/finding-format";
@@ -49,7 +49,7 @@ const annotationLevelBySeverity: Record<
 function annotate(finding: ReviewFinding, line: number): CheckRunAnnotation {
   const parts = [finding.explanation];
   if (finding.evidence !== undefined && finding.evidence.length > 0) {
-    const seen = finding.evidence.map((entry) => `${entry.file}:${entry.line}`);
+    const seen = finding.evidence.map(evidenceLabel);
     parts.push(`Convention seen in: ${seen.join(", ")}`);
   }
   if (finding.suggestedFix !== undefined) {

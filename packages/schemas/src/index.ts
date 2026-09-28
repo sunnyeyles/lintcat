@@ -1,11 +1,14 @@
 /** Shared Zod schemas for the review trigger contract and review findings. */
 export {
   categoryLabel,
+  evidenceLabel,
   findingCategorySchema,
   findingEvidenceSchema,
+  isConventionCount,
   MAX_EVIDENCE_ENTRIES,
   reviewFindingSchema,
   wellFormedFindings,
+  type ConventionCountEvidence,
   type FindingCategory,
   type FindingEvidence,
   type FindingPatch,

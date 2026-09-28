@@ -71,9 +71,11 @@ export default function SecurityPage() {
           <Bullet>The reviewer is confident in it.</Bullet>
           <Bullet>
             It cites at least two places in your existing code that show the convention your
-            change departs from, or one line of your CLAUDE.md, AGENTS.md or CONTRIBUTING.md
-            that states it. Each must exist and sit outside this pull request; a reference that
-            doesn&rsquo;t check out is removed, and so is a finding left without enough.
+            change departs from, one line of your CLAUDE.md, AGENTS.md or CONTRIBUTING.md that
+            states it, or one count LintCat made of the neighbouring files that follow it. Each
+            place must exist and sit outside this pull request, and each count must match
+            LintCat&rsquo;s own; a reference that doesn&rsquo;t check out is removed, and so is a
+            finding left without enough.
           </Bullet>
           <Bullet>
             A broken doc link is the one finding LintCat makes itself: the link is resolved at
