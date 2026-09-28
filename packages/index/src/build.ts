@@ -3,6 +3,7 @@
  * be tested with inline fixtures and reused unchanged anywhere the files come from.
  */
 import { nodesInCycles } from "#src/cycles";
+import { isDocPath, readDoc, type IndexedDoc } from "#src/docs";
 import { collectEntryPoints, isEntryPoint } from "#src/entry-points";
 import { parseImports, type ImportedName } from "#src/imports";
 import {
@@ -69,6 +70,8 @@ export interface RepositoryIndex {
   readonly importers: ReadonlyMap<string, readonly ImportEdge[]>;
   /** Manifests and aliases, read again for entry points and package ownership. */
   readonly workspace: WorkspaceModel;
+  /** Every Markdown file, by path: headings, links and mentions. */
+  readonly docs: ReadonlyMap<string, IndexedDoc>;
 }
 
 export interface RepositoryIndexInput {
@@ -237,6 +240,13 @@ export function buildRepositoryIndex(
     }
   }
   flagFiles(files, edges, workspace);
+  const docs = new Map<string, IndexedDoc>();
+  for (const path of files.keys()) {
+    const contents = input.files.get(path);
+    if (contents !== undefined && isDocPath(path)) {
+      docs.set(path, readDoc(path, contents));
+    }
+  }
 
   return {
     sha: input.sha,
@@ -250,5 +260,6 @@ export function buildRepositoryIndex(
     edges,
     importers,
     workspace,
+    docs,
   };
 }

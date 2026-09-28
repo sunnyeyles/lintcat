@@ -35,6 +35,7 @@ import type {
 import { assessBlastRadius, type BlastRadius } from "#src/blast-radius";
 import { buildReviewIndex } from "#src/build-index";
 import { buildDiffLineIndex } from "#src/diff-lines";
+import { checkDocLinks, mergeCheckedFindings } from "#src/doc-links";
 import { countLabel } from "#src/finding-format";
 import {
   computeHints,
@@ -417,15 +418,24 @@ async function review(
   cancelled.check("agent");
 
   // The AI boundary: only what passes validation reaches GitHub.
-  const findings = validateFindings(
+  const validated = validateFindings(
     candidates,
     scope.changedFiles,
     categorySlugs(hinted),
     { index: repositoryIndex, changedPaths: changedPaths(changedFiles) },
   );
+  const brokenLinks = await checkDocLinks({
+    index: repositoryIndex,
+    scope: scope.changedFiles,
+    pullRequest: changedFiles,
+    readHead: (path) =>
+      client.getFileContents({ owner: target.owner, repo: target.repo, path, ref: target.headSha }),
+  });
+  const findings = mergeCheckedFindings(brokenLinks, validated);
   logger.info("findings.validated", {
     ...fields,
     candidateCount: candidates.length,
+    brokenLinkCount: brokenLinks.length,
     findingCount: findings.length,
   });
 

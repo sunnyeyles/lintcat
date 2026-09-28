@@ -1,12 +1,16 @@
 /** The drift fixtures are solvable under validation: the evidence a reviewer would cite survives it. */
+import { renderDocMentions, type ReviewEngine } from "@pr-review/ai";
 import { changedPaths } from "@pr-review/github";
 import { createSilentLogger } from "@pr-review/logging";
 import { buildReviewIndex, validateFindings } from "@pr-review/reviewer";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
+import { evalCases } from "#src/cases";
+import { evaluateExpectation } from "#src/expectations";
 import { loadFixture, type LoadedFixture } from "#src/fixture";
 import { createFixtureClient } from "#src/fixture-client";
+import { runFixtureReview } from "#src/run-fixture-review";
 
 function lineOf(files: ReadonlyMap<string, string>, file: string, marker: string): number {
   const at = (files.get(file) ?? "").split("\n").findIndex((line) => line.includes(marker));
@@ -16,7 +20,7 @@ function lineOf(files: ReadonlyMap<string, string>, file: string, marker: string
   return at + 1;
 }
 
-async function survivors(fixture: LoadedFixture, finding: ReviewFinding) {
+async function indexOf(fixture: LoadedFixture) {
   const { pullRequest } = fixture.context;
   const { index } = await buildReviewIndex({
     client: createFixtureClient(fixture).client,
@@ -30,11 +34,20 @@ async function survivors(fixture: LoadedFixture, finding: ReviewFinding) {
     enabled: true,
     logger: createSilentLogger(),
   });
+  return index;
+}
+
+async function survivors(fixture: LoadedFixture, finding: ReviewFinding) {
   return validateFindings([finding], fixture.changedFiles, [finding.category], {
-    index,
+    index: await indexOf(fixture),
     changedPaths: changedPaths(fixture.changedFiles),
   });
 }
+
+/** An engine whose agent finds nothing, so only the checks made in code can report. */
+const silentEngine: ReviewEngine = {
+  createAgent: ({ agent }) => ({ name: agent.name, run: async () => [] }),
+};
 
 describe("naming-drift-data-reads", () => {
   const fixture = loadFixture("naming-drift-data-reads");
@@ -80,3 +93,51 @@ describe("naming-drift-data-reads", () => {
     expect(await survivors(fixture, finding)).toEqual([]);
   });
 });
+
+describe("docs-drift-retry-budget", () => {
+  const fixture = loadFixture("docs-drift-retry-budget");
+
+  it("hands the reviewer the doc lines that still document the attempt count", async () => {
+    const block = renderDocMentions(await indexOf(fixture), fixture.context).join("\n");
+
+    expect(block).toContain(`README.md:${lineOf(fixture.baseFiles, "README.md", "| `NOTIFY_MAX_RETRIES`")}`);
+    expect(block).toContain(`docs/runbook.md:${lineOf(fixture.baseFiles, "docs/runbook.md", "gives each notification")}`);
+  });
+
+  it("keeps a finding that cites those doc lines", async () => {
+    const finding: ReviewFinding = {
+      file: "src/config.ts",
+      line: lineOf(fixture.headFiles, "src/config.ts", "export const RETRY_BUDGET_ENV"),
+      category: "docs",
+      severity: "medium",
+      title: "NOTIFY_MAX_RETRIES is gone, but the README and runbook still document it",
+      explanation: "The worker now reads NOTIFY_RETRY_BUDGET_MS; operators following the docs set a variable nothing reads.",
+      evidence: [
+        { file: "README.md", line: lineOf(fixture.baseFiles, "README.md", "| `NOTIFY_MAX_RETRIES`") },
+        { file: "docs/runbook.md", line: lineOf(fixture.baseFiles, "docs/runbook.md", "gives each notification") },
+      ],
+      confidence: 0.9,
+    };
+
+    expect(await survivors(fixture, finding)).toEqual([finding]);
+  });
+});
+
+describe.each(["docs-broken-anchor", "clean-docs-valid-anchor", "clean-docs-reword"])(
+  "%s, decided in code",
+  (name) => {
+    it("meets every expectation with an agent that reports nothing", async () => {
+      const fixture = loadFixture(name);
+      const review = await runFixtureReview(fixture, {
+        engine: silentEngine,
+        logger: createSilentLogger(),
+      });
+      const expectations = evalCases.find((evalCase) => evalCase.fixture === name)?.expectations;
+
+      expect(expectations).toBeDefined();
+      for (const expectation of expectations ?? []) {
+        expect(evaluateExpectation(review, expectation)).toMatchObject({ passed: true });
+      }
+    });
+  },
+);

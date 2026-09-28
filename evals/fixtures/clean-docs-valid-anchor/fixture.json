@@ -1,0 +1,22 @@
+{
+  "name": "clean-docs-valid-anchor",
+  "title": "Clean \u2014 a new README link lands on a runbook heading outside the diff",
+  "owner": "harbourline",
+  "repo": "notify-worker",
+  "baseSha": "3f5a1c8e07b249d6a1e4f0c72b8d95e3a6417cb0",
+  "headSha": "e82c5a1f07d94b3e6c2a8d05f1b73e9a4c0d6f25",
+  "pullRequest": {
+    "number": 276,
+    "title": "Point the README at the runbook",
+    "body": "Operators keep asking in chat what to do when deliveries stall. The runbook already covers it, so the README now links there.",
+    "author": "j-okafor",
+    "baseRef": "main",
+    "headRef": "docs/readme-troubleshooting"
+  },
+  "changedFiles": [
+    {
+      "path": "README.md",
+      "status": "modified"
+    }
+  ]
+}

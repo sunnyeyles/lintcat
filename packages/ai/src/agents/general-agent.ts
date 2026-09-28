@@ -14,7 +14,8 @@ const DRIFT_CATEGORIES = [
   },
   {
     slug: "docs",
-    covers: "documentation, a code comment or a doc link this change made wrong",
+    covers:
+      "documentation or a code comment this change made false; rewording that leaves a doc less specific is not drift",
   },
   {
     slug: "style",

@@ -102,6 +102,48 @@ export const evalCases: EvalCase[] = [
     ],
   },
   {
+    fixture: "docs-drift-retry-budget",
+    expectations: [
+      {
+        kind: "finding",
+        description:
+          "reports that the retry budget replaced the attempt count the README and the runbook still document",
+        anchors: [
+          { file: "src/config.ts", startMarker: "export const RETRY_BUDGET_ENV" },
+          { file: "src/delivery/retry.ts", startMarker: "export async function withRetryBudget" },
+        ],
+      },
+    ],
+  },
+  {
+    fixture: "docs-broken-anchor",
+    expectations: [
+      {
+        kind: "finding",
+        description: "reports that the new README link names a runbook heading that does not exist",
+        anchors: [{ file: "README.md", startMarker: "docs/runbook.md#the-queue-is-stuck" }],
+      },
+    ],
+  },
+  {
+    fixture: "clean-docs-valid-anchor",
+    expectations: [
+      {
+        kind: "no-findings",
+        description: "reports nothing on a README link to a runbook heading the diff does not show",
+      },
+    ],
+  },
+  {
+    fixture: "clean-docs-reword",
+    expectations: [
+      {
+        kind: "no-findings",
+        description: "reports nothing on a README section reworded to say less while staying true",
+      },
+    ],
+  },
+  {
     fixture: "correctness-admin-check",
     expectations: [
       outOfScope(
