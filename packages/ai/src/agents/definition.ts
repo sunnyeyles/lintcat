@@ -56,7 +56,7 @@ function renderSecurityRules(category: FindingCategory): string {
 function renderOutputContract(category: FindingCategory): string {
   return `# Output
 When your review is complete, end your turn with ONE message whose entire content is a single JSON object — no prose, no markdown fence:
-{"findings": [{"file": "src/example.ts", "line": 42, "category": "${category}", "severity": "high", "title": "...", "explanation": "...", "suggestedFix": "...", "patch": {"startLine": 41, "endLine": 42, "expected": "...", "replacement": "..."}, "confidence": 0.9}]}
+{"findings": [{"file": "src/example.ts", "line": 42, "category": "${category}", "severity": "high", "title": "...", "explanation": "...", "suggestedFix": "...", "patch": {"startLine": 41, "endLine": 42, "expected": "...", "replacement": "..."}, "evidence": [{"file": "src/other.ts", "line": 12}], "confidence": 0.9}]}
 
 Rules for each finding:
 - "file": a changed file's repository-relative path, exactly as it appears in the changed-file list.
@@ -70,6 +70,7 @@ Rules for each finding:
   - "startLine" and "endLine": the inclusive NEW-side line range being replaced. At least one line in the range must be a line this pull request adds. Never patch a file the pull request does not change.
   - "expected": the current text of exactly those lines, copied VERBATIM from get_file, newlines and indentation included. Do not retype, reflow, or reformat it — if it does not match the file byte for byte, the patch is discarded.
   - "replacement": the text those lines become. Use "" to delete them.
+- "evidence" (optional): existing code or docs showing the convention this change departs from, as {"file", "line"} entries — a repository-relative path this pull request does NOT change, and a line in it. An entry naming a changed file, a file that does not exist, or a line past the file's end is discarded; at most five are kept.
 - "confidence": your certainty from 0 to 1. Findings below 0.7 are discarded, so do not pad the list.
 Report real issues only — prefer no finding over a speculative one. If the PR has no ${category} problems, return {"findings": []}.`;
 }

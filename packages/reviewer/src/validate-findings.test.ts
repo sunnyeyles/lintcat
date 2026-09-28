@@ -1,4 +1,5 @@
 import type { ChangedFile } from "@pr-review/github";
+import { buildRepositoryIndex } from "@pr-review/index";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
@@ -383,5 +384,30 @@ describe("validateFindings", () => {
     );
     // The slot the duplicate used to waste now carries a real finding.
     expect(survivors.map((f) => f.title)).toContain("Distinct finding 8");
+  });
+
+  it("checks evidence against the base index, keeping only entries it can vouch for", () => {
+    const index = buildRepositoryIndex({
+      sha: "0".repeat(40),
+      files: new Map([
+        ["src/service.ts", "a\n"],
+        ["src/conventions.ts", "a\nb\nc\n"],
+      ]),
+    });
+    const evidenced = finding({
+      evidence: [
+        { file: "src/conventions.ts", line: 2 },
+        { file: "src/service.ts", line: 1 },
+        { file: "src/absent.ts", line: 1 },
+        { file: "src/conventions.ts", line: 40 },
+      ],
+    });
+
+    expect(
+      validateFindings([evidenced], changedFiles, CATEGORIES, {
+        index,
+        changedPaths: new Set(["src/service.ts", "src/other.ts"]),
+      }),
+    ).toEqual([{ ...evidenced, evidence: [{ file: "src/conventions.ts", line: 2 }] }]);
   });
 });

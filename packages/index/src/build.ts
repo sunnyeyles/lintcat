@@ -26,6 +26,7 @@ export interface IndexedFile {
   readonly path: string;
   readonly role: FileRole;
   readonly language: string;
+  readonly lineCount: number;
   /** The nearest named package.json above it, absent when there is none. */
   readonly package?: string;
   /** Distinct files importing this one, resolved. */
@@ -198,18 +199,29 @@ function flagFiles(
   }
 }
 
+function countLines(contents: string): number {
+  if (contents === "") {
+    return 0;
+  }
+  const breaks = contents.split("\n").length - 1;
+  return contents.endsWith("\n") ? breaks : breaks + 1;
+}
+
 /** Builds the index. Paths are sorted, so the same tree always indexes alike. */
 export function buildRepositoryIndex(
   input: RepositoryIndexInput,
 ): RepositoryIndex {
   const workspace = readWorkspace(input.files);
   const files = new Map<string, MutableIndexedFile>();
-  for (const path of [...input.files.keys()].sort()) {
+  for (const [path, contents] of [...input.files].sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  )) {
     const owner = packageOf(workspace, path);
     files.set(path, {
       path,
       role: classifyFileRole(path),
       language: languageOf(path),
+      lineCount: countLines(contents),
       importerCount: 0,
       inCycle: false,
       dead: false,

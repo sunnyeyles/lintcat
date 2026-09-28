@@ -233,6 +233,17 @@ describe("buildRepositoryIndex", () => {
       "source",
     );
   });
+
+  it("counts each file's lines, with or without a final newline", () => {
+    const built = graphIndex({
+      "a.ts": "one\ntwo\n",
+      "b.ts": "one\ntwo",
+      "c.ts": "",
+      "d.ts": "\n",
+    });
+
+    expect([...built.files.values()].map((file) => file.lineCount)).toEqual([2, 2, 0, 1]);
+  });
 });
 
 describe("import cycles", () => {

@@ -309,6 +309,32 @@ describe("the review risk migration on a populated database", () => {
   });
 });
 
+describe("the finding evidence migration on a populated database", () => {
+  it("leaves findings stored before it with no evidence, and takes a list after", async () => {
+    const { pg, applyTarget } = await migratedUpTo("0018_");
+    await pg.exec(`
+      insert into organizations (github_account_id, account_type, slug, name) values (1, 'user', 'acme', 'acme');
+      insert into repos (organization_id, owner, name) values (1, 'acme', 'widgets');
+      insert into reviews (repo_id, pr_number, head_sha, summary) values (1, 1, 'a', 's');
+      insert into findings (review_id, file, category, severity, title, explanation, confidence)
+        values (1, 'a.ts', 'naming', 'low', 'old', 'e', 0.9);
+    `);
+    await applyTarget();
+    await pg.exec(`
+      insert into findings (review_id, file, category, severity, title, explanation, confidence, evidence)
+        values (1, 'b.ts', 'naming', 'low', 'new', 'e', 0.9, '[{"file": "c.ts", "line": 3}]');
+    `);
+
+    const result = await pg.query<{ title: string; file: string | null }>(
+      "select title, evidence->0->>'file' as file from findings order by id",
+    );
+    expect(result.rows).toEqual([
+      { title: "old", file: null },
+      { title: "new", file: "c.ts" },
+    ]);
+  });
+});
+
 describe("the single-reviewer migration on a populated database", () => {
   it("sums each review's agent runs into the review before dropping them", async () => {
     const { pg, applyTarget } = await migratedUpTo("0009_");

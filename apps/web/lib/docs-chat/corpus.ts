@@ -141,7 +141,7 @@ LintCat reads a pull request the way a careful reviewer would: the diff, the cod
 ## How a review works {#review}
 - **Read.** The reviewer starts from the diff, then opens the surrounding code, the previous version of each file, the files that import it and the tests that cover it.
 - **Propose.** It returns candidate findings, each tied to a file, a line and, where it can, a fix.
-- **Check.** LintCat drops anything that doesn’t point at a line you changed, isn’t confident enough or repeats another finding, and checks every fix against the current file.
+- **Check.** LintCat drops anything that doesn’t point at a line you changed, isn’t confident enough or repeats another finding, removes any cited example of your conventions that doesn’t exist, and checks every fix against the current file.
 - **Post.** What survives becomes inline comments, the AI PR Review check run and the review on your dashboard.
 
 After the first review, a new push is reviewed from the commits added since, and findings nobody has resolved stay listed on the check run.
@@ -198,6 +198,7 @@ LintCat reads your code to review it, and that is all the AI part can do. Everyt
 Before anything is posted, every finding has to pass these checks:
 - It points at a line this pull request added or changed.
 - The reviewer is confident in it.
+- Any code it cites as the convention your change departs from exists, and sits outside this pull request. A reference that doesn’t check out is removed.
 - It doesn’t repeat another finding.
 - It makes the cut of at most 10 per review, most important first.
 

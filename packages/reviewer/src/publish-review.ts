@@ -60,7 +60,7 @@ export type PublishFixes = (
 interface ReviewDeliveryInput
   extends Pick<
     ReviewNotes,
-    "alreadyPosted" | "diffLines"
+    "alreadyPosted" | "diffLines" | "evidenceSource"
   > {
   findings: readonly ReviewFinding[];
   /** Verified patches: committed when a publisher can, offered otherwise. */
@@ -197,6 +197,7 @@ export async function deliverReview(
       scopeNote: input.scopeNote,
       blastRadius: input.blastRadius,
       suggestedReviewers: input.suggestedReviewers,
+      evidenceSource: input.evidenceSource,
     }),
   );
 

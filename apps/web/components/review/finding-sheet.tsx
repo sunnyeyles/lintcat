@@ -12,12 +12,16 @@ import {
 import type { ReactNode } from "react";
 
 import { ConfidenceMeter } from "./confidence-meter";
+import { ConventionEvidence } from "./convention-evidence";
 import { FilePath } from "./file-path";
 
 import { SeverityBadge } from "@/components/ui";
+import type { CommitRef } from "@/lib/github-links";
 
 export type FindingSheetProps = {
   finding: Finding | null;
+  /** The commit evidence was checked at; evidence links point into it. */
+  source: CommitRef;
   onClose: () => void;
 };
 
@@ -30,7 +34,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function FindingSheet({ finding, onClose }: FindingSheetProps) {
+export function FindingSheet({ finding, source, onClose }: FindingSheetProps) {
   return (
     <Sheet open={finding !== null} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="max-w-[min(34rem,94vw)]">
@@ -61,6 +65,12 @@ export function FindingSheet({ finding, onClose }: FindingSheetProps) {
                   {finding.explanation}
                 </p>
               </Section>
+
+              {finding.evidence && finding.evidence.length > 0 ? (
+                <Section title="Convention seen in">
+                  <ConventionEvidence evidence={finding.evidence} source={source} />
+                </Section>
+              ) : null}
 
               {finding.suggestedFix ? (
                 <Section title="Suggested fix">

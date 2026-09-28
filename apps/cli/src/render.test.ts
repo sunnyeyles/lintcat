@@ -36,6 +36,19 @@ describe("a finding in a terminal", () => {
     expect(renderFinding(finding, plain)).not.toContain("README.md:");
   });
 
+  it("names the convention evidence after the explanation", () => {
+    const finding = makeFinding("naming", {
+      evidence: [
+        { file: "src/data/invoices.ts", line: 4 },
+        { file: "src/data/customers.ts", line: 9 },
+      ],
+    });
+
+    expect(renderFinding(finding, plain).split("\n")).toContain(
+      "  Convention seen in: src/data/invoices.ts:4, src/data/customers.ts:9",
+    );
+  });
+
   it("colours the severity only when colour is on", () => {
     const finding = makeFinding("general");
 

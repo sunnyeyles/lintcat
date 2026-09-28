@@ -29,6 +29,17 @@ const findingPatchSchema = z
 
 export type FindingPatch = z.infer<typeof findingPatchSchema>;
 
+/** A pre-existing line showing the convention a finding says the change departs from. */
+export const findingEvidenceSchema = z.object({
+  file: z.string().min(1),
+  line: z.number().int().positive(),
+});
+
+export type FindingEvidence = z.infer<typeof findingEvidenceSchema>;
+
+/** Past this, a finding is malformed rather than well evidenced. */
+export const MAX_EVIDENCE_ENTRIES = 20;
+
 /**
  * One structured review finding. `line` is a new-side line number and is
  * optional; `confidence` is the agent's self-assessed certainty in [0, 1].
@@ -42,6 +53,7 @@ export const reviewFindingSchema = z.object({
   explanation: z.string().min(1),
   suggestedFix: z.string().min(1).optional(),
   patch: findingPatchSchema.optional(),
+  evidence: z.array(findingEvidenceSchema).max(MAX_EVIDENCE_ENTRIES).optional(),
   confidence: z.number().min(0).max(1),
 });
 

@@ -5,7 +5,13 @@
 import type { ReviewComment } from "@pr-review/github";
 import type { ReviewFinding } from "@pr-review/schemas";
 
-import { countLabel, heading, summarise } from "#src/finding-format";
+import {
+  countLabel,
+  evidenceNote,
+  heading,
+  summarise,
+  type EvidenceSource,
+} from "#src/finding-format";
 import {
   compareFindingStrength,
   normaliseTitle,
@@ -85,8 +91,16 @@ export function parsePostedFinding(body: string): PostedFinding | undefined {
 }
 
 /** One finding as the body of its own inline comment. */
-function commentBody(finding: ReviewFinding, suggest: boolean): string {
+function commentBody(
+  finding: ReviewFinding,
+  suggest: boolean,
+  source: EvidenceSource | undefined,
+): string {
   const lines = [`**${heading(finding)}**`, "", finding.explanation];
+  const evidence = evidenceNote(finding, source);
+  if (evidence !== undefined) {
+    lines.push("", evidence);
+  }
   if (finding.suggestedFix !== undefined) {
     lines.push("", `**Suggested fix:** ${finding.suggestedFix}`);
   }
@@ -130,6 +144,8 @@ export interface ReviewNotes {
   offerSuggestions: boolean;
   /** One sentence on what happened to the proposed fixes. */
   fixNote: string | undefined;
+  /** Absent, evidence is named without links. */
+  evidenceSource: EvidenceSource | undefined;
 }
 
 /**
@@ -143,6 +159,7 @@ export function renderReview(
     diffLines = new Map(),
     offerSuggestions = false,
     fixNote,
+    evidenceSource,
   }: Partial<ReviewNotes> = {},
 ): RenderedReview | undefined {
   const fresh = findings.filter(
@@ -165,7 +182,7 @@ export function renderReview(
         path: finding.file,
         startLine: anchor.startLine,
         line: anchor.line,
-        body: commentBody(finding, true),
+        body: commentBody(finding, true, evidenceSource),
       });
       continue;
     }
@@ -176,7 +193,7 @@ export function renderReview(
     comments.push({
       path: finding.file,
       line: finding.line,
-      body: commentBody(finding, false),
+      body: commentBody(finding, false, evidenceSource),
     });
   }
 
@@ -189,7 +206,7 @@ export function renderReview(
   if (fileLevel.length > 0) {
     sections.push(
       "These findings apply to a file rather than a line:",
-      ...fileLevel.map(summarise),
+      ...fileLevel.map((finding) => summarise(finding, evidenceSource)),
     );
   }
   if (fixNote !== undefined) {

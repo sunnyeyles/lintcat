@@ -45,6 +45,13 @@ and to prefer a few serious findings over many small ones.
   request touches
 - a finding must carry the agent's own category (`general`); any other is
   dropped, never re-stamped
+- a finding's **evidence** — the `file:line` references it cites for the
+  convention the change departs from — is checked against the repository index
+  at the base commit: an entry naming a file that does not exist, a file the
+  pull request changes, or a line past the file's end is removed
+  ([`validate-evidence.ts`](packages/reviewer/src/validate-evidence.ts)). What
+  survives is shown as "Convention seen in" links on the comment and the
+  dashboard
 - duplicates are removed and the survivors are **capped at 10**, strongest first
 - the check run's conclusion is always `neutral` — the review is advisory and
   never blocks a merge
@@ -120,8 +127,9 @@ Agent ──► raw candidates (unknown[])
    │  3. file exists in the PR            │
    │  4. line is an ADDED line in the diff│
    │  5. confidence >= 0.70               │
-   │  6. duplicate removal                │
-   │  7. cap at 10, strongest first       │
+   │  6. evidence checked at the base     │
+   │  7. duplicate removal                │
+   │  8. cap at 10, strongest first       │
    └──────────────────────────────────────┘
               │
               ▼

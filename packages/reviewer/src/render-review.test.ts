@@ -51,6 +51,38 @@ describe("renderReview", () => {
     expect(rendered?.comments[0]?.body).toContain("**Suggested fix:** Use === instead.");
   });
 
+  it("links each piece of evidence as a convention reference", () => {
+    const rendered = renderReview(
+      [
+        finding({
+          evidence: [
+            { file: "src/auth/roles.ts", line: 4 },
+            { file: "docs/access control.md", line: 20 },
+          ],
+        }),
+      ],
+      { evidenceSource: { owner: "octo-org", repo: "api", sha: "abc123" } },
+    );
+
+    expect(rendered?.comments[0]?.body).toContain(
+      "**Convention seen in:** " +
+        "[`src/auth/roles.ts:4`](https://github.com/octo-org/api/blob/abc123/src/auth/roles.ts#L4), " +
+        "[`docs/access control.md:20`](https://github.com/octo-org/api/blob/abc123/docs/access%20control.md#L20)",
+    );
+  });
+
+  it("names evidence without links when no source commit is known", () => {
+    const rendered = renderReview([
+      finding({ line: undefined, evidence: [{ file: "src/auth/roles.ts", line: 4 }] }),
+    ]);
+
+    expect(rendered?.body).toContain("**Convention seen in:** `src/auth/roles.ts:4`");
+  });
+
+  it("says nothing about conventions for a finding without evidence", () => {
+    expect(renderReview([finding()])?.comments[0]?.body).not.toContain("Convention seen in");
+  });
+
   it("carries a file-level finding in the body rather than dropping it", () => {
     const rendered = renderReview([finding({ line: undefined })]);
 

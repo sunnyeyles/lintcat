@@ -1,11 +1,16 @@
 /**
  * The validation chain, in order: schema, category, changed file, added line,
- * confidence, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
+ * confidence, evidence, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
  */
 import type { ChangedFile } from "@pr-review/github";
 import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
+import {
+  changedPathsOf,
+  withVerifiedEvidence,
+  type EvidenceBase,
+} from "#src/validate-evidence";
 
 /** Findings with confidence below this threshold are dropped. */
 export const CONFIDENCE_THRESHOLD = 0.7;
@@ -55,6 +60,10 @@ export function validateFindings(
   candidates: readonly unknown[],
   changedFiles: readonly ChangedFile[],
   allowedCategories: readonly string[],
+  evidenceBase: EvidenceBase = {
+    index: undefined,
+    changedPaths: changedPathsOf(changedFiles),
+  },
 ): ReviewFinding[] {
   // 1. Schema validity.
   const wellFormed = wellFormedFindings(candidates);
@@ -82,9 +91,14 @@ export function validateFindings(
     (finding) => finding.confidence >= CONFIDENCE_THRESHOLD,
   );
 
-  // 6. Duplicate removal. Sorted first, so the strongest of each group
+  // 6. Evidence entries the base commit cannot vouch for are removed.
+  const evidenced = confident.map((finding) =>
+    withVerifiedEvidence(finding, evidenceBase),
+  );
+
+  // 7. Duplicate removal. Sorted first, so the strongest of each group
   // is the one that survives.
-  const strongestFirst = [...confident].sort(compareFindingStrength);
+  const strongestFirst = [...evidenced].sort(compareFindingStrength);
   const seen = new Set<string>();
   const distinct: ReviewFinding[] = [];
   for (const finding of strongestFirst) {
@@ -98,6 +112,6 @@ export function validateFindings(
     distinct.push(finding);
   }
 
-  // 7. Cap at MAX_FINDINGS, keeping the strongest.
+  // 8. Cap at MAX_FINDINGS, keeping the strongest.
   return distinct.slice(0, MAX_FINDINGS);
 }

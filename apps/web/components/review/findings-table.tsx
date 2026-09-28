@@ -26,6 +26,7 @@ import {
 import { useId, useMemo, useState } from "react";
 
 import { SeverityBadge } from "@/components/ui";
+import type { CommitRef } from "@/lib/github-links";
 import type { Severity } from "@pr-review/db/dashboard";
 
 import { ConfidenceMeter } from "./confidence-meter";
@@ -36,7 +37,13 @@ import { SEVERITIES, sortFindings } from "./sort";
 
 const ALL = "all";
 
-export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
+export function FindingsTable({
+  findings,
+  source,
+}: {
+  findings: readonly Finding[];
+  source: CommitRef;
+}) {
   const severityId = useId();
   const [severity, setSeverity] = useState<Severity | typeof ALL>(ALL);
   const [selected, setSelected] = useState<Finding | null>(null);
@@ -180,7 +187,7 @@ export function FindingsTable({ findings }: { findings: readonly Finding[] }) {
         </Card>
       )}
 
-      <FindingSheet finding={selected} onClose={() => setSelected(null)} />
+      <FindingSheet finding={selected} source={source} onClose={() => setSelected(null)} />
     </section>
   );
 }

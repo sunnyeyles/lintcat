@@ -53,6 +53,7 @@ import type { FinishedReviewRun, ReviewDelivery } from "#src/review-delivery";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { suggestReviewers } from "#src/suggest-reviewers";
+import { changedPathsOf } from "#src/validate-evidence";
 import { validateFindings } from "#src/validate-findings";
 import { verifyPatches, type PatchSummary } from "#src/validate-patches";
 
@@ -415,9 +416,12 @@ async function review(
   cancelled.check("agent");
 
   // The AI boundary: only what passes validation reaches GitHub.
-  const findings = validateFindings(candidates, scope.changedFiles, [
-    agent.name,
-  ]);
+  const findings = validateFindings(
+    candidates,
+    scope.changedFiles,
+    [agent.name],
+    { index: repositoryIndex, changedPaths: changedPathsOf(changedFiles) },
+  );
   logger.info("findings.validated", {
     ...fields,
     candidateCount: candidates.length,
@@ -468,6 +472,11 @@ async function review(
           : undefined,
       blastRadius,
       suggestedReviewers,
+      evidenceSource: {
+        owner: target.owner,
+        repo: target.repo,
+        sha: pullRequest.baseSha,
+      },
     },
     { ...delivery, logger },
   );

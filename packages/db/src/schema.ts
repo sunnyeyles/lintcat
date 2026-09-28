@@ -1,4 +1,5 @@
 import type {
+  FindingEvidence,
   ReviewRecordChangedFile,
   ReviewRecordRisk,
 } from "@pr-review/schemas";
@@ -291,6 +292,7 @@ export const findings = pgTable(
     title: text("title").notNull(),
     explanation: text("explanation").notNull(),
     suggestedFix: text("suggested_fix"),
+    evidence: jsonb("evidence").$type<FindingEvidence[]>(),
     confidence: real("confidence").notNull(),
   },
   (t) => [index("findings_review_severity_idx").on(t.reviewId, t.severity)],

@@ -39,8 +39,9 @@ export default function HowItWorksPage() {
           </Bullet>
           <Bullet>
             <strong>Check.</strong> LintCat drops anything that doesn&rsquo;t point at a line you
-            changed, isn&rsquo;t confident enough or repeats another finding, and checks every fix
-            against the current file.
+            changed, isn&rsquo;t confident enough or repeats another finding, removes any cited
+            example of your conventions that doesn&rsquo;t exist, and checks every fix against the
+            current file.
           </Bullet>
           <Bullet>
             <strong>Post.</strong> What survives becomes inline comments, the AI PR Review check

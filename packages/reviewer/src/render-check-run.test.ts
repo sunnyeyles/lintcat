@@ -164,6 +164,22 @@ describe("renderCheckRun with findings", () => {
     );
   });
 
+  it("names the evidence in the summary, linked at the evidence commit", () => {
+    const evidenced = finding({ evidence: [{ file: "src/orders/list.ts", line: 7 }] });
+
+    const { output } = renderCheckRun([evidenced], {
+      annotate: true,
+      evidenceSource: { owner: "octo-org", repo: "shop", sha: "b".repeat(40) },
+    });
+
+    expect(output.summary).toContain(
+      `**Convention seen in:** [\`src/orders/list.ts:7\`](https://github.com/octo-org/shop/blob/${"b".repeat(40)}/src/orders/list.ts#L7)`,
+    );
+    expect(output.annotations?.[0]?.message).toBe(
+      "API failures are being returned as empty results.\n\nConvention seen in: src/orders/list.ts:7",
+    );
+  });
+
   it("caps annotations at 50 per request, keeping the strongest findings", () => {
     expect(MAX_ANNOTATIONS_PER_REQUEST).toBe(50);
     const many = Array.from({ length: 55 }, (_, i) =>

@@ -60,6 +60,10 @@ export function renderFinding(finding: ReviewFinding, options: RenderOptions): s
     location(finding),
   ].join(" ");
   const lines = [header, ...wrap(finding.title, "  "), ...wrap(finding.explanation, "  ")];
+  if (finding.evidence !== undefined && finding.evidence.length > 0) {
+    const seen = finding.evidence.map((entry) => `${entry.file}:${entry.line}`).join(", ");
+    lines.push(...wrap(`Convention seen in: ${seen}`, "  "));
+  }
   if (finding.suggestedFix !== undefined) {
     lines.push(...wrap(`Fix: ${finding.suggestedFix}`, "  "));
   }

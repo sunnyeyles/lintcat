@@ -111,6 +111,7 @@ erDiagram
     text title
     text explanation
     text suggested_fix
+    jsonb evidence "file line pairs, checked at base_sha"
     real confidence
   }
   repo_settings {
@@ -136,6 +137,8 @@ erDiagram
 - `reviews (repo_id, pr_number, head_sha)` is unique: the ingest upsert's
   conflict target, so a rerun of one commit replaces its runs and findings.
 - `findings.category` is the finding's own classification.
+- `findings.evidence` is the convention evidence that survived validation, as
+  `{ file, line }` entries at the review's `base_sha`; null when there was none.
 - `repository_graphs` is the repository index serialised by `@pr-review/index`,
   gzipped by the reviewer and stored as those exact bytes: ingest only base64
   decodes them, and the web data layer gunzips on read. It is unique on
