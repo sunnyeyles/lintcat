@@ -55,8 +55,6 @@ const changedFiles: ChangedFile[] = [
   },
 ];
 
-const diff = `diff --git a/${CHANGED_PATH} b/${CHANGED_PATH}`;
-
 const fixture: LoadedFixture = {
   name: "conformance",
   title: "Conformance — a planted repository",
@@ -79,8 +77,7 @@ const fixture: LoadedFixture = {
   },
   pullRequest,
   changedFiles,
-  diff,
-  context: { owner: OWNER, repo: REPO, pullRequest, changedFiles, diff },
+  context: { owner: OWNER, repo: REPO, pullRequest, changedFiles, pullRequestFiles: changedFiles },
   headFiles: HEAD_FILES,
   baseFiles: new Map([...HEAD_FILES, [CHANGED_PATH, "export const api = 1;\n"]]),
 };

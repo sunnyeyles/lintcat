@@ -71,7 +71,7 @@ describe("the single-shot sampling agent", () => {
 
     await review(sample, {
       ...context,
-      incremental: { sinceSha: "old111", diff: context.diff, changedFiles: context.changedFiles },
+      sinceSha: "old111",
     });
 
     expect(calls[0]?.prompt).toContain('<review_scope since="old111">');

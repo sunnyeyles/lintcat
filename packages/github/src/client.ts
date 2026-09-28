@@ -297,7 +297,6 @@ export interface WriteFileRequest {
 export interface PullRequestReadClient {
   getPullRequest(ref: PullRequestRef): Promise<PullRequestDetails>;
   listChangedFiles(ref: PullRequestRef): Promise<ChangedFile[]>;
-  getDiff(ref: PullRequestRef): Promise<string>;
   /** Reads one file's decoded contents at a specific SHA. Read-only. */
   getFileContents(request: FileContentsRequest): Promise<string>;
   /** Searches code within the single named repository. Read-only. */

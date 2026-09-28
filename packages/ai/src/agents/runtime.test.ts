@@ -30,6 +30,7 @@ import {
   makeModel,
   message,
   pullRequest,
+  reviewing,
   textBlock,
   toolUseBlock,
 } from "#src/agent-test-support";
@@ -180,14 +181,13 @@ describe("the review agent", () => {
       message([textBlock(finalJson)], "end_turn"),
     ]);
 
-    await agent.run({
-      ...context,
-      changedFiles: [
+    await agent.run(
+      reviewing([
         ...context.changedFiles,
         { filename: "pnpm-lock.yaml", status: "modified", additions: 900, deletions: 900, patch: "+lockfile churn" },
         { filename: "docs/logo.png", status: "added", additions: 0, deletions: 0 },
-      ],
-    });
+      ]),
+    );
 
     const opening = openingOf(calls[0]);
     expect(opening).toContain("user.isAdmin = true");
@@ -857,12 +857,11 @@ describe("the repository index block", () => {
   it("says a file nothing imports is dead", async () => {
     const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
 
-    await agent.run({
-      ...context,
-      changedFiles: [
+    await agent.run(
+      reviewing([
         { filename: "src/boot.ts", status: "modified", additions: 1, deletions: 0 },
-      ],
-    });
+      ]),
+    );
 
     expect(openingOf(calls[0])).toContain(
       "- src/boot.ts — source, no test, 0 importers, dead (not an entry point)",
@@ -879,12 +878,11 @@ describe("the repository index block", () => {
     });
     const { agent, calls } = makeAgent(scripted, { index: cycling });
 
-    await agent.run({
-      ...context,
-      changedFiles: [
+    await agent.run(
+      reviewing([
         { filename: "src/a.ts", status: "modified", additions: 1, deletions: 0 },
-      ],
-    });
+      ]),
+    );
 
     expect(openingOf(calls[0])).toContain(
       "- src/a.ts — source, no test, 1 importer, in import cycle\n",
@@ -894,12 +892,11 @@ describe("the repository index block", () => {
   it("says so for a changed file with no covering test", async () => {
     const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
 
-    await agent.run({
-      ...context,
-      changedFiles: [
+    await agent.run(
+      reviewing([
         { filename: "src/untested.ts", status: "modified", additions: 1, deletions: 0 },
-      ],
-    });
+      ]),
+    );
 
     expect(openingOf(calls[0])).toContain(
       "- src/untested.ts — source, no test, 1 importer",
@@ -909,12 +906,11 @@ describe("the repository index block", () => {
   it("says a file the base commit did not have is not in the index", async () => {
     const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
 
-    await agent.run({
-      ...context,
-      changedFiles: [
+    await agent.run(
+      reviewing([
         { filename: "src/added.ts", status: "added", additions: 9, deletions: 0 },
-      ],
-    });
+      ]),
+    );
 
     expect(openingOf(calls[0])).toContain(
       "- src/added.ts — not in the index at this commit",
@@ -949,7 +945,7 @@ describe("the repository index block", () => {
     }));
     const { agent, calls } = makeAgent(scripted, { index: fakeIndex() });
 
-    await agent.run({ ...context, changedFiles });
+    await agent.run(reviewing(changedFiles));
 
     expect(openingOf(calls[0])).toContain("- [... 2 more files]");
   });
@@ -1048,17 +1044,16 @@ describe("the repository block", () => {
   it("names the package a changed file belongs to", async () => {
     const { agent, calls } = makeAgent(scripted, { index: monorepoIndex() });
 
-    await agent.run({
-      ...context,
-      changedFiles: [
+    await agent.run(
+      reviewing([
         {
           filename: "packages/app/main.ts",
           status: "modified",
           additions: 1,
           deletions: 0,
         },
-      ],
-    });
+      ]),
+    );
 
     expect(openingOf(calls[0])).toContain(
       "- packages/app/main.ts — @acme/app, source, no test, 0 importers, dead (not an entry point)",

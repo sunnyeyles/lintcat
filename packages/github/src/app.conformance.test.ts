@@ -84,17 +84,14 @@ function stubOctokit(): OctokitLike {
       pulls: {
         get: (params) =>
           Promise.resolve({
-            data:
-              params.mediaType?.format === "diff"
-                ? "diff --git a/src/unique.ts b/src/unique.ts\n"
-                : {
-                    number: params.pull_number,
-                    title: "Extract the unique token",
-                    body: null,
-                    user: { login: "octocat" },
-                    base: { ref: "main", sha: "0".repeat(40) },
-                    head: { ref: "feature/unique", sha: HEAD_SHA },
-                  },
+            data: {
+              number: params.pull_number,
+              title: "Extract the unique token",
+              body: null,
+              user: { login: "octocat" },
+              base: { ref: "main", sha: "0".repeat(40) },
+              head: { ref: "feature/unique", sha: HEAD_SHA },
+            },
           }),
         listFiles: (params) => Promise.resolve({ data: params.page === 1 ? CHANGED : [] }),
         listReviewComments: () => Promise.resolve({ data: [] }),

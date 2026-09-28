@@ -34,7 +34,6 @@ export async function loadHeadImports(
   if (index === undefined) {
     return undefined;
   }
-  const whole = (context.incremental ?? context).changedFiles;
   const targets = context.changedFiles
     .filter(
       (file) =>
@@ -60,8 +59,8 @@ export async function loadHeadImports(
 
   return resolveHeadImports(index, {
     contents,
-    added: pathsWithStatus(whole, (status) => ADDED_STATUSES.has(status)),
-    removed: pathsWithStatus(whole, (status) => status === "removed"),
+    added: pathsWithStatus(context.pullRequestFiles, (status) => ADDED_STATUSES.has(status)),
+    removed: pathsWithStatus(context.pullRequestFiles, (status) => status === "removed"),
   });
 }
 

@@ -624,7 +624,7 @@ html { scroll-behavior: smooth; }
       </div>
       <div class="prose">
         <p>
-          Three GitHub reads, concurrently. This is the only place the review
+          Two GitHub reads, concurrently. This is the only place the review
           context is built.
         </p>
         <p>
@@ -637,10 +637,9 @@ html { scroll-behavior: smooth; }
 
       <figure class="code">
         <div class="code-head"><span class="p">packages/reviewer/src/review-pull-request.ts</span><span class="ln">line 132</span></div>
-<pre><span class="c-key">const</span> [pullRequest, changedFiles, diff] = <span class="c-key">await</span> Promise.all([
+<pre><span class="c-key">const</span> [pullRequest, changedFiles] = <span class="c-key">await</span> Promise.all([
   client.getPullRequest(target),
   client.listChangedFiles(target),
-  client.getDiff(target),
 ]);</pre>
       </figure>
 

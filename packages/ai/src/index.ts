@@ -19,6 +19,7 @@ export {
 export type {
   ReviewAgent,
   ReviewContext,
+  ReviewScope,
 } from "#src/agent-contract";
 export {
   ReviewCancelledError,

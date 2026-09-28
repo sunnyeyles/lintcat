@@ -50,7 +50,7 @@ import {
   type PostedFinding,
 } from "#src/render-review";
 import type { FinishedReviewRun, ReviewDelivery } from "#src/review-delivery";
-import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
+import { resolveReviewScope } from "#src/review-scope";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { suggestReviewers } from "#src/suggest-reviewers";
 import { validateFindings } from "#src/validate-findings";
@@ -307,27 +307,23 @@ async function review(
   const delivery = guarded(unguarded, cancelled.beforeWrite);
 
   cancelled.check("before start");
-  const [pullRequest, changedFiles, diff] = await Promise.all([
+  const [pullRequest, changedFiles] = await Promise.all([
     client.getPullRequest(target),
     client.listChangedFiles(target),
-    client.getDiff(target),
   ]);
   logger.info("review.loaded", {
     ...fields,
     changedFileCount: changedFiles.length,
-    diffLength: diff.length,
   });
   const tree: ReviewedTree = { baseSha: pullRequest.baseSha, changedFiles };
 
+  // The agent sees the scope; publishing sees the whole PR, so comments anchor anywhere.
   const scope = await resolveReviewScope(target, {
     client,
     incremental,
-    diff,
     changedFiles,
     logger,
   });
-  const whole = wholePullRequest(scope);
-  // The agent sees the scope; publishing sees the whole PR, so comments anchor anywhere.
   const carriedForward =
     scope.kind === "incremental"
       ? await openEarlierFindings(client, target, logger)
@@ -388,11 +384,8 @@ async function review(
         repo: target.repo,
         pullRequest,
         changedFiles: scope.changedFiles,
-        diff: scope.diff,
-        incremental:
-          scope.kind === "incremental"
-            ? { sinceSha: scope.sinceSha, ...scope.pullRequest }
-            : undefined,
+        pullRequestFiles: scope.pullRequestFiles,
+        sinceSha: scope.sinceSha,
         signal,
       })
       .then(
@@ -434,7 +427,7 @@ async function review(
   }
 
   // A patch is proved against the head commit before any of it can be committed or offered.
-  const verified = await verifyPatches(kept, whole.changedFiles, {
+  const verified = await verifyPatches(kept, scope.pullRequestFiles, {
     client,
     owner: target.owner,
     repo: target.repo,
@@ -452,7 +445,7 @@ async function review(
     target,
     {
       findings: verified.findings,
-      diffLines: buildDiffLineIndex(whole.changedFiles),
+      diffLines: buildDiffLineIndex(scope.pullRequestFiles),
       patches: {
         branch: pullRequest.headRef,
         files: verified.files,

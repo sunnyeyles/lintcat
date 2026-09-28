@@ -2,12 +2,7 @@ import { CHECK_RUN_NAME, type ChangedFile } from "@pr-review/github";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  intersectWithPullRequest,
-  renderDiff,
-  resolveReviewScope,
-  wholePullRequest,
-} from "#src/review-scope";
+import { intersectWithPullRequest, resolveReviewScope } from "#src/review-scope";
 import type { ReviewTarget } from "#src/review-target";
 
 const target: ReviewTarget = {
@@ -22,7 +17,6 @@ function file(filename: string, patch = `@@ -1 +1 @@\n+${filename}\n`): ChangedF
 }
 
 const changedFiles = [file("src/a.ts"), file("src/b.ts")];
-const diff = "the whole pull request diff";
 
 function completedRun(name = CHECK_RUN_NAME) {
   return { name, status: "completed" };
@@ -63,7 +57,6 @@ function deps(client: ReturnType<typeof makeClient>, incremental = true) {
   return {
     client,
     incremental,
-    diff,
     changedFiles,
     logger: createCapturingLogger().logger,
   };
@@ -76,6 +69,7 @@ describe("resolveReviewScope", () => {
     const scope = await resolveReviewScope(target, deps(client, false));
 
     expect(scope).toMatchObject({ kind: "full", reason: "not enabled" });
+    expect(scope).toMatchObject({ changedFiles, pullRequestFiles: changedFiles });
     expect(client.listPullRequestCommitShas).not.toHaveBeenCalled();
   });
 
@@ -97,12 +91,12 @@ describe("resolveReviewScope", () => {
     );
   });
 
-  it("keeps the whole pull request available alongside the narrowed diff", async () => {
+  it("keeps the whole pull request available alongside the narrowed files", async () => {
     const client = makeClient({ runs: { old111: [completedRun()] } });
 
     const scope = await resolveReviewScope(target, deps(client));
 
-    expect(wholePullRequest(scope)).toEqual({ diff, changedFiles });
+    expect(scope.pullRequestFiles).toEqual(changedFiles);
   });
 
   it("reviews it all when no earlier commit carries our check run", async () => {
@@ -212,17 +206,5 @@ describe("intersectWithPullRequest", () => {
     const [kept] = intersectWithPullRequest(since, changedFiles);
 
     expect(kept?.patch).toContain("since the baseline");
-  });
-});
-
-describe("renderDiff", () => {
-  it("renders one header per file, skipping files with no patch", () => {
-    const rendered = renderDiff([
-      file("src/a.ts"),
-      { filename: "logo.png", status: "modified", additions: 0, deletions: 0 },
-    ]);
-
-    expect(rendered).toContain("diff --git a/src/a.ts b/src/a.ts");
-    expect(rendered).not.toContain("logo.png");
   });
 });

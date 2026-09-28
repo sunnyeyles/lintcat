@@ -19,7 +19,6 @@ export type ClientMethod =
 const READ_METHOD_SET: Record<keyof PullRequestReadClient, true> = {
   getPullRequest: true,
   listChangedFiles: true,
-  getDiff: true,
   getFileContents: true,
   searchCode: true,
   getRepositoryArchive: true,

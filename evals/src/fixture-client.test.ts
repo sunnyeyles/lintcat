@@ -60,13 +60,12 @@ function makeFixture(
     },
     pullRequest,
     changedFiles,
-    diff: "diff --git a/src/http/pagination.ts b/src/http/pagination.ts",
     context: {
       owner: OWNER,
       repo: REPO,
       pullRequest,
       changedFiles,
-      diff: "diff --git a/src/http/pagination.ts b/src/http/pagination.ts",
+      pullRequestFiles: changedFiles,
     },
     headFiles: new Map(Object.entries(headFiles)),
     baseFiles: new Map(Object.entries(baseFiles)),
@@ -96,18 +95,16 @@ describe("indexEnabled", () => {
 });
 
 describe("pull request reads", () => {
-  it("serves the fixture's pull request, files and diff, recording each read", async () => {
+  it("serves the fixture's pull request and files, recording each read", async () => {
     const { client, calls } = createFixtureClient(makeFixture(SIMPLE));
 
     await expect(client.getPullRequest(REF)).resolves.toBe(pullRequest);
-    await expect(client.getDiff(REF)).resolves.toContain("diff --git");
     await expect(client.listChangedFiles(REF)).resolves.toEqual([
       expect.objectContaining({ filename: "src/http/pagination.ts" }),
     ]);
 
     expect(calls).toEqual([
       { method: "getPullRequest", detail: "#154" },
-      { method: "getDiff", detail: "#154" },
       { method: "listChangedFiles", detail: "#154" },
     ]);
   });

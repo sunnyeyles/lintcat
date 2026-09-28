@@ -192,9 +192,7 @@ export function createReviewTools(
   context: ReviewContext,
   index?: RepositoryIndex | undefined,
 ): ToolSet {
-  const { owner, repo } = context;
-  // Tools serve the whole pull request, even when the reviewed diff is narrowed.
-  const whole = context.incremental ?? context;
+  const { owner, repo, pullRequestFiles } = context;
   // Commits are immutable, so one fetch per SHA serves every call this run.
   const commitFiles = new Map<string, Promise<string[]>>();
   const filesOf = (sha: string): Promise<string[]> => {
@@ -220,7 +218,7 @@ export function createReviewTools(
         "List the files changed by the pull request (filename, status, additions, deletions) as JSON.",
       inputSchema: emptyInputSchema,
       async execute() {
-        const listed = whole.changedFiles.map(
+        const listed = pullRequestFiles.map(
           ({ filename, status, additions, deletions }) => ({
             filename,
             status,
@@ -244,8 +242,8 @@ export function createReviewTools(
       async execute({ path }) {
         return truncate(
           path === undefined
-            ? renderPatchIndex(whole.changedFiles)
-            : patchFor(whole.changedFiles, path),
+            ? renderPatchIndex(pullRequestFiles)
+            : patchFor(pullRequestFiles, path),
         );
       },
     }),
@@ -322,7 +320,7 @@ export function createReviewTools(
             findReferences(index, {
               path,
               name,
-              absentReason: addedReason(whole.changedFiles, path),
+              absentReason: addedReason(pullRequestFiles, path),
             }),
           ),
         );

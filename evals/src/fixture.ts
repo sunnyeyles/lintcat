@@ -10,7 +10,7 @@ import type { ReviewContext } from "@pr-review/ai";
 import type { ChangedFile, PullRequestDetails } from "@pr-review/github";
 import { z } from "zod";
 
-import { buildFileDiff, buildPatch } from "#src/unified-diff";
+import { buildPatch } from "#src/unified-diff";
 
 /** The directory holding every fixture, one subdirectory each. */
 const FIXTURES_DIR = resolve(
@@ -56,8 +56,6 @@ export interface LoadedFixture {
   manifest: FixtureManifest;
   pullRequest: PullRequestDetails;
   changedFiles: ChangedFile[];
-  /** The pull request's full unified diff. */
-  diff: string;
   /** The context the review pipeline runs against. */
   context: ReviewContext;
   /** Every file in the repository at the head SHA, by path. */
@@ -146,16 +144,6 @@ export function loadFixture(name: string): LoadedFixture {
     return { filename: file.path, status: file.status, additions, deletions, patch };
   });
 
-  const diff = manifest.changedFiles
-    .map((file) =>
-      buildFileDiff(
-        file.path,
-        file.status === "added" ? undefined : baseFiles.get(file.path),
-        required(headFiles, file.path, "repo"),
-      ),
-    )
-    .join("\n");
-
   const pullRequest: PullRequestDetails = {
     number: manifest.pullRequest.number,
     title: manifest.pullRequest.title,
@@ -173,13 +161,12 @@ export function loadFixture(name: string): LoadedFixture {
     manifest,
     pullRequest,
     changedFiles,
-    diff,
     context: {
       owner: manifest.owner,
       repo: manifest.repo,
       pullRequest,
       changedFiles,
-      diff,
+      pullRequestFiles: changedFiles,
     },
     headFiles,
     baseFiles,

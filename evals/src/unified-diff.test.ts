@@ -1,7 +1,7 @@
 /** Diff construction, checked by reading the hunks and by replaying them. */
 import { describe, expect, it } from "vitest";
 
-import { buildFileDiff, buildPatch } from "#src/unified-diff";
+import { buildPatch } from "#src/unified-diff";
 
 const HUNK_HEADER = /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@$/;
 
@@ -143,44 +143,6 @@ describe("buildPatch", () => {
   ])("rejects a fixture file with no trailing newline on %s", (_label, base, head) => {
     expect(() => buildPatch(base, head, "src/unterminated.ts")).toThrow(
       /src\/unterminated\.ts does not end with a newline/,
-    );
-  });
-});
-
-describe("buildFileDiff", () => {
-  it("marks an added file with /dev/null and a null blob", () => {
-    const diff = buildFileDiff("src/new.ts", undefined, "alpha\n").split("\n");
-    expect(diff.slice(0, 5)).toEqual([
-      "diff --git a/src/new.ts b/src/new.ts",
-      "new file mode 100644",
-      "index 0000000..4a58007",
-      "--- /dev/null",
-      "+++ b/src/new.ts",
-    ]);
-  });
-
-  it("names both blobs and the mode for a modified file", () => {
-    const diff = buildFileDiff("src/mid.ts", "alpha\n", "beta\n").split("\n");
-    expect(diff.slice(0, 4)).toEqual([
-      "diff --git a/src/mid.ts b/src/mid.ts",
-      "index 4a58007..65b2df8 100644",
-      "--- a/src/mid.ts",
-      "+++ b/src/mid.ts",
-    ]);
-  });
-
-  it("uses the blob SHA git itself computes", () => {
-    // `printf 'alpha\n' | git hash-object --stdin`
-    expect(buildFileDiff("f.ts", undefined, "alpha\n")).toContain(
-      "index 0000000..4a58007",
-    );
-  });
-
-  it("carries the patch after the headers", () => {
-    const diff = buildFileDiff("src/mid.ts", TEN, TEN.replace("line 5\n", "x\n"));
-    expect(diff).toContain("@@ -2,7 +2,7 @@");
-    expect(applyPatch(TEN, diff.split("\n").slice(4).join("\n"))).toBe(
-      TEN.replace("line 5\n", "x\n"),
     );
   });
 });

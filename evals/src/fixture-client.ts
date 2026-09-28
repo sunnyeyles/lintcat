@@ -87,12 +87,6 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
       return fixture.changedFiles.map((file) => ({ ...file }));
     },
 
-    async getDiff(ref): Promise<string> {
-      checkRef(ref);
-      record("getDiff", `#${ref.pullRequestNumber}`);
-      return fixture.diff;
-    },
-
     async getFileContents(request: FileContentsRequest): Promise<string> {
       const { owner, repo } = fixture.context;
       if (request.owner !== owner || request.repo !== repo) {

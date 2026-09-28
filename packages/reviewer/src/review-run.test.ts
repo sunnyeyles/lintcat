@@ -85,7 +85,6 @@ const changedFiles: ChangedFile[] = [
   },
 ];
 
-const diff = "diff --git a/src/sessions.ts b/src/sessions.ts\n";
 
 /** The tree the fake archive serves at the base commit. */
 const baseFiles = new Map<string, string>([
@@ -113,7 +112,6 @@ function makeClient() {
   return {
     getPullRequest: vi.fn(async (_ref: PullRequestRef) => pullRequest),
     listChangedFiles: vi.fn(async (_ref: PullRequestRef) => changedFiles),
-    getDiff: vi.fn(async (_ref: PullRequestRef) => diff),
     getFileContents: vi.fn(async () => "export const sessions = [];\n"),
     searchCode: vi.fn(async () => ({
       matches: [],
@@ -229,14 +227,13 @@ afterEach(() => {
 });
 
 describe("runReview", () => {
-  it("loads the PR, its changed files, and its diff concurrently", async () => {
+  it("loads the PR and its changed files", async () => {
     const { spec, client } = makeRun();
 
     await runReview(spec);
 
     expect(client.getPullRequest).toHaveBeenCalledExactlyOnceWith(target);
     expect(client.listChangedFiles).toHaveBeenCalledExactlyOnceWith(target);
-    expect(client.getDiff).toHaveBeenCalledExactlyOnceWith(target);
   });
 
   it("runs the general agent against the loaded context with the same client", async () => {
@@ -256,8 +253,8 @@ describe("runReview", () => {
       repo: target.repo,
       pullRequest,
       changedFiles,
-      diff,
-      incremental: undefined,
+      pullRequestFiles: changedFiles,
+      sinceSha: undefined,
       signal: undefined,
     });
   });
@@ -569,7 +566,7 @@ describe("runReview, narrowed to the commits since the last review", () => {
     patch: "@@ -2 +2,3 @@\n+const limit = 0;\n",
   };
 
-  it("hands the agent the narrowed diff, and the whole pull request beside it", async () => {
+  it("hands the agent the narrowed files, and the whole pull request beside them", async () => {
     const { spec, client, agentRun } = makeRun([], {
       incremental: true,
     });
@@ -577,12 +574,11 @@ describe("runReview, narrowed to the commits since the last review", () => {
 
     await runReview(spec);
 
-    const context = agentRun.mock.calls[0]?.[0];
-    expect(context).toMatchObject({
+    expect(agentRun.mock.calls[0]?.[0]).toMatchObject({
       changedFiles: [sinceFile],
-      incremental: { sinceSha: "old111", diff, changedFiles },
+      pullRequestFiles: changedFiles,
+      sinceSha: "old111",
     });
-    expect(context?.diff).toContain("+const limit = 0;");
   });
 
   it("reviews the whole pull request when no earlier commit was reviewed", async () => {
@@ -595,9 +591,9 @@ describe("runReview, narrowed to the commits since the last review", () => {
 
     expect(agentRun.mock.calls[0]?.[0]).toMatchObject({
       changedFiles,
-      diff,
+      pullRequestFiles: changedFiles,
     });
-    expect(agentRun.mock.calls[0]?.[0].incremental).toBeUndefined();
+    expect(agentRun.mock.calls[0]?.[0].sinceSha).toBeUndefined();
   });
 
   it("runs nothing when nothing this pull request changed has moved", async () => {

@@ -61,8 +61,7 @@ const fixture: LoadedFixture = {
   },
   pullRequest,
   changedFiles,
-  diff: "",
-  context: { owner: "acme", repo: "shop", pullRequest, changedFiles, diff: "" },
+  context: { owner: "acme", repo: "shop", pullRequest, changedFiles, pullRequestFiles: changedFiles },
   headFiles: new Map([[FILE, CONTENTS]]),
   baseFiles: new Map([[FILE, "export function summarise() {}\n"]]),
 };

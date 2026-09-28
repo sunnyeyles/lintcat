@@ -41,7 +41,9 @@ describe("openLocalRepository", () => {
       ["src/sessions.ts", "modified"],
       ["src/draft.ts", "added"],
     ]);
-    expect(await local.client.getDiff(local.target)).toContain("+export const draft = true;");
+    expect(files.find((file) => file.filename === "src/draft.ts")?.patch).toContain(
+      "+export const draft = true;",
+    );
   });
 
   it("keeps real paths whatever diff prefix the user's git config sets", async () => {
@@ -187,7 +189,6 @@ describe("the range scope", () => {
     const local = await range("feature..feature");
 
     await expect(local.client.listChangedFiles(local.target)).resolves.toEqual([]);
-    await expect(local.client.getDiff(local.target)).resolves.toBe("");
   });
 
   it("names an unknown ref rather than guessing", async () => {

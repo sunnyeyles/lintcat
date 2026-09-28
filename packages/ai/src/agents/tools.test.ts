@@ -14,6 +14,7 @@ import {
   headSha,
   makeGithub,
   pullRequest,
+  reviewing,
 } from "#src/agent-test-support";
 
 /** The index the fake archive builds, as the reviewer would build it. */
@@ -22,13 +23,10 @@ function index() {
 }
 
 /** The shared context plus one changed file that carries no patch. */
-const scope = {
-  ...context,
-  changedFiles: [
-    ...changedFiles,
-    { filename: "assets/logo.png", status: "added", additions: 0, deletions: 0 },
-  ],
-};
+const scope = reviewing([
+  ...changedFiles,
+  { filename: "assets/logo.png", status: "added", additions: 0, deletions: 0 },
+]);
 
 /** The SDK stores the Zod schema we passed, so tests can parse against it. */
 function schemaOf(tools: ToolSet, name: string): z.ZodType {
@@ -51,16 +49,12 @@ function run(tools: ToolSet, name: string, input: unknown): Promise<unknown> {
 
 const narrowed = {
   ...context,
-  diff: "@@ -2 +2 @@\n+const limit = 0;\n",
   changedFiles: [changedFiles[0]!],
-  incremental: {
-    sinceSha: "old111",
-    diff: context.diff,
-    changedFiles: [
-      ...changedFiles,
-      { filename: "docs/sessions.md", status: "modified", additions: 1, deletions: 0, patch: "@@ -1 +1 @@\n+docs\n" },
-    ],
-  },
+  pullRequestFiles: [
+    ...changedFiles,
+    { filename: "docs/sessions.md", status: "modified", additions: 1, deletions: 0, patch: "@@ -1 +1 @@\n+docs\n" },
+  ],
+  sinceSha: "old111",
 };
 
 describe("createReviewTools on a narrowed review", () => {
@@ -175,7 +169,6 @@ describe("review tool execution", () => {
     const github = makeGithub();
     const result = String(await run(createReviewTools(github, scope), "get_diff", {}));
 
-    expect(github.getDiff).not.toHaveBeenCalled();
     expect(result).toBe(
       [
         "2 changed file(s); call get_diff with a path for one patch.",
@@ -461,12 +454,9 @@ describe("review tool execution", () => {
   });
 
   it("says a path the pull request added has no node at the base commit", async () => {
-    const added = {
-      ...scope,
-      changedFiles: [
-        { filename: "src/new.ts", status: "added", additions: 4, deletions: 0 },
-      ],
-    };
+    const added = reviewing([
+      { filename: "src/new.ts", status: "added", additions: 4, deletions: 0 },
+    ]);
 
     const payload = JSON.parse(
       (await run(

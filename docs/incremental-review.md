@@ -47,18 +47,20 @@ and `behind` both fall back.
 pipeline one value:
 
 ```ts
-type ReviewScope =
-  | { kind: "full"; reason: string; diff; changedFiles }
-  | { kind: "incremental"; sinceSha: string; diff; changedFiles; pullRequest };
+type ResolvedReviewScope =
+  | ReviewScope & { kind: "full"; reason: string }
+  | ReviewScope & { kind: "incremental"; sinceSha: string };
 ```
 
-`pullRequest` carries the whole diff and file list beside the narrowed ones, so
-one value serves both readers: the agent gets the narrowed pair, publishing
-gets the whole pair.
+`ReviewScope` is the shape `ReviewContext` extends in `packages/ai`:
+`changedFiles` (the files under review), `pullRequestFiles` (every file the pull
+request changed) and `sinceSha` when narrowed. One value serves both readers:
+the agent reviews `changedFiles`, while its tools and publishing read
+`pullRequestFiles`. A full review sets both lists to the same files.
 
-`runReview` calls it in place of the `getDiff` / `listChangedFiles`
-pair, and reads `scope.diff` and `scope.changedFiles` from then on. A run asks
-for it with `policy.incremental` on the `runReview` spec.
+`runReview` resolves it right after `listChangedFiles`, and reads
+`scope.changedFiles` from then on. A run asks for it with `policy.incremental`
+on the `runReview` spec.
 
 ### The base-merge trap
 
@@ -83,10 +85,11 @@ and its result is what gets re-stated.
 
 ## What the agent sees
 
-The opening message carries the incremental diff and the full pull request's
-changed-file list. `get_diff` continues to return the whole diff, so an agent
-that needs the full picture asks for it and pays for it then — which is where
-the saving comes from, since most turns will not need to.
+The opening message carries the incremental diff and a count of the files the
+whole pull request changed. `list_changed_files` and `get_diff` still serve the
+whole pull request, so an agent that needs the full picture asks for it and
+pays for it then — which is where the saving comes from, since most turns will
+not need to.
 
 One line joins each agent's prompt: the diff is the change since the last
 review, earlier commits were already reviewed, and a finding must anchor to a
