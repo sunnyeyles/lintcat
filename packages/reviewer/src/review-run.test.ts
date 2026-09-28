@@ -17,6 +17,7 @@ import type {
   CreateCommitInput,
   CreateReviewInput,
   ExistingReviewComment,
+  FileContentsRequest,
   PullRequestDetails,
   PullRequestReadClient,
   PullRequestRef,
@@ -33,6 +34,7 @@ import {
 } from "@pr-review/index";
 import { createCapturingLogger } from "@pr-review/logging";
 import {
+  MAX_OVERLAY_FILES,
   reviewMemorySchema,
   type MemoryShape,
   type ReviewFinding,
@@ -120,7 +122,9 @@ function makeClient() {
     getPullRequest: vi.fn(async (_ref: PullRequestRef) => pullRequest),
     listChangedFiles: vi.fn(async (_ref: PullRequestRef) => changedFiles),
     getDiff: vi.fn(async (_ref: PullRequestRef) => diff),
-    getFileContents: vi.fn(async () => "export const sessions = [];\n"),
+    getFileContents: vi.fn(
+      async (_request: FileContentsRequest) => "export const sessions = [];\n",
+    ),
     searchCode: vi.fn(async () => ({
       matches: [],
       totalCount: 0,
@@ -324,6 +328,14 @@ describe("runReview", () => {
         impact: expect.any(Object),
         risk: expect.objectContaining({ band: "low" }),
       },
+      overlay: {
+        headSha: target.headSha,
+        files: [{ path: "src/sessions.ts", status: "modified" }],
+        added: [],
+        removed: [],
+        unresolvedImportCount: 0,
+        partial: false,
+      },
     });
   });
 
@@ -361,6 +373,7 @@ describe("runReview", () => {
       "review.loaded",
       "index.built",
       "risk.scored",
+      "overlay.built",
       "reviewers.suggested",
       "findings.validated",
       "patches.verified",
@@ -1030,6 +1043,112 @@ describe("the repository index", () => {
     const summary = client.createCheckRun.mock.calls[0]?.[0].output.summary;
     expect(summary).not.toContain("Blast radius");
     expect(entry(entries, "risk.scored")).toBeUndefined();
+  });
+});
+
+describe("the change overlay", () => {
+  const overlayBase = new Map<string, string>([
+    ["src/sessions.ts", 'import { limit } from "./limit";\n'],
+    ["src/limit.ts", "export const limit = 1;\n"],
+    ["src/old.ts", 'import { limit } from "./limit";\n'],
+    ["src/util.ts", "export const util = 1;\n"],
+  ]);
+
+  const file = (filename: string, status: string, previous?: string): ChangedFile => ({
+    filename,
+    status,
+    additions: 1,
+    deletions: 0,
+    ...(previous === undefined ? {} : { previous_filename: previous }),
+  });
+
+  function overlayRun(files: ChangedFile[], head: Record<string, string>) {
+    const run = makeRun();
+    run.client.listChangedFiles.mockResolvedValue(files);
+    run.client.getRepositoryArchive.mockResolvedValue({
+      sha: pullRequest.baseSha,
+      files: new Map(overlayBase),
+      truncated: false,
+    });
+    run.client.getFileContents.mockImplementation(async (request: FileContentsRequest) => {
+      const text = head[request.path];
+      if (text === undefined) throw new Error(`no ${request.path} at head`);
+      return text;
+    });
+    return run;
+  }
+
+  it("diffs added, modified, removed and renamed files against the base graph", async () => {
+    const { spec, client } = overlayRun(
+      [
+        file("src/fresh.ts", "added"),
+        file("src/sessions.ts", "modified"),
+        file("src/old.ts", "removed"),
+        file("src/utils.ts", "renamed", "src/util.ts"),
+      ],
+      {
+        "src/fresh.ts": 'import { util } from "./utils";\nimport { x } from "./missing";\n',
+        "src/sessions.ts": 'import { util } from "./utils";\n',
+        "src/utils.ts": "export const util = 1;\n",
+      },
+    );
+
+    const { overlay } = (await runReview(spec)).outcome;
+
+    expect(client.getFileContents).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "src/fresh.ts", ref: target.headSha }),
+    );
+    expect(overlay).toEqual({
+      headSha: target.headSha,
+      files: [
+        { path: "src/fresh.ts", status: "added" },
+        { path: "src/sessions.ts", status: "modified" },
+        { path: "src/old.ts", status: "removed" },
+        { path: "src/utils.ts", status: "renamed", previousPath: "src/util.ts" },
+      ],
+      added: [
+        { from: "src/fresh.ts", to: "src/utils.ts" },
+        { from: "src/sessions.ts", to: "src/utils.ts" },
+      ],
+      removed: [
+        { from: "src/old.ts", to: "src/limit.ts" },
+        { from: "src/sessions.ts", to: "src/limit.ts" },
+      ],
+      unresolvedImportCount: 1,
+      partial: false,
+    });
+  });
+
+  it("stops at the changed-file cap and says it is partial", async () => {
+    const many = Array.from({ length: MAX_OVERLAY_FILES + 5 }, (_, i) =>
+      file(`docs/page-${i}.md`, "added"),
+    );
+    const { spec } = overlayRun(many, {});
+
+    const { overlay } = (await runReview(spec)).outcome;
+
+    expect(overlay?.files).toHaveLength(MAX_OVERLAY_FILES);
+    expect(overlay?.partial).toBe(true);
+  });
+
+  it("ships the review without an overlay when a head read fails", async () => {
+    const { spec, client, entries } = overlayRun([file("src/sessions.ts", "modified")], {});
+
+    const run = await runReview(spec);
+
+    expect(run.outcome.overlay).toBeUndefined();
+    expect(run.outcome.graph).toBeDefined();
+    expect(client.createCheckRun).toHaveBeenCalledTimes(1);
+    expect(entries.find((logged) => logged["event"] === "overlay.failed")).toMatchObject({
+      reason: "no src/sessions.ts at head",
+      level: "error",
+    });
+  });
+
+  it("builds none without an index", async () => {
+    const { spec } = makeRun([], { index: false });
+
+    expect((await runReview(spec)).outcome.overlay).toBeUndefined();
   });
 });
 
