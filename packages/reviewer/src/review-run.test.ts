@@ -384,6 +384,25 @@ describe("runReview", () => {
     expect(client.createReview.mock.calls[0]?.[0].comments).toHaveLength(1);
   });
 
+  it("publishes a doc link the pull request adds to a missing file, with no model involved", async () => {
+    const { spec, client } = makeRun();
+    const readme: ChangedFile = {
+      filename: "README.md",
+      status: "added",
+      additions: 1,
+      deletions: 0,
+      patch: "@@ -0,0 +1 @@\n+See [limits](docs/limits.md).",
+    };
+    client.listChangedFiles.mockResolvedValue([...changedFiles, readme]);
+    client.getFileContents.mockImplementation(async () => "See [limits](docs/limits.md).\n");
+
+    const { outcome } = await runReview(spec);
+
+    expect(outcome.findings).toMatchObject([
+      { file: "README.md", line: 1, category: "docs", confidence: 1 },
+    ]);
+  });
+
   it("propagates an agent failure without publishing", async () => {
     const { spec, client, agentRun } = makeRun();
     agentRun.mockRejectedValueOnce(new Error("every agent failed"));

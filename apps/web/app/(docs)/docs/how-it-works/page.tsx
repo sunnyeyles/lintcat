@@ -74,7 +74,10 @@ export default function HowItWorksPage() {
             files share and no formatter or linter enforces.
           </Bullet>
           <Bullet>
-            <strong>Documentation:</strong> a README, doc or comment the change made wrong.
+            <strong>Documentation:</strong> a README, doc or comment the change made wrong, and
+            a doc link the change adds to a file or heading that doesn&rsquo;t exist. Broken links
+            are found by LintCat itself, not the AI, so they need no cited examples. Rewording
+            that makes a doc say less is not drift.
           </Bullet>
           <Bullet>
             <strong>Config:</strong> a setting or dependency added differently from the ones
@@ -107,7 +110,10 @@ export default function HowItWorksPage() {
           <Bullet>whether it sits in an import cycle;</Bullet>
           <Bullet>
             which unchanged files sit beside it and play the same role: the local convention it
-            is compared against.
+            is compared against;
+          </Bullet>
+          <Bullet>
+            which lines of your Markdown docs name something the change adds, removes or edits.
           </Bullet>
         </Bullets>
         <P>

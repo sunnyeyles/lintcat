@@ -17,14 +17,17 @@ one of these categories:
 | --- | --- |
 | **naming** | a function, type, file, export, route or flag named differently from how the repository names the same kind of thing |
 | **pattern** | a re-implemented helper, a bypassed layer, a hand-rolled version of an established construct |
-| **docs** | documentation, a code comment or a doc link this change made wrong |
+| **docs** | documentation or a code comment this change made false, and a doc link the change adds to a file or heading that does not exist |
 | **style** | a structural habit the neighbouring files share and no formatter or linter enforces: export style, error shape, module layout |
 | **config** | a setting, env var or dependency added differently from the ones already there |
 
-Every finding cites **evidence**: at least two places in files the pull request
-does not change that show the convention. The opening message lists each
-changed file's siblings — the unchanged files in its directory with the same
-role — as the local convention to read first.
+Every finding the agent makes cites **evidence**: at least two places in files
+the pull request does not change that show the convention. The opening message
+lists each changed file's siblings — the unchanged files in its directory with
+the same role — as the local convention to read first. It also quotes the lines
+of unchanged Markdown docs that name something the diff's code adds, removes or
+edits, so a doc the change made false can be cited as the evidence. Rewording
+that leaves a doc less specific is not drift.
 
 A finding may carry a **patch**: a replacement for a range of lines, quoted
 alongside the exact text it expects to replace. With [fixes](#fixes) on, the
@@ -60,6 +63,11 @@ many small ones.
   ([`validate-evidence.ts`](packages/reviewer/src/validate-evidence.ts)). What
   survives is shown as "Convention seen in" links on the comment and the
   dashboard
+- a Markdown link the pull request adds is resolved against its head commit
+  and, when it points at a missing file or a heading the target does not have,
+  reported as a `docs` finding with no model involved
+  ([`doc-links.ts`](packages/reviewer/src/doc-links.ts)). These findings need no
+  evidence, and go ahead of the agent's
 - duplicates are removed and the survivors are **capped at 10**, strongest first
 - the check run's conclusion is always `neutral` — the review is advisory and
   never blocks a merge
@@ -138,6 +146,13 @@ Agent ──► raw candidates (unknown[])
    │  6. evidence checked at the base     │
    │  7. duplicate removal                │
    │  8. cap at 10, strongest first       │
+   └──────────────────────────────────────┘
+              │
+              ▼
+   ┌──────────────────────────────────────┐
+   │ checkDocLinks()     — no model here  │
+   │  added doc links resolved at head;   │
+   │  a broken one leads the findings     │
    └──────────────────────────────────────┘
               │
               ▼

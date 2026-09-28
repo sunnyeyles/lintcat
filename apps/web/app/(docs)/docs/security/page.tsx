@@ -74,6 +74,10 @@ export default function SecurityPage() {
             change departs from. Each must exist and sit outside this pull request; a reference
             that doesn&rsquo;t check out is removed, and so is a finding left with fewer than two.
           </Bullet>
+          <Bullet>
+            A broken doc link is the one finding LintCat makes itself: the link is resolved at
+            the pull request&rsquo;s latest commit, so it needs no cited examples.
+          </Bullet>
           <Bullet>It doesn&rsquo;t repeat another finding.</Bullet>
           <Bullet>It makes the cut of at most 10 per review, most important first.</Bullet>
         </Bullets>

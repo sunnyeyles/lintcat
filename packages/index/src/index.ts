@@ -17,6 +17,23 @@ export {
 } from "#src/codeowners";
 export { nodesInCycles } from "#src/cycles";
 export {
+  changedNames,
+  docLinesMentioning,
+  type ChangedNames,
+  type DocLineMention,
+} from "#src/doc-mentions";
+export {
+  isDocPath,
+  readDoc,
+  resolveDocLink,
+  type DocHeading,
+  type DocLink,
+  type DocMention,
+  type IndexedDoc,
+  type LinkDestination,
+  type MentionKind,
+} from "#src/docs";
+export {
   collectEntryPoints,
   isEntryPoint,
   type EntryPoints,
@@ -60,6 +77,12 @@ export {
   type PathAlias,
 } from "#src/manifests";
 export { coveredSourcePaths } from "#src/pairing";
+export {
+  patchLines,
+  type PatchedFile,
+  type PatchLine,
+  type PatchLines,
+} from "#src/patch-lines";
 export {
   referencesTo,
   type Reference,
