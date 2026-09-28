@@ -1,4 +1,5 @@
 /** Every failure here widens to a full review; none fails one. */
+import type { ReviewScope } from "@pr-review/ai";
 import {
   CHECK_RUN_NAME,
   type ChangedFile,
@@ -9,35 +10,11 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
-interface FullReviewScope {
-  kind: "full";
-  reason: string;
-  diff: string;
-  changedFiles: readonly ChangedFile[];
-}
+type FullReviewScope = ReviewScope & { kind: "full"; reason: string; sinceSha?: undefined };
 
-/** `pullRequest` keeps the whole diff beside the narrowed one. */
-interface IncrementalReviewScope {
-  kind: "incremental";
-  sinceSha: string;
-  diff: string;
-  changedFiles: readonly ChangedFile[];
-  pullRequest: {
-    diff: string;
-    changedFiles: readonly ChangedFile[];
-  };
-}
+type IncrementalReviewScope = ReviewScope & { kind: "incremental"; sinceSha: string };
 
-export type ReviewScope = FullReviewScope | IncrementalReviewScope;
-
-export function wholePullRequest(scope: ReviewScope): {
-  diff: string;
-  changedFiles: readonly ChangedFile[];
-} {
-  return scope.kind === "incremental"
-    ? scope.pullRequest
-    : { diff: scope.diff, changedFiles: scope.changedFiles };
-}
+type ResolvedReviewScope = FullReviewScope | IncrementalReviewScope;
 
 /** `compareCommits` is optional: an adapter without it can only review the whole pull request. */
 type ScopeClient = Pick<RepositoryHistoryClient, "listPullRequestCommitShas"> &
@@ -47,20 +24,19 @@ type ScopeClient = Pick<RepositoryHistoryClient, "listPullRequestCommitShas"> &
 export interface ResolveReviewScopeDeps {
   client: ScopeClient;
   incremental: boolean;
-  diff: string;
   changedFiles: readonly ChangedFile[];
   logger: StructuredLogger;
 }
 
 function full(
   reason: string,
-  deps: Pick<ResolveReviewScopeDeps, "diff" | "changedFiles">,
+  deps: Pick<ResolveReviewScopeDeps, "changedFiles">,
 ): FullReviewScope {
   return {
     kind: "full",
     reason,
-    diff: deps.diff,
     changedFiles: deps.changedFiles,
+    pullRequestFiles: deps.changedFiles,
   };
 }
 
@@ -95,20 +71,6 @@ async function findBaseline(
   return undefined;
 }
 
-export function renderDiff(files: readonly ChangedFile[]): string {
-  return files
-    .filter((file) => file.patch !== undefined)
-    .map((file) =>
-      [
-        `diff --git a/${file.filename} b/${file.filename}`,
-        `--- a/${file.filename}`,
-        `+++ b/${file.filename}`,
-        file.patch,
-      ].join("\n"),
-    )
-    .join("\n");
-}
-
 // Drops files that only changed because the base branch was merged in.
 export function intersectWithPullRequest(
   since: readonly ChangedFile[],
@@ -121,8 +83,8 @@ export function intersectWithPullRequest(
 async function narrow(
   target: ReviewTarget,
   deps: ResolveReviewScopeDeps,
-): Promise<ReviewScope> {
-  const { client, diff, changedFiles } = deps;
+): Promise<ResolvedReviewScope> {
+  const { client, changedFiles } = deps;
   if (client.compareCommits === undefined) {
     return full("no_commit_comparison", deps);
   }
@@ -146,21 +108,20 @@ async function narrow(
   return {
     kind: "incremental",
     sinceSha,
-    diff: renderDiff(since),
     changedFiles: since,
-    pullRequest: { diff, changedFiles },
+    pullRequestFiles: changedFiles,
   };
 }
 
 export async function resolveReviewScope(
   target: ReviewTarget,
   deps: ResolveReviewScopeDeps,
-): Promise<ReviewScope> {
+): Promise<ResolvedReviewScope> {
   if (!deps.incremental) {
     return full("not enabled", deps);
   }
 
-  let scope: ReviewScope;
+  let scope: ResolvedReviewScope;
   try {
     scope = await narrow(target, deps);
   } catch (error) {

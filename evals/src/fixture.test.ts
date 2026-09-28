@@ -102,18 +102,6 @@ describe("loadFixture", () => {
     }
   });
 
-  it.each(fixtureNames)("gives %s a diff covering every changed file", (name) => {
-    const fixture = loadFixture(name);
-
-    for (const file of fixture.changedFiles) {
-      expect(fixture.diff).toContain(`diff --git a/${file.filename} b/${file.filename}`);
-      expect(fixture.diff).toContain(
-        file.status === "added" ? "--- /dev/null" : `--- a/${file.filename}`,
-      );
-    }
-    expect(fixture.context.diff).toBe(fixture.diff);
-  });
-
   it("covers both an added and a modified file across the fixture set", () => {
     const statuses = new Set(
       fixtureNames.flatMap((name) =>

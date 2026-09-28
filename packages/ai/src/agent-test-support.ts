@@ -64,8 +64,13 @@ export const context: ReviewContext = {
   repo: "example-service",
   pullRequest,
   changedFiles,
-  diff: "diff --git a/src/sessions.ts b/src/sessions.ts\n+if ((user.isAdmin = true)) {\n",
+  pullRequestFiles: changedFiles,
 };
+
+/** The shared context, reviewing a whole pull request of these files. */
+export function reviewing(files: readonly ChangedFile[]): ReviewContext {
+  return { ...context, changedFiles: files, pullRequestFiles: files };
+}
 
 /** A schema-valid candidate finding in the given category. */
 export function makeFinding(
@@ -207,7 +212,6 @@ export function makeGithub() {
   return {
     getPullRequest: vi.fn(async () => pullRequest),
     listChangedFiles: vi.fn(async () => changedFiles),
-    getDiff: vi.fn(async () => context.diff),
     getFileContents: vi.fn(
       async (_request: FileContentsRequest) => "export const sessions = [];\n",
     ),

@@ -90,7 +90,6 @@ const HINT = 'Findings like "assignment instead of comparison in".';
 
 const incremental: ReviewContext = {
   ...context,
-  diff: "@@ -2 +2 @@\n+const limit = 0;\n",
   changedFiles: [
     {
       filename: "src/limits.ts",
@@ -100,11 +99,7 @@ const incremental: ReviewContext = {
       patch: "@@ -2 +2 @@\n+const limit = 0;",
     },
   ],
-  incremental: {
-    sinceSha: "old111",
-    diff: context.diff,
-    changedFiles: context.changedFiles,
-  },
+  sinceSha: "old111",
 };
 
 function runEngineConformance(name: string, make: MakeHarness): void {

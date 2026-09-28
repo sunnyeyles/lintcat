@@ -352,7 +352,7 @@ function createLocalGitClient(
   const { root, baseSha, baseRef, branch, scope } = repository;
   const headRef = scope.headRef;
 
-  let snapshot: Promise<{ diff: string; files: ChangedFile[] }> | undefined;
+  let snapshot: Promise<ChangedFile[]> | undefined;
   // Taken once, so every reader of one review sees the same working tree.
   const changes = () => {
     snapshot ??= (async () => {
@@ -368,15 +368,14 @@ function createLocalGitClient(
         ...(headRef === WORKING_TREE ? [] : [headRef]),
       ]);
       if (headRef !== WORKING_TREE) {
-        return { diff: tracked, files: parseUnifiedDiff(tracked) };
+        return parseUnifiedDiff(tracked);
       }
       // A trailing slash is a nested repository, which has no content of its own to diff.
       const untracked = (await git(root, ["ls-files", "-z", "--others", "--exclude-standard"]))
         .split("\0")
         .filter((file) => file !== "" && !file.endsWith("/"));
       const added = untracked.map((file) => addedFileDiff(file, untrackedContent(root, file)));
-      const diff = [tracked, ...added].filter((part) => part !== "").join("");
-      return { diff, files: parseUnifiedDiff(diff) };
+      return parseUnifiedDiff([tracked, ...added].filter((part) => part !== "").join(""));
     })();
     return snapshot;
   };
@@ -422,12 +421,7 @@ function createLocalGitClient(
         headSha: headRef,
       };
     },
-    async listChangedFiles() {
-      return (await changes()).files;
-    },
-    async getDiff() {
-      return (await changes()).diff;
-    },
+    listChangedFiles: () => changes(),
     getFileContents: ({ path: file, ref }) => readAt(ref, file),
     async searchCode({ query }) {
       const terms = parseSearchQuery(query);

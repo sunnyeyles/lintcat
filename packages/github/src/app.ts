@@ -55,7 +55,6 @@ export interface OctokitLike {
         owner: string;
         repo: string;
         pull_number: number;
-        mediaType?: { format: "diff" };
       }): Promise<{ data: unknown }>;
       listFiles(params: {
         owner: string;
@@ -555,16 +554,6 @@ export function createInstallationClient(
           }),
         (data) => changedFilesSchema.parse(data),
       );
-    },
-
-    async getDiff(ref: PullRequestRef): Promise<string> {
-      const response = await octokit.rest.pulls.get({
-        owner: ref.owner,
-        repo: ref.repo,
-        pull_number: ref.pullRequestNumber,
-        mediaType: { format: "diff" },
-      });
-      return z.string().parse(response.data);
     },
 
     async getFileContents(request: FileContentsRequest): Promise<string> {

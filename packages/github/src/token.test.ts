@@ -31,16 +31,6 @@ const pullResponse = {
   draft: false,
 };
 
-const diffText = [
-  "diff --git a/src/sessions.ts b/src/sessions.ts",
-  "--- a/src/sessions.ts",
-  "+++ b/src/sessions.ts",
-  "@@ -1 +1,2 @@",
-  " export const sessions = [];",
-  "+export const rateLimited = true;",
-  "",
-].join("\n");
-
 function makeFile(index: number) {
   return {
     filename: `src/file-${index}.ts`,
@@ -159,7 +149,6 @@ function emptyTarball(): ArrayBuffer {
 interface StubOptions {
   filePages?: unknown[][];
   pullData?: unknown;
-  diffData?: unknown;
   contentData?: unknown;
   /** When set, repos.getContent rejects with it instead of returning data. */
   contentError?: unknown;
@@ -193,15 +182,9 @@ function makeOctokit(options: StubOptions = {}) {
     rest: {
       pulls: {
         get: vi.fn(
-          async (params: {
-            owner: string;
-            repo: string;
-            pull_number: number;
-            mediaType?: { format: "diff" };
-          }) =>
-            params.mediaType?.format === "diff"
-              ? { data: options.diffData ?? diffText }
-              : { data: options.pullData ?? pullResponse },
+          async (_params: { owner: string; repo: string; pull_number: number }) => ({
+            data: options.pullData ?? pullResponse,
+          }),
         ),
         listFiles: vi.fn(
           async (params: {
@@ -376,7 +359,6 @@ describe("createTokenClient", () => {
 
     expect(typeof client.getPullRequest).toBe("function");
     expect(typeof client.listChangedFiles).toBe("function");
-    expect(typeof client.getDiff).toBe("function");
     expect(typeof client.createCheckRun).toBe("function");
   });
 });
@@ -510,28 +492,6 @@ describe("listChangedFiles", () => {
     });
 
     await expect(client.listChangedFiles(ref)).rejects.toThrow();
-  });
-});
-
-describe("getDiff", () => {
-  it("requests the diff media type and returns the raw diff", async () => {
-    const { octokit, client } = makeClient();
-
-    const diff = await client.getDiff(ref);
-
-    expect(diff).toBe(diffText);
-    expect(octokit.rest.pulls.get).toHaveBeenCalledWith({
-      owner: "octo-org",
-      repo: "example-service",
-      pull_number: 42,
-      mediaType: { format: "diff" },
-    });
-  });
-
-  it("rejects when the API does not return a textual diff", async () => {
-    const { client } = makeClient({ diffData: { not: "a diff" } });
-
-    await expect(client.getDiff(ref)).rejects.toThrow();
   });
 });
 

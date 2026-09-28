@@ -26,14 +26,14 @@ export interface OpeningBudget {
 }
 
 function scopeNote(context: ReviewContext, tools: boolean): string[] {
-  const { incremental } = context;
-  if (incremental === undefined) {
+  const { sinceSha } = context;
+  if (sinceSha === undefined) {
     return [];
   }
-  const count = incremental.changedFiles.length;
+  const count = context.pullRequestFiles.length;
   return [
-    `<review_scope since="${incremental.sinceSha}">`,
-    `The diff below covers only the commits added since ${incremental.sinceSha}, which an earlier review already read.`,
+    `<review_scope since="${sinceSha}">`,
+    `The diff below covers only the commits added since ${sinceSha}, which an earlier review already read.`,
     tools
       ? `Report findings on these changes alone. The whole pull request (${count} file(s)) is still available through list_changed_files and get_diff.`
       : `Report findings on these changes alone. The whole pull request touches ${count} file(s); the rest of it is not shown here.`,
