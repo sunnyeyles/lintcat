@@ -9,6 +9,7 @@ export function expandGroup(base: MapGraph, groupId: string, slice: MapGraph): M
     imports: [...base.imports, ...(slice.imports ?? [])],
   });
   const next: MapGraph = { ...base, files: [...merged.files], imports: [...merged.imports] };
+  if (merged.groupPositions) next.groupPositions = { ...merged.groupPositions };
   if (base.summaries) {
     next.summaries = merged.summaries.filter((summary) => summary.id !== groupId);
   }

@@ -1,8 +1,12 @@
+import type { RepositoryGraphSnapshot } from "@pr-review/index";
+import type { ReviewRecordChangedFile, ReviewRecordOverlay } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
 import { EMPHASIS_MARKERS } from "@/lib/codebase-map/emphasis";
 import { groupIdFor } from "@/lib/codebase-map/clustering";
+import { mapFromSnapshot } from "@/lib/codebase-map/from-snapshot";
 import { normaliseGraph, type NormalisedGraph } from "@/lib/codebase-map/normalise";
+import { mapQuery } from "@/lib/codebase-map/query";
 import { buildScene } from "@/lib/codebase-map/scene";
 import type { MapGraph, MapViewState } from "@/lib/codebase-map/types";
 
@@ -166,11 +170,14 @@ describe("buildScene with impacted files", () => {
   });
 
   it("counts impacted files onto a collapsed group and ranks it impacted", () => {
-    const group = buildScene(impacted, view()).byId.get("pkg::pkg/b")!;
+    const group = buildScene(impacted, view({ reachDepth: 1 })).byId.get("pkg::pkg/b")!;
+    const unreached = normaliseGraph({ files: [...impacted.files], imports: [] });
 
     expect(group.kind).toBe("group");
-    expect(group.level).toBe("impacted");
     expect(group.impactedCount).toBe(1);
+    // Reach outranks impact while nothing is focused; without it the count decides.
+    expect(group.level).toBe("reached");
+    expect(buildScene(unreached, view()).byId.get("pkg::pkg/b")?.level).toBe("impacted");
   });
 
   it("ranks a summary changed over impacted, and impacted over context", () => {
@@ -203,7 +210,8 @@ describe("buildScene with impacted files", () => {
     expect(scene.nodes.some((node) => node.level === "impacted")).toBe(false);
     expect(scene.nodes.every((node) => node.impactedCount === 0)).toBe(true);
     expect(scene.byId.get("pkg/a/two.ts")?.level).toBe("context");
-    expect(scene.byId.get("pkg::pkg/b")?.level).toBe("context");
+    // four.ts imports the change, so its group is still reached; that is not impact.
+    expect(scene.byId.get("pkg::pkg/b")?.level).toBe("reached");
     expect(scene.clustering.groups.find((g) => g.id === "pkg::pkg/b")?.impactedCount).toBe(1);
   });
 
@@ -320,3 +328,272 @@ describe("buildScene neighbourhood", () => {
   });
 });
 
+
+type SnapshotFile = RepositoryGraphSnapshot["files"][number];
+
+function indexed(path: string, extra: Partial<SnapshotFile> = {}): SnapshotFile {
+  return { path, role: "source", language: "ts", importerCount: 0, inCycle: false, dead: false, ...extra } as SnapshotFile;
+}
+
+function changedFile(
+  path: string,
+  status: ReviewRecordChangedFile["status"],
+): ReviewRecordChangedFile {
+  return { path, status, additions: 1, deletions: 1 };
+}
+
+// The one seam: stored snapshot and overlay, through the payload and normalising, to the scene.
+function sceneOf(
+  snapshot: RepositoryGraphSnapshot,
+  changes: ReviewRecordChangedFile[],
+  overlay: ReviewRecordOverlay | null | undefined,
+  over: Partial<MapViewState> = {},
+) {
+  const source = mapFromSnapshot(snapshot, changes, [], [], overlay);
+  const payload = mapQuery(source).first();
+  const graph = normaliseGraph(payload.graph);
+  const expandedGroups = new Set(graph.files.map(groupIdFor));
+  return { graph, scene: buildScene(graph, view({ expandedGroups, ...over })) };
+}
+
+describe("buildScene with the PR drawn as merged", () => {
+  const base: RepositoryGraphSnapshot = {
+    sha: "base",
+    truncated: false,
+    files: [
+      indexed("src/app.ts"),
+      indexed("src/util.ts"),
+      indexed("src/old-name.ts"),
+      indexed("src/gone.ts"),
+      indexed("src/uses-old.ts"),
+    ],
+    edges: [
+      { from: "src/app.ts", to: "src/util.ts", names: [] },
+      { from: "src/app.ts", to: "src/gone.ts", names: [] },
+      { from: "src/uses-old.ts", to: "src/old-name.ts", names: [] },
+    ],
+    packages: [],
+  };
+  const changes = [
+    changedFile("src/app.ts", "modified"),
+    changedFile("src/new.ts", "added"),
+    changedFile("src/gone.ts", "removed"),
+    changedFile("src/new-name.ts", "renamed"),
+  ];
+  const overlay: ReviewRecordOverlay = {
+    headSha: "head",
+    files: [
+      { path: "src/app.ts", status: "modified" },
+      { path: "src/new.ts", status: "added" },
+      { path: "src/gone.ts", status: "removed" },
+      { path: "src/new-name.ts", status: "renamed", previousPath: "src/old-name.ts" },
+    ],
+    added: [
+      { from: "src/new.ts", to: "src/util.ts" },
+      { from: "src/app.ts", to: "src/new.ts" },
+    ],
+    removed: [{ from: "src/app.ts", to: "src/gone.ts" }],
+    unresolvedImportCount: 0,
+    partial: false,
+  };
+  const { graph, scene } = sceneOf(base, changes, overlay);
+  const edge = (a: string, b: string) => scene.edges.find((e) => e.a === a && e.b === b);
+
+  it("tells the four change statuses apart by shape", () => {
+    const markers = ["src/app.ts", "src/new.ts", "src/gone.ts", "src/new-name.ts"].map(
+      (path) => scene.byId.get(path)!,
+    );
+
+    expect(markers.map((node) => [node.change, node.level])).toEqual([
+      ["modified", "changed"],
+      ["added", "changed"],
+      ["removed", "changed"],
+      ["renamed", "changed"],
+    ]);
+    expect(new Set(markers.map((node) => node.marker)).size).toBe(4);
+  });
+
+  it("draws an added file with the imports it makes", () => {
+    expect(edge("src/new.ts", "src/util.ts")).toMatchObject({ relation: "base", change: "added" });
+    expect(edge("src/app.ts", "src/new.ts")?.change).toBe("added");
+  });
+
+  it("keeps an edge the PR removes, marked removed, and never walks it", () => {
+    expect(edge("src/app.ts", "src/gone.ts")?.change).toBe("removed");
+    expect(graph.outgoing.get("src/app.ts")).not.toContain("src/gone.ts");
+    expect(edge("src/app.ts", "src/util.ts")?.change).toBeNull();
+  });
+
+  it("draws a rename once, at its new path, with the old path's edges", () => {
+    expect(scene.byId.has("src/old-name.ts")).toBe(false);
+    expect(graph.byPath.get("src/new-name.ts")?.previousPath).toBe("src/old-name.ts");
+    expect(edge("src/uses-old.ts", "src/new-name.ts")).toBeDefined();
+  });
+
+  it("says the overlay is complete and draws the base alone without one", () => {
+    expect(graph.overlay).toBe("complete");
+    const plain = sceneOf(base, changes, undefined);
+    expect(plain.graph.overlay).toBeUndefined();
+    expect(plain.scene.nodes.every((node) => node.change === null)).toBe(true);
+    expect(plain.scene.edges.every((e) => e.change === null)).toBe(true);
+    expect(sceneOf(base, changes, null).graph.overlay).toBe("absent");
+  });
+});
+
+describe("buildScene reach", () => {
+  const chain = normaliseGraph({
+    files: [
+      { path: "src/core.ts", changed: true },
+      { path: "src/one.ts" },
+      { path: "src/two.ts" },
+      { path: "src/three.ts" },
+      { path: "src/four.ts" },
+      { path: "src/below.ts" },
+    ],
+    imports: [
+      { from: "src/one.ts", to: "src/core.ts" },
+      { from: "src/two.ts", to: "src/one.ts" },
+      { from: "src/three.ts", to: "src/two.ts" },
+      { from: "src/four.ts", to: "src/three.ts" },
+      { from: "src/core.ts", to: "src/below.ts" },
+    ],
+  });
+  const at = (over: Partial<MapViewState> = {}) =>
+    buildScene(chain, view({ expandedGroups: new Set(chain.files.map(groupIdFor)), ...over }));
+
+  it("marks the change's dependents by depth, two steps by default", () => {
+    const scene = at();
+
+    expect(scene.byId.get("src/one.ts")).toMatchObject({ level: "reached", depth: 1, marker: "triangle-1" });
+    expect(scene.byId.get("src/two.ts")).toMatchObject({ level: "reached", depth: 2, marker: "triangle-2" });
+    expect(scene.byId.get("src/three.ts")).toMatchObject({ level: "context", depth: null });
+    // Reach follows who imports the change, never what the change imports.
+    expect(scene.byId.get("src/below.ts")?.level).toBe("context");
+    expect(scene.reach.count).toBe(2);
+  });
+
+  it("widens and narrows with the chosen depth", () => {
+    expect(at({ reachDepth: 1 }).reach.count).toBe(1);
+    expect(at({ reachDepth: 3 }).byId.get("src/three.ts")).toMatchObject({ depth: 3, marker: "triangle-3" });
+    expect(at({ reachDepth: 7 }).reach.depth).toBe(3);
+  });
+
+  it("gives way to the focus neighbourhood when a file is focused", () => {
+    const scene = at({ focusedPath: "src/three.ts" });
+
+    expect(scene.byId.get("src/two.ts")?.level).toBe("neighbour");
+    expect(scene.byId.get("src/one.ts")?.level).toBe("dimmed");
+  });
+
+  it("ranks a collapsed or summarised group reached, with its count", () => {
+    const summarised = normaliseGraph({
+      files: [{ path: "src/core.ts", changed: true }],
+      imports: [],
+      summaries: [{ id: "-::far", fileCount: 9, changedCount: 0, reachedByDepth: [0, 4, 1] }],
+    });
+    const scene = buildScene(summarised, view());
+
+    expect(scene.byId.get("-::far")).toMatchObject({ level: "reached", reachedCount: 4 });
+    expect(buildScene(summarised, view({ reachDepth: 1 })).byId.get("-::far")?.level).toBe("context");
+    expect(buildScene(summarised, view({ reachDepth: 3 })).reach.count).toBe(5);
+  });
+});
+
+describe("buildScene flags", () => {
+  const flagged = normaliseGraph({
+    files: [
+      { path: "src/a.ts", inCycle: true, dead: false },
+      { path: "src/b.ts", inCycle: true, dead: false },
+      { path: "src/c.ts", inCycle: false, dead: false },
+      { path: "src/orphan.ts", dead: true, inCycle: false },
+      { path: "src/unknown.ts" },
+      { path: "src/a.test.ts", role: "test" },
+      { path: "src/__fixtures__/data.ts" },
+    ],
+    imports: [
+      { from: "src/a.ts", to: "src/b.ts" },
+      { from: "src/b.ts", to: "src/a.ts" },
+      { from: "src/a.ts", to: "src/c.ts" },
+      { from: "src/a.test.ts", to: "src/a.ts" },
+    ],
+  });
+  const at = (over: Partial<MapViewState> = {}) =>
+    buildScene(flagged, view({ expandedGroups: new Set(flagged.files.map(groupIdFor)), ...over }));
+
+  it("draws the edges that close a cycle as their own relation", () => {
+    const relations = Object.fromEntries(at().edges.map((e) => [`${e.a}->${e.b}`, e.relation]));
+
+    expect(relations["src/a.ts->src/b.ts"]).toBe("cycle");
+    expect(relations["src/b.ts->src/a.ts"]).toBe("cycle");
+    expect(relations["src/a.ts->src/c.ts"]).toBe("base");
+  });
+
+  it("lets the focus relation win over a cycle", () => {
+    const scene = at({ focusedPath: "src/a.ts" });
+    const edge = scene.edges.find((e) => e.a === "src/a.ts" && e.b === "src/b.ts");
+
+    expect(edge?.relation).toBe("dependency");
+  });
+
+  it("marks a dead file, and never an unknown one", () => {
+    const scene = at();
+
+    expect(scene.byId.get("src/orphan.ts")?.dead).toBe(true);
+    expect(scene.byId.get("src/unknown.ts")?.dead).toBe(false);
+    expect(scene.byId.get("src/orphan.ts")?.marker).toBe(EMPHASIS_MARKERS.context);
+  });
+
+  it("draws tests and fixtures quieter at the same level", () => {
+    const scene = at();
+
+    expect(scene.byId.get("src/a.test.ts")).toMatchObject({ quiet: true, level: "context" });
+    expect(scene.byId.get("src/__fixtures__/data.ts")?.quiet).toBe(true);
+    expect(scene.byId.get("src/a.ts")?.quiet).toBe(false);
+  });
+
+  it("leaves hidden tests out of the scene and counts them", () => {
+    const scene = at({ hideTests: true });
+
+    expect(scene.byId.has("src/a.test.ts")).toBe(false);
+    expect(scene.edges.some((e) => e.a === "src/a.test.ts")).toBe(false);
+    expect(scene.hiddenTests).toBe(2);
+  });
+});
+
+describe("buildScene layout", () => {
+  const groups: MapGraph = {
+    files: [
+      { path: "a/one.ts", changed: true },
+      { path: "b/two.ts" },
+      { path: "c/three.ts" },
+      { path: "c/four.ts" },
+    ],
+    imports: [
+      { from: "a/one.ts", to: "b/two.ts" },
+      { from: "c/three.ts", to: "c/four.ts" },
+    ],
+  };
+
+  it("never moves a group when another is expanded", () => {
+    const graph = normaliseGraph(groups);
+    const closed = buildScene(graph, view());
+    const open = buildScene(graph, view({ expandedGroups: new Set(["-::c"]) }));
+
+    for (const node of closed.nodes) {
+      const same = open.byId.get(node.id);
+      if (same) expect([same.x, same.y]).toEqual([node.x, node.y]);
+    }
+    const group = closed.byId.get("-::c")!;
+    const file = open.byId.get("c/three.ts")!;
+    expect(Math.hypot(file.x - group.x, file.y - group.y)).toBeLessThanOrEqual(150.01);
+  });
+
+  it("puts a summary where the payload's layout says", () => {
+    const graph = normaliseGraph({
+      ...groups,
+      summaries: [{ id: "-::far", fileCount: 3, changedCount: 0, at: [120, -40] }],
+    });
+
+    expect(buildScene(graph, view()).byId.get("-::far")).toMatchObject({ x: 120, y: -40 });
+  });
+});

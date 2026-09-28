@@ -4,7 +4,14 @@ import { useId } from "react";
 import { EMPHASIS_MARKERS } from "@/lib/codebase-map";
 import type { NeighbourDirection } from "@/lib/codebase-map";
 
-import { markerParts } from "@/components/codebase-map/markers";
+import {
+  DEAD_DASH,
+  EDGE_STYLES,
+  markerParts,
+  QUIET_ALPHA,
+  QUIET_SCALE,
+  type EdgeClass,
+} from "@/components/codebase-map/markers";
 
 interface Entry {
   marker: string;
@@ -14,6 +21,8 @@ interface Entry {
   label: string;
   /** Listed only while the map has impacted files. */
   impacted?: true;
+  dead?: true;
+  quiet?: true;
 }
 
 const ENTRIES: Entry[] = [
@@ -22,7 +31,33 @@ const ENTRIES: Entry[] = [
     marker: EMPHASIS_MARKERS.changed,
     direction: null,
     colour: "var(--map-module-changed)",
-    label: "Changed in this PR",
+    label: "Changed in this PR (modified)",
+  },
+  { marker: "plus", direction: null, colour: "var(--success)", label: "Added by this PR" },
+  { marker: "cross", direction: null, colour: "var(--destructive)", label: "Removed by this PR" },
+  {
+    marker: "filled-diamond",
+    direction: null,
+    colour: "var(--map-module-changed)",
+    label: "Renamed by this PR, drawn at its new path",
+  },
+  {
+    marker: `${EMPHASIS_MARKERS.reached}-1`,
+    direction: null,
+    colour: "var(--map-kind-2)",
+    label: "Reached: imports the change directly",
+  },
+  {
+    marker: `${EMPHASIS_MARKERS.reached}-2`,
+    direction: null,
+    colour: "var(--map-kind-2)",
+    label: "Reached in two import steps",
+  },
+  {
+    marker: `${EMPHASIS_MARKERS.reached}-3`,
+    direction: null,
+    colour: "var(--map-kind-2)",
+    label: "Reached in three import steps",
   },
   {
     marker: EMPHASIS_MARKERS.impacted,
@@ -50,6 +85,20 @@ const ENTRIES: Entry[] = [
     label: "Other file",
   },
   {
+    marker: EMPHASIS_MARKERS.context,
+    direction: null,
+    colour: "var(--map-module)",
+    label: "Dead: nothing imports it (dashed outline)",
+    dead: true,
+  },
+  {
+    marker: EMPHASIS_MARKERS.context,
+    direction: null,
+    colour: "var(--map-module)",
+    label: "Test or fixture (smaller and fainter)",
+    quiet: true,
+  },
+  {
     marker: EMPHASIS_MARKERS.dimmed,
     direction: null,
     colour: "var(--map-edge)",
@@ -71,24 +120,44 @@ const ENTRIES: Entry[] = [
   },
 ];
 
+const EDGES: { kind: EdgeClass; label: string }[] = [
+  { kind: "dependency", label: "Focus → dependency" },
+  { kind: "dependent", label: "Dependent → focus" },
+  { kind: "cycle", label: "Closes an import cycle" },
+  { kind: "added", label: "Import the PR adds" },
+  { kind: "removed", label: "Import the PR removes" },
+];
+
 function Swatch({ entry }: { entry: Entry }) {
-  const parts = markerParts(entry.marker, 7, entry.direction);
+  const radius = entry.quiet ? 7 * QUIET_SCALE : 7;
+  const parts = markerParts(entry.marker, radius, entry.direction);
   return (
     <svg viewBox="-12 -12 24 24" className="size-5 shrink-0" aria-hidden="true">
-      {parts.map((part, i) => (
+      <g opacity={entry.quiet ? QUIET_ALPHA : 1}>
+        {parts.map((part, i) => (
+          <path
+            key={i}
+            d={part.d}
+            fill={part.mode === "fill" ? entry.colour : "none"}
+            stroke={
+              part.mode === "stroke"
+                ? (entry.stroke ??
+                  (entry.marker === "group" ? "var(--map-structure-border)" : entry.colour))
+                : "none"
+            }
+            strokeWidth={part.width}
+          />
+        ))}
+      </g>
+      {entry.dead ? (
         <path
-          key={i}
-          d={part.d}
-          fill={part.mode === "fill" ? entry.colour : "none"}
-          stroke={
-            part.mode === "stroke"
-              ? (entry.stroke ??
-                (entry.marker === "group" ? "var(--map-structure-border)" : entry.colour))
-              : "none"
-          }
-          strokeWidth={part.width}
+          d={markerParts("dead", radius)[0]!.d}
+          fill="none"
+          stroke="var(--muted-foreground)"
+          strokeWidth={1}
+          strokeDasharray={DEAD_DASH.join(" ")}
         />
-      ))}
+      ) : null}
     </svg>
   );
 }
@@ -137,26 +206,25 @@ export function MapLegend({
         ))}
       </ul>
       <ul className="mt-3 space-y-1.5">
-        <li className="flex items-center gap-2">
-          <svg viewBox="0 0 24 24" className="size-5 shrink-0" aria-hidden="true">
-            <line x1="2" y1="12" x2="22" y2="12" stroke="var(--map-kind-1)" strokeWidth="2" />
-          </svg>
-          <span className="text-muted-foreground text-xs">Solid edge: focus → dependency</span>
-        </li>
-        <li className="flex items-center gap-2">
-          <svg viewBox="0 0 24 24" className="size-5 shrink-0" aria-hidden="true">
-            <line
-              x1="2"
-              y1="12"
-              x2="22"
-              y2="12"
-              stroke="var(--map-kind-3)"
-              strokeWidth="2"
-              strokeDasharray="5 4"
-            />
-          </svg>
-          <span className="text-muted-foreground text-xs">Dashed edge: dependent → focus</span>
-        </li>
+        {EDGES.map(({ kind, label }) => {
+          const style = EDGE_STYLES[kind];
+          return (
+            <li key={kind} className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" className="size-5 shrink-0" aria-hidden="true">
+                <line
+                  x1="2"
+                  y1="12"
+                  x2="22"
+                  y2="12"
+                  stroke={`var(${style.token})`}
+                  strokeWidth={style.width + 0.4}
+                  strokeDasharray={style.dash.length > 0 ? style.dash.join(" ") : undefined}
+                />
+              </svg>
+              <span className="text-muted-foreground text-xs">{label}</span>
+            </li>
+          );
+        })}
       </ul>
       <ul className="mt-3 space-y-1.5">
         {HEAT.map((entry, i) => (

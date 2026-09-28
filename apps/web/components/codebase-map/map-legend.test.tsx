@@ -23,6 +23,28 @@ describe("MapLegend", () => {
     expect(markup).toContain('aria-checked="true"');
   });
 
+  it("explains every change status, reach depth, flag and edge kind", () => {
+    const markup = renderToStaticMarkup(<MapLegend />);
+
+    for (const label of [
+      "Added by this PR",
+      "Removed by this PR",
+      "Renamed by this PR, drawn at its new path",
+      "Changed in this PR (modified)",
+      "Reached: imports the change directly",
+      "Reached in two import steps",
+      "Reached in three import steps",
+      "Dead: nothing imports it (dashed outline)",
+      "Test or fixture (smaller and fainter)",
+      "Closes an import cycle",
+      "Import the PR adds",
+      "Import the PR removes",
+    ]) {
+      expect(markup).toContain(label);
+    }
+    expect(markup).toContain('stroke-dasharray="2 2"');
+  });
+
   it("shows the switch off once the overlay is hidden", () => {
     const markup = renderToStaticMarkup(<MapLegend impacted={overlay(false)} />);
 

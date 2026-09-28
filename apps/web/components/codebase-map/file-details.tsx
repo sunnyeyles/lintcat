@@ -3,11 +3,18 @@
 import { Badge, Button, Empty, EmptyDescription, EmptyHeader, EmptyTitle, Tooltip, TooltipContent, TooltipTrigger } from "@pr-review/design";
 
 import { SEVERITIES } from "@/components/review/sort";
-import { heatOf } from "@/lib/codebase-map";
+import { heatOf, isTest } from "@/lib/codebase-map";
 import type { FindingHeat, Neighbourhood, NormalisedGraph } from "@/lib/codebase-map";
 import { SeverityBadge } from "@/components/ui";
 
 const SHOWN = 12;
+
+const CHANGE_LABELS = {
+  added: "Added",
+  modified: "Modified",
+  removed: "Removed",
+  renamed: "Renamed",
+} as const;
 
 export interface FileDetailsProps {
   graph: NormalisedGraph;
@@ -19,6 +26,8 @@ export interface FileDetailsProps {
   onToggleGroup: () => void;
   heat?: FindingHeat;
   onShowFindings?: (path: string) => void;
+  /** The change's reach: this file's depth in it, and how far it was walked. */
+  reach?: { depth: number | undefined; steps: number };
 }
 
 function FlagRow({
@@ -143,6 +152,7 @@ export function FileDetails({
   onToggleGroup,
   heat,
   onShowFindings,
+  reach,
 }: FileDetailsProps) {
   const file = focusedPath === null ? undefined : graph.byPath.get(focusedPath);
   if (!file) {
@@ -166,11 +176,34 @@ export function FileDetails({
         <p className="text-muted-foreground mt-1 text-xs">
           {file.package ?? "no package"}
           {file.role ? ` · ${file.role}` : ""}
+          {isTest(file) ? " · drawn quieter as a test" : ""}
         </p>
+        {file.previousPath ? (
+          <p className="text-muted-foreground mt-1 text-xs">
+            Renamed from <span className="font-mono break-all">{file.previousPath}</span>
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-1.5">
-        <FlagRow label="Changed in this PR" value={file.changed} flagged="Changed" clear="Unchanged" />
+        <FlagRow
+          label="Changed in this PR"
+          value={file.changed}
+          flagged={file.change ? CHANGE_LABELS[file.change] : "Changed"}
+          clear="Unchanged"
+        />
+        {reach && file.changed !== true ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground text-xs">Reached by the change</span>
+            {reach.depth === undefined ? (
+              <Badge variant="outline">Not within {reach.steps}</Badge>
+            ) : (
+              <Badge variant="attention">
+                {reach.depth} step{reach.depth === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
+        ) : null}
         <FlagRow label="Dead file" value={file.dead} flagged="Dead" clear="Reachable" />
         <FlagRow label="Import cycle" value={file.inCycle} flagged="In a cycle" clear="No cycle" />
       </div>

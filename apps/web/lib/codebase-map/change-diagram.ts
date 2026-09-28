@@ -112,7 +112,7 @@ function select(
 
   const byFile = new Map(graph.files.map((file) => [file.path, file]));
   const changed = graph.files
-    .filter((file) => file.changed === true)
+    .filter((file) => file.changed === true && file.change !== "removed")
     .map((file) => file.path)
     .sort(byFindings(heat));
   const picked = new Set(changed.slice(0, Math.min(maxChanged, maxNodes)));
@@ -126,7 +126,9 @@ function select(
     seen.add(changedPath);
     links.set(neighbour, seen);
   };
-  for (const { from, to } of graph.imports) {
+  // The diagram draws the PR as merged, so an import it removes is gone.
+  const imports = graph.imports.filter((edge) => edge.change !== "removed");
+  for (const { from, to } of imports) {
     if (picked.has(from)) link(to, from);
     if (picked.has(to)) link(from, to);
   }
@@ -138,7 +140,7 @@ function select(
   const drawn = new Set([...picked, ...neighbours]);
   const edges: DiagramEdge[] = [];
   const seen = new Set<string>();
-  for (const { from, to } of graph.imports) {
+  for (const { from, to } of imports) {
     if (from === to || !drawn.has(from) || !drawn.has(to)) continue;
     const key = from < to ? `${from}\u0000${to}` : `${to}\u0000${from}`;
     if (seen.has(key)) continue;

@@ -1,4 +1,4 @@
-export type { MapFile, MapGraph, MapViewState } from "@/lib/codebase-map/types";
+export type { ChangeStatus, MapFile, MapGraph, MapViewState } from "@/lib/codebase-map/types";
 
 export { expandGroup } from "@/lib/codebase-map/merge";
 
@@ -11,18 +11,20 @@ export type { MapQuery, MapSearchAnswer } from "@/lib/codebase-map/query";
 export { normaliseGraph } from "@/lib/codebase-map/normalise";
 export type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 
-export { buildScene } from "@/lib/codebase-map/scene";
+export { buildScene, clampReach } from "@/lib/codebase-map/scene";
 export type { Scene, SceneNode } from "@/lib/codebase-map/scene";
 
-export { neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
+export { DEFAULT_REACH, MAX_REACH, neighbourhoodOf } from "@/lib/codebase-map/neighbourhood";
 export type { NeighbourDirection, Neighbourhood } from "@/lib/codebase-map/neighbourhood";
 
 export { findingHeat, mapFromSnapshot } from "@/lib/codebase-map/from-snapshot";
-export type { FindingHeat, MapSource, MapSourceFinding } from "@/lib/codebase-map/from-snapshot";
+export type { FindingHeat, MapSource } from "@/lib/codebase-map/from-snapshot";
 
 export { heatOf } from "@/lib/codebase-map/heat";
 
-export { CLOSED_VIEW, groupIdFor } from "@/lib/codebase-map/clustering";
+export { CLOSED_VIEW, groupIdFor, isTest } from "@/lib/codebase-map/clustering";
+
+export { layoutGroups } from "@/lib/codebase-map/layout";
 export type { Clustering } from "@/lib/codebase-map/clustering";
 
 export { EMPHASIS_MARKERS } from "@/lib/codebase-map/emphasis";

@@ -59,7 +59,7 @@ describe("normaliseGraph", () => {
 
     expect(graph.imports).toEqual([{ from: "a.ts", to: "b.ts" }]);
     expect(graph.dropped.selfImports).toBe(1);
-    expect(graph.dropped.unresolvedImports).toBe(2);
+    expect(graph.dropped.missingEndpoints).toBe(2);
   });
 
   it("drops repeated imports", () => {

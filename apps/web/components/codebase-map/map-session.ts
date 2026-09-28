@@ -2,15 +2,20 @@ import type { MapAdapter } from "@/components/codebase-map/adapter";
 import { initialBounds, type MapBounds } from "@/components/codebase-map/view";
 import {
   buildScene,
+  clampReach,
   CLOSED_VIEW,
+  DEFAULT_REACH,
   expandGroup,
   groupIdFor,
+  isTest,
+  layoutGroups,
   mapStatus,
   navigate,
   normaliseGraph,
 } from "@/lib/codebase-map";
 import type {
   FindingHeat,
+  MapFile,
   MapGraph,
   MapStatus,
   NavigationAxis,
@@ -33,6 +38,9 @@ export interface MapSessionView {
   query: string;
   expandedGroups: ReadonlySet<string>;
   showImpacted: boolean;
+  /** Import steps the change's reach covers, 1 to 3. */
+  reachDepth: number;
+  showTests: boolean;
 }
 
 export interface MapSnapshot {
@@ -49,12 +57,22 @@ export interface MapSnapshot {
   pending: ReadonlySet<string>;
   error: string | null;
   hasImpacted: boolean;
+  hasTests: boolean;
+  /** Files the change reaches within `view.reachDepth`, summaries included. */
+  reachedCount: number;
   focusedGroupId: string | null;
   focusedGroupCollapsed: boolean;
   announcement: string;
 }
 
 const NO_GRAPH: MapGraph = { files: [], imports: [] };
+
+const OPEN_VIEW: MapSessionView = {
+  ...CLOSED_VIEW,
+  showImpacted: true,
+  reachDepth: DEFAULT_REACH,
+  showTests: true,
+};
 
 
 function loadedGroupsOf(graph: NormalisedGraph): ReadonlySet<string> {
@@ -80,13 +98,15 @@ export class MapSession {
   #status: MapStatus = mapStatus(this.#graph);
   #heat: FindingHeat = {};
   #opening: MapBounds | null = null;
-  #view: MapSessionView = { ...CLOSED_VIEW, showImpacted: true };
+  #view: MapSessionView = OPEN_VIEW;
+  #hasTests = false;
   #pending: ReadonlySet<string> = new Set();
   #error: string | null = null;
 
   #snapshot: MapSnapshot | null = null;
   #scene: { graph: NormalisedGraph; view: MapSessionView; heat: FindingHeat; scene: Scene } | null =
     null;
+  #hiddenStatus: { graph: NormalisedGraph; hidden: number; status: MapStatus } | null = null;
 
   constructor(source: MapSessionSource | null = null) {
     this.#reset(source);
@@ -110,6 +130,10 @@ export class MapSession {
   setQuery = (query: string): void => this.#setView({ query });
 
   setShowImpacted = (showImpacted: boolean): void => this.#setView({ showImpacted });
+
+  setReachDepth = (depth: number): void => this.#setView({ reachDepth: clampReach(depth) });
+
+  setShowTests = (showTests: boolean): void => this.#setView({ showTests });
 
   expandLoaded = (): void => this.#setView({ expandedGroups: new Set(this.#loaded) });
 
@@ -164,9 +188,10 @@ export class MapSession {
     this.#source = source;
     this.#generation += 1;
     this.#inFlight = new Map();
-    this.#setGraph(source?.graph ?? NO_GRAPH);
+    this.#setGraph(pinLayout(source?.graph ?? NO_GRAPH));
     this.#heat = source?.heat ?? {};
-    this.#view = { ...CLOSED_VIEW, showImpacted: this.#view.showImpacted };
+    const { showImpacted, reachDepth, showTests } = this.#view;
+    this.#view = { ...CLOSED_VIEW, showImpacted, reachDepth, showTests };
     this.#pending = new Set();
     this.#error = null;
     this.#opening = source
@@ -179,6 +204,7 @@ export class MapSession {
     this.#graph = normaliseGraph(raw);
     this.#loaded = loadedGroupsOf(this.#graph);
     this.#status = mapStatus(this.#graph);
+    this.#hasTests = this.#graph.files.some(isTest);
   }
 
   #ensure(groupId: string): Promise<boolean> {
@@ -249,9 +275,23 @@ export class MapSession {
     if (cached && cached.graph === graph && cached.view === view && cached.heat === heat) {
       return cached.scene;
     }
-    const scene = buildScene(graph, { ...view, hideImpacted: !view.showImpacted }, 1, heat);
+    const scene = buildScene(
+      graph,
+      { ...view, hideImpacted: !view.showImpacted, hideTests: !view.showTests },
+      1,
+      heat,
+    );
     this.#scene = { graph, view, heat, scene };
     return scene;
+  }
+
+  #statusWith(graph: NormalisedGraph, hidden: number): MapStatus {
+    if (hidden === 0) return this.#status;
+    const cached = this.#hiddenStatus;
+    if (cached && cached.graph === graph && cached.hidden === hidden) return cached.status;
+    const status = mapStatus(graph, hidden);
+    this.#hiddenStatus = { graph, hidden, status };
+    return status;
   }
 
   #derive(): MapSnapshot {
@@ -265,11 +305,12 @@ export class MapSession {
         ? undefined
         : scene.clustering.groups.find((group) => group.id === focusedGroupId);
 
-    let announcement = "No file focused.";
+    let announcement = `No file focused. The change reaches ${scene.reach.count} files within ${view.reachDepth} import steps.`;
     if (view.focusedPath !== null) {
       const hood = scene.neighbourhood;
       const found = heat[view.focusedPath]?.total ?? 0;
-      announcement = `${view.focusedPath}. ${hood.dependencies.size} dependencies, ${hood.dependents.size} dependents, ${found} findings.`;
+      const about = describeFile(graph.byPath.get(view.focusedPath), scene.reach.files.get(view.focusedPath));
+      announcement = `${view.focusedPath}. ${about}${hood.dependencies.size} dependencies, ${hood.dependents.size} dependents, ${found} findings.`;
     }
 
     return {
@@ -277,7 +318,7 @@ export class MapSession {
       heat,
       view,
       scene,
-      status: this.#status,
+      status: this.#statusWith(graph, scene.hiddenTests),
       opening: this.#opening,
       loadedGroups: this.#loaded,
       lod: graph.summaries.length > 0,
@@ -285,9 +326,29 @@ export class MapSession {
       error: this.#error,
       // Clustering counts ignore the overlay, so hiding it keeps the switch on screen.
       hasImpacted: scene.clustering.groups.some((group) => group.impactedCount > 0),
+      hasTests: this.#hasTests,
+      reachedCount: scene.reach.count,
       focusedGroupId,
       focusedGroupCollapsed: focusedGroup?.collapsed ?? true,
       announcement,
     };
   }
+}
+
+/** The payload's own layout, pinned so no later expansion moves a group. */
+function pinLayout(raw: MapGraph): MapGraph {
+  if (raw.groupPositions || raw.summaries?.some((s) => s.at) || raw.files.length === 0) return raw;
+  return { ...raw, groupPositions: layoutGroups(normaliseGraph(raw)) };
+}
+
+function describeFile(file: MapFile | undefined, reached: number | undefined): string {
+  if (!file) return "";
+  const parts = [
+    file.change ? `${file.change}${file.previousPath ? ` from ${file.previousPath}` : ""}` : null,
+    reached !== undefined ? `reached in ${reached} step${reached === 1 ? "" : "s"}` : null,
+    file.dead === true ? "dead" : null,
+    file.inCycle === true ? "in an import cycle" : null,
+    isTest(file) ? "test" : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? `${parts.join(", ")}. ` : "";
 }

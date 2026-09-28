@@ -2,7 +2,7 @@ import type { ImportEdge, IndexedFile, RepositoryIndex } from "@pr-review/index"
 import { computeImpact } from "@pr-review/index/impact";
 
 import { findingHeat, mapQuery, sampleRepo } from "@/lib/codebase-map";
-import type { FindingHeat, MapGraph } from "@/lib/codebase-map";
+import type { ChangeStatus, FindingHeat, MapGraph } from "@/lib/codebase-map";
 
 import { localMapAdapter, type MapAdapter } from "@/components/codebase-map/adapter";
 
@@ -27,7 +27,7 @@ function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
   if (kind === "empty") return { files: [], imports: [], truncated: false };
 
   const graph = sampleRepo(SEED, files);
-  if (kind === "ready") return graph;
+  if (kind === "ready") return withOverlay(graph);
 
   if (kind === "no-changes") {
     return { ...graph, files: graph.files.map((file) => ({ ...file, changed: false })) };
@@ -36,6 +36,8 @@ function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
   // Two files in three lose their dead and cycle flags, so both "flagged" and "unknown" show.
   return {
     ...graph,
+    overlay: "partial",
+    unresolvedImportCount: 3,
     files: graph.files.map((file, i) => {
       if (i % 3 === 0) return file;
       const { dead, inCycle, ...rest } = file;
@@ -44,6 +46,28 @@ function fixtureGraph(kind: FixtureKind, files: number): MapGraph {
       return rest;
     }),
   };
+}
+
+const CHANGES: ChangeStatus[] = ["modified", "added", "renamed", "removed"];
+
+/** Cycles the changed files through every status, so the dev page shows each mark. */
+function withOverlay(graph: MapGraph): MapGraph {
+  const status = new Map<string, ChangeStatus>();
+  const files = graph.files.map((file) => {
+    if (file.changed !== true) return file;
+    const change = CHANGES[status.size % CHANGES.length]!;
+    status.set(file.path, change);
+    return change === "renamed"
+      ? { ...file, change, previousPath: file.path.replace(/(\.\w+)$/, "-old$1") }
+      : { ...file, change };
+  });
+  const imports = graph.imports.map((edge) => {
+    const change = status.get(edge.from);
+    if (change === "added") return { ...edge, change: "added" as const };
+    if (change === "removed") return { ...edge, change: "removed" as const };
+    return edge;
+  });
+  return { ...graph, files, imports, overlay: "complete" };
 }
 
 // Shaped like a stored index just enough for the blast radius; every sample file is source.

@@ -69,7 +69,7 @@ describe("lodGraph", () => {
     for (const edge of lod.imports) {
       expect(sent.has(edge.from) && sent.has(edge.to)).toBe(true);
     }
-    expect(normaliseGraph(lod).dropped.unresolvedImports).toBe(0);
+    expect(normaliseGraph(lod).dropped.missingEndpoints).toBe(0);
   });
 
   it("opens the groups the change lands in first", () => {
@@ -121,5 +121,66 @@ describe("lodGraph with impacted files", () => {
     });
 
     expect(bare.summaries!.every((s) => !("impactedCount" in s))).toBe(true);
+  });
+});
+
+describe("lodGraph budget and reach", () => {
+  // One directory far past the budget, holding the change, and a small one beside it.
+  const big: MapGraph = {
+    files: [
+      ...Array.from({ length: 40 }, (_, i) => ({
+        path: `huge/f${String(i).padStart(2, "0")}.ts`,
+        changed: i === 0,
+      })),
+      { path: "small/a.ts", changed: false },
+      { path: "small/b.ts", changed: false },
+      { path: "far/x.ts", changed: false },
+    ],
+    imports: [
+      { from: "huge/f01.ts", to: "huge/f00.ts" },
+      { from: "huge/f02.ts", to: "huge/f01.ts" },
+      { from: "small/a.ts", to: "huge/f00.ts" },
+      { from: "far/x.ts", to: "small/a.ts" },
+    ],
+  };
+  const graph = normaliseGraph(big);
+  const lod = lodGraph(graph, ["huge/f00.ts"], {}, { openFiles: 5 });
+  const sent = (path: string) => lod.files.some((file) => file.path === path);
+
+  it("sends an oversized group's changed and reached files, and keeps its summary", () => {
+    expect(sent("huge/f00.ts")).toBe(true);
+    expect(sent("huge/f01.ts")).toBe(true);
+    expect(sent("huge/f39.ts")).toBe(false);
+    expect(lod.summaries!.find((s) => s.id === "-::huge")?.fileCount).toBe(40);
+
+    const merged = clusterGraph(normaliseGraph(lod), SHUT);
+    expect(merged.groups.find((g) => g.id === "-::huge")).toMatchObject({
+      loaded: false,
+      changedCount: 1,
+    });
+  });
+
+  it("never lets the first group opened blow the budget", () => {
+    expect(lod.files.filter((file) => file.changed !== true).length).toBeLessThanOrEqual(5);
+  });
+
+  it("carries the server's reach on files and summaries", () => {
+    expect(lod.files.find((file) => file.path === "huge/f02.ts")?.reach).toBe(2);
+    expect(lod.summaries!.find((s) => s.id === "-::far")?.reachedByDepth).toEqual([0, 1, 0]);
+  });
+
+  it("places every group, summaries included", () => {
+    const summarised = lod.summaries!.map((s) => s.id);
+    expect(lod.summaries!.every((s) => s.at !== undefined)).toBe(true);
+    expect(Object.keys(normaliseGraph(lod).groupPositions!).sort()).toEqual(
+      [...new Set([...summarised, ...Object.keys(lod.groupPositions!)])].sort(),
+    );
+  });
+
+  it("counts the group edges the budget left out", () => {
+    const capped = lodGraph(graph, ["huge/f00.ts"], {}, { openFiles: 5, groupImports: 1 });
+
+    expect(capped.groupImports).toHaveLength(1);
+    expect(capped.groupImportsDropped).toBeGreaterThan(0);
   });
 });

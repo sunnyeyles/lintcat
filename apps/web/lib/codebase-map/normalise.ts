@@ -2,9 +2,11 @@ import { groupIdFor } from "@/lib/codebase-map/clustering";
 import type {
   GroupImport,
   GroupSummary,
+  LayoutPoint,
   MapFile,
   MapGraph,
   MapImport,
+  OverlayCoverage,
 } from "@/lib/codebase-map/types";
 
 interface DroppedCounts {
@@ -12,13 +14,15 @@ interface DroppedCounts {
   duplicateFiles: number;
   duplicateImports: number;
   selfImports: number;
-  unresolvedImports: number;
+  /** Edges pointing at a file this map does not hold. */
+  missingEndpoints: number;
 }
 
 export interface NormalisedGraph {
   files: readonly MapFile[];
   imports: readonly MapImport[];
   byPath: ReadonlyMap<string, MapFile>;
+  /** The graph as merged: an edge the PR removes is drawn but never walked. */
   outgoing: ReadonlyMap<string, readonly string[]>;
   incoming: ReadonlyMap<string, readonly string[]>;
   truncated: boolean;
@@ -26,11 +30,25 @@ export interface NormalisedGraph {
   /** Empty unless the payload was level-of-detail. */
   summaries: readonly GroupSummary[];
   groupImports: readonly GroupImport[];
+  groupImportsDropped: number;
   /** The repo's size, which is `files.length` unless summaries stand in. */
   totalFileCount: number;
+  overlay: OverlayCoverage | undefined;
+  unresolvedImportCount: number | undefined;
+  groupPositions: Readonly<Record<string, LayoutPoint>> | undefined;
 }
 
-const FLAG_KEYS = ["role", "package", "changed", "impacted", "dead", "inCycle"] as const;
+const FLAG_KEYS = [
+  "role",
+  "package",
+  "changed",
+  "change",
+  "previousPath",
+  "impacted",
+  "reach",
+  "dead",
+  "inCycle",
+] as const;
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -65,7 +83,7 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
     duplicateFiles: 0,
     duplicateImports: 0,
     selfImports: 0,
-    unresolvedImports: 0,
+    missingEndpoints: 0,
   };
 
   const byPath = new Map<string, MapFile>();
@@ -84,7 +102,7 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
     byPath.set(path, clean(file, path));
   }
 
-  const seen = new Set<string>();
+  const seen = new Map<string, MapImport>();
   const imports: MapImport[] = [];
   for (const edge of graph.imports ?? []) {
     const from = text(edge?.from);
@@ -94,16 +112,19 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
       continue;
     }
     if (!byPath.has(from) || !byPath.has(to)) {
-      dropped.unresolvedImports += 1;
+      dropped.missingEndpoints += 1;
       continue;
     }
     const key = `${from}\u0000${to}`;
-    if (seen.has(key)) {
+    const held = seen.get(key);
+    if (held) {
       dropped.duplicateImports += 1;
+      if (held.change === undefined && edge.change !== undefined) held.change = edge.change;
       continue;
     }
-    seen.add(key);
-    imports.push({ from, to });
+    const next: MapImport = edge.change === undefined ? { from, to } : { from, to, change: edge.change };
+    seen.set(key, next);
+    imports.push(next);
   }
 
   imports.sort((a, b) => byPathAscending(a.from, b.from) || byPathAscending(a.to, b.to));
@@ -115,6 +136,7 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
     incoming.set(path, []);
   }
   for (const edge of imports) {
+    if (edge.change === "removed") continue;
     outgoing.get(edge.from)?.push(edge.to);
     incoming.get(edge.to)?.push(edge.from);
   }
@@ -126,7 +148,10 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
   const summaries = (graph.summaries ?? []).filter(
     (summary) => summary.fileCount > (held?.get(summary.id) ?? 0),
   );
-  const summarised = summaries.reduce((sum, summary) => sum + summary.fileCount, 0);
+  const summarised = summaries.reduce(
+    (sum, summary) => sum + summary.fileCount - (held?.get(summary.id) ?? 0),
+    0,
+  );
 
   return {
     files,
@@ -138,8 +163,21 @@ export function normaliseGraph(graph: MapGraph): NormalisedGraph {
     dropped,
     summaries,
     groupImports: graph.groupImports ?? [],
+    groupImportsDropped: graph.groupImportsDropped ?? 0,
     totalFileCount: graph.totalFileCount ?? files.length + summarised,
+    overlay: graph.overlay,
+    unresolvedImportCount: graph.unresolvedImportCount,
+    groupPositions: positionsOf(graph),
   };
+}
+
+// Read before summaries are filtered, so a group keeps its point once its files arrive.
+function positionsOf(graph: MapGraph): Record<string, LayoutPoint> | undefined {
+  const placed = (graph.summaries ?? []).filter((summary) => summary.at !== undefined);
+  if (placed.length === 0) return graph.groupPositions;
+  const positions: Record<string, LayoutPoint> = { ...graph.groupPositions };
+  for (const { id, at } of placed) positions[id] ??= { x: at![0], y: at![1] };
+  return positions;
 }
 
 function filesPerGroup(files: readonly MapFile[]): ReadonlyMap<string, number> {
