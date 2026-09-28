@@ -45,6 +45,35 @@ export const evalCases: EvalCase[] = [
     ],
   },
   {
+    fixture: "naming-drift-file-casing",
+    expectations: [
+      {
+        kind: "finding",
+        description:
+          "reports that refundRequests.ts is camelCase where the data modules' names are kebab-case",
+        anchors: [
+          {
+            file: "src/data/refundRequests.ts",
+            startMarker: "/** Refund request reads and writes.",
+          },
+        ],
+      },
+      {
+        kind: "files-unread",
+        description:
+          "takes the casing from the convention counts, without reading the data modules beside it",
+        files: [
+          "src/data/credit-notes.ts",
+          "src/data/customers.ts",
+          "src/data/invoice-lines.ts",
+          "src/data/invoices.ts",
+          "src/data/payment-methods.ts",
+          "src/data/tax-rates.ts",
+        ],
+      },
+    ],
+  },
+  {
     fixture: "rule-doc-service-not-found",
     expectations: [
       {

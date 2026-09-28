@@ -13,10 +13,11 @@ project; `vitest.eval.config.ts` still matches only `*.eval.ts`.
 
 Codebase drift: a change that names or does something differently from how the
 rest of the repository already does it, or from what its rule docs write
-down. Eighteen fixtures, twenty-one assertions. Eight are recall signals, one
-per planted drift; the rest are precision signals.
+down. Nineteen fixtures, twenty-three assertions. Nine are recall signals, one
+per planted drift, and one checks that a counted convention was taken from the
+counts rather than read for; the rest are precision signals.
 
-Seven fixtures are the same small billing API (`ledgerly/billing-api`): routes,
+Eight fixtures are the same small billing API (`ledgerly/billing-api`): routes,
 services, data and db layers, with the boundaries written down in its
 `ARCHITECTURE.md`. Seven are a notification worker (`harbourline/notify-worker`)
 whose README and runbook document its configuration; the three config fixtures
@@ -26,6 +27,8 @@ their own.
 | Fixture | Planted problem | Assertion | Signal |
 | --- | --- | --- | --- |
 | `naming-drift-data-reads` | new credit-note reads are named `getCreditNoteById` and `fetchCreditNotesByInvoice`, where every other data module names them `find*` and `list*For*` | a finding lands on the new reads or the service that calls them | recall |
+| `naming-drift-file-casing` | a new data module is named `refundRequests.ts`, where every multi-word data module is kebab-case | a finding lands on the new module | recall |
+| `naming-drift-file-casing` | | no data module beside it is read | convention counts |
 | `rule-doc-service-not-found` | a new payment service returns `undefined` for a hidden payment and its route sets the 404 itself, where `AGENTS.md` says services throw `HttpError(404)` | a finding lands on the service or the route's 404, citing the `AGENTS.md` rule line | recall |
 | `architecture-duplicate-helper` | a new reminder email builds its own `formatAmount`, a copy of `formatMoney` in `src/lib/money.ts` | a finding lands on `formatAmount` | recall |
 | `architecture-duplicate-helper` | | every proposed patch matches the file at head | precision |
@@ -57,14 +60,18 @@ repository sets a precedent the bug departs from: the performance fixture has no
 batch lookup to reuse, and the security fixture has no other redirect.
 
 None of the recall fixtures can be solved from the diff alone. A convention is
-only a convention once the reviewer has read the files that follow it, and a
-finding survives validation only with two pieces of evidence in files the pull
-request does not change, or one line of a rule doc (`CLAUDE.md`, `AGENTS.md`,
-`CONTRIBUTING.md`) stating it. `drift-fixtures.test.ts` checks, in `pnpm test`,
-that the naming and retry-budget fixtures' evidence is citable that way, that
-the retry-budget doc lines reach the opening message, that the rule-doc
-fixture's rule line stands alone where its one sibling does not, and that the
-lint-only fixture's ESLint and Prettier config reach the base index.
+only a convention once the reviewer has read the files that follow it, or the
+opening message has counted it, and a finding survives validation only with two
+pieces of evidence in files the pull request does not change, one line of a
+rule doc (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`) stating it, or one
+count. `naming-drift-file-casing` is the one the counts alone solve: its casing
+is listed under `<convention_counts>`, and its `files-unread` assertion fails if
+the reviewer opens a sibling to establish it. `drift-fixtures.test.ts` checks,
+in `pnpm test`, that each naming fixture's convention and the retry-budget
+fixture's evidence are citable, that `clean-no-convention-lib` gets no counts at
+all, that the retry-budget doc lines reach the opening message, that the
+rule-doc fixture's rule line stands alone where its one sibling does not, and
+that the lint-only fixture's ESLint and Prettier config reach the base index.
 
 The link fixtures are decided in code, not by the model: a doc link the pull
 request adds is resolved against head, and one pointing at a missing file or
@@ -115,13 +122,13 @@ The index is kept only if it is measured to help, and this is where that is
 decided.
 
 **The fixtures.** The recall fixtures. With the index, the opening message
-lists each changed file's siblings, the doc lines naming what the diff changes,
-and the rule docs and lint config that govern it, and validation checks every
-piece of evidence against the base commit. Without it, the reviewer has to find
-the convention with `search_repository` alone, validation can only reject
-evidence that names a changed file, and a link into a file the diff does not
-show goes unchecked — so `docs-broken-anchor` is expected to fail the control
-arm.
+lists each changed file's siblings and their convention counts, the doc lines
+naming what the diff changes, and the rule docs and lint config that govern it,
+and validation checks every piece of evidence against the base commit. Without
+it, there are no counts to cite, the reviewer has to find the convention with
+`search_repository` alone, validation can only reject evidence that names a
+changed file, and a link into a file the diff does not show goes unchecked — so
+`docs-broken-anchor` is expected to fail the control arm.
 
 **The control switch.** `EVAL_INDEX=off` makes the fixture client report the
 archive unavailable. `buildReviewIndex` then logs `index.failed` and returns
@@ -147,7 +154,7 @@ when a run is meant as evidence, so a cost change has a before and an after.
 
 ## Known gaps
 
-- **No fixture has reached a model.** The eighteen fixtures load, diff and
+- **No fixture has reached a model.** The nineteen fixtures load, diff and
   resolve their anchors in `pnpm test`, but none has been reviewed by a model
   yet, so whether each planted problem is findable, and each out-of-scope bug
   left alone, is unproven.
@@ -166,7 +173,7 @@ when a run is meant as evidence, so a cost change has a before and an after.
 ```
 cases.ts               the spec: fixtures and their expectations
 drift-fixtures.test.ts each fixture's evidence and index inputs survive validation
-expectations.ts        the judge: anchored location, and cited evidence
+expectations.ts        the judge: anchored location, cited evidence, files left unread
 fixture.ts             loads repo/ (head) and base/ into the pipeline's inputs
 fixture-client.ts      the reads a fixture can serve; publishing is undeclared,
                        and EVAL_INDEX=off withholds the archive

@@ -1,5 +1,10 @@
 /** The drift fixtures are solvable under validation: the evidence a reviewer would cite survives it. */
-import { renderConfigDrift, renderDocMentions, type ReviewEngine } from "@pr-review/ai";
+import {
+  renderConfigDrift,
+  renderConventionCounts,
+  renderDocMentions,
+  type ReviewEngine,
+} from "@pr-review/ai";
 import { changedPaths } from "@pr-review/github";
 import { createSilentLogger } from "@pr-review/logging";
 import { buildReviewIndex, validateFindings } from "@pr-review/reviewer";
@@ -268,5 +273,65 @@ describe("clean-lint-only", () => {
     expect(configs.get("ESLint")).toContain('"@typescript-eslint/no-unused-vars": "error"');
     expect(configs.get("Prettier")).toContain('"singleQuote": false');
     expect(configs.get("package.json scripts")).toContain("lint: eslint .");
+  });
+});
+
+describe("naming-drift-file-casing", () => {
+  const fixture = loadFixture("naming-drift-file-casing");
+  const casing = { convention: "file-name-casing", file: "src/data/refundRequests.ts" };
+  const finding: ReviewFinding = {
+    file: "src/data/refundRequests.ts",
+    category: "naming",
+    severity: "low",
+    title: "refundRequests.ts is camelCase; the data modules are kebab-case",
+    explanation: "Every multi-word data module is named in kebab-case.",
+    evidence: [casing],
+    confidence: 0.9,
+  };
+
+  it("shows the casing count in the opening message", async () => {
+    const opening = renderConventionCounts(await indexOf(fixture), fixture.context, 50);
+
+    expect(opening).toContain("- src/data/refundRequests.ts:");
+    expect(opening).toContain("  - file-name-casing: all 4 siblings use kebab-case file names");
+  });
+
+  it("keeps a finding that cites the count alone, with the measured summary", async () => {
+    expect(await survivors(fixture, finding)).toEqual([
+      {
+        ...finding,
+        evidence: [
+          {
+            ...casing,
+            summary: "all 4 siblings of src/data/refundRequests.ts use kebab-case file names",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("drops one citing a count the siblings do not support", async () => {
+    const unsupported = { ...finding, evidence: [{ ...casing, convention: "test-file-naming" }] };
+
+    expect(await survivors(fixture, unsupported)).toEqual([]);
+  });
+});
+
+describe("clean-no-convention-lib", () => {
+  const fixture = loadFixture("clean-no-convention-lib");
+
+  it("shows no convention counts, and drops a finding citing one", async () => {
+    expect(renderConventionCounts(await indexOf(fixture), fixture.context, 50)).toEqual([]);
+
+    const finding: ReviewFinding = {
+      file: "src/lib/percent.ts",
+      category: "naming",
+      severity: "low",
+      title: "percent.ts does not follow the lib naming",
+      explanation: "The lib helpers are named otherwise.",
+      evidence: [{ convention: "file-name-casing", file: "src/lib/percent.ts" }],
+      confidence: 0.9,
+    };
+    expect(await survivors(fixture, finding)).toEqual([]);
   });
 });

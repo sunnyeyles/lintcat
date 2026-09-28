@@ -28,7 +28,7 @@ export function indexEnabled(env: Record<string, string | undefined>): boolean {
 }
 
 /** One recorded read against the fixture repository. */
-interface FixtureCall {
+export interface FixtureCall {
   method: string;
   detail: string;
 }
