@@ -22,11 +22,14 @@ one of these categories:
 | **config** | a setting, env var or dependency added differently from the ones already there: an env var the code starts reading that neither `.env.example` nor the docs list, or a dependency doing a job one already in use does |
 
 Every finding the agent makes cites **evidence**: at least two places in files
-the pull request does not change that show the convention. The opening message
-lists each changed file's siblings — the unchanged files in its directory with
-the same role — as the local convention to read first. It also quotes the lines
-of unchanged Markdown docs that name something the diff's code edits or
-removes, so a doc the change made false can be cited as the evidence. Rewording
+the pull request does not change that show the convention, or one line of the
+repository's own rule docs — `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` — that
+states it. The opening message lists each changed file's siblings — the
+unchanged files in its directory with the same role — as the local convention to
+read first, and carries the rule docs and lint configuration that govern it. It
+also quotes the lines of unchanged Markdown docs that name something the diff's
+code edits or removes, so a doc the change made false can be cited as the
+evidence. Rewording
 that leaves a doc less specific is not drift. Config drift is found in code
 first ([`config-drift.ts`](packages/index/src/config-drift.ts)) and handed to the
 agent as facts, each with the lines to cite: a new env var read that no env
@@ -46,8 +49,10 @@ decides what actually gets published.
 **What it deliberately stays silent about.** Correctness bugs, security holes,
 performance problems and missing tests are out of scope, and so is anything a
 formatter, linter, typecheck or build already catches — including whether an
-import resolves. A directory whose files disagree among themselves has no
-convention to drift from, so nothing in it is reported. The agent is told to
+import resolves. The agent is shown the repository's own lint, format and
+typecheck configuration so it knows what that covers. A directory whose files
+disagree among themselves, and no rule doc settles, has no convention to drift
+from, so nothing in it is reported. The agent is told to
 cite only lines it has read, and to prefer a few well-evidenced findings over
 many small ones.
 
@@ -63,7 +68,9 @@ many small ones.
   convention the change departs from — is checked against the repository index
   at the base commit: an entry naming a file that does not exist, a file the
   pull request changes, or a line past the file's end is removed, and a finding
-  left with fewer than **two** entries is dropped
+  left with fewer than **two** entries is dropped — unless one of them is a line
+  of a rule doc (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`), which is the
+  convention stated and enough on its own
   ([`validate-evidence.ts`](packages/reviewer/src/validate-evidence.ts)). What
   survives is shown as "Convention seen in" links on the comment and the
   dashboard
@@ -390,14 +397,25 @@ does not exist. The query lives in `@pr-review/index`; the agent tool and the
 MCP tool of the same name both render what it returns, so there is one cap, one
 header and one unknown-path answer.
 
-The opening message carries three blocks. `<repository>` gives bearings in a
+The opening message carries five blocks. `<repository>` gives bearings in a
 monorepo: every workspace package with its root, the indexed commit, and what
 each language contributed, resolution rate included. `<repository_index>` is
 one line per changed file — its package, its role, its covering test and its
 importer count. `<sibling_files>` names, for each changed file, up to five
 unchanged files in the same directory with the same role
 ([`siblingsOf`](packages/index/src/siblings.ts)): the local convention the
-reviewer reads before calling anything drift.
+reviewer reads before calling anything drift. `<rule_docs>` is the text of every
+`CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md` at the repository root or above a
+changed file (a `CONTRIBUTING.md` in `.github/` or `docs/` counts as the
+root's), numbered by line so a finding can cite one, root first and capped at
+12 000 characters; a rule doc the pull request edits is left out, since it
+cannot be cited ([`rule-docs.ts`](packages/index/src/rule-docs.ts)).
+`<lint_config>` lists the linter, formatter and typecheck configuration
+governing the changed files — ESLint, Prettier, Biome, EditorConfig,
+`tsconfig.json`, Ruff and the like, and the lint and format scripts of a
+`package.json` — each as a short excerpt, capped at 4 000 characters
+([`lint-config.ts`](packages/index/src/lint-config.ts)). Both come from the base
+commit, never the pull request's head.
 
 Reading the archive is capped at 50 MB, 20 000 files and 512 KB per file, and
 `node_modules`, `vendor`, `dist`, `.git` and similar are dropped as it reads.

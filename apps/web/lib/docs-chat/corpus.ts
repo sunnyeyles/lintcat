@@ -155,9 +155,9 @@ Drift: places where a change departs from how the rest of your repository alread
 - **Documentation:** a README, doc or comment the change made wrong, and a doc link the change adds to a file or heading that doesn’t exist. Broken links are found by LintCat itself, not the AI, so they need no cited examples. Rewording that makes a doc say less is not drift.
 - **Config:** a setting or dependency added differently from the ones already there, such as an environment variable your \`.env.example\` and docs don’t list, or a second library for a job one you already use does.
 
-Every finding cites at least two places in your existing code that show the convention, and each is checked before the finding posts. Where the existing files disagree among themselves there is no convention, and nothing is reported.
+Every finding cites at least two places in your existing code that show the convention, or one line of your CLAUDE.md, AGENTS.md or CONTRIBUTING.md that states it, and each is checked before the finding posts. Where the existing files disagree among themselves and no rule doc settles it, there is no convention, and nothing is reported.
 
-Bugs, security holes and performance problems are outside its scope, and so is anything your formatter, linter, typecheck or build already catches.
+Bugs, security holes and performance problems are outside its scope, and so is anything your formatter, linter, typecheck or build already catches. The reviewer reads your lint and format configuration to know what that is.
 
 ## Keeping the codebase in line {#in-line}
 
@@ -169,7 +169,8 @@ A diff only shows what changed. Before the reviewer starts, LintCat maps the rep
 - whether it sits in an import cycle;
 - which unchanged files sit beside it and play the same role: the local convention it is compared against;
 - which lines of your Markdown docs name something the change edits or removes;
-- which new environment variables nothing documents, and which new dependencies duplicate one you already use.
+- which new environment variables nothing documents, and which new dependencies duplicate one you already use;
+- what your CLAUDE.md, AGENTS.md and CONTRIBUTING.md say, and which linter, formatter and typecheck settings apply to it, as they stand on your base branch.
 
 It can also look up which files use a name, and which files have historically changed alongside this one. That is how it finds the helper the change wrote again, the convention three other files follow, and the doc that now describes something else.
 
@@ -205,7 +206,7 @@ LintCat reads your code to review it, and that is all the AI part can do. Everyt
 Before anything is posted, every finding has to pass these checks:
 - It points at a line this pull request added or changed.
 - The reviewer is confident in it.
-- It cites at least two places in your existing code that show the convention your change departs from. Each must exist and sit outside this pull request; a reference that doesn’t check out is removed, and so is a finding left with fewer than two.
+- It cites at least two places in your existing code that show the convention your change departs from, or one line of your CLAUDE.md, AGENTS.md or CONTRIBUTING.md that states it. Each must exist and sit outside this pull request; a reference that doesn’t check out is removed, and so is a finding left without enough.
 - A broken doc link is the one finding LintCat makes itself: the link is resolved at the pull request’s latest commit, so it needs no cited examples.
 - It doesn’t repeat another finding.
 - It makes the cut of at most 10 per review, most important first.
