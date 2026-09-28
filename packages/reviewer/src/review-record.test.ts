@@ -45,7 +45,13 @@ const changedFiles: ChangedFile[] = [
   { filename: "src/sessions.ts", status: "modified", additions: 2, deletions: 1 },
   { filename: "src/added.ts", status: "added", additions: 10, deletions: 0 },
   { filename: "src/gone.ts", status: "removed", additions: 0, deletions: 8 },
-  { filename: "src/moved.ts", status: "renamed", additions: 1, deletions: 1 },
+  {
+    filename: "src/moved.ts",
+    status: "renamed",
+    additions: 1,
+    deletions: 1,
+    previous_filename: "src/was.ts",
+  },
   { filename: "src/copied.ts", status: "copied", additions: 3, deletions: 0 },
 ];
 
@@ -124,7 +130,13 @@ describe("buildReviewRecord", () => {
       { path: "src/sessions.ts", status: "modified", additions: 2, deletions: 1 },
       { path: "src/added.ts", status: "added", additions: 10, deletions: 0 },
       { path: "src/gone.ts", status: "removed", additions: 0, deletions: 8 },
-      { path: "src/moved.ts", status: "renamed", additions: 1, deletions: 1 },
+      {
+        path: "src/moved.ts",
+        status: "renamed",
+        additions: 1,
+        deletions: 1,
+        previousPath: "src/was.ts",
+      },
       // GitHub's copied has no status of its own.
       { path: "src/copied.ts", status: "modified", additions: 3, deletions: 0 },
     ]);
@@ -239,6 +251,45 @@ describe("buildReviewRecord", () => {
 
   it("sends no risk when the review had no blast radius", () => {
     expect(record(outcome()).record).not.toHaveProperty("risk");
+  });
+
+  it("sends the change overlay as the schema's section", () => {
+    const overlay = {
+      headSha: target.headSha,
+      files: [
+        { path: "src/moved.ts", status: "renamed" as const, previousPath: "src/was.ts" },
+        { path: "src/added.ts", status: "added" as const },
+      ],
+      added: [{ from: "src/added.ts", to: "src/sessions.ts" }],
+      removed: [],
+      unresolvedImportCount: 2,
+      partial: true,
+    };
+
+    expect(record(outcome({ overlay })).record.overlay).toEqual(overlay);
+    expect(record(outcome()).record).not.toHaveProperty("overlay");
+  });
+
+  it("drops only an overlay the schema would reject, and logs its paths", () => {
+    const built = record(
+      outcome({
+        graph: snapshot,
+        overlay: {
+          headSha: "",
+          files: [],
+          added: [],
+          removed: [],
+          unresolvedImportCount: 0,
+          partial: false,
+        },
+      }),
+    );
+
+    expect(built.record).not.toHaveProperty("overlay");
+    expect(built.record.graph).toBeDefined();
+    expect(built.entries).toMatchObject([
+      { section: "overlay", issues: ["overlay.headSha"] },
+    ]);
   });
 
   it("keeps whether a finding had a patch, never the patch source", () => {

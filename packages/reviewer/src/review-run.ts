@@ -20,6 +20,7 @@ import {
 } from "@pr-review/github";
 import {
   snapshotRepositoryIndex,
+  type ChangeOverlay,
   type RepositoryGraphSnapshot,
 } from "@pr-review/index";
 import {
@@ -34,6 +35,7 @@ import type {
 
 import { assessBlastRadius, type BlastRadius } from "#src/blast-radius";
 import { buildReviewIndex } from "#src/build-index";
+import { loadChangeOverlay } from "#src/change-overlay";
 import { buildDiffLineIndex } from "#src/diff-lines";
 import { checkDocLinks, mergeCheckedFindings } from "#src/doc-links";
 import { countLabel } from "#src/finding-format";
@@ -109,6 +111,8 @@ interface ReviewedTree {
   graph?: RepositoryGraphSnapshot | undefined;
   /** Absent when the index was off or failed, or scoring failed. */
   blastRadius?: BlastRadius | undefined;
+  /** The pull request at HEAD over `graph`; absent without an index or when building it failed. */
+  overlay?: ChangeOverlay | undefined;
 }
 
 /** One review's outcome, plus how the patches its agent proposed fared. */
@@ -384,7 +388,7 @@ async function review(
     logger,
     onUsage: (report) => onUsage(report.usage),
   });
-  const [candidates, suggestedReviewers] = await Promise.all([
+  const [candidates, suggestedReviewers, overlay] = await Promise.all([
     agent
       .run({
         owner: target.owner,
@@ -414,6 +418,7 @@ async function review(
       now: now(),
       logger,
     }),
+    loadChangeOverlay({ client, target, index: repositoryIndex, changedFiles, logger }),
   ]);
   cancelled.check("agent");
 
@@ -502,5 +507,6 @@ async function review(
       ? {}
       : { graph: snapshotRepositoryIndex(repositoryIndex) }),
     ...(blastRadius === undefined ? {} : { blastRadius }),
+    ...(overlay === undefined ? {} : { overlay }),
   };
 }

@@ -1,6 +1,7 @@
 /** The dashboard's record of one finished run, shaped so the schema always accepts it. */
 import {
   encodeRepositoryGraph,
+  type ChangeOverlay,
   type RepositoryGraphSnapshot,
 } from "@pr-review/index";
 import type { StructuredLogger } from "@pr-review/logging";
@@ -11,6 +12,7 @@ import {
   reviewRecordSchema,
   type ReviewRecord,
   type ReviewRecordGraph,
+  type ReviewRecordOverlay,
   type ReviewRecordRisk,
 } from "@pr-review/schemas";
 
@@ -18,7 +20,7 @@ import { changeStatus, type BlastRadius } from "#src/blast-radius";
 import type { FinishedReviewRun } from "#src/review-delivery";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
-type OptionalSection = "baseSha" | "changedFiles" | "graph" | "risk";
+type OptionalSection = "baseSha" | "changedFiles" | "graph" | "risk" | "overlay";
 
 function graphPayload(snapshot: RepositoryGraphSnapshot): ReviewRecordGraph {
   return {
@@ -51,6 +53,21 @@ function riskPayload({ impact, risk }: BlastRadius): ReviewRecordRisk {
     },
     packages: impact.packages.length,
     dependents: impact.transitive.slice(0, MAX_RISK_DEPENDENTS),
+  };
+}
+
+function overlayPayload(overlay: ChangeOverlay): ReviewRecordOverlay {
+  return {
+    headSha: overlay.headSha,
+    files: overlay.files.map(({ path, status, previousPath }) => ({
+      path,
+      status,
+      ...(previousPath === undefined ? {} : { previousPath }),
+    })),
+    added: overlay.added.map(({ from, to }) => ({ from, to })),
+    removed: overlay.removed.map(({ from, to }) => ({ from, to })),
+    unresolvedImportCount: overlay.unresolvedImportCount,
+    partial: overlay.partial,
   };
 }
 
@@ -94,6 +111,9 @@ export function buildReviewRecord(
       status: changeStatus(file.status),
       additions: file.additions,
       deletions: file.deletions,
+      ...(file.previous_filename === undefined
+        ? {}
+        : { previousPath: file.previous_filename }),
     })),
   );
   let graph = checked(
@@ -109,6 +129,10 @@ export function buildReviewRecord(
       ? undefined
       : riskPayload(outcome.blastRadius),
   );
+  const overlay = checked(
+    "overlay",
+    outcome.overlay === undefined ? undefined : overlayPayload(outcome.overlay),
+  );
   return {
     owner: target.owner,
     repo: target.repo,
@@ -120,6 +144,7 @@ export function buildReviewRecord(
     ...(changedFiles === undefined ? {} : { changedFiles }),
     ...(graph === undefined ? {} : { graph }),
     ...(risk === undefined ? {} : { risk }),
+    ...(overlay === undefined ? {} : { overlay }),
     ...usage,
     // The patch is verbatim source, so the dashboard learns only that one survived.
     findings: outcome.findings.map(({ patch, ...finding }) => ({
