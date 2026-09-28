@@ -43,7 +43,7 @@ const OPERAND_KEYWORDS = new Set([
 
 const WORD_CHARACTER = /[\w$]/;
 
-interface MaskedSource {
+export interface MaskedSource {
   text: string;
   /** Each literal's body, by the index of its opening quote. */
   values: Map<number, string>;
@@ -108,7 +108,7 @@ function endOfRegex(source: string, start: number): number {
 }
 
 /** Blanks comments and literal bodies, keeping every offset and line intact. */
-function maskSource(source: string): MaskedSource {
+export function maskSource(source: string): MaskedSource {
   const out: string[] = [];
   const values = new Map<number, string>();
   let token = "";
