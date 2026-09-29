@@ -14,9 +14,6 @@ export type InsightsScopeProps = {
   children: ReactNode;
 };
 
-const TAB_LINK =
-  "focus-visible:ring-ring -mb-px inline-flex h-11 items-center border-b-2 px-1 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2";
-
 // The range lives in the URL, so each tab link carries it; the frame dims while a new one streams.
 export function InsightsScope({ tabs, children }: InsightsScopeProps) {
   const router = useRouter();
@@ -25,30 +22,25 @@ export function InsightsScope({ tabs, children }: InsightsScopeProps) {
   const [pending, startTransition] = useTransition();
   const range = parseRange(param);
   const query = rangeQuery(param);
+  const active = tabs.find((tab) => isActiveTab(pathname, tab.href));
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b">
-        <nav aria-label="Insights" className="flex gap-5">
-          {tabs.map((tab) => {
-            const active = isActiveTab(pathname, tab.href);
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href + query}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  TAB_LINK,
-                  active
-                    ? "border-foreground text-foreground"
-                    : "text-muted-foreground hover:text-foreground border-transparent",
-                )}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <Tabs value={active?.href ?? ""} activationMode="manual">
+          <TabsList variant="line" aria-label="Insights" className="border-b-0">
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.href} value={tab.href} asChild>
+                <Link
+                  href={tab.href + query}
+                  aria-current={tab === active ? "page" : undefined}
+                >
+                  {tab.label}
+                </Link>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
         <div className="flex items-center gap-3 pb-2">
           <Tabs
             value={range}
