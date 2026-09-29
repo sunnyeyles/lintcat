@@ -4,7 +4,7 @@
 # exists elsewhere: on the default branch, a remote ref, or a PR head.
 #
 # An unpushed commit, uncommitted changes, a live claude process or an
-# unreachable GitHub all mean keep. Evidence ladder and rationale: CLAUDE.md.
+# unreachable GitHub all mean keep. Evidence ladder and rationale: .claude/rules/worktrees.md.
 #
 # The PR index is keyed by head SHA as well as head-ref name. Squash merges mean
 # a merged tip is never an ancestor, so never reduce the gate to local checks.

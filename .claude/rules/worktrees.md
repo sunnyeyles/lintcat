@@ -1,15 +1,62 @@
-# Worktree policy
+# Work in a worktree
 
-Never do implementation work in the main checkout while it is on the default
-branch (`main`). If a session starts there, call the **EnterWorktree** tool to
-create and switch into a fresh worktree before the first file edit, build, or
-commit. Use a short kebab-case `name` describing the task. This standing
-instruction authorises EnterWorktree without asking the user first.
+**Before making any code change, call `EnterWorktree` and work there.** Do not
+edit files in the main checkout while it is on the default branch (`main`).
+`EnterWorktree` is opt-in by design, so this standing instruction is what turns
+it on for this repo and authorises it without asking the user first. Use a
+short kebab-case `name` describing the task.
 
-Read-only work — answering questions, reading code, inspecting git history —
-does not need a worktree.
+The exceptions are narrow, and they are about the change not being code:
+answering a question, reading the tree or git history, or editing `AGENTS.md`
+files and `.claude/` (the rules and the hooks that implement the workflow
+below). A session already pinned to a directory (a background job, or a
+subagent launched with an explicit cwd) cannot move, and should say so rather
+than silently editing the main checkout.
 
-Worktrees are created under `.claude/worktrees/` (gitignored). The gitignored
-files listed in `.worktreeinclude` — `.env.local` — are copied in by the
-worktree copier, so a new worktree is runnable immediately. Existing files are
-never overwritten.
+Worktrees live at `.claude/worktrees/<name>`, gitignored, one per branch.
+
+**A fresh worktree is not a usable checkout on its own** — it carries tracked
+files and nothing else. Two gitignored things it needs arrive automatically:
+
+- `.env.local`, via `.worktreeinclude`. That file lists gitignored paths for the
+  worktree copier to bring across; existing files are never overwritten. It
+  copies file _content_ — a symlink listed there never arrives, so keep the
+  entries pointing at real files.
+- `node_modules`, via `.claude/hooks/install-worktree-deps.sh`, a `SessionStart`
+  hook that runs `pnpm install --frozen-lockfile` the first time a session opens
+  in a worktree that has none. `--frozen-lockfile` is deliberate: a worktree is
+  never the place to resolve new versions, and a drifted `pnpm-lock.yaml` should
+  fail loudly rather than be rewritten in a checkout nobody is watching. Set
+  `WORKTREE_INSTALL_SKIP=1` to disable it.
+
+The install runs at session start, so it does **not** cover a worktree created
+mid-session — the hook fires on the next session there. If a command fails on a
+missing module in a worktree you just made, run `pnpm install` rather than
+treating it as a regression.
+
+Because worktrees sit _inside_ the main checkout, pnpm walks up to the outer
+`pnpm-workspace.yaml` and warns about multiple lockfiles. That warning is how
+you tell a worktree run from a main-checkout one; it is not a problem.
+
+## Cleanup
+
+**A `SessionEnd` hook deletes worktrees whose work is already published.**
+`.claude/hooks/cleanup-merged-worktrees.sh` removes a checkout under
+`.claude/worktrees/` and its local branch once every commit it holds exists
+somewhere else — on the default branch, on a remote branch, or as the head of a
+pull request GitHub still knows about. An unpushed commit satisfies none of
+those, and it is the one thing the hook must never destroy; uncommitted changes
+and a live `claude` process holding the worktree also make it refuse. Being
+unable to reach GitHub is always a reason to keep, never to remove.
+
+The evidence is graded. A pull request sitting on exactly this tip is **strong**
+and collects immediately. Merely being contained in the default branch, or on
+some remote ref, is **weak** — true of a brand-new worktree that has not been
+committed to yet — and collects only after `WORKTREE_CLEANUP_MIN_IDLE_HOURS`
+(72) of inactivity. Every decision is logged with a reason to
+`~/.claude/worktree-cleanup.log`. `WORKTREE_CLEANUP_DRY_RUN=1` removes nothing.
+The ladder is tested by `bash .claude/hooks/cleanup-merged-worktrees.test.sh`,
+run by hand — it builds throwaway repos and stubs `gh` on `PATH`, so it is not
+part of `pnpm test`.
+
+Worktrees outside `.claude/worktrees/` are never touched.

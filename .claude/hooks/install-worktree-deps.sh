@@ -30,7 +30,7 @@ esac
 [ -f "$toplevel/pnpm-lock.yaml" ] || exit 0
 
 if out=$(cd "$toplevel" && pnpm install --frozen-lockfile 2>&1); then
-  printf '{"systemMessage":"Installed node_modules in this worktree (fresh checkouts carry none) — see CLAUDE.md"}\n'
+  printf '{"systemMessage":"Installed node_modules in this worktree (fresh checkouts carry none) — see .claude/rules/worktrees.md"}\n'
 else
   # A failed install is worth surfacing: every later command will fail too, and
   # the reason will be much less obvious by then.
