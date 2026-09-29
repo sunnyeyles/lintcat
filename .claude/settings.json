@@ -1,6 +1,19 @@
 {
   "outputStyle": "default",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Installing dependencies for the cloud session",
+            "timeout": 600,
+            "command": "s=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/cloud-install.sh\"; [ -f \"$s\" ] && bash \"$s\" || true"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
