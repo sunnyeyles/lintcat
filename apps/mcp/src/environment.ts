@@ -91,10 +91,16 @@ export function hasModelApiKey(environment: McpEnvironment): boolean {
   return (env[apiKeyEnvFor(selectProvider(env))]?.trim() ?? "") !== "";
 }
 
+/** Which model resolveModel would build, without building it. */
+export function modelIdentity(environment: McpEnvironment): Pick<ModelSelection, "provider" | "modelId"> {
+  const provider = selectProvider(environment.env);
+  return { provider, modelId: environment.env["PR_REVIEW_MODEL"]?.trim() || defaultModelFor(provider) };
+}
+
 /** Reads PR_REVIEW_MODEL_PROVIDER / PR_REVIEW_MODEL / PR_REVIEW_MODEL_BASE_URL and the provider's key. */
 export function resolveModel(environment: McpEnvironment): ModelSelection {
   const { env } = environment;
-  const provider = selectProvider(env);
+  const { provider, modelId } = modelIdentity(environment);
   const keyEnv = apiKeyEnvFor(provider);
   const apiKey = env[keyEnv]?.trim() ?? "";
   if (apiKey === "") {
@@ -102,7 +108,6 @@ export function resolveModel(environment: McpEnvironment): ModelSelection {
     throw new Error(`No model API key is set. Set ${keys} in the MCP server's environment or .env.local.`);
   }
   const baseUrl = env["PR_REVIEW_MODEL_BASE_URL"]?.trim() ?? "";
-  const modelId = env["PR_REVIEW_MODEL"]?.trim() || defaultModelFor(provider);
   return {
     model: environment.createLanguageModel({
       provider,

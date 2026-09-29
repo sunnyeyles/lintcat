@@ -2,12 +2,14 @@
 export { git, GitError } from "#src/git";
 export {
   hasModelApiKey,
+  modelIdentity,
   processEnvironment,
   type McpEnvironment,
 } from "#src/environment";
 export {
   openLocalRepository,
   repositoryRoot,
+  reviewedTree,
   type LocalRepository,
   type LocalScope,
   type ResolvedScope,

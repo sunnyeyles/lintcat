@@ -33,6 +33,7 @@ Review options:
   --fail-on <level>    Exit non-zero at this severity or above: low, medium, high (default), off
   --format <format>    text (default), or json: one document on stdout, progress on stderr
   --no-index           Skip the repository import index
+  --no-cache           Review again even when this tree, base and model were just reviewed
   --verbose            Let the review's structured log through to stderr
   --color / --no-color Force colour on or off (default: on for a terminal, off otherwise)
 

@@ -26,6 +26,8 @@ export interface ReviewOptions {
   profile: Profile;
   format: Format;
   index: boolean;
+  /** Reuse the last report when nothing it depends on has changed. */
+  cache: boolean;
   failOn: FailOn;
   /** Let the review's own structured log through to stderr. */
   verbose: boolean;
@@ -65,6 +67,7 @@ interface Flags {
 
 const SWITCHES = new Set([
   "no-index",
+  "no-cache",
   "verbose",
   "force",
   "color",
@@ -174,6 +177,7 @@ const REVIEW_FLAGS = [
   "format",
   "fail-on",
   "no-index",
+  "no-cache",
   "verbose",
   "color",
   "no-color",
@@ -189,6 +193,7 @@ function reviewOptions(flags: Flags): ReviewOptions {
     profile: readProfile(flags),
     format: readFormat(flags),
     index: !flags.switches.has("no-index"),
+    cache: !flags.switches.has("no-cache"),
     failOn: readFailOn(flags),
     verbose: flags.switches.has("verbose"),
     color: readColor(flags),

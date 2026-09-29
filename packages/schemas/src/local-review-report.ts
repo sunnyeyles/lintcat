@@ -12,6 +12,8 @@ export const localReviewReportSchema = z.object({
   // A commit or tree, or WORKING_TREE for uncommitted changes.
   head: z.string(),
   failOn: z.enum(["low", "medium", "high", "off"]),
+  // Answered from an earlier run over the same tree, base and model.
+  cached: z.boolean(),
   findings: z.array(reviewFindingSchema.extend({ id: z.string() })),
   blocking: z.number().int().nonnegative(),
   suppressed: z.number().int().nonnegative(),

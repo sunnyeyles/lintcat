@@ -14,6 +14,8 @@ export class GitError extends Error {
 interface GitOptions {
   /** Exit codes that still mean success, e.g. 1 from `git grep` with no match. */
   okExitCodes?: readonly number[];
+  /** Added to the process environment, e.g. a scratch GIT_INDEX_FILE. */
+  env?: Record<string, string>;
   maxBuffer?: number;
 }
 
@@ -29,7 +31,12 @@ function runGit<T extends string | Buffer>(
     execFile(
       "git",
       ["-c", "core.quotePath=false", ...args],
-      { cwd, encoding, maxBuffer: options.maxBuffer ?? DEFAULT_MAX_BUFFER },
+      {
+        cwd,
+        encoding,
+        maxBuffer: options.maxBuffer ?? DEFAULT_MAX_BUFFER,
+        ...(options.env === undefined ? {} : { env: { ...process.env, ...options.env } }),
+      },
       (error, stdout, stderr) => {
         const code = (error as { code?: unknown } | null)?.code;
         if (error && !(typeof code === "number" && options.okExitCodes?.includes(code))) {

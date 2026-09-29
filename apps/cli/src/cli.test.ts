@@ -307,6 +307,81 @@ describe("the JSON report", () => {
   });
 });
 
+describe("reusing an earlier review", () => {
+  const review = ["--base", "main", "--no-index", "--format", "json"];
+
+  function counted(findings: readonly ReviewFinding[] = [admin]) {
+    return vi.fn(() => scriptedModel(findings));
+  }
+
+  it("answers a second run over the same tree without calling a model", async () => {
+    await run(review, { createLanguageModel: counted() });
+    const createLanguageModel = counted();
+
+    const { code, out, err } = await run(review, { createLanguageModel });
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    const parsed = localReviewReportSchema.parse(JSON.parse(out));
+    expect(parsed.cached).toBe(true);
+    expect(parsed.findings.map((finding) => finding.title)).toEqual(["Admin is always on"]);
+    expect(err).toContain("from the cache");
+    expect(code).toBe(1);
+  });
+
+  it("reviews again once a file changes", async () => {
+    await run(review, { createLanguageModel: counted() });
+    repo.write("src/api.ts", 'import { createSession } from "./sessions";\nexport const x = 1;\n');
+    const createLanguageModel = counted();
+
+    await run(review, { createLanguageModel });
+
+    expect(createLanguageModel).toHaveBeenCalled();
+  });
+
+  it("reviews again under another model", async () => {
+    await run(review, { createLanguageModel: counted() });
+    const createLanguageModel = counted();
+
+    await run(review, {
+      env: { OPENAI_API_KEY: "sk-test", PR_REVIEW_MODEL: "gpt-5.6-luna-mini" },
+      createLanguageModel,
+    });
+
+    expect(createLanguageModel).toHaveBeenCalled();
+  });
+
+  it("reviews again when asked not to use the cache", async () => {
+    await run(review, { createLanguageModel: counted() });
+    const createLanguageModel = counted();
+
+    await run([...review, "--no-cache"], { createLanguageModel });
+
+    expect(createLanguageModel).toHaveBeenCalled();
+  });
+
+  it("judges a cached report against the threshold asked for now", async () => {
+    await run(review, { createLanguageModel: counted() });
+
+    const { code } = await run([...review, "--fail-on", "off"], { createLanguageModel: counted() });
+
+    expect(code).toBe(0);
+  });
+
+  it("never caches a cancelled review", async () => {
+    const { model, firstCall } = makeHangingModel();
+    const controller = new AbortController();
+    const pending = run(review, { createLanguageModel: () => model }, controller.signal);
+    await firstCall;
+    controller.abort();
+    await pending;
+    const createLanguageModel = counted();
+
+    await run(review, { createLanguageModel });
+
+    expect(createLanguageModel).toHaveBeenCalled();
+  });
+});
+
 describe("cancelling a review", () => {
   it("aborts the in-flight model calls and prints no verdict", async () => {
     const { model, firstCall } = makeHangingModel();

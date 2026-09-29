@@ -5,9 +5,11 @@ import { apiKeyEnvFor, defaultModelFor, MODEL_PROVIDERS } from "@pr-review/ai";
 import { createSilentLogger } from "@pr-review/logging";
 import {
   hasModelApiKey,
+  modelIdentity,
   modelReviewEngine,
   openLocalMemoryStore,
   openLocalRepository,
+  reviewedTree,
   runReview,
   type McpEnvironment,
 } from "@pr-review/mcp/local-review";
@@ -15,6 +17,7 @@ import { CI_REVIEW_POLICY, findingId } from "@pr-review/reviewer";
 import type { LocalReviewReport } from "@pr-review/schemas";
 
 import type { ReviewOptions } from "#src/options";
+import { readLastReview, reviewCachePath, writeLastReview } from "#src/review-cache";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
 
 export const EXIT_OK = 0;
@@ -79,6 +82,7 @@ async function review(
     baseSha: local.baseSha,
     head: local.target.headSha,
     failOn: options.failOn,
+    cached: false,
     findings: [],
     blocking: 0,
     suppressed: 0,
@@ -91,6 +95,28 @@ async function review(
     err(`Nothing to review: no changes in ${where}.`);
     return report({});
   }
+
+  const ci = options.profile === "ci";
+  const memory = ci ? undefined : await openLocalMemoryStore(local.root);
+  const cacheFile = await reviewCachePath(local.root);
+  const key = JSON.stringify({
+    tree: await reviewedTree(local),
+    baseSha: local.baseSha,
+    profile: options.profile,
+    index: options.index,
+    model: modelIdentity(environment),
+    memory: (await memory?.read()) ?? null,
+  });
+  const earlier = options.cache ? readLastReview(cacheFile) : undefined;
+  if (earlier?.key === key) {
+    err(`Reusing the review of ${where} from the cache; --no-cache runs it again.`);
+    return report({
+      ...earlier.report,
+      failOn: options.failOn,
+      blocking: blockingFindings(earlier.report.findings, options.failOn).length,
+      cached: true,
+    });
+  }
   err(`Reviewing ${changed.length} changed file(s): ${where}.`);
 
   const selected = modelReviewEngine(environment);
@@ -102,7 +128,6 @@ async function review(
       err(`Warning: CI reviews with ${ciModel} unless the repository's settings choose another model.`);
     }
   }
-  const ci = options.profile === "ci";
   const result = await runReview(
     { ...environment, logger: options.verbose ? environment.logger : createSilentLogger() },
     {
@@ -110,18 +135,20 @@ async function review(
       target: local.target,
       selected,
       index: options.index,
-      ...(ci ? { policy: CI_REVIEW_POLICY } : { memory: await openLocalMemoryStore(local.root) }),
+      ...(ci ? { policy: CI_REVIEW_POLICY } : { memory }),
       signal,
     },
   );
   const { findings, suppressed } = result.outcome;
-  return report({
+  const reviewed = report({
     model: selected.model ?? null,
     findings: orderFindings(findings).map((finding) => ({ ...finding, id: findingId(finding) })),
     blocking: blockingFindings(findings, options.failOn).length,
     suppressed,
     summary: result.summary,
   });
+  if (signal?.aborted !== true) writeLastReview(cacheFile, { key, report: reviewed });
+  return reviewed;
 }
 
 function printText(report: LocalReviewReport, color: boolean, out: (text: string) => void): void {
