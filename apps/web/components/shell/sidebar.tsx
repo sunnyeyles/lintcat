@@ -14,6 +14,7 @@ import {
   ChartLine,
   Coins,
   FolderGit2,
+  GitPullRequest,
   type IconComponent,
   LayoutDashboard,
   Menu,
@@ -30,6 +31,7 @@ type NavItem = { href: string; label: string; icon: IconComponent; ownerOnly?: b
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/reviews", label: "Reviews", icon: GitPullRequest },
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
   { href: "/analytics", label: "Analytics", icon: ChartLine },
   { href: "/usage", label: "Usage", icon: Coins },

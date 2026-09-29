@@ -106,8 +106,10 @@ export function computeTrends(
   );
   const bySeverity = emptySeverity();
   const durations: number[] = [];
+  let costUsd = 0;
   for (const v of scoped) {
     durations.push(v.durationMs);
+    costUsd += v.costUsd;
     bySeverity.low += v.bySeverity.low;
     bySeverity.medium += v.bySeverity.medium;
     bySeverity.high += v.bySeverity.high;
@@ -127,6 +129,7 @@ export function computeTrends(
       findings: bySeverity.low + bySeverity.medium + bySeverity.high,
       bySeverity,
       medianDurationMs: median(durations),
+      costUsd,
     },
   };
 }

@@ -1,52 +1,33 @@
-import {
-  Badge,
-  Button,
-  Card,
-  cn,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@pr-review/design";
+import { Button, Card } from "@pr-review/design";
 import { Settings } from "@pr-review/design/icons";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 
-import { RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
+import {
+  EmptyNotice,
+  groupByPr,
+  ReviewsTable,
+  Section,
+  Sparkline,
+  toReviewRow,
+  type ReviewColumn,
+} from "@/components/overview";
 import { PageHeader } from "@/components/shell";
 import { InlineSkeleton, StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
 import { Stat, StatGrid } from "@/components/ui/stat";
-import type { ReviewSummary } from "@pr-review/db/dashboard";
 import { data } from "@/lib/data/server";
-import {
-  formatDuration,
-  formatNumber,
-  formatRelative,
-  formatUsd,
-  shortSha,
-} from "@/lib/format";
+import { formatDuration, formatNumber, formatRelative, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 
-type PrGroup = { prNumber: number; reviews: ReviewSummary[] };
-
-// Input is newest-first, so insertion order already ranks groups by latest review.
-function groupByPr(reviews: ReviewSummary[]): PrGroup[] {
-  const byPr = new Map<number, ReviewSummary[]>();
-  for (const review of reviews) {
-    const existing = byPr.get(review.prNumber);
-    if (existing) existing.push(review);
-    else byPr.set(review.prNumber, [review]);
-  }
-  return [...byPr].map(([prNumber, rows]) => ({ prNumber, reviews: rows }));
-}
+const HISTORY_COLUMNS: readonly ReviewColumn[] = [
+  "pullRequest",
+  "head",
+  "risk",
+  "findings",
+  "duration",
+  "ran",
+];
 
 // Shared by the header count and the history table, so both read one query.
 const repoReviews = cache(
@@ -118,104 +99,26 @@ async function ReviewHistory({
   repo: { id: number; owner: string; name: string };
 }) {
   const reviews = await repoReviews(slug, repo.id);
-  const groups = groupByPr(reviews);
 
   return (
     <Card className="py-0">
       {reviews.length > 0 ? (
-        <Table className="min-w-[40rem]">
-          <TableCaption className="sr-only">
-            Every review of {repo.owner}/{repo.name}, grouped by pull request, newest
-            first.
-          </TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead scope="col">Pull request</TableHead>
-              <TableHead scope="col">Head</TableHead>
-              <TableHead scope="col">Findings</TableHead>
-              <TableHead scope="col" className="text-right">
-                Duration
-              </TableHead>
-              <TableHead scope="col" className="text-right">
-                When
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          {groups.map((group) => {
-            const total = group.reviews.length;
-            const grouped = total > 1;
-            return (
-              <TableBody
-                key={group.prNumber}
-                className={cn(grouped && "border-b border-border last:border-b-0")}
-              >
-                {grouped ? (
-                  <tr>
-                    <th
-                      scope="rowgroup"
-                      colSpan={5}
-                      className="pt-4 pb-1.5 text-left font-mono text-sm font-medium"
-                    >
-                      PR #{group.prNumber}{" "}
-                      <Badge variant="secondary" className="ml-1.5">
-                        {total} reviews
-                      </Badge>
-                    </th>
-                  </tr>
-                ) : null}
-                {group.reviews.map((review, index) => {
-                  const revision = total - index;
-                  return (
-                    <TableRow key={review.id} className="group relative">
-                      <TableCell
-                        className={cn(
-                          "whitespace-nowrap",
-                          grouped && "border-l-2 border-primary/30 pl-3",
-                        )}
-                      >
-                        <RowLink
-                          href={organizationPath(slug, `/reviews/${review.id}`)}
-                          aria-label={
-                            grouped
-                              ? `Review ${revision} of ${total} for pull request ${group.prNumber}`
-                              : `Review of pull request ${group.prNumber}`
-                          }
-                        >
-                          {grouped ? `rev ${revision}` : `#${group.prNumber}`}
-                        </RowLink>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <code className="rounded-sm border border-border bg-muted px-1 py-0.5 text-sm">
-                          {shortSha(review.headSha)}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <SeverityMix bySeverity={review.bySeverity} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums whitespace-nowrap">
-                        {formatDuration(review.durationMs)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <time dateTime={review.createdAt.toISOString()}>
-                          {formatRelative(review.createdAt)}
-                        </time>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            );
-          })}
-        </Table>
+        <ReviewsTable
+          slug={slug}
+          rows={reviews.map(toReviewRow)}
+          columns={HISTORY_COLUMNS}
+          caption={`Every review of ${repo.owner}/${repo.name}, grouped by pull request, newest first.`}
+          groupByPullRequest
+        />
       ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No reviews for this repository</EmptyTitle>
-            <EmptyDescription>
-              No review has been published a review here yet.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyNotice
+          title="No reviews for this repository"
+          sentence="No review has been published here yet."
+          action={{
+            label: "Check review settings",
+            href: organizationPath(slug, `/repos/${repo.owner}/${repo.name}/settings`),
+          }}
+        />
       )}
     </Card>
   );
@@ -223,7 +126,7 @@ async function ReviewHistory({
 
 async function RevisitedNote({ slug, repoId }: { slug: string; repoId: number }) {
   const groups = groupByPr(await repoReviews(slug, repoId));
-  if (!groups.some((group) => group.reviews.length > 1)) return null;
+  if (!groups.some((group) => group.length > 1)) return null;
   return (
     <span className="text-muted-foreground font-mono text-xs">
       Grouped by pull request
@@ -241,7 +144,7 @@ async function ReviewsAllTimeStat({
   reviewCount: number;
 }) {
   const groups = groupByPr(await repoReviews(slug, repoId));
-  const revisited = groups.filter((group) => group.reviews.length > 1).length;
+  const revisited = groups.filter((group) => group.length > 1).length;
   return (
     <Stat
       label="Reviews all time"

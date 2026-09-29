@@ -58,6 +58,7 @@ export type Trends = {
     findings: number;
     bySeverity: Record<Severity, number>;
     medianDurationMs: number;
+    costUsd: number;
   };
 };
 
@@ -74,11 +75,20 @@ export type Usage = {
 
 export type Range = "7d" | "30d" | "90d";
 
+export type ReviewListOptions = {
+  repoId?: number;
+  repo?: { owner: string; name: string };
+  // Keeps reviews with at least one finding this severe or worse.
+  minSeverity?: Severity;
+  hasFindings?: boolean;
+  limit?: number;
+};
+
 export type DataSource = {
   organization: Organization;
   listRepos(): Promise<RepoSummary[]>;
   getRepo(owner: string, name: string): Promise<RepoSummary | null>;
-  listReviews(opts?: { repoId?: number; limit?: number }): Promise<ReviewSummary[]>;
+  listReviews(opts?: ReviewListOptions): Promise<ReviewSummary[]>;
   getReview(id: number): Promise<ReviewDetail | null>;
   /** The access check a map runs before any cache read; null when the review is unreadable. */
   getMapAccess(id: number): Promise<{ repoId: number; baseSha: string | null } | null>;
