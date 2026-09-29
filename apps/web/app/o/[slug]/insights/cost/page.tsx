@@ -13,7 +13,7 @@ import {
 import { RangeEmpty } from "@/components/insights";
 import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
-import { formatNumber, formatTokens, formatUsd } from "@/lib/format";
+import { formatTokens, formatUsd } from "@/lib/format";
 import { installAppUrl } from "@/lib/github-app";
 
 export const metadata: Metadata = { title: "Tokens & cost" };

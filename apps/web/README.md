@@ -291,8 +291,8 @@ the topbar links to them with `apexUrl`). Links inside an organization still use
 
 Sign-in and the OAuth callback stay on the apex. The session cookie gets
 `Domain=<APP_DOMAIN>`, so one sign-in covers every subdomain. A signed-out
-visitor to `acme.example.com/usage` goes to
-`https://example.com/sign-in?callbackUrl=https://acme.example.com/usage` and is
+visitor to `acme.example.com/insights` goes to
+`https://example.com/sign-in?callbackUrl=https://acme.example.com/insights` and is
 returned there; `safeCallbackUrl` accepts only paths and URLs on the app domain
 or its subdomains.
 
@@ -428,13 +428,13 @@ app/
     page.tsx            overview
     repos/              repo list, per-repo review history and settings
     reviews/            recent reviews; [id]/ one review
-    analytics/          trends over time
-    usage/              tokens and spend
+    insights/           trends and tokens & cost, tabs under one layout
+    analytics/ usage/   old URLs, redirected into insights/
     settings/           the organization's model key, owners only
   api/github/webhook/   the GitHub App's webhook
   api/docs-chat/        the docs' Ask AI
 components/
-  ui/ shell/ charts/ overview/ review/ config/
+  ui/ shell/ charts/ insights/ overview/ review/ config/
   docs/                 the docs shell: nav, table of contents, prose
   docs-chat/            the Ask AI button, panel and streaming hook
 lib/
