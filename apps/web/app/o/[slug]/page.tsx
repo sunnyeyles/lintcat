@@ -78,8 +78,8 @@ async function ModelKeyNudge({ slug }: { slug: string }) {
       <AlertTitle>Add a model key to start reviews</AlertTitle>
       <AlertDescription>
         <p>
-          Reviews run on your own Anthropic or OpenAI key. Until one is saved, pull requests
-          get a check asking for it and nothing is reviewed.{" "}
+          Reviews run on your own Anthropic or OpenAI key, and nothing is reviewed until one
+          is saved.{" "}
           <Link href={organizationPath(slug, "/settings")}>Add a model key</Link>
         </p>
       </AlertDescription>

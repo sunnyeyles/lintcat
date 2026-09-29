@@ -19,12 +19,11 @@ export type StatProps = {
   label: string;
   value: ReactNode;
   delta?: StatDelta;
-  hint?: ReactNode;
   children?: ReactNode;
   className?: string;
 };
 
-export function Stat({ label, value, delta, hint, children, className }: StatProps) {
+export function Stat({ label, value, delta, children, className }: StatProps) {
   return (
     <Card className={cn("gap-0 py-4", className)}>
       <CardHeader className="gap-1 px-4">
@@ -43,14 +42,7 @@ export function Stat({ label, value, delta, hint, children, className }: StatPro
           </CardAction>
         ) : null}
       </CardHeader>
-      {hint || children ? (
-        <CardContent className="px-4 pt-2">
-          {hint ? (
-            <p className="text-muted-foreground text-sm">{hint}</p>
-          ) : null}
-          {children ? <div className="mt-2 min-w-0">{children}</div> : null}
-        </CardContent>
-      ) : null}
+      {children ? <CardContent className="min-w-0 px-4 pt-4">{children}</CardContent> : null}
     </Card>
   );
 }

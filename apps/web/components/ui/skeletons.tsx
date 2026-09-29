@@ -23,13 +23,8 @@ export function InlineSkeleton({ className }: { className?: string }) {
   );
 }
 
-type StatShape = {
-  hint?: boolean;
-  sparkline?: boolean;
-};
-
 // Each bar takes its height from the line box of the type it stands in for (h-lh).
-function StatCardSkeleton({ hint = true, sparkline = false }: StatShape) {
+function StatCardSkeleton({ sparkline }: { sparkline: boolean }) {
   return (
     <Card className="gap-0 py-4">
       <CardHeader className="gap-1 px-4">
@@ -40,47 +35,30 @@ function StatCardSkeleton({ hint = true, sparkline = false }: StatShape) {
           <Skeleton className="h-lh w-16" />
         </div>
       </CardHeader>
-      {hint || sparkline ? (
-        <CardContent className="px-4 pt-2">
-          {hint ? (
-            <div className="text-sm">
-              <Skeleton className="h-lh w-28" />
-            </div>
-          ) : null}
-          {sparkline ? (
-            <Skeleton className="mt-2 h-[26px] w-full max-w-[120px]" />
-          ) : null}
+      {sparkline ? (
+        <CardContent className="px-4 pt-4">
+          <Skeleton className="h-[26px] w-full max-w-[120px]" />
         </CardContent>
       ) : null}
     </Card>
   );
 }
 
-// `sparkline` applies to the first card only, as in the overview's leading stat.
-export function StatCardsSkeleton({
-  count,
-  hint,
-  sparkline,
-}: StatShape & { count: number }) {
-  return (
-    <>
-      {Array.from({ length: count }, (_, i) => (
-        <StatCardSkeleton key={i} hint={hint} sparkline={i === 0 && sparkline} />
-      ))}
-    </>
-  );
-}
-
+// `sparkline` applies to the first card only, as in the repository page's leading stat.
 export function StatGridSkeleton({
   count = 4,
+  sparkline = false,
   className,
 }: {
   count?: number;
+  sparkline?: boolean;
   className?: string;
 }) {
   return (
     <StatGrid className={className}>
-      <StatCardsSkeleton count={count} />
+      {Array.from({ length: count }, (_, i) => (
+        <StatCardSkeleton key={i} sparkline={i === 0 && sparkline} />
+      ))}
     </StatGrid>
   );
 }

@@ -1,6 +1,6 @@
-// One tone per level, so a high risk band reads as loud as a high finding.
+// Only the high level is coloured, so colour on a badge always means "look here".
 export const LEVEL_TONE = {
-  low: "border-severity-low/40 bg-severity-low/10 text-severity-low",
-  medium: "border-severity-medium/40 bg-severity-medium/10 text-severity-medium",
+  low: "text-muted-foreground",
+  medium: "text-foreground",
   high: "border-severity-high/40 bg-severity-high/15 text-severity-high",
 } as const;

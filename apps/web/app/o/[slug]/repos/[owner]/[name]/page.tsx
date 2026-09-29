@@ -14,7 +14,7 @@ import {
   type ReviewColumn,
 } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { InlineSkeleton, StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
+import { InlineSkeleton, StatGridSkeleton, TableCardSkeleton } from "@/components/ui";
 import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber, formatRelative, formatUsd } from "@/lib/format";
@@ -34,60 +34,32 @@ const repoReviews = cache(
   async (slug: string, repoId: number) => (await data(slug)).listReviews({ repoId }),
 );
 
-const repoTrends = cache(
-  async (slug: string, repoId: number) => (await data(slug)).getTrends("30d", repoId),
-);
-
 async function PullRequestCount({ slug, repoId }: { slug: string; repoId: number }) {
   const groups = groupByPr(await repoReviews(slug, repoId));
   return `${formatNumber(groups.length)} pull requests`;
 }
 
-async function ReviewsStat({
+// Every stat reads the one 30-day trends query, so they resolve together.
+async function RepoStats({
   slug,
   repo,
 }: {
   slug: string;
   repo: { id: number; owner: string; name: string };
 }) {
-  const trends = await repoTrends(slug, repo.id);
+  const { totals, points } = await (await data(slug)).getTrends("30d", repo.id);
   return (
-    <Stat label="Reviews / 30d" value={formatNumber(trends.totals.reviews)}>
-      <Sparkline
-        points={trends.points}
-        label={`Daily review volume for ${repo.owner}/${repo.name} over the last 30 days`}
-      />
-    </Stat>
-  );
-}
-
-async function MedianDurationStat({ slug, repoId }: { slug: string; repoId: number }) {
-  const trends = await repoTrends(slug, repoId);
-  return (
-    <Stat
-      label="Median duration"
-      value={formatDuration(trends.totals.medianDurationMs)}
-      hint="last 30 days"
-    />
-  );
-}
-
-async function SpendStat({
-  slug,
-  repoId,
-  allTimeCostUsd,
-}: {
-  slug: string;
-  repoId: number;
-  allTimeCostUsd: number;
-}) {
-  const usage = await (await data(slug)).getUsage("30d", repoId);
-  return (
-    <Stat
-      label="Spend / 30d"
-      value={formatUsd(usage.totals.costUsd)}
-      hint={`${formatUsd(allTimeCostUsd)} all time`}
-    />
+    <StatGrid>
+      <Stat label="Reviews / 30d" value={formatNumber(totals.reviews)}>
+        <Sparkline
+          points={points}
+          label={`Daily review volume for ${repo.owner}/${repo.name} over the last 30 days`}
+        />
+      </Stat>
+      <Stat label="High severity / 30d" value={formatNumber(totals.bySeverity.high)} />
+      <Stat label="Median duration / 30d" value={formatDuration(totals.medianDurationMs)} />
+      <Stat label="Spend / 30d" value={formatUsd(totals.costUsd)} />
+    </StatGrid>
   );
 }
 
@@ -121,38 +93,6 @@ async function ReviewHistory({
         />
       )}
     </Card>
-  );
-}
-
-async function RevisitedNote({ slug, repoId }: { slug: string; repoId: number }) {
-  const groups = groupByPr(await repoReviews(slug, repoId));
-  if (!groups.some((group) => group.length > 1)) return null;
-  return (
-    <span className="text-muted-foreground font-mono text-xs">
-      Grouped by pull request
-    </span>
-  );
-}
-
-async function ReviewsAllTimeStat({
-  slug,
-  repoId,
-  reviewCount,
-}: {
-  slug: string;
-  repoId: number;
-  reviewCount: number;
-}) {
-  const groups = groupByPr(await repoReviews(slug, repoId));
-  const revisited = groups.filter((group) => group.length > 1).length;
-  return (
-    <Stat
-      label="Reviews all time"
-      value={formatNumber(reviewCount)}
-      hint={
-        revisited > 0 ? `${formatNumber(revisited)} PRs reviewed more than once` : undefined
-      }
-    />
   );
 }
 
@@ -194,36 +134,14 @@ export default async function RepoDetailPage({
         }
       />
 
-      <StatGrid className="mt-8">
-        <Suspense fallback={<StatCardsSkeleton count={1} hint={false} sparkline />}>
-          <ReviewsStat slug={slug} repo={repo} />
+      <div className="mt-8">
+        <Suspense fallback={<StatGridSkeleton count={4} sparkline />}>
+          <RepoStats slug={slug} repo={repo} />
         </Suspense>
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
-          <ReviewsAllTimeStat
-            slug={slug}
-            repoId={repo.id}
-            reviewCount={repo.reviewCount}
-          />
-        </Suspense>
-        <Stat label="Findings all time" value={formatNumber(repo.findingCount)} />
-        <Stat label="High severity" value={formatNumber(repo.highSeverity)} />
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
-          <MedianDurationStat slug={slug} repoId={repo.id} />
-        </Suspense>
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
-          <SpendStat slug={slug} repoId={repo.id} allTimeCostUsd={repo.costUsd} />
-        </Suspense>
-      </StatGrid>
+      </div>
 
-      <Section
-        title="Review history"
-        action={
-          <Suspense fallback={null}>
-            <RevisitedNote slug={slug} repoId={repo.id} />
-          </Suspense>
-        }
-      >
-        <Suspense fallback={<TableCardSkeleton rows={8} />}>
+      <Section title="Review history">
+        <Suspense fallback={<TableCardSkeleton rows={8} columns={HISTORY_COLUMNS.length} />}>
           <ReviewHistory slug={slug} repo={repo} />
         </Suspense>
       </Section>
