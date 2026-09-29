@@ -5,6 +5,7 @@ export {
   reviewFindingSchema,
   wellFormedFindings,
   type FindingCategory,
+  type FindingEvidence,
   type FindingPatch,
   type ReviewFinding,
 } from "#src/review-finding";

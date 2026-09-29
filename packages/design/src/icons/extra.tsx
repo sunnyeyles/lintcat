@@ -46,14 +46,6 @@ export const GitPullRequestGlyph = glyph(
   </>,
 );
 
-export const BugGlyph = glyph(
-  "BugGlyph",
-  <>
-    <rect x="7" y="8" width="10" height="13" rx="5" />
-    <path d="M9 8V7a3 3 0 0 1 6 0v1M12 12v9M3 14h4M17 14h4M4 20l3.2-2M20 20l-3.2-2M4 8l3.2 2M20 8l-3.2 2" />
-  </>,
-);
-
 export const LinkOffGlyph = glyph(
   "LinkOffGlyph",
   <path d="M9 17H7A5 5 0 0 1 5.5 7.2M15 7h2a5 5 0 0 1 3.4 8.7M8 12h2M3 3l18 18" />,

@@ -2,7 +2,18 @@
  * How a finding reads once it leaves the pipeline. Shared so the check
  * run and the review describe a finding identically.
  */
-import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
+import {
+  categoryLabel,
+  type FindingEvidence,
+  type ReviewFinding,
+} from "@pr-review/schemas";
+
+/** The commit evidence links point at: the one validation checked it against. */
+export interface EvidenceSource {
+  owner: string;
+  repo: string;
+  sha: string;
+}
 
 /** `file` alone, or `file:line` when the finding is line-anchored. */
 function location(finding: ReviewFinding): string {
@@ -16,8 +27,32 @@ export function heading(finding: ReviewFinding): string {
   return `${finding.severity.toUpperCase()} — ${categoryLabel(finding.category)}: ${finding.title}`;
 }
 
+function evidenceLink(entry: FindingEvidence, source: EvidenceSource | undefined): string {
+  const label = `\`${entry.file}:${entry.line}\``;
+  if (source === undefined) {
+    return label;
+  }
+  const path = entry.file.split("/").map(encodeURIComponent).join("/");
+  return `[${label}](https://github.com/${source.owner}/${source.repo}/blob/${source.sha}/${path}#L${entry.line})`;
+}
+
+/** The "Convention seen in" line, or undefined when no evidence survived. */
+export function evidenceNote(
+  finding: ReviewFinding,
+  source: EvidenceSource | undefined,
+): string | undefined {
+  const { evidence } = finding;
+  if (evidence === undefined || evidence.length === 0) {
+    return undefined;
+  }
+  return `**Convention seen in:** ${evidence.map((entry) => evidenceLink(entry, source)).join(", ")}`;
+}
+
 /** A finding as a standalone Markdown block, location included. */
-export function summarise(finding: ReviewFinding): string {
+export function summarise(
+  finding: ReviewFinding,
+  source?: EvidenceSource | undefined,
+): string {
   const lines = [
     `### ${heading(finding)}`,
     "",
@@ -25,6 +60,10 @@ export function summarise(finding: ReviewFinding): string {
     "",
     finding.explanation,
   ];
+  const evidence = evidenceNote(finding, source);
+  if (evidence !== undefined) {
+    lines.push("", evidence);
+  }
   if (finding.suggestedFix !== undefined) {
     lines.push("", `**Suggested fix:** ${finding.suggestedFix}`);
   }

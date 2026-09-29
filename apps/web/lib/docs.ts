@@ -53,11 +53,11 @@ export const DOCS_NAV: DocsSection[] = [
 ];
 
 export const LOOKS_FOR = [
-  ["Correctness", "Logic errors, wrong bounds, unhandled null, broken error handling"],
-  ["Security", "Auth, cross-tenant access, injection, secret leakage, privilege"],
-  ["Performance", "N+1 queries, unbounded reads, quadratic scans, blocking I/O"],
-  ["Tests", "Branches this change adds or changes and leaves untested"],
-  ["Documentation", "Documentation this change made wrong"],
+  ["Naming", "Names that break how the rest of the repository names the same kind of thing"],
+  ["Patterns", "A re-implemented helper, a bypassed layer, a second way to do a solved job"],
+  ["Style", "Export style, error shapes and module layout the neighbours share and no linter checks"],
+  ["Documentation", "Docs, comments and links this change made wrong"],
+  ["Config", "Settings and dependencies added differently from the ones already there"],
 ] as const;
 
 export const DOCS_PAGES: DocsPage[] = DOCS_NAV.flatMap((section) => section.pages);

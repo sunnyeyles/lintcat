@@ -40,6 +40,7 @@ export {
   INDEX_ABSENT_LINE,
 } from "#src/agents/repository-index";
 export {
+  categorySlugs,
   withRepositoryHints,
   type AgentDefinition,
 } from "#src/agents/definition";

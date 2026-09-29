@@ -1,4 +1,5 @@
-import type { ChangedFile } from "@pr-review/github";
+import { changedPaths, type ChangedFile } from "@pr-review/github";
+import { buildRepositoryIndex } from "@pr-review/index";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +8,7 @@ import {
   MAX_FINDINGS,
   validateFindings,
 } from "#src/validate-findings";
+import type { EvidenceBase } from "#src/validate-evidence";
 
 /** src/service.ts has added lines 10, 11, and 12 (line 9 is context). */
 const servicePatch = [
@@ -48,6 +50,9 @@ const changedFiles: ChangedFile[] = [
   },
 ];
 
+/** No base index, so evidence is taken on trust. */
+const BLIND: EvidenceBase = { index: undefined, changedPaths: changedPaths(changedFiles) };
+
 function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   return {
     file: "src/service.ts",
@@ -56,6 +61,10 @@ function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
     severity: "medium",
     title: "Off-by-one in pagination",
     explanation: "The page offset is computed from a 1-based index.",
+    evidence: [
+      { file: "src/pagination.ts", line: 4 },
+      { file: "src/cursor.ts", line: 9 },
+    ],
     confidence: 0.9,
     ...overrides,
   };
@@ -63,7 +72,7 @@ function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
 
 describe("validateFindings", () => {
   it("returns an empty list for empty input", () => {
-    expect(validateFindings([], changedFiles, CATEGORIES)).toEqual([]);
+    expect(validateFindings([], changedFiles, CATEGORIES, BLIND)).toEqual([]);
   });
 
   it("passes a fully valid set of findings through untouched", () => {
@@ -86,14 +95,14 @@ describe("validateFindings", () => {
       }),
     ];
 
-    expect(validateFindings(findings, changedFiles, CATEGORIES)).toEqual(findings);
+    expect(validateFindings(findings, changedFiles, CATEGORIES, BLIND)).toEqual(findings);
   });
 
   it("accepts a category no build ships, when the run configures it", () => {
     // The agent set is configurable, so the schema cannot judge this.
     const custom = finding({ category: "performance" });
 
-    expect(validateFindings([custom], changedFiles, ["performance"])).toEqual([
+    expect(validateFindings([custom], changedFiles, ["performance"], BLIND)).toEqual([
       custom,
     ]);
   });
@@ -104,10 +113,7 @@ describe("validateFindings", () => {
     const kept = finding({ line: 11, category: "security" });
 
     expect(
-      validateFindings([invented, kept], changedFiles, [
-        "correctness",
-        "security",
-      ]),
+      validateFindings([invented, kept], changedFiles, ["correctness", "security"], BLIND),
     ).toEqual([kept]);
   });
 
@@ -117,14 +123,14 @@ describe("validateFindings", () => {
     delete missingTitle["title"];
 
     expect(
-      validateFindings([invalid, missingTitle, "not-a-finding"], changedFiles, CATEGORIES),
+      validateFindings([invalid, missingTitle, "not-a-finding"], changedFiles, CATEGORIES, BLIND),
     ).toEqual([]);
   });
 
   it("drops findings that reference files not changed in the PR", () => {
     const wrongFile = finding({ file: "src/not-in-this-pr.ts" });
 
-    expect(validateFindings([wrongFile], changedFiles, CATEGORIES)).toEqual([]);
+    expect(validateFindings([wrongFile], changedFiles, CATEGORIES, BLIND)).toEqual([]);
   });
 
   it("drops line-anchored findings whose line is not an added line in the file's diff", () => {
@@ -137,6 +143,7 @@ describe("validateFindings", () => {
         [outsideDiff, contextLine, addedLineInOtherFile],
         changedFiles,
         CATEGORIES,
+        BLIND,
       ),
     ).toEqual([]);
   });
@@ -145,7 +152,7 @@ describe("validateFindings", () => {
     const fileLevel = finding({ line: undefined });
     const { line: _line, ...withoutLine } = fileLevel;
 
-    expect(validateFindings([withoutLine], changedFiles, CATEGORIES)).toEqual([
+    expect(validateFindings([withoutLine], changedFiles, CATEGORIES, BLIND)).toEqual([
       withoutLine,
     ]);
   });
@@ -158,7 +165,7 @@ describe("validateFindings", () => {
     });
 
     expect(
-      validateFindings([lineOnBinary, fileLevelOnBinary], changedFiles, CATEGORIES),
+      validateFindings([lineOnBinary, fileLevelOnBinary], changedFiles, CATEGORIES, BLIND),
     ).toEqual([fileLevelOnBinary]);
   });
 
@@ -167,31 +174,22 @@ describe("validateFindings", () => {
     const justBelow = finding({ confidence: 0.69 });
     const atThreshold = finding({ confidence: 0.7 });
 
-    expect(validateFindings([justBelow], changedFiles, CATEGORIES)).toEqual([]);
-    expect(validateFindings([atThreshold], changedFiles, CATEGORIES)).toEqual([
+    expect(validateFindings([justBelow], changedFiles, CATEGORIES, BLIND)).toEqual([]);
+    expect(validateFindings([atThreshold], changedFiles, CATEGORIES, BLIND)).toEqual([
       atThreshold,
     ]);
   });
 
-  it("drops a finding whose explanation admits it never checked the claim", () => {
-    const unverified = finding({
+  it("keeps a finding whatever its explanation says about verification", () => {
+    const aboutVerification = finding({
+      title: "Session token is trusted unchecked",
       explanation:
-        "The link assumes a '#permissions' anchor exists, which cannot be verified from the changes provided.",
-    });
-    const couldNot = finding({
-      line: 11,
-      title: "Import target missing",
-      explanation: "I could not confirm that src/cn.ts exists.",
-    });
-    const verified = finding({
-      line: 12,
-      title: "Stale anchor",
-      explanation: "configuration/page.tsx has no section with id 'permissions'.",
+        "The handler cannot verify the token: it decodes the JWT without checking the signature.",
     });
 
-    expect(
-      validateFindings([unverified, couldNot, verified], changedFiles, CATEGORIES),
-    ).toEqual([verified]);
+    expect(validateFindings([aboutVerification], changedFiles, CATEGORIES, BLIND)).toEqual([
+      aboutVerification,
+    ]);
   });
 
   it("truncates more than 10 surviving findings to the strongest 10", () => {
@@ -229,7 +227,7 @@ describe("validateFindings", () => {
       }),
     );
 
-    const survivors = validateFindings([weakest, ...strong], changedFiles, CATEGORIES);
+    const survivors = validateFindings([weakest, ...strong], changedFiles, CATEGORIES, BLIND);
 
     expect(survivors).toHaveLength(10);
     expect(survivors.map((f) => f.title)).not.toContain("Weakest finding");
@@ -259,6 +257,7 @@ describe("validateFindings", () => {
       [lowHighConfidence, highLessConfident, highMoreConfident],
       changedFiles,
       CATEGORIES,
+      BLIND,
     );
 
     expect(survivors.map((f) => f.title)).toEqual([
@@ -280,7 +279,7 @@ describe("validateFindings", () => {
       confidence: 0.8,
     });
 
-    expect(validateFindings([weakDuplicate, strong], changedFiles, CATEGORIES)).toEqual([
+    expect(validateFindings([weakDuplicate, strong], changedFiles, CATEGORIES, BLIND)).toEqual([
       strong,
     ]);
   });
@@ -300,7 +299,7 @@ describe("validateFindings", () => {
       confidence: 0.85,
     });
 
-    expect(validateFindings([weakDuplicate, strong], changedFiles, CATEGORIES)).toEqual([
+    expect(validateFindings([weakDuplicate, strong], changedFiles, CATEGORIES, BLIND)).toEqual([
       strong,
     ]);
   });
@@ -324,6 +323,7 @@ describe("validateFindings", () => {
       [first, fileLevelA, fileLevelB],
       changedFiles,
       CATEGORIES,
+      BLIND,
     );
 
     expect(survivors).toEqual([first, fileLevelA]);
@@ -338,7 +338,7 @@ describe("validateFindings", () => {
       confidence: 0.8,
     });
 
-    expect(validateFindings([correctness, security], changedFiles, CATEGORIES)).toEqual([
+    expect(validateFindings([correctness, security], changedFiles, CATEGORIES, BLIND)).toEqual([
       correctness,
       security,
     ]);
@@ -383,6 +383,7 @@ describe("validateFindings", () => {
       [duplicateA, duplicateB, ...rest],
       changedFiles,
       CATEGORIES,
+      BLIND,
     );
 
     expect(survivors).toHaveLength(MAX_FINDINGS);
@@ -392,5 +393,78 @@ describe("validateFindings", () => {
     );
     // The slot the duplicate used to waste now carries a real finding.
     expect(survivors.map((f) => f.title)).toContain("Distinct finding 8");
+  });
+
+  it("checks evidence against the base index, keeping only entries it can vouch for", () => {
+    const index = buildRepositoryIndex({
+      sha: "0".repeat(40),
+      files: new Map([
+        ["src/service.ts", "a\n"],
+        ["src/conventions.ts", "a\nb\nc\n"],
+      ]),
+    });
+    const evidenced = finding({
+      evidence: [
+        { file: "src/conventions.ts", line: 2 },
+        { file: "src/service.ts", line: 1 },
+        { file: "src/absent.ts", line: 1 },
+        { file: "src/conventions.ts", line: 40 },
+        { file: "src/conventions.ts", line: 3 },
+      ],
+    });
+
+    expect(
+      validateFindings([evidenced], changedFiles, CATEGORIES, {
+        index,
+        changedPaths: new Set(["src/service.ts", "src/other.ts"]),
+      }),
+    ).toEqual([
+      {
+        ...evidenced,
+        evidence: [
+          { file: "src/conventions.ts", line: 2 },
+          { file: "src/conventions.ts", line: 3 },
+        ],
+      },
+    ]);
+  });
+
+  it("drops a finding left with fewer than two valid evidence entries", () => {
+    const index = buildRepositoryIndex({
+      sha: "0".repeat(40),
+      files: new Map([
+        ["src/a.ts", "a\nb\n"],
+        ["src/b.ts", "a\n"],
+      ]),
+    });
+    const base = { index, changedPaths: new Set(["src/service.ts", "src/other.ts"]) };
+    const withTwo = finding({
+      evidence: [
+        { file: "src/a.ts", line: 1 },
+        { file: "src/b.ts", line: 1 },
+      ],
+    });
+    const leftWithOne = finding({
+      line: 11,
+      title: "One real example",
+      evidence: [
+        { file: "src/a.ts", line: 2 },
+        { file: "src/service.ts", line: 1 },
+        { file: "src/ghost.ts", line: 1 },
+      ],
+    });
+    const repeatedOne = finding({
+      line: 12,
+      title: "The same example twice",
+      evidence: [
+        { file: "src/a.ts", line: 1 },
+        { file: "src/a.ts", line: 1 },
+      ],
+    });
+    const { evidence: _none, ...unevidenced } = finding({ file: "src/other.ts", line: 5 });
+
+    expect(
+      validateFindings([withTwo, leftWithOne, repeatedOne, unevidenced], changedFiles, CATEGORIES, base),
+    ).toEqual([withTwo]);
   });
 });

@@ -12,6 +12,7 @@ function file(path: string, extra: Partial<SnapshotFile> = {}): SnapshotFile {
     path,
     role: "source",
     language: "ts",
+    lineCount: 0,
     importerCount: 0,
     inCycle: false,
     dead: false,

@@ -1,0 +1,26 @@
+{
+  "name": "clean-no-convention-lib",
+  "title": "Clean — a new helper joins a directory whose helpers follow no shared convention",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "3f7a91c0e25b48d6a1f0c93e7b24d58a6c0e1b92",
+  "headSha": "c05e82b4f19d3a67e2c8b0f41d9a73e6b52c0f18",
+  "pullRequest": {
+    "number": 233,
+    "title": "Show the late fee rate on an invoice",
+    "body": "Customers asked what the late fee on an overdue invoice would be. The rate is already stored on the invoice; this formats it as a percentage on the invoice endpoint.",
+    "author": "marco-bianchi",
+    "baseRef": "main",
+    "headRef": "feature/late-fee-rate"
+  },
+  "changedFiles": [
+    {
+      "path": "src/lib/percent.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/invoices.ts",
+      "status": "modified"
+    }
+  ]
+}

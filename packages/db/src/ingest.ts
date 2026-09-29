@@ -156,6 +156,7 @@ async function replaceFindings(
       title: finding.title,
       explanation: finding.explanation,
       suggestedFix: finding.suggestedFix ?? null,
+      evidence: finding.evidence ?? null,
       confidence: finding.confidence,
     })),
   );

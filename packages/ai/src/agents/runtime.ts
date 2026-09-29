@@ -1,6 +1,6 @@
 /**
  * The shared review-agent runtime — the tool loop every agent runs. An
- * AgentDefinition supplies role, focus and category; the rest is identical.
+ * AgentDefinition supplies role, focus and categories; the rest is identical.
  */
 import { startActiveObservation } from "@langfuse/tracing";
 import type { RepositoryIndex } from "@pr-review/index";
@@ -14,6 +14,7 @@ import { generateText, isStepCount, type ModelMessage } from "ai";
 
 import {
   buildReviewSystemPrompt,
+  categorySlugs,
   type AgentDefinition,
 } from "#src/agents/definition";
 import { extractAgentOutput } from "#src/agents/output";
@@ -103,11 +104,12 @@ export function createReviewAgent(
 ): ReviewAgent {
   const maxTurns = deps.maxTurns ?? DEFAULT_MAX_TURNS;
   const systemPrompt = buildReviewSystemPrompt(agent);
+  const owned = new Set<string>(categorySlugs(agent));
   const logger = deps.logger ?? createConsoleLogger();
   const model = deps.model;
 
   return {
-    name: agent.category,
+    name: agent.name,
 
     async run(context: ReviewContext): Promise<readonly unknown[]> {
       // Every event of this run carries these fields.
@@ -115,7 +117,7 @@ export function createReviewAgent(
         repository: `${context.owner}/${context.repo}`,
         pullRequestNumber: context.pullRequest.number,
         headSha: context.pullRequest.headSha,
-        agent: agent.category,
+        agent: agent.name,
       };
       logger.info("agent.started", eventFields);
       const startedAt = Date.now();
@@ -124,7 +126,7 @@ export function createReviewAgent(
       let steps = 0;
       let salvaged = false;
       const report = (durationMs: number): AgentUsageReport => ({
-        agent: agent.category,
+        agent: agent.name,
         durationMs,
         steps,
         salvaged,
@@ -134,7 +136,7 @@ export function createReviewAgent(
       // Active, not detached: the SDK's model spans nest under this one, so
       // their cost lands on the agent trace instead of a trace of its own.
       return startActiveObservation(
-        `review-agent-${agent.category}`,
+        `review-agent-${agent.name}`,
         async (agentObservation) => {
           agentObservation.update({
             input: {
@@ -144,7 +146,7 @@ export function createReviewAgent(
               changedFileCount: context.changedFiles.length,
             },
             metadata: {
-              agent: agent.category,
+              agent: agent.name,
               provider: model.provider,
               model: model.modelId,
             },
@@ -163,8 +165,8 @@ export function createReviewAgent(
               },
               tools: createReviewTools(deps.github, context, deps.index),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
-              providerOptions: callProviderOptions(context, agent.category),
-              telemetry: { functionId: `review-agent-${agent.category}` },
+              providerOptions: callProviderOptions(context, agent.name),
+              telemetry: { functionId: `review-agent-${agent.name}` },
               onStepEnd: (step: { usage: Parameters<typeof toTokenUsage>[0] }) => {
                 steps += 1;
                 usage = addTokenUsage(usage, toTokenUsage(step.usage));
@@ -172,8 +174,7 @@ export function createReviewAgent(
             };
             const opening: ModelMessage = {
               role: "user",
-              content: await buildOpeningPrompt(context, {
-                github: deps.github,
+              content: buildOpeningPrompt(context, {
                 index: deps.index,
                 budget: OPENING_BUDGET,
               }),
@@ -198,7 +199,7 @@ export function createReviewAgent(
             // The SDK stops silently at the cap, still holding tool calls.
             if (result.finishReason === "tool-calls") {
               throw new AgentRunError(
-                `${agent.category} agent exceeded the ${maxTurns}-turn cap without returning findings`,
+                `${agent.name} agent exceeded the ${maxTurns}-turn cap without returning findings`,
               );
             }
 
@@ -217,7 +218,7 @@ export function createReviewAgent(
               output = extractAgentOutput(repaired.text);
               if (!output.ok) {
                 throw new AgentRunError(
-                  `${agent.category} agent produced invalid findings output after one repair turn ` +
+                  `${agent.name} agent produced invalid findings output after one repair turn ` +
                     `(stop reason: ${repaired.rawFinishReason ?? "unknown"}): ${output.error}`,
                 );
               }
@@ -225,7 +226,7 @@ export function createReviewAgent(
             }
             // Cross-category findings are dropped, never re-stamped.
             const findings = output.findings.filter(
-              (finding) => finding.category === agent.category,
+              (finding) => owned.has(finding.category),
             );
 
             const durationMs = Date.now() - startedAt;

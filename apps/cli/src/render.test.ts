@@ -30,14 +30,27 @@ describe("a finding in a terminal", () => {
   });
 
   it("names the file alone when the finding has no line", () => {
-    const finding = makeFinding("general", { file: "README.md", line: undefined });
+    const finding = makeFinding("naming", { file: "README.md", line: undefined });
 
     expect(renderFinding(finding, plain).split("\n")[0]).toContain("README.md");
     expect(renderFinding(finding, plain)).not.toContain("README.md:");
   });
 
+  it("names the convention evidence after the explanation", () => {
+    const finding = makeFinding("naming", {
+      evidence: [
+        { file: "src/data/invoices.ts", line: 4 },
+        { file: "src/data/customers.ts", line: 9 },
+      ],
+    });
+
+    expect(renderFinding(finding, plain).split("\n")).toContain(
+      "  Convention seen in: src/data/invoices.ts:4, src/data/customers.ts:9",
+    );
+  });
+
   it("colours the severity only when colour is on", () => {
-    const finding = makeFinding("general");
+    const finding = makeFinding("naming");
 
     expect(renderFinding(finding, { color: true })).toContain("\u001b[");
     expect(renderFinding(finding, plain)).not.toContain("\u001b[");
@@ -53,7 +66,7 @@ describe("a finding in a terminal", () => {
 
 describe("what blocks", () => {
   const findings = [
-    makeFinding("general", { severity: "low" }),
+    makeFinding("naming", { severity: "low" }),
     makeFinding("security", { severity: "high" }),
     makeFinding("correctness", { severity: "medium" }),
   ];
@@ -88,7 +101,7 @@ describe("the summary", () => {
   });
 
   it("counts by severity and names what blocks", () => {
-    const findings = [makeFinding("security"), makeFinding("general", { severity: "low" })];
+    const findings = [makeFinding("security"), makeFinding("naming", { severity: "low" })];
 
     const summary = renderSummary(
       {

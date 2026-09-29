@@ -189,10 +189,10 @@ function runEngineConformance(name: string, make: MakeHarness): void {
       const { outcome } = await review(
         context,
         {},
-        finalFindingsJson([makeFinding("general"), makeFinding("security")]),
+        finalFindingsJson([makeFinding("naming"), makeFinding("security")]),
       );
 
-      expect(outcome).toMatchObject({ findings: [{ category: "general" }] });
+      expect(outcome).toMatchObject({ findings: [{ category: "naming" }] });
     });
   });
 }

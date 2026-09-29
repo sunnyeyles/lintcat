@@ -13,7 +13,7 @@ An AI reviewer that reads your pull requests and leaves inline review comments, 
 
 ## What it does {#what-it-does}
 
-One reviewer reads each pull request in a single pass, looking for correctness, security, performance, test and documentation problems. You don’t need to configure anything to get that.
+One reviewer reads each pull request in a single pass, looking for drift: places where the change names or does something differently from how the rest of your repository already does it. You don’t need to configure anything to get that.
 
 A finding can include a **suggested fix**. LintCat checks the fix against the file at the pull request’s latest commit before offering it, so a suggestion never lands on the wrong lines. Apply it with one click, or have LintCat commit it for you.
 
@@ -26,11 +26,11 @@ By default every pull request is reviewed when it is opened, and again on every 
 **Note: No workflow file, no secrets in GitHub** Reviews run on LintCat’s side. Your repository gets no workflow, and your Actions minutes go untouched.
 
 ## What the reviewer looks for {#reviewer}
-- **Correctness** — Logic errors, wrong bounds, unhandled null, broken error handling
-- **Security** — Auth, cross-tenant access, injection, secret leakage, privilege
-- **Performance** — N+1 queries, unbounded reads, quadratic scans, blocking I/O
-- **Tests** — Branches this change adds or changes and leaves untested
-- **Documentation** — Documentation this change made wrong
+- **Naming** — Names that break how the rest of the repository names the same kind of thing
+- **Patterns** — A re-implemented helper, a bypassed layer, a second way to do a solved job
+- **Style** — Export style, error shapes and module layout the neighbours share and no linter checks
+- **Documentation** — Docs, comments and links this change made wrong
+- **Config** — Settings and dependencies added differently from the ones already there
 
 ## Keep reading {#keep-reading}
 
@@ -141,19 +141,23 @@ LintCat reads a pull request the way a careful reviewer would: the diff, the cod
 ## How a review works {#review}
 - **Read.** The reviewer starts from the diff, then opens the surrounding code, the previous version of each file, the files that import it and the tests that cover it.
 - **Propose.** It returns candidate findings, each tied to a file, a line and, where it can, a fix.
-- **Check.** LintCat drops anything that doesn’t point at a line you changed, isn’t confident enough or repeats another finding, and checks every fix against the current file.
+- **Check.** LintCat drops anything that doesn’t point at a line you changed, isn’t confident enough or repeats another finding, removes any cited example of your conventions that doesn’t exist, and checks every fix against the current file.
 - **Post.** What survives becomes inline comments, the AI PR Review check run and the review on your dashboard.
 
 After the first review, a new push is reviewed from the commits added since, and findings nobody has resolved stay listed on the check run.
 
 ## What it looks for {#looks-for}
-- **Correctness:** wrong conditions or bounds, unhandled empty input, swallowed errors, missing awaits, ordering bugs.
-- **Security:** missing or bypassable auth, cross-tenant access, injection, leaked secrets, sensitive data in logs.
-- **Performance:** N+1 queries, unbounded reads on a request path, quadratic scans over growing data.
-- **Tests:** a new branch the module’s tests don’t exercise, or a test still asserting the old behaviour.
-- **Documentation:** a README, doc or comment the change made wrong.
 
-It leaves style, formatting, naming and architectural taste to your linter and your team. It reports a problem only when it can say concretely what goes wrong, and when.
+Drift: places where a change departs from how the rest of your repository already does the same thing. The code may work; the next reader now finds two conventions where there was one.
+- **Naming:** a function, type, file or export named differently from how its neighbours name the same kind of thing.
+- **Patterns:** a helper written again when the repository already has one, a layer the other files go through and this one skips.
+- **Style:** export style, error shapes or module layout the neighbouring files share and no formatter or linter enforces.
+- **Documentation:** a README, doc or comment the change made wrong.
+- **Config:** a setting or dependency added differently from the ones already there.
+
+Every finding cites at least two places in your existing code that show the convention, and each is checked before the finding posts. Where the existing files disagree among themselves there is no convention, and nothing is reported.
+
+Bugs, security holes and performance problems are outside its scope, and so is anything your formatter, linter, typecheck or build already catches.
 
 ## Keeping the codebase in line {#in-line}
 
@@ -162,9 +166,10 @@ A diff only shows what changed. Before the reviewer starts, LintCat maps the rep
 - which test covers it, or that nothing does;
 - how many files import it;
 - whether it is dead, with nothing importing it and no entry point reaching it;
-- whether it sits in an import cycle.
+- whether it sits in an import cycle;
+- which unchanged files sit beside it and play the same role: the local convention it is compared against.
 
-It can also look up which files use a name that changed, and which files have historically changed alongside this one. That is how it catches the caller that wasn’t updated, the test that no longer covers the code, and the doc that now describes something else.
+It can also look up which files use a name, and which files have historically changed alongside this one. That is how it finds the helper the change wrote again, the convention three other files follow, and the doc that now describes something else.
 
 ## How it's different {#different}
 - **Nothing unchecked reaches your pull request.** Every finding and fix is checked before it posts. See [Security](/docs/security).
@@ -198,6 +203,7 @@ LintCat reads your code to review it, and that is all the AI part can do. Everyt
 Before anything is posted, every finding has to pass these checks:
 - It points at a line this pull request added or changed.
 - The reviewer is confident in it.
+- It cites at least two places in your existing code that show the convention your change departs from. Each must exist and sit outside this pull request; a reference that doesn’t check out is removed, and so is a finding left with fewer than two.
 - It doesn’t repeat another finding.
 - It makes the cut of at most 10 per review, most important first.
 

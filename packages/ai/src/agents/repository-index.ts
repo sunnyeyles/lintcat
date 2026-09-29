@@ -2,12 +2,15 @@
  * The `<repository_index>` block of the opening message: what the index knows
  * about each changed file. Absent, it still renders, so the prompt shape holds.
  */
-import type { ChangedFile } from "@pr-review/github";
-import type {
-  IndexedFile,
-  LanguageCoverage,
-  RepositoryIndex,
+import { changedPaths, type ChangedFile } from "@pr-review/github";
+import {
+  siblingsOf,
+  type IndexedFile,
+  type LanguageCoverage,
+  type RepositoryIndex,
 } from "@pr-review/index";
+
+import type { ReviewContext } from "#src/agent-contract";
 
 /** Said when there is no index, so an agent falls back instead of retrying. */
 export const INDEX_ABSENT_LINE =
@@ -125,5 +128,42 @@ export function renderRepositoryIndex(
     `<repository_index sha="${index.sha}" truncated="${index.truncated}">`,
     ...lines,
     "</repository_index>",
+  ];
+}
+
+/** Siblings named per changed file before the rest become a count. */
+const MAX_LISTED_SIBLINGS = 5;
+
+/** The `<sibling_files>` block; siblings exclude every file the whole pull request changes. */
+export function renderSiblingFiles(
+  index: RepositoryIndex | undefined,
+  context: Pick<ReviewContext, "changedFiles" | "incremental">,
+  maxListedFiles: number,
+): string[] {
+  if (index === undefined) {
+    return [];
+  }
+  const changed = changedPaths((context.incremental ?? context).changedFiles);
+  const lines = context.changedFiles
+    .filter((file) => file.status !== "removed")
+    .slice(0, maxListedFiles)
+    .flatMap((file) => {
+      const siblings = siblingsOf(index, file.filename, changed);
+      if (siblings.length === 0) {
+        return [];
+      }
+      const named = siblings.slice(0, MAX_LISTED_SIBLINGS).map((sibling) => sibling.path);
+      const more = siblings.length - named.length;
+      return [`- ${file.filename}: ${named.join(", ")}${more > 0 ? ` (+${more} more)` : ""}`];
+    });
+  if (lines.length === 0) {
+    return [];
+  }
+  return [
+    "<sibling_files>",
+    "Unchanged files in the same directory, with the same role, as each changed file: the local convention to compare it against.",
+    ...lines,
+    "</sibling_files>",
+    "",
   ];
 }

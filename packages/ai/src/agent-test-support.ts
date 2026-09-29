@@ -67,6 +67,12 @@ export const context: ReviewContext = {
   diff: "diff --git a/src/sessions.ts b/src/sessions.ts\n+if ((user.isAdmin = true)) {\n",
 };
 
+/** Two archive files no test pull request changes, so validation keeps them. */
+const TEST_EVIDENCE = [
+  { file: "src/api.ts", line: 1 },
+  { file: "src/boot.ts", line: 1 },
+];
+
 /** A schema-valid candidate finding in the given category. */
 export function makeFinding(
   category: ReviewFinding["category"],
@@ -79,6 +85,7 @@ export function makeFinding(
     severity: "high",
     title: `A ${category} problem in the sessions endpoint`,
     explanation: `Concrete ${category} explanation.`,
+    evidence: TEST_EVIDENCE,
     confidence: 0.95,
     ...overrides,
   };

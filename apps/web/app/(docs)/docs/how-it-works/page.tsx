@@ -39,8 +39,9 @@ export default function HowItWorksPage() {
           </Bullet>
           <Bullet>
             <strong>Check.</strong> LintCat drops anything that doesn&rsquo;t point at a line you
-            changed, isn&rsquo;t confident enough or repeats another finding, and checks every fix
-            against the current file.
+            changed, isn&rsquo;t confident enough or repeats another finding, removes any cited
+            example of your conventions that doesn&rsquo;t exist, and checks every fix against the
+            current file.
           </Bullet>
           <Bullet>
             <strong>Post.</strong> What survives becomes inline comments, the AI PR Review check
@@ -54,30 +55,40 @@ export default function HowItWorksPage() {
       </Section>
 
       <Section id="looks-for" title="What it looks for">
+        <P>
+          Drift: places where a change departs from how the rest of your repository already
+          does the same thing. The code may work; the next reader now finds two conventions
+          where there was one.
+        </P>
         <Bullets>
           <Bullet>
-            <strong>Correctness:</strong> wrong conditions or bounds, unhandled empty input,
-            swallowed errors, missing awaits, ordering bugs.
+            <strong>Naming:</strong> a function, type, file or export named differently from how
+            its neighbours name the same kind of thing.
           </Bullet>
           <Bullet>
-            <strong>Security:</strong> missing or bypassable auth, cross-tenant access, injection,
-            leaked secrets, sensitive data in logs.
+            <strong>Patterns:</strong> a helper written again when the repository already has
+            one, a layer the other files go through and this one skips.
           </Bullet>
           <Bullet>
-            <strong>Performance:</strong> N+1 queries, unbounded reads on a request path,
-            quadratic scans over growing data.
-          </Bullet>
-          <Bullet>
-            <strong>Tests:</strong> a new branch the module&rsquo;s tests don&rsquo;t exercise, or
-            a test still asserting the old behaviour.
+            <strong>Style:</strong> export style, error shapes or module layout the neighbouring
+            files share and no formatter or linter enforces.
           </Bullet>
           <Bullet>
             <strong>Documentation:</strong> a README, doc or comment the change made wrong.
           </Bullet>
+          <Bullet>
+            <strong>Config:</strong> a setting or dependency added differently from the ones
+            already there.
+          </Bullet>
         </Bullets>
         <P>
-          It leaves style, formatting, naming and architectural taste to your linter and your
-          team. It reports a problem only when it can say concretely what goes wrong, and when.
+          Every finding cites at least two places in your existing code that show the
+          convention, and each is checked before the finding posts. Where the existing files
+          disagree among themselves there is no convention, and nothing is reported.
+        </P>
+        <P>
+          Bugs, security holes and performance problems are outside its scope, and so is
+          anything your formatter, linter, typecheck or build already catches.
         </P>
       </Section>
 
@@ -93,13 +104,17 @@ export default function HowItWorksPage() {
           <Bullet>
             whether it is dead, with nothing importing it and no entry point reaching it;
           </Bullet>
-          <Bullet>whether it sits in an import cycle.</Bullet>
+          <Bullet>whether it sits in an import cycle;</Bullet>
+          <Bullet>
+            which unchanged files sit beside it and play the same role: the local convention it
+            is compared against.
+          </Bullet>
         </Bullets>
         <P>
-          It can also look up which files use a name that changed, and which files have
-          historically changed alongside this one. That is how it catches the caller that
-          wasn&rsquo;t updated, the test that no longer covers the code, and the doc that now
-          describes something else.
+          It can also look up which files use a name, and which files have historically
+          changed alongside this one. That is how it finds the helper the change wrote again,
+          the convention three other files follow, and the doc that now describes something
+          else.
         </P>
       </Section>
 

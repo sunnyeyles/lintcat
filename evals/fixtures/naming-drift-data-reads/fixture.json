@@ -1,0 +1,34 @@
+{
+  "name": "naming-drift-data-reads",
+  "title": "Naming drift — new credit-note reads are named get*/fetch* where every data module uses find*/list*",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "8e3b0f41c72d95a6e10b4f7c3d28a95e6b1f0c47",
+  "headSha": "b27c94e05f1a83d6c0e4b9f7a2d15c8e30f6a914",
+  "pullRequest": {
+    "number": 231,
+    "title": "Show credit notes in the customer portal",
+    "body": "Finance issues credit notes against invoices, and customers can't see them yet. This adds the credit note data module, a service that hides credit notes on voided invoices, and two portal endpoints.",
+    "author": "dana-okafor",
+    "baseRef": "main",
+    "headRef": "feature/credit-notes"
+  },
+  "changedFiles": [
+    {
+      "path": "src/data/credit-notes.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/services/credit-notes.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/credit-notes.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/index.ts",
+      "status": "modified"
+    }
+  ]
+}

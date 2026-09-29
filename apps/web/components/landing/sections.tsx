@@ -1,13 +1,13 @@
 import { Button, Card, Spotlight } from "@pr-review/design";
 import {
   BookOpen,
+  BookText,
   Bot,
-  Bug,
-  FlaskConical,
-  Gauge,
+  FolderGit2,
   GitPullRequest,
   type IconComponent,
-  ShieldCheck,
+  Radius,
+  Settings,
 } from "@pr-review/design/icons";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -102,18 +102,18 @@ export function Audiences() {
 }
 
 const CATEGORY_ICON: Record<(typeof LOOKS_FOR)[number][0], IconComponent> = {
-  Correctness: Bug,
-  Security: ShieldCheck,
-  Performance: Gauge,
-  Tests: FlaskConical,
+  Naming: BookText,
+  Patterns: FolderGit2,
+  Style: Radius,
   Documentation: BookOpen,
+  Config: Settings,
 };
 
 export function Findings() {
   return (
     <Block
       eyebrow="What it looks for"
-      title="Problems a careful reviewer would raise, and nothing else."
+      title="Where a change drifts from how your codebase already does things."
       className="border-t border-border"
     >
       <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-5">

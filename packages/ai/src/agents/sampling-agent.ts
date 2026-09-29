@@ -4,12 +4,12 @@ import type { RepositoryIndex } from "@pr-review/index";
 import type { ReviewAgent, ReviewContext } from "#src/agent-contract";
 import {
   buildSingleShotSystemPrompt,
+  categorySlugs,
   type AgentDefinition,
 } from "#src/agents/definition";
 import { buildOpeningPrompt, type OpeningBudget } from "#src/agents/opening-prompt";
 import { extractAgentOutput } from "#src/agents/output";
 import { AgentRunError, type AgentUsageReport } from "#src/agents/runtime";
-import type { ReviewToolsClient } from "#src/agents/tools";
 import { emptyTokenUsage, type TokenUsage } from "#src/usage";
 
 /** The whole review fits in one request, so the diff is cut harder than the tool loop cuts it. */
@@ -38,7 +38,6 @@ export type SampleText = (request: SamplingRequest) => Promise<string>;
 export interface SamplingAgentDeps {
   sample: SampleText;
   agent: AgentDefinition;
-  github: Pick<ReviewToolsClient, "getFileContents">;
   index?: RepositoryIndex | undefined;
   maxTokens?: number | undefined;
   onUsage?: ((report: AgentUsageReport) => void) | undefined;
@@ -56,15 +55,15 @@ function estimateUsage(input: string, output: string): TokenUsage {
 export function createSamplingAgent(deps: SamplingAgentDeps): ReviewAgent {
   const { agent } = deps;
   const systemPrompt = buildSingleShotSystemPrompt(agent);
+  const owned = new Set<string>(categorySlugs(agent));
   const maxTokens = deps.maxTokens ?? DEFAULT_MAX_TOKENS;
 
   return {
-    name: agent.category,
+    name: agent.name,
 
     async run(context: ReviewContext): Promise<readonly unknown[]> {
       const startedAt = Date.now();
-      const prompt = await buildOpeningPrompt(context, {
-        github: deps.github,
+      const prompt = buildOpeningPrompt(context, {
         index: deps.index,
         budget: OPENING_BUDGET,
       });
@@ -80,7 +79,7 @@ export function createSamplingAgent(deps: SamplingAgentDeps): ReviewAgent {
         steps = 1;
       } finally {
         deps.onUsage?.({
-          agent: agent.category,
+          agent: agent.name,
           durationMs: Date.now() - startedAt,
           steps,
           salvaged: false,
@@ -91,11 +90,11 @@ export function createSamplingAgent(deps: SamplingAgentDeps): ReviewAgent {
       const output = extractAgentOutput(text);
       if (!output.ok) {
         throw new AgentRunError(
-          `${agent.category} sampling agent produced invalid findings output: ${output.error}`,
+          `${agent.name} sampling agent produced invalid findings output: ${output.error}`,
         );
       }
       return output.findings.filter(
-        (finding) => finding.category === agent.category,
+        (finding) => owned.has(finding.category),
       );
     },
   };

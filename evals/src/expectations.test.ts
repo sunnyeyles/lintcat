@@ -69,7 +69,7 @@ const fixture: LoadedFixture = {
 
 function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
   return {
-    category: "general",
+    category: "naming",
     severity: "high",
     confidence: 0.9,
     title: "N+1 query",

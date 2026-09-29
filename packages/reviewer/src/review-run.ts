@@ -2,6 +2,7 @@
 // patch verification and delivery. Cancellation is decided here.
 import {
   addTokenUsage,
+  categorySlugs,
   emptyTokenUsage,
   GENERAL_AGENT,
   isCancellation,
@@ -10,11 +11,12 @@ import {
   type AgentDefinition,
   type ReviewEngine,
 } from "@pr-review/ai";
-import type {
-  ChangedFile,
-  ExistingReviewComment,
-  PullRequestReadClient,
-  RepositoryHistoryClient,
+import {
+  changedPaths,
+  type ChangedFile,
+  type ExistingReviewComment,
+  type PullRequestReadClient,
+  type RepositoryHistoryClient,
 } from "@pr-review/github";
 import {
   snapshotRepositoryIndex,
@@ -415,9 +417,12 @@ async function review(
   cancelled.check("agent");
 
   // The AI boundary: only what passes validation reaches GitHub.
-  const findings = validateFindings(candidates, scope.changedFiles, [
-    agent.name,
-  ]);
+  const findings = validateFindings(
+    candidates,
+    scope.changedFiles,
+    categorySlugs(hinted),
+    { index: repositoryIndex, changedPaths: changedPaths(changedFiles) },
+  );
   logger.info("findings.validated", {
     ...fields,
     candidateCount: candidates.length,
@@ -468,6 +473,11 @@ async function review(
           : undefined,
       blastRadius,
       suggestedReviewers,
+      evidenceSource: {
+        owner: target.owner,
+        repo: target.repo,
+        sha: pullRequest.baseSha,
+      },
     },
     { ...delivery, logger },
   );

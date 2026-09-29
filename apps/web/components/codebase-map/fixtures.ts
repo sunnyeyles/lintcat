@@ -54,6 +54,7 @@ function fixtureIndex(graph: MapGraph): RepositoryIndex {
       path: file.path,
       role: "source",
       language: "typescript",
+      lineCount: 0,
       importerCount: 0,
       inCycle: file.inCycle === true,
       dead: file.dead === true,

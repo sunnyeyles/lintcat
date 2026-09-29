@@ -50,6 +50,7 @@ const record: ReviewRecord = {
       title: "Missing tenant validation",
       explanation: "The session query is not filtered by tenant.",
       suggestedFix: "Filter by the authenticated tenant id.",
+      evidence: [{ file: "src/auth/tokens.ts", line: 31 }],
       confidence: 0.9,
     },
     {
@@ -123,11 +124,13 @@ describe("ingestReviewRecord", () => {
       severity: "high",
       title: "Missing tenant validation",
       suggestedFix: "Filter by the authenticated tenant id.",
+      evidence: [{ file: "src/auth/tokens.ts", line: 31 }],
     });
     expect(findingRows[0]?.confidence).toBeCloseTo(0.9, 5);
     expect(findingRows[1]).toMatchObject({
       line: null,
       suggestedFix: null,
+      evidence: null,
       title: "Quadratic scan",
     });
   });

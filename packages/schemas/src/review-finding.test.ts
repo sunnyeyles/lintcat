@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { reviewFindingSchema, type ReviewFinding } from "#src/index";
+import {
+  MAX_EVIDENCE_ENTRIES,
+  reviewFindingSchema,
+  type ReviewFinding,
+} from "#src/review-finding";
 
 const validFinding: ReviewFinding = {
   file: "src/auth/session.ts",
@@ -121,6 +125,33 @@ describe("reviewFindingSchema", () => {
     if (result.success) {
       expect(result.data).toEqual(validFinding);
     }
+  });
+
+  it("accepts evidence as a list of file and line references", () => {
+    const evidence = [
+      { file: "src/auth/tokens.ts", line: 12 },
+      { file: "docs/auth.md", line: 40 },
+    ];
+    const result = reviewFindingSchema.safeParse({ ...validFinding, evidence });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.evidence).toEqual(evidence);
+    }
+  });
+
+  it("rejects evidence without a positive line, or past the entry cap", () => {
+    for (const entry of [{ file: "src/a.ts" }, { file: "src/a.ts", line: 0 }, { file: "", line: 3 }]) {
+      expect(
+        reviewFindingSchema.safeParse({ ...validFinding, evidence: [entry] }).success,
+      ).toBe(false);
+    }
+    const tooMany = Array.from({ length: MAX_EVIDENCE_ENTRIES + 1 }, (_, i) => ({
+      file: "src/a.ts",
+      line: i + 1,
+    }));
+    expect(
+      reviewFindingSchema.safeParse({ ...validFinding, evidence: tooMany }).success,
+    ).toBe(false);
   });
 
   it("rejects non-object input", () => {

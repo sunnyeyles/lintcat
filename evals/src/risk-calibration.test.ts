@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { loadFixture } from "#src/fixture";
 import { createFixtureClient } from "#src/fixture-client";
 
-const fixture = loadFixture("architecture-dead-module");
+const fixture = loadFixture("naming-drift-data-reads");
 const { owner, repo, pullRequest } = fixture.context;
 const target: ReviewTarget = {
   owner,

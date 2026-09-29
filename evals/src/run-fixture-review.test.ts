@@ -20,7 +20,7 @@ function memoryFile(): string {
       version: 1,
       shapes: [
         {
-          category: "general",
+          category: "pattern",
           shape: "assignment instead of comparison in",
           resolved: 0,
           ignored: 5,
@@ -40,7 +40,7 @@ function scriptedDeps() {
   const built: AgentDefinition[] = [];
   const createAgent = vi.fn(({ agent }: { agent: AgentDefinition }): ReviewAgent => {
     built.push(agent);
-    return { name: agent.category, run: async () => [] };
+    return { name: agent.name, run: async () => [] };
   });
   const { logger } = createCapturingLogger();
   const deps: FixtureReviewDeps = { engine: { createAgent }, logger };

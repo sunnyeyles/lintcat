@@ -11,7 +11,7 @@ import type {
 import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
 
 import type { BlastRadius } from "#src/blast-radius";
-import { countLabel, summarise } from "#src/finding-format";
+import { countLabel, summarise, type EvidenceSource } from "#src/finding-format";
 import type { PostedFinding } from "#src/render-review";
 import type { SuggestedReviewer } from "#src/suggest-reviewers";
 import { compareFindingStrength } from "#src/validate-findings";
@@ -33,6 +33,8 @@ interface RenderCheckRunOptions {
   blastRadius?: BlastRadius | undefined;
   /** Follows the blast radius; none omits the section. */
   suggestedReviewers?: readonly SuggestedReviewer[] | undefined;
+  /** Absent, evidence is named without links. */
+  evidenceSource?: EvidenceSource | undefined;
 }
 
 const annotationLevelBySeverity: Record<
@@ -45,10 +47,15 @@ const annotationLevelBySeverity: Record<
 };
 
 function annotate(finding: ReviewFinding, line: number): CheckRunAnnotation {
-  const message =
-    finding.suggestedFix === undefined
-      ? finding.explanation
-      : `${finding.explanation}\n\nSuggested fix: ${finding.suggestedFix}`;
+  const parts = [finding.explanation];
+  if (finding.evidence !== undefined && finding.evidence.length > 0) {
+    const seen = finding.evidence.map((entry) => `${entry.file}:${entry.line}`);
+    parts.push(`Convention seen in: ${seen.join(", ")}`);
+  }
+  if (finding.suggestedFix !== undefined) {
+    parts.push(`Suggested fix: ${finding.suggestedFix}`);
+  }
+  const message = parts.join("\n\n");
   return {
     path: finding.file,
     start_line: line,
@@ -187,7 +194,7 @@ export function renderCheckRun(
     ...lead,
     `**${title}**`,
     "",
-    ...ordered.map(summarise),
+    ...ordered.map((finding) => summarise(finding, options.evidenceSource)),
     ...notes,
   ].join("\n\n");
 

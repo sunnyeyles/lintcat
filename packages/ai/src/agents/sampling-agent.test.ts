@@ -40,7 +40,7 @@ function review(sample: SampleText, reviewContext: ReviewContext = context) {
 describe("the single-shot sampling agent", () => {
   it("returns the findings of one sampling request", async () => {
     const { calls, sample } = sampler(
-      finalFindingsJson([makeFinding("general", { title: "Assignment in a condition" })]),
+      finalFindingsJson([makeFinding("naming", { title: "Assignment in a condition" })]),
     );
 
     const findings = await review(sample);

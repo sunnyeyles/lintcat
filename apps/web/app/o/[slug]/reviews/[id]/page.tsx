@@ -132,7 +132,14 @@ export default async function ReviewDetailPage({ params }: PageProps) {
             </EmptyHeader>
           </Empty>
         ) : (
-          <FindingsTable findings={review.findings} />
+          <FindingsTable
+            findings={review.findings}
+            source={{
+              owner: review.repo.owner,
+              repo: review.repo.name,
+              sha: review.baseSha ?? review.headSha,
+            }}
+          />
         )}
       </FindingsFocusProvider>
 

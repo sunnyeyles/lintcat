@@ -1,18 +1,19 @@
 /**
  * The validation chain, in order: schema, category, changed file, added line,
- * confidence, unverified, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
+ * confidence, evidence, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
  */
 import type { ChangedFile } from "@pr-review/github";
 import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
+import {
+  hasEnoughEvidence,
+  withVerifiedEvidence,
+  type EvidenceBase,
+} from "#src/validate-evidence";
 
 /** Findings with confidence below this threshold are dropped. */
 export const CONFIDENCE_THRESHOLD = 0.7;
-
-/** An explanation that admits it never checked the claim it makes. */
-const UNVERIFIED_CLAIM =
-  /\b(cannot|could not|can ?not be|unable to|not able to) (be )?(verif|confirm)\w*|\bwithout (verifying|checking)\b/i;
 
 /** At most this many findings are published per review. */
 export const MAX_FINDINGS = 10;
@@ -59,6 +60,7 @@ export function validateFindings(
   candidates: readonly unknown[],
   changedFiles: readonly ChangedFile[],
   allowedCategories: readonly string[],
+  evidenceBase: EvidenceBase,
 ): ReviewFinding[] {
   // 1. Schema validity.
   const wellFormed = wellFormedFindings(candidates);
@@ -81,16 +83,20 @@ export function validateFindings(
     return finding.line === undefined || lines.has(finding.line);
   });
 
-  // 5. Confidence threshold, and no claim the agent admits it never checked.
+  // 5. Confidence threshold.
   const confident = anchored.filter(
-    (finding) =>
-      finding.confidence >= CONFIDENCE_THRESHOLD &&
-      !UNVERIFIED_CLAIM.test(finding.explanation),
+    (finding) => finding.confidence >= CONFIDENCE_THRESHOLD,
   );
 
-  // 6. Duplicate removal. Sorted first, so the strongest of each group
+  // 6. Evidence entries the base commit cannot vouch for are removed,
+  // then a finding left without enough evidence goes with them.
+  const evidenced = confident
+    .map((finding) => withVerifiedEvidence(finding, evidenceBase))
+    .filter(hasEnoughEvidence);
+
+  // 7. Duplicate removal. Sorted first, so the strongest of each group
   // is the one that survives.
-  const strongestFirst = [...confident].sort(compareFindingStrength);
+  const strongestFirst = [...evidenced].sort(compareFindingStrength);
   const seen = new Set<string>();
   const distinct: ReviewFinding[] = [];
   for (const finding of strongestFirst) {
@@ -104,6 +110,6 @@ export function validateFindings(
     distinct.push(finding);
   }
 
-  // 7. Cap at MAX_FINDINGS, keeping the strongest.
+  // 8. Cap at MAX_FINDINGS, keeping the strongest.
   return distinct.slice(0, MAX_FINDINGS);
 }

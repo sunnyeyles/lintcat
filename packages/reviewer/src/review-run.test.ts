@@ -91,16 +91,22 @@ const diff = "diff --git a/src/sessions.ts b/src/sessions.ts\n";
 const baseFiles = new Map<string, string>([
   ["src/sessions.ts", "export const sessions = [];\n"],
   ["src/sessions.test.ts", "import './sessions';\n"],
+  ["src/conventions/first.ts", "export const first = 1;\n"],
+  ["src/conventions/second.ts", "export const second = 2;\n"],
 ]);
 
 const finding: ReviewFinding = {
   file: "src/sessions.ts",
   line: 2,
-  category: "general",
+  category: "naming",
   severity: "high",
   title: "Assignment instead of comparison in admin check",
   explanation:
     "The if condition assigns true to user.isAdmin instead of comparing, so every user passes the check.",
+  evidence: [
+    { file: "src/conventions/first.ts", line: 1 },
+    { file: "src/conventions/second.ts", line: 1 },
+  ],
   confidence: 0.9,
 };
 
@@ -178,7 +184,7 @@ function scriptedEngine(candidates: readonly unknown[]) {
   const engine: ReviewEngine = {
     createAgent: (request): ReviewAgent => {
       requests.push(request);
-      const name = request.agent.category;
+      const name = request.agent.name;
       return {
         name,
         run: async (context) => {

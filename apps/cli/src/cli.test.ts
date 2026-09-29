@@ -82,7 +82,7 @@ async function run(
   return { code: await runCli(argv, deps), out: out.join("\n"), err: err.join("\n") };
 }
 
-const admin = makeFinding("general", {
+const admin = makeFinding("naming", {
   file: "src/sessions.ts",
   line: 3,
   title: "Admin is always on",
@@ -130,7 +130,7 @@ describe("reviewing a working tree", () => {
   });
 
   it("prints nothing the pull-request path would have dropped", async () => {
-    const elsewhere = makeFinding("general", { file: "src/untouched.ts", line: 2 });
+    const elsewhere = makeFinding("naming", { file: "src/untouched.ts", line: 2 });
 
     const { code, out } = await run(["--base", "main", "--no-index"], {
       createLanguageModel: () => scriptedModel([elsewhere]),
