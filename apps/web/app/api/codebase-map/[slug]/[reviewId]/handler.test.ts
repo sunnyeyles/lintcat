@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   groupIdFor,
   mapQuery,
+  NO_GRAPH_CODE,
   sampleRepo,
   SEARCH_LIMIT,
   type GroupSlice,
+  type MapPayload,
   type MapSearchAnswer,
   type MapSource,
 } from "@/lib/codebase-map";
@@ -79,6 +81,33 @@ describe("handleCodebaseMap rejects", () => {
       load,
     );
     expect(response.status).toBe(404);
+  });
+});
+
+describe("handleCodebaseMap's first request", () => {
+  it("is the map's opening payload, reduced for a repo past the threshold", async () => {
+    const response = await handleCodebaseMap({ action: "first" }, load);
+    const body = await json<MapPayload>(response);
+
+    expect(response.status).toBe(200);
+    expect(body.mode).toBe("lod");
+    expect(body.graph.summaries?.map((summary) => summary.id)).toEqual(held.map((s) => s.id));
+  });
+
+  it("is not found for another organization's review", async () => {
+    const response = await handleCodebaseMap({ action: "first" }, missing);
+    expect(response.status).toBe(404);
+    expect(await json<{ error: string }>(response)).toEqual({ error: "review not found" });
+  });
+
+  it("names a review with no stored graph, so the map can say so", async () => {
+    const response = await handleCodebaseMap({ action: "first" }, async () => ({
+      graph: undefined,
+      heat: {},
+      changedPaths: [],
+    }));
+    expect(response.status).toBe(404);
+    expect(await json<{ code: string }>(response)).toMatchObject({ code: NO_GRAPH_CODE });
   });
 });
 

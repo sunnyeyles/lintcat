@@ -22,6 +22,9 @@ export type ReviewDetail = ReviewSummary & {
   findings: Finding[];
 };
 
+/** Just enough to link to a review. */
+export type ReviewLink = Pick<Review, "id" | "prNumber"> & { repo: Pick<Repo, "owner" | "name"> };
+
 export type ReviewStat = TokenCounts &
   Pick<Review, "id" | "repoId" | "createdAt" | "durationMs"> & {
     bySeverity: Record<Severity, number>;
@@ -80,6 +83,8 @@ export type DataSource = {
   getRepo(owner: string, name: string): Promise<RepoSummary | null>;
   listReviews(opts?: { repoId?: number; limit?: number }): Promise<ReviewSummary[]>;
   getReview(id: number): Promise<ReviewDetail | null>;
+  /** The reviews either side of this one in its repo's history. */
+  getAdjacentReviews(id: number): Promise<{ newer: ReviewLink | null; older: ReviewLink | null }>;
   /** The access check a map runs before any cache read; null when the review is unreadable. */
   getMapAccess(id: number): Promise<{ repoId: number; baseSha: string | null } | null>;
   getTrends(range: Range, repoId?: number): Promise<Trends>;
