@@ -7,7 +7,7 @@ export interface PatchedFile {
   readonly patch?: string | undefined;
 }
 
-export interface PatchLine {
+interface PatchLine {
   readonly line: number;
   readonly text: string;
 }
