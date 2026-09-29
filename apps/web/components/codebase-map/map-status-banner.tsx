@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle, Badge } from "@pr-review/design";
+import { Alert, AlertDescription, AlertTitle } from "@pr-review/design";
 import { CircleCheck, CircleSlash, Info, TriangleAlert } from "@pr-review/design/icons";
 
 import type { MapStatus } from "@/lib/codebase-map";
@@ -22,12 +22,7 @@ export function MapStatusBanner({ status }: { status: MapStatus }) {
   return (
     <Alert data-status={status.kind}>
       <Icon />
-      <AlertTitle className="flex flex-wrap items-center gap-2">
-        {HEADINGS[status.kind]}
-        <Badge variant={status.kind === "partial" ? "attention" : "secondary"}>
-          {status.kind}
-        </Badge>
-      </AlertTitle>
+      <AlertTitle>{HEADINGS[status.kind]}</AlertTitle>
       <AlertDescription>
         <p>
           {status.totalFileCount > status.fileCount

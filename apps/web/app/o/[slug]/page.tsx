@@ -1,78 +1,71 @@
 import { db, findModelKeySummary } from "@pr-review/db";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Card,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@pr-review/design";
+import { Alert, AlertDescription, AlertTitle, Card, cn } from "@pr-review/design";
 import { KeyRound } from "@pr-review/design/icons";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { RepoTable, ReviewsTable, Section, Sparkline } from "@/components/overview";
+import {
+  EmptyNotice,
+  RepoTable,
+  ReviewsTable,
+  Section,
+  toReviewRow,
+  ViewAllLink,
+  type ReviewColumn,
+} from "@/components/overview";
 import { PageHeader } from "@/components/shell";
-import { StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
-import { Stat, StatGrid } from "@/components/ui/stat";
+import { InlineSkeleton, TableCardSkeleton } from "@/components/ui";
 import { data } from "@/lib/data/server";
+import { installAppUrl } from "@/lib/github-app";
 import { formatDuration, formatNumber, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 import { requireOrganization } from "@/lib/session";
 
-async function TrendStats({ slug }: { slug: string }) {
-  const trends = await (await data(slug)).getTrends("30d");
-  const { totals } = trends;
-  const highShare =
-    totals.findings > 0
-      ? Math.round((totals.bySeverity.high / totals.findings) * 100)
-      : 0;
+const RECENT_LIMIT = 5;
+
+const RECENT_COLUMNS: readonly ReviewColumn[] = [
+  "repository",
+  "pullRequest",
+  "risk",
+  "findings",
+  "ran",
+];
+
+// Spend comes from the same review rows as the counts, so one query answers the whole line.
+async function SummaryLine({ slug }: { slug: string }) {
+  const { totals } = await (await data(slug)).getTrends("30d");
+  const items: { label: string; value: string; alert?: boolean }[] = [
+    { label: "reviews", value: formatNumber(totals.reviews) },
+    { label: "findings", value: formatNumber(totals.findings) },
+    {
+      label: "high severity",
+      value: formatNumber(totals.bySeverity.high),
+      alert: totals.bySeverity.high > 0,
+    },
+    { label: "median duration", value: formatDuration(totals.medianDurationMs) },
+    { label: "spend", value: formatUsd(totals.costUsd) },
+  ];
 
   return (
-    <>
-      <Stat
-        label="Reviews / 30d"
-        value={formatNumber(totals.reviews)}
-        hint="one per head SHA"
-      >
-        <Sparkline
-          points={trends.points}
-          label="Daily review volume over the last 30 days"
-        />
-      </Stat>
-      <Stat
-        label="Findings / 30d"
-        value={formatNumber(totals.findings)}
-        hint={`${formatNumber(totals.bySeverity.medium)} medium · ${formatNumber(totals.bySeverity.low)} low`}
-      />
-      <Stat
-        label="High severity"
-        value={formatNumber(totals.bySeverity.high)}
-        delta={{
-          value: `${highShare}% of findings`,
-          tone: totals.bySeverity.high > 0 ? "stop" : "ok",
-        }}
-      />
-      <Stat
-        label="Median duration"
-        value={formatDuration(totals.medianDurationMs)}
-        hint="per review"
-      />
-    </>
-  );
-}
-
-async function SpendStat({ slug }: { slug: string }) {
-  const usage = await (await data(slug)).getUsage("30d");
-  return (
-    <Stat
-      label="Spend / 30d"
-      value={formatUsd(usage.totals.costUsd)}
-      hint={`${formatNumber(usage.totals.reviewCount)} billed reviews`}
-    />
+    <dl className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
+      <dt className="sr-only">Window</dt>
+      <dd className="text-muted-foreground font-mono text-xs tracking-wide uppercase">
+        Last 30 days
+      </dd>
+      {items.map((item) => (
+        <div key={item.label} className="flex items-baseline gap-1.5">
+          <dt className="text-muted-foreground order-last">{item.label}</dt>
+          <dd
+            className={cn(
+              "font-semibold tabular-nums",
+              item.alert ? "text-destructive" : "text-foreground",
+            )}
+          >
+            {item.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -85,8 +78,8 @@ async function ModelKeyNudge({ slug }: { slug: string }) {
       <AlertTitle>Add a model key to start reviews</AlertTitle>
       <AlertDescription>
         <p>
-          Reviews run on your own Anthropic or OpenAI key. Until one is saved, pull requests
-          get a check asking for it and nothing is reviewed.{" "}
+          Reviews run on your own Anthropic or OpenAI key, and nothing is reviewed until one
+          is saved.{" "}
           <Link href={organizationPath(slug, "/settings")}>Add a model key</Link>
         </p>
       </AlertDescription>
@@ -95,31 +88,34 @@ async function ModelKeyNudge({ slug }: { slug: string }) {
 }
 
 async function RecentReviews({ slug }: { slug: string }) {
-  const reviews = await (await data(slug)).listReviews({ limit: 8 });
+  const source = await data(slug);
+  const reviews = await source.listReviews({ limit: RECENT_LIMIT });
   return (
     <Card className="py-0">
       {reviews.length > 0 ? (
         <ReviewsTable
           slug={slug}
-          reviews={reviews}
-          caption="The eight most recent reviews, newest first."
+          rows={reviews.map(toReviewRow)}
+          columns={RECENT_COLUMNS}
+          caption="The five most recent reviews, newest first."
         />
       ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No reviews yet</EmptyTitle>
-            <EmptyDescription>
-              Open a pull request on a connected repository and its review lands here.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyNotice
+          title="No reviews yet"
+          sentence="Open a pull request on a connected repository and its review lands here."
+          action={{
+            label: "Connect a repository",
+            href: installAppUrl(source.organization.githubAccountId),
+          }}
+        />
       )}
     </Card>
   );
 }
 
 async function ReposGlance({ slug }: { slug: string }) {
-  const repos = await (await data(slug)).listRepos();
+  const source = await data(slug);
+  const repos = await source.listRepos();
   return (
     <Card className="py-0">
       {repos.length > 0 ? (
@@ -130,14 +126,14 @@ async function ReposGlance({ slug }: { slug: string }) {
           caption="Repositories connected to this account, most recently reviewed first."
         />
       ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No repositories connected</EmptyTitle>
-            <EmptyDescription>
-              Give the LintCat GitHub App access to a repository to see it here.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyNotice
+          title="No repositories connected"
+          sentence="Give the LintCat GitHub App access to a repository to see it here."
+          action={{
+            label: "Choose repositories",
+            href: installAppUrl(source.organization.githubAccountId),
+          }}
+        />
       )}
     </Card>
   );
@@ -156,29 +152,26 @@ export default async function OverviewPage({
       <PageHeader
         eyebrow="Dashboard"
         title="Overview"
-        description={`${source.organization.name} — every review published in the last 30 days, newest first.`}
-        actions={
-          <Button asChild variant="outline">
-            <Link href={organizationPath(slug, "/repos")}>All repositories</Link>
-          </Button>
-        }
+        description={`${source.organization.name} — what needs your attention, at a glance.`}
       />
 
       <Suspense fallback={null}>
         <ModelKeyNudge slug={slug} />
       </Suspense>
 
-      <StatGrid className="mt-8">
-        <Suspense fallback={<StatCardsSkeleton count={4} sparkline />}>
-          <TrendStats slug={slug} />
+      <div className="mt-8">
+        <Suspense fallback={<InlineSkeleton className="h-5 w-[36rem] max-w-full" />}>
+          <SummaryLine slug={slug} />
         </Suspense>
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
-          <SpendStat slug={slug} />
-        </Suspense>
-      </StatGrid>
+      </div>
 
-      <Section title="Recent reviews">
-        <Suspense fallback={<TableCardSkeleton rows={8} />}>
+      <Section
+        title="Recent reviews"
+        action={
+          <ViewAllLink href={organizationPath(slug, "/reviews")} label="View all reviews" />
+        }
+      >
+        <Suspense fallback={<TableCardSkeleton rows={RECENT_LIMIT} />}>
           <RecentReviews slug={slug} />
         </Suspense>
       </Section>
@@ -186,12 +179,10 @@ export default async function OverviewPage({
       <Section
         title="Repositories at a glance"
         action={
-          <Link
+          <ViewAllLink
             href={organizationPath(slug, "/repos")}
-            className="text-link font-mono text-xs no-underline hover:underline"
-          >
-            View all →
-          </Link>
+            label="View all repositories"
+          />
         }
       >
         <Suspense fallback={<TableCardSkeleton rows={6} />}>

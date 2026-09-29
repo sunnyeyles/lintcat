@@ -4,6 +4,7 @@ import {
   count,
   desc,
   eq,
+  exists,
   gte,
   inArray,
   isNull,
@@ -45,9 +46,18 @@ import type {
 type ReviewFilter = {
   id?: number;
   repoId?: number;
+  repo?: { owner: string; name: string };
+  // Empty means any finding at all.
+  findingSeverities?: Severity[];
   since?: Date;
   limit?: number;
 };
+
+const SEVERITY_ORDER: Severity[] = ["low", "medium", "high"];
+
+function severitiesFrom(minSeverity: Severity): Severity[] {
+  return SEVERITY_ORDER.slice(SEVERITY_ORDER.indexOf(minSeverity));
+}
 
 type CategoryRow = {
   category: string;
@@ -150,6 +160,23 @@ export function createDbSource(
     if (filter.id !== undefined) conditions.push(eq(reviews.id, filter.id));
     if (filter.repoId !== undefined) conditions.push(eq(reviews.repoId, filter.repoId));
     if (filter.since !== undefined) conditions.push(gte(reviews.createdAt, filter.since));
+    if (filter.repo !== undefined) {
+      conditions.push(eq(repos.owner, filter.repo.owner), eq(repos.name, filter.repo.name));
+    }
+    if (filter.findingSeverities !== undefined) {
+      const matching = subqueries
+        .select({ one: sql`1` })
+        .from(findings)
+        .where(
+          and(
+            eq(findings.reviewId, reviews.id),
+            filter.findingSeverities.length > 0
+              ? inArray(findings.severity, filter.findingSeverities)
+              : undefined,
+          ),
+        );
+      conditions.push(exists(matching));
+    }
     return conditions;
   }
 
@@ -222,6 +249,8 @@ export function createDbSource(
     return JSON.stringify([
       filter.id ?? null,
       filter.repoId ?? null,
+      filter.repo ? `${filter.repo.owner}/${filter.repo.name}` : null,
+      filter.findingSeverities ?? null,
       filter.since?.getTime() ?? null,
       filter.limit ?? null,
     ]);
@@ -425,10 +454,17 @@ export function createDbSource(
       return repo ?? null;
     },
 
-    async listReviews({ repoId, limit } = {}) {
+    async listReviews({ repoId, repo, minSeverity, hasFindings, limit } = {}) {
+      const findingSeverities = minSeverity
+        ? severitiesFrom(minSeverity)
+        : hasFindings
+          ? []
+          : undefined;
       const rows = await loadReviews(
         {
           ...(repoId === undefined ? {} : { repoId }),
+          ...(repo === undefined ? {} : { repo }),
+          ...(findingSeverities === undefined ? {} : { findingSeverities }),
           ...(limit === undefined ? {} : { limit }),
         },
         false,

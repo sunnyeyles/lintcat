@@ -12,8 +12,8 @@ import {
 } from "@pr-review/design";
 import {
   ChartLine,
-  Coins,
   FolderGit2,
+  GitPullRequest,
   type IconComponent,
   LayoutDashboard,
   Menu,
@@ -30,9 +30,9 @@ type NavItem = { href: string; label: string; icon: IconComponent; ownerOnly?: b
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/reviews", label: "Reviews", icon: GitPullRequest },
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
-  { href: "/analytics", label: "Analytics", icon: ChartLine },
-  { href: "/usage", label: "Usage", icon: Coins },
+  { href: "/insights", label: "Insights", icon: ChartLine },
   { href: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
 ];
 
@@ -73,7 +73,7 @@ function NavLinks({
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
             )}
           >
-            <Icon className={cn("size-4 shrink-0", active && "text-attention")} />
+            <Icon className="size-4 shrink-0" />
             <span className="truncate">{label}</span>
           </Link>
         );

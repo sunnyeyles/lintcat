@@ -1,6 +1,7 @@
 import {
   Button,
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -30,22 +31,28 @@ import { organizationPath } from "@/lib/paths";
 
 type PageProps = { params: Promise<{ slug: string; id: string }> };
 
-const nothingSurvived = (
-  <FindingsSection>
-    <Empty className="rounded-lg border border-dashed border-border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <ShieldCheck />
-        </EmptyMedia>
-        <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
-        <EmptyDescription>
-          The reviewer ran and every candidate finding was dropped before publish.
-          That is the clean outcome, not a failure.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  </FindingsSection>
-);
+function NothingSurvived({ pullRequestUrl }: { pullRequestUrl: string }) {
+  return (
+    <FindingsSection>
+      <Empty className="rounded-lg border border-dashed border-border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <ShieldCheck />
+          </EmptyMedia>
+          <EmptyTitle>No findings on this head</EmptyTitle>
+          <EmptyDescription>
+            Every candidate finding was dropped in validation, which is the clean outcome.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button asChild variant="outline">
+            <a href={pullRequestUrl}>Open the pull request</a>
+          </Button>
+        </EmptyContent>
+      </Empty>
+    </FindingsSection>
+  );
+}
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -117,7 +124,9 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         findingCount={review.findings.length}
         findings={
           review.findings.length === 0 ? (
-            nothingSurvived
+            <NothingSurvived
+              pullRequestUrl={`https://github.com/${review.repo.owner}/${review.repo.name}/pull/${review.prNumber}`}
+            />
           ) : (
             <FindingsTable
               findings={review.findings}

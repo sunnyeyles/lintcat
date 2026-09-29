@@ -1,149 +1,123 @@
-import {
-  Card,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@pr-review/design";
-import { GitPullRequest } from "@pr-review/design/icons";
+import { Card } from "@pr-review/design";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { cache, Suspense } from "react";
+import { Suspense } from "react";
 
-import { SEVERITIES } from "@/components/review";
-import { PageHeader } from "@/components/shell";
 import {
-  InlineSkeleton,
-  RiskBadge,
-  SeverityBadge,
-  TableCardSkeleton,
-} from "@/components/ui";
+  EmptyNotice,
+  RepoFilterSelect,
+  ReviewFilterScope,
+  ReviewsTable,
+  toReviewRow,
+  type ReviewColumn,
+} from "@/components/overview";
+import { PageHeader } from "@/components/shell";
+import { InlineSkeleton, TableCardSkeleton } from "@/components/ui";
 import { data } from "@/lib/data/server";
-import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/format";
+import { installAppUrl } from "@/lib/github-app";
 import { organizationPath } from "@/lib/paths";
+import {
+  isFiltered,
+  parseReviewFilters,
+  type ReviewFilters,
+  reviewListOptions,
+} from "@/lib/review-filters";
 
 export const metadata: Metadata = { title: "Reviews" };
 
-// Shared by the header summary and the table, so both read one query.
-const recentReviews = cache(async (slug: string) =>
-  (await data(slug)).listReviews({ limit: 50 }),
-);
+const PAGE_LIMIT = 50;
 
-async function ReviewsSummary({ slug }: { slug: string }) {
-  const reviews = await recentReviews(slug);
-  return `The last ${reviews.length} runs across every repository, newest first. Open one to read what the review found.`;
+const COLUMNS: readonly ReviewColumn[] = [
+  "repository",
+  "pullRequest",
+  "head",
+  "risk",
+  "findings",
+  "duration",
+  "cost",
+  "ran",
+];
+
+async function RepoFilter({ slug }: { slug: string }) {
+  const repos = await (await data(slug)).listRepos();
+  return (
+    <RepoFilterSelect
+      repos={repos.map((repo) => ({ owner: repo.owner, name: repo.name }))}
+    />
+  );
 }
 
-async function ReviewsBody({ slug }: { slug: string }) {
-  const reviews = await recentReviews(slug);
+async function ReviewsBody({ slug, filters }: { slug: string; filters: ReviewFilters }) {
+  const source = await data(slug);
+  const reviews = await source.listReviews({
+    ...reviewListOptions(filters),
+    limit: PAGE_LIMIT,
+  });
 
-  return reviews.length === 0 ? (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <GitPullRequest />
-        </EmptyMedia>
-        <EmptyTitle>No reviews yet</EmptyTitle>
-        <EmptyDescription>
-          Once a pull request event reaches the pipeline, its review lands here.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  ) : (
+  if (reviews.length > 0) {
+    return (
+      <Card className="py-0">
+        <ReviewsTable
+          slug={slug}
+          rows={reviews.map(toReviewRow)}
+          columns={COLUMNS}
+          caption={`Up to ${PAGE_LIMIT} reviews matching the filters, newest first.`}
+        />
+      </Card>
+    );
+  }
+
+  return (
     <Card className="py-0">
-      <Table className="min-w-[54rem]">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Pull request</TableHead>
-            <TableHead>Head</TableHead>
-            <TableHead className="w-[7rem]">Blast radius</TableHead>
-            <TableHead>Findings</TableHead>
-            <TableHead className="w-[6rem]">Duration</TableHead>
-            <TableHead className="w-[5.5rem]">Cost</TableHead>
-            <TableHead className="w-[6rem]">Ran</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {reviews.map((review) => (
-            <TableRow key={review.id}>
-              <TableCell>
-                <Link
-                  href={organizationPath(slug, `/reviews/${review.id}`)}
-                  className="focus-visible:ring-ring underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-offset-2"
-                >
-                  {review.repo.owner}/{review.repo.name} #{review.prNumber}
-                </Link>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {shortSha(review.headSha)}
-              </TableCell>
-              <TableCell>
-                {review.risk ? (
-                  <RiskBadge band={review.risk.band} score={review.risk.score} />
-                ) : (
-                  <span className="text-muted-foreground">
-                    <span aria-hidden>—</span>
-                    <span className="sr-only">not scored</span>
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                {review.findingCount === 0 ? (
-                  <span className="text-muted-foreground">clean</span>
-                ) : (
-                  <span className="flex flex-wrap gap-1">
-                    {SEVERITIES.filter((s) => review.bySeverity[s] > 0).map((s) => (
-                      <SeverityBadge key={s} severity={s} count={review.bySeverity[s]} />
-                    ))}
-                  </span>
-                )}
-              </TableCell>
-              <TableCell className="tabular-nums">
-                {formatDuration(review.durationMs)}
-              </TableCell>
-              <TableCell className="tabular-nums">{formatUsd(review.costUsd)}</TableCell>
-              <TableCell className="whitespace-nowrap">
-                <time dateTime={review.createdAt.toISOString()}>
-                  {formatRelative(review.createdAt)}
-                </time>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {isFiltered(filters) ? (
+        <EmptyNotice
+          title="No matching reviews"
+          sentence="No review matches every one of these filters."
+          action={{ label: "Clear filters", href: organizationPath(slug, "/reviews") }}
+        />
+      ) : (
+        <EmptyNotice
+          title="No reviews yet"
+          sentence="Open a pull request on a connected repository and its review lands here."
+          action={{
+            label: "Connect a repository",
+            href: installAppUrl(source.organization.githubAccountId),
+          }}
+        />
+      )}
     </Card>
   );
 }
 
 export default async function ReviewsIndexPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const filters = parseReviewFilters(query);
 
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         eyebrow="Reviews"
-        title="Recent reviews"
-        description={
-          <Suspense fallback={<InlineSkeleton className="h-4 w-96 max-w-full" />}>
-            <ReviewsSummary slug={slug} />
-          </Suspense>
-        }
+        title="Reviews"
+        description={`Every review across your repositories, newest first, up to the latest ${PAGE_LIMIT}.`}
       />
 
-      <Suspense fallback={<TableCardSkeleton rows={10} columns={7} />}>
-        <ReviewsBody slug={slug} />
-      </Suspense>
+      <ReviewFilterScope
+        filters={filters}
+        repoControl={
+          <Suspense fallback={<InlineSkeleton className="h-control w-60" />}>
+            <RepoFilter slug={slug} />
+          </Suspense>
+        }
+      >
+        <Suspense fallback={<TableCardSkeleton rows={10} columns={COLUMNS.length} />}>
+          <ReviewsBody slug={slug} filters={filters} />
+        </Suspense>
+      </ReviewFilterScope>
     </div>
   );
 }

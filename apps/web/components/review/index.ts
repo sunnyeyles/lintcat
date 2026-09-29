@@ -6,4 +6,3 @@ export { ReviewMapSkeleton } from "./review-map-skeleton";
 export { ReviewPager } from "./review-pager";
 export { ReviewSummaryPanel } from "./review-summary";
 export { ReviewTabs } from "./review-tabs";
-export { SEVERITIES } from "./sort";

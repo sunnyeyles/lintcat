@@ -160,6 +160,48 @@ describe("createDbSource", () => {
     expect(await (await sourceFor(acme)).listReviews({ limit: 1 })).toHaveLength(1);
   });
 
+  it("filters reviews by repo, minimum severity and having findings", async () => {
+    const [firstFinding, secondFinding] = record().findings;
+    await ingest(acme, record());
+    await ingest(acme, record({ prNumber: 8, headSha: "b".repeat(40), findings: [] }));
+    await ingest(
+      acme,
+      record({
+        prNumber: 9,
+        headSha: "c".repeat(40),
+        findings: [{ ...firstFinding!, severity: "medium" }, secondFinding!],
+      }),
+    );
+    await ingest(acme, record({ repo: "gadgets", prNumber: 1, headSha: "d".repeat(40) }));
+    await ingest(globex, record({ owner: "globex", repo: "widgets" }));
+    const source = await sourceFor(acme);
+    const prs = async (opts: Parameters<typeof source.listReviews>[0]) =>
+      (await source.listReviews(opts)).map((review) => review.prNumber);
+
+    expect(await prs({ repo: { owner: "acme", name: "widgets" } })).toEqual([9, 8, 7]);
+    expect(await prs({ repo: { owner: "globex", name: "widgets" } })).toEqual([]);
+    expect(await prs({ hasFindings: true })).toEqual([1, 9, 7]);
+    expect(await prs({ minSeverity: "low" })).toEqual([1, 9, 7]);
+    expect(await prs({ minSeverity: "medium" })).toEqual([1, 9, 7]);
+    expect(await prs({ minSeverity: "high" })).toEqual([1, 7]);
+    expect(
+      await prs({ repo: { owner: "acme", name: "widgets" }, minSeverity: "high", limit: 5 }),
+    ).toEqual([7]);
+  });
+
+  it("totals a trend window's spend as usage does", async () => {
+    await ingest(acme, record());
+    await ingest(acme, record({ headSha: "b".repeat(40), ...tokens(1) }));
+    const source = await sourceFor(acme);
+
+    const [trends, usage] = await Promise.all([
+      source.getTrends("30d"),
+      source.getUsage("30d"),
+    ]);
+    expect(trends.totals.costUsd).toBeCloseTo(usage.totals.costUsd, 10);
+    expect(trends.totals.costUsd).toBeCloseTo(costOf(tokens(3)), 10);
+  });
+
   it("returns a review with its findings, and not another organization's", async () => {
     const mine = await ingest(acme, record());
     const theirs = await ingest(globex, record({ owner: "globex", repo: "secret" }));

@@ -55,11 +55,9 @@ export function RepoSettingsForm({
     <Card>
       <CardHeader>
         <CardTitle>Hosted reviews</CardTitle>
-        <CardDescription>
-          {isOwner
-            ? "Choose when this repository is reviewed, which model runs it, and whether verified fixes are committed."
-            : "Only a repository owner can change these settings."}
-        </CardDescription>
+        {isOwner ? null : (
+          <CardDescription>Only a repository owner can change these settings.</CardDescription>
+        )}
       </CardHeader>
 
       <form action={formAction}>

@@ -16,7 +16,19 @@ export const RANGE_PHRASE: Record<Range, string> = {
 
 const DEFAULT_RANGE: Range = "30d";
 
-export function parseRange(value: string | string[] | undefined): Range {
+type RangeParam = string | string[] | null | undefined;
+
+function knownRange(value: RangeParam): Range | undefined {
   const first = Array.isArray(value) ? value[0] : value;
-  return RANGES.find((range) => range === first) ?? DEFAULT_RANGE;
+  return RANGES.find((range) => range === first);
+}
+
+export function parseRange(value: RangeParam): Range {
+  return knownRange(value) ?? DEFAULT_RANGE;
+}
+
+// Empty for a missing or unknown range, so links and redirects carry only a real choice.
+export function rangeQuery(value: RangeParam): string {
+  const range = knownRange(value);
+  return range === undefined ? "" : `?range=${range}`;
 }

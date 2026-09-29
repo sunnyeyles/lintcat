@@ -39,8 +39,8 @@ export function GroupList({ clustering, reached, onToggle }: GroupListProps) {
             >
               <span className="min-w-0 flex-1 truncate font-mono text-xs">{group.directory}</span>
               {group.changedCount > 0 ? (
-                <Badge variant="attention" className="shrink-0" aria-label={`${group.changedCount} changed`}>
-                  {group.changedCount}
+                <Badge variant="secondary" className="shrink-0">
+                  {group.changedCount} changed
                 </Badge>
               ) : null}
               {(reached?.get(group.id) ?? 0) > 0 ? (

@@ -54,7 +54,7 @@ export function ModelKeyForm({ slug, providers, current }: ModelKeyFormProps) {
               <code className="font-mono">{`••••${current.last4}`}</code>, updated {current.updated}.
             </span>
           ) : (
-            "No key is saved. Until one is, a labelled pull request gets a neutral check run asking for a key, and no model is called."
+            "No key is saved, so pull requests are not reviewed yet."
           )}
         </CardDescription>
       </CardHeader>

@@ -45,7 +45,7 @@ function FlagRow({
     <div className="flex items-center justify-between gap-2">
       <span className="text-muted-foreground text-xs">{label}</span>
       {value === true ? (
-        <Badge variant="attention">{flagged}</Badge>
+        <Badge variant="secondary">{flagged}</Badge>
       ) : value === false ? (
         <Badge variant="outline">{clear}</Badge>
       ) : (
@@ -198,7 +198,7 @@ export function FileDetails({
             {reach.depth === undefined ? (
               <Badge variant="outline">Not within {reach.steps}</Badge>
             ) : (
-              <Badge variant="attention">
+              <Badge variant="secondary">
                 {reach.depth} step{reach.depth === 1 ? "" : "s"}
               </Badge>
             )}

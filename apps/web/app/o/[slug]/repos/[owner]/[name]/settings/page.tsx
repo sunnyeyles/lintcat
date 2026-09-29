@@ -40,7 +40,7 @@ export default async function RepoSettingsPage({
         description={
           provider
             ? `Hosted reviews run on the organization's ${MODEL_KEY_PROVIDERS[provider]} key.`
-            : "The organization has no model key yet, so hosted reviews cannot run until an owner adds one."
+            : "No model key is saved, so hosted reviews cannot run yet."
         }
       />
       <div className="mt-8 max-w-2xl">

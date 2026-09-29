@@ -1,60 +1,37 @@
-import {
-  Badge,
-  Button,
-  Card,
-  cn,
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@pr-review/design";
+import { Button, Card } from "@pr-review/design";
 import { Settings } from "@pr-review/design/icons";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 
-import { RowLink, Section, SeverityMix, Sparkline } from "@/components/overview";
-import { PageHeader } from "@/components/shell";
-import { InlineSkeleton, StatCardsSkeleton, TableCardSkeleton } from "@/components/ui";
-import { Stat, StatGrid } from "@/components/ui/stat";
-import type { ReviewSummary } from "@pr-review/db/dashboard";
-import { data } from "@/lib/data/server";
 import {
-  formatDuration,
-  formatNumber,
-  formatRelative,
-  formatUsd,
-  shortSha,
-} from "@/lib/format";
+  EmptyNotice,
+  groupByPr,
+  ReviewsTable,
+  Section,
+  Sparkline,
+  toReviewRow,
+  type ReviewColumn,
+} from "@/components/overview";
+import { PageHeader } from "@/components/shell";
+import { InlineSkeleton, StatGridSkeleton, TableCardSkeleton } from "@/components/ui";
+import { Stat, StatGrid } from "@/components/ui/stat";
+import { data } from "@/lib/data/server";
+import { formatDuration, formatNumber, formatRelative, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
 
-type PrGroup = { prNumber: number; reviews: ReviewSummary[] };
-
-// Input is newest-first, so insertion order already ranks groups by latest review.
-function groupByPr(reviews: ReviewSummary[]): PrGroup[] {
-  const byPr = new Map<number, ReviewSummary[]>();
-  for (const review of reviews) {
-    const existing = byPr.get(review.prNumber);
-    if (existing) existing.push(review);
-    else byPr.set(review.prNumber, [review]);
-  }
-  return [...byPr].map(([prNumber, rows]) => ({ prNumber, reviews: rows }));
-}
+const HISTORY_COLUMNS: readonly ReviewColumn[] = [
+  "pullRequest",
+  "head",
+  "risk",
+  "findings",
+  "duration",
+  "ran",
+];
 
 // Shared by the header count and the history table, so both read one query.
 const repoReviews = cache(
   async (slug: string, repoId: number) => (await data(slug)).listReviews({ repoId }),
-);
-
-const repoTrends = cache(
-  async (slug: string, repoId: number) => (await data(slug)).getTrends("30d", repoId),
 );
 
 async function PullRequestCount({ slug, repoId }: { slug: string; repoId: number }) {
@@ -62,51 +39,27 @@ async function PullRequestCount({ slug, repoId }: { slug: string; repoId: number
   return `${formatNumber(groups.length)} pull requests`;
 }
 
-async function ReviewsStat({
+// Every stat reads the one 30-day trends query, so they resolve together.
+async function RepoStats({
   slug,
   repo,
 }: {
   slug: string;
   repo: { id: number; owner: string; name: string };
 }) {
-  const trends = await repoTrends(slug, repo.id);
+  const { totals, points } = await (await data(slug)).getTrends("30d", repo.id);
   return (
-    <Stat label="Reviews / 30d" value={formatNumber(trends.totals.reviews)}>
-      <Sparkline
-        points={trends.points}
-        label={`Daily review volume for ${repo.owner}/${repo.name} over the last 30 days`}
-      />
-    </Stat>
-  );
-}
-
-async function MedianDurationStat({ slug, repoId }: { slug: string; repoId: number }) {
-  const trends = await repoTrends(slug, repoId);
-  return (
-    <Stat
-      label="Median duration"
-      value={formatDuration(trends.totals.medianDurationMs)}
-      hint="last 30 days"
-    />
-  );
-}
-
-async function SpendStat({
-  slug,
-  repoId,
-  allTimeCostUsd,
-}: {
-  slug: string;
-  repoId: number;
-  allTimeCostUsd: number;
-}) {
-  const usage = await (await data(slug)).getUsage("30d", repoId);
-  return (
-    <Stat
-      label="Spend / 30d"
-      value={formatUsd(usage.totals.costUsd)}
-      hint={`${formatUsd(allTimeCostUsd)} all time`}
-    />
+    <StatGrid>
+      <Stat label="Reviews / 30d" value={formatNumber(totals.reviews)}>
+        <Sparkline
+          points={points}
+          label={`Daily review volume for ${repo.owner}/${repo.name} over the last 30 days`}
+        />
+      </Stat>
+      <Stat label="High severity / 30d" value={formatNumber(totals.bySeverity.high)} />
+      <Stat label="Median duration / 30d" value={formatDuration(totals.medianDurationMs)} />
+      <Stat label="Spend / 30d" value={formatUsd(totals.costUsd)} />
+    </StatGrid>
   );
 }
 
@@ -118,138 +71,28 @@ async function ReviewHistory({
   repo: { id: number; owner: string; name: string };
 }) {
   const reviews = await repoReviews(slug, repo.id);
-  const groups = groupByPr(reviews);
 
   return (
     <Card className="py-0">
       {reviews.length > 0 ? (
-        <Table className="min-w-[40rem]">
-          <TableCaption className="sr-only">
-            Every review of {repo.owner}/{repo.name}, grouped by pull request, newest
-            first.
-          </TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead scope="col">Pull request</TableHead>
-              <TableHead scope="col">Head</TableHead>
-              <TableHead scope="col">Findings</TableHead>
-              <TableHead scope="col" className="text-right">
-                Duration
-              </TableHead>
-              <TableHead scope="col" className="text-right">
-                When
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          {groups.map((group) => {
-            const total = group.reviews.length;
-            const grouped = total > 1;
-            return (
-              <TableBody
-                key={group.prNumber}
-                className={cn(grouped && "border-b border-border last:border-b-0")}
-              >
-                {grouped ? (
-                  <tr>
-                    <th
-                      scope="rowgroup"
-                      colSpan={5}
-                      className="pt-4 pb-1.5 text-left font-mono text-sm font-medium"
-                    >
-                      PR #{group.prNumber}{" "}
-                      <Badge variant="secondary" className="ml-1.5">
-                        {total} reviews
-                      </Badge>
-                    </th>
-                  </tr>
-                ) : null}
-                {group.reviews.map((review, index) => {
-                  const revision = total - index;
-                  return (
-                    <TableRow key={review.id} className="group relative">
-                      <TableCell
-                        className={cn(
-                          "whitespace-nowrap",
-                          grouped && "border-l-2 border-primary/30 pl-3",
-                        )}
-                      >
-                        <RowLink
-                          href={organizationPath(slug, `/reviews/${review.id}`)}
-                          aria-label={
-                            grouped
-                              ? `Review ${revision} of ${total} for pull request ${group.prNumber}`
-                              : `Review of pull request ${group.prNumber}`
-                          }
-                        >
-                          {grouped ? `rev ${revision}` : `#${group.prNumber}`}
-                        </RowLink>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <code className="rounded-sm border border-border bg-muted px-1 py-0.5 text-sm">
-                          {shortSha(review.headSha)}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <SeverityMix bySeverity={review.bySeverity} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums whitespace-nowrap">
-                        {formatDuration(review.durationMs)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <time dateTime={review.createdAt.toISOString()}>
-                          {formatRelative(review.createdAt)}
-                        </time>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            );
-          })}
-        </Table>
+        <ReviewsTable
+          slug={slug}
+          rows={reviews.map(toReviewRow)}
+          columns={HISTORY_COLUMNS}
+          caption={`Every review of ${repo.owner}/${repo.name}, grouped by pull request, newest first.`}
+          groupByPullRequest
+        />
       ) : (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No reviews for this repository</EmptyTitle>
-            <EmptyDescription>
-              No review has been published a review here yet.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyNotice
+          title="No reviews for this repository"
+          sentence="No review has been published here yet."
+          action={{
+            label: "Check review settings",
+            href: organizationPath(slug, `/repos/${repo.owner}/${repo.name}/settings`),
+          }}
+        />
       )}
     </Card>
-  );
-}
-
-async function RevisitedNote({ slug, repoId }: { slug: string; repoId: number }) {
-  const groups = groupByPr(await repoReviews(slug, repoId));
-  if (!groups.some((group) => group.reviews.length > 1)) return null;
-  return (
-    <span className="text-muted-foreground font-mono text-xs">
-      Grouped by pull request
-    </span>
-  );
-}
-
-async function ReviewsAllTimeStat({
-  slug,
-  repoId,
-  reviewCount,
-}: {
-  slug: string;
-  repoId: number;
-  reviewCount: number;
-}) {
-  const groups = groupByPr(await repoReviews(slug, repoId));
-  const revisited = groups.filter((group) => group.reviews.length > 1).length;
-  return (
-    <Stat
-      label="Reviews all time"
-      value={formatNumber(reviewCount)}
-      hint={
-        revisited > 0 ? `${formatNumber(revisited)} PRs reviewed more than once` : undefined
-      }
-    />
   );
 }
 
@@ -291,36 +134,14 @@ export default async function RepoDetailPage({
         }
       />
 
-      <StatGrid className="mt-8">
-        <Suspense fallback={<StatCardsSkeleton count={1} hint={false} sparkline />}>
-          <ReviewsStat slug={slug} repo={repo} />
+      <div className="mt-8">
+        <Suspense fallback={<StatGridSkeleton count={4} sparkline />}>
+          <RepoStats slug={slug} repo={repo} />
         </Suspense>
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
-          <ReviewsAllTimeStat
-            slug={slug}
-            repoId={repo.id}
-            reviewCount={repo.reviewCount}
-          />
-        </Suspense>
-        <Stat label="Findings all time" value={formatNumber(repo.findingCount)} />
-        <Stat label="High severity" value={formatNumber(repo.highSeverity)} />
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
-          <MedianDurationStat slug={slug} repoId={repo.id} />
-        </Suspense>
-        <Suspense fallback={<StatCardsSkeleton count={1} />}>
-          <SpendStat slug={slug} repoId={repo.id} allTimeCostUsd={repo.costUsd} />
-        </Suspense>
-      </StatGrid>
+      </div>
 
-      <Section
-        title="Review history"
-        action={
-          <Suspense fallback={null}>
-            <RevisitedNote slug={slug} repoId={repo.id} />
-          </Suspense>
-        }
-      >
-        <Suspense fallback={<TableCardSkeleton rows={8} />}>
+      <Section title="Review history">
+        <Suspense fallback={<TableCardSkeleton rows={8} columns={HISTORY_COLUMNS.length} />}>
           <ReviewHistory slug={slug} repo={repo} />
         </Suspense>
       </Section>
