@@ -2,13 +2,13 @@ import { cn } from "@pr-review/design";
 import { ArrowLeft, ArrowRight } from "@pr-review/design/icons";
 import Link from "next/link";
 
-import type { ReviewSummary } from "@pr-review/db/dashboard";
+import type { ReviewLink } from "@pr-review/db/dashboard";
 import { organizationPath } from "@/lib/paths";
 
 export type ReviewPagerProps = {
   slug: string;
-  newer: ReviewSummary | null;
-  older: ReviewSummary | null;
+  newer: ReviewLink | null;
+  older: ReviewLink | null;
 };
 
 function PagerLink({
@@ -17,7 +17,7 @@ function PagerLink({
   direction,
 }: {
   slug: string;
-  review: ReviewSummary;
+  review: ReviewLink;
   direction: "newer" | "older";
 }) {
   const newer = direction === "newer";

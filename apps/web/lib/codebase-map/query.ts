@@ -16,7 +16,7 @@ import type { MapGraph } from "@/lib/codebase-map/types";
 /** The most search results one question gets. */
 export const SEARCH_LIMIT = 40;
 
-interface MapPayload {
+export interface MapPayload {
   mode: "full" | "lod";
   graph: MapGraph;
   heat: FindingHeat;

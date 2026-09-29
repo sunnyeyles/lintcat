@@ -1,4 +1,12 @@
-import { Skeleton } from "@pr-review/design";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  Skeleton,
+} from "@pr-review/design";
+import { MapPinOff } from "@pr-review/design/icons";
 import type { ReactNode } from "react";
 
 import { SectionHeading } from "@/components/ui";
@@ -34,5 +42,23 @@ export function ReviewMapSkeleton() {
     <MapSection>
       <MapSurfaceSkeleton />
     </MapSection>
+  );
+}
+
+export function MapNoGraph() {
+  return (
+    <Empty className="rounded-lg border border-dashed border-border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <MapPinOff />
+        </EmptyMedia>
+        <EmptyTitle>No repository graph for this review</EmptyTitle>
+        <EmptyDescription>
+          Indexing was off or it failed when this review ran, so there is nothing to draw.
+          This is not a claim that the repository is empty. A later review on this repo
+          will have a map once indexing succeeds.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

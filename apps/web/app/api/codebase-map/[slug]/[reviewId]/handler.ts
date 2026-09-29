@@ -1,10 +1,17 @@
 import { z } from "zod";
 
-import { mapQuery, SEARCH_LIMIT, type MapSource } from "@/lib/codebase-map";
+import {
+  mapQuery,
+  NO_GRAPH_CODE,
+  resolveLodThreshold,
+  SEARCH_LIMIT,
+  type MapSource,
+} from "@/lib/codebase-map";
 
 const GROUP_ID = z.string().min(1).max(1024);
 
 const requestSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("first") }),
   z.object({
     action: z.literal("expand"),
     groupId: GROUP_ID,
@@ -37,10 +44,18 @@ export async function handleCodebaseMap(
   const source = await load();
   if (!source) return Response.json({ error: "review not found" }, { status: 404 });
   if (!source.graph) {
-    return Response.json({ error: "no repository graph for this review" }, { status: 404 });
+    return Response.json(
+      { error: "no repository graph for this review", code: NO_GRAPH_CODE },
+      { status: 404 },
+    );
   }
 
   const query = mapQuery(source);
+  if (parsed.data.action === "first") {
+    return Response.json(
+      query.first({ threshold: resolveLodThreshold(process.env.CODEBASE_MAP_LOD_THRESHOLD) }),
+    );
+  }
   if (parsed.data.action === "search") {
     return Response.json(query.search(parsed.data.query, parsed.data.limit));
   }
