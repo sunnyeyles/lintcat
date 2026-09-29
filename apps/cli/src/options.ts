@@ -9,11 +9,11 @@ const FAIL_ON: readonly FailOn[] = ["low", "medium", "high", "off"];
 const SCOPES = ["working-tree", "staged", "range"] as const;
 
 /** `ci` runs what the worker runs: its policy, and no local memory. */
-export type Profile = "local" | "ci";
+type Profile = "local" | "ci";
 
 const PROFILES: readonly Profile[] = ["local", "ci"];
 
-export type Format = "text" | "json";
+type Format = "text" | "json";
 
 const FORMATS: readonly Format[] = ["text", "json"];
 
