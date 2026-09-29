@@ -936,7 +936,7 @@ html { scroll-behavior: smooth; }
         <li><b>The file exists</b> among the PR's changed files</li>
         <li><b>The line is an added line</b> in that file's diff, when a line is given</li>
         <li><b>Confidence ≥ 0.7</b> — <code>CONFIDENCE_THRESHOLD</code></li>
-        <li><b>Evidence checked at the base</b> — entries in changed files or past a base file's end are dropped, and a finding left with fewer than two goes with them</li>
+        <li><b>Evidence checked at the base</b> — entries in changed files or past a base file's end are dropped, and a finding left with fewer than two goes with them, unless one is a rule-doc line or a convention count</li>
         <li><b>Duplicate removal</b> — the strongest of each group survives</li>
         <li><b>Cap at 10</b> — <code>MAX_FINDINGS</code>, keeping the strongest</li>
       </ol>
