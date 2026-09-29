@@ -15,12 +15,13 @@ import { Suspense } from "react";
 import {
   ChangeDiagramSection,
   ChangeDiagramSkeleton,
-  FindingsFocusProvider,
+  FindingsSection,
   FindingsTable,
   ReviewMapSection,
   ReviewMapSkeleton,
   ReviewPager,
   ReviewSummaryPanel,
+  ReviewTabs,
 } from "@/components/review";
 import { PageHeader } from "@/components/shell";
 import { data, loadMapSource } from "@/lib/data/server";
@@ -28,6 +29,23 @@ import { formatDuration, formatRelative, formatUsd, shortSha } from "@/lib/forma
 import { organizationPath } from "@/lib/paths";
 
 type PageProps = { params: Promise<{ slug: string; id: string }> };
+
+const nothingSurvived = (
+  <FindingsSection>
+    <Empty className="rounded-lg border border-dashed border-border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <ShieldCheck />
+        </EmptyMedia>
+        <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
+        <EmptyDescription>
+          The reviewer ran and every candidate finding was dropped before publish.
+          That is the clean outcome, not a failure.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  </FindingsSection>
+);
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -106,44 +124,37 @@ export default async function ReviewDetailPage({ params }: PageProps) {
         risk={review.risk}
       />
 
-      <FindingsFocusProvider>
-        <Suspense fallback={<ChangeDiagramSkeleton />}>
-          <ChangeDiagramSection
-            source={mapSource}
-            title={`Review · ${review.repo.owner}/${review.repo.name} #${review.prNumber}`}
-            changedFiles={review.changedFiles}
-            findingCount={review.findings.length}
-          />
-        </Suspense>
-
-        <Suspense fallback={<ReviewMapSkeleton />}>
-          <ReviewMapSection slug={slug} reviewId={review.id} source={mapSource} />
-        </Suspense>
-
-        {review.findings.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <ShieldCheck />
-              </EmptyMedia>
-              <EmptyTitle>Nothing survived validation on this head</EmptyTitle>
-              <EmptyDescription>
-                The reviewer ran and every candidate finding was dropped before publish.
-                That is the clean outcome, not a failure.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <FindingsTable
-            findings={review.findings}
-            source={{
-              owner: review.repo.owner,
-              repo: review.repo.name,
-              sha: review.baseSha ?? review.headSha,
-            }}
-          />
-        )}
-      </FindingsFocusProvider>
+      <ReviewTabs
+        findingCount={review.findings.length}
+        findings={
+          review.findings.length === 0 ? (
+            nothingSurvived
+          ) : (
+            <FindingsTable
+              findings={review.findings}
+              source={{
+                owner: review.repo.owner,
+                repo: review.repo.name,
+                sha: review.baseSha ?? review.headSha,
+              }}
+            />
+          )
+        }
+        change={
+          <Suspense fallback={<ChangeDiagramSkeleton />}>
+            <ChangeDiagramSection
+              source={mapSource}
+              changedFiles={review.changedFiles}
+              findingCount={review.findings.length}
+            />
+          </Suspense>
+        }
+        map={
+          <Suspense fallback={<ReviewMapSkeleton />}>
+            <ReviewMapSection slug={slug} reviewId={review.id} source={mapSource} />
+          </Suspense>
+        }
+      />
 
       <Suspense fallback={null}>
         <AdjacentReviews slug={slug} repoId={review.repoId} reviewId={review.id} />

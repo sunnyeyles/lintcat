@@ -9,7 +9,7 @@ export function DiagramFrame({
   className,
   children,
 }: {
-  title: string;
+  title?: string;
   badge: string;
   description: string;
   footer?: ReactNode;
@@ -19,7 +19,7 @@ export function DiagramFrame({
   return (
     <Card className={cn("gap-0 overflow-hidden py-0 shadow-lg", className)}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-surface-2 px-4 py-2.5">
-        <span className="font-mono text-caption text-muted-foreground">{title}</span>
+        {title ? <span className="font-mono text-caption text-muted-foreground">{title}</span> : null}
         <div className="ml-auto flex items-center gap-3 text-caption text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-map-module" />

@@ -58,6 +58,26 @@ describe("ReviewSummaryPanel", () => {
     expect(out).not.toContain("partial");
   });
 
+  it("keeps the hubs and the score breakdown behind a native disclosure", () => {
+    const markup = renderToStaticMarkup(
+      <ReviewSummaryPanel summary="3 findings" bySeverity={bySeverity} risk={risk} />,
+    );
+    const details = markup.slice(markup.indexOf("<details"), markup.indexOf("</details>"));
+    expect(details).toContain("<summary");
+    expect(details).toContain("packages/db/src/schema.ts");
+    expect(details).toContain("How the score adds up");
+    expect(details).not.toContain("depend on this change.");
+  });
+
+  it("titles both panels with the one section heading", () => {
+    const markup = renderToStaticMarkup(
+      <ReviewSummaryPanel summary="3 findings" bySeverity={bySeverity} risk={risk} />,
+    );
+    const headings = [...markup.matchAll(/<h2 id="([^"]+)" class="([^"]+)"/g)];
+    expect(headings.map(([, id]) => id)).toEqual(["summary-heading", "blast-radius-heading"]);
+    expect(new Set(headings.map(([, , cls]) => cls)).size).toBe(1);
+  });
+
   it("says when the index could not see everything", () => {
     expect(text({ ...risk, partial: true })).toContain(
       "Static imports only, and partial:",
@@ -86,5 +106,6 @@ describe("ReviewSummaryPanel", () => {
     expect(none).toMatch(/low 0/);
     expect(none).not.toContain("Most depended-on changed files");
     expect(none).not.toContain("How the score adds up");
+    expect(none).not.toContain("Where the reach comes from");
   });
 });
