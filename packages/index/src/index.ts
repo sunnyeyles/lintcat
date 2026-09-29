@@ -99,12 +99,6 @@ export {
 } from "#src/overlay";
 export { coveredSourcePaths } from "#src/pairing";
 export {
-  patchLines,
-  type PatchedFile,
-  type PatchLine,
-  type PatchLines,
-} from "#src/patch-lines";
-export {
   referencesTo,
   type Reference,
   type ReferenceImport,

@@ -25,16 +25,20 @@ export function changeStatus(status: string): ImpactChange["status"] {
     : "modified";
 }
 
-export function impactChanges(
-  changedFiles: readonly ChangedFile[],
-): ImpactChange[] {
-  return changedFiles.map((file) => ({
+export function impactChange(file: ChangedFile): ImpactChange {
+  return {
     path: file.filename,
     status: changeStatus(file.status),
     ...(file.previous_filename === undefined
       ? {}
       : { previousPath: file.previous_filename }),
-  }));
+  };
+}
+
+export function impactChanges(
+  changedFiles: readonly ChangedFile[],
+): ImpactChange[] {
+  return changedFiles.map(impactChange);
 }
 
 interface BlastRadiusRequest {

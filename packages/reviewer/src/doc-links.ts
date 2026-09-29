@@ -1,14 +1,9 @@
 /** Doc links a pull request adds that point at nothing: checked in code, reported as findings. */
 import type { ChangedFile } from "@pr-review/github";
-import {
-  isDocPath,
-  patchLines,
-  readDoc,
-  resolveDocLink,
-  type RepositoryIndex,
-} from "@pr-review/index";
+import { isDocPath, readDoc, resolveDocLink, type RepositoryIndex } from "@pr-review/index";
 import type { ReviewFinding } from "@pr-review/schemas";
 
+import { changedLinesFromPatch } from "#src/diff-lines";
 import { MAX_FINDINGS } from "#src/validate-findings";
 
 interface DocLinkCheck {
@@ -123,7 +118,7 @@ export async function checkDocLinks({
     if (file.status === "removed" || !isDocPath(file.filename)) {
       continue;
     }
-    const added = new Set(patchLines(file.patch).added.map((entry) => entry.line));
+    const added = changedLinesFromPatch(file.patch ?? "");
     const contents = added.size === 0 ? undefined : await headOf(file.filename);
     if (contents === undefined) {
       continue;

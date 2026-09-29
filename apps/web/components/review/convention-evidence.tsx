@@ -1,6 +1,5 @@
-import type { FindingEvidence } from "@pr-review/schemas";
-
-import { blobUrl, type CommitRef } from "@/lib/github-links";
+import { blobUrl, type CommitRef } from "@pr-review/github/links";
+import { evidenceLabel, isConventionCount, type FindingEvidence } from "@pr-review/schemas";
 
 export type ConventionEvidenceProps = {
   evidence: readonly FindingEvidence[];
@@ -11,9 +10,9 @@ export function ConventionEvidence({ evidence, source }: ConventionEvidenceProps
   return (
     <ul className="flex flex-col gap-1.5">
       {evidence.map((entry) =>
-        "convention" in entry ? (
+        isConventionCount(entry) ? (
           <li key={`${entry.convention}@${entry.file}`} className="text-sm text-foreground">
-            {entry.summary ?? `${entry.convention} count for ${entry.file}`}
+            {evidenceLabel(entry)}
           </li>
         ) : (
           <li key={`${entry.file}:${entry.line}`}>
