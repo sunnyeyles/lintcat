@@ -8,7 +8,8 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./conformance": "./src/conformance.ts"
+    "./conformance": "./src/conformance.ts",
+    "./links": "./src/links.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

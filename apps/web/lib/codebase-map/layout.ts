@@ -1,4 +1,4 @@
-import { CLOSED_VIEW, clusterGraph } from "@/lib/codebase-map/clustering";
+import { CLOSED_VIEW, clusterGraph, type Clustering } from "@/lib/codebase-map/clustering";
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 import type { GroupImport, LayoutPoint } from "@/lib/codebase-map/types";
 
@@ -274,7 +274,13 @@ export function layoutGroups(
   graph: NormalisedGraph,
   options: LayoutOptions = MAP_LAYOUT,
 ): Record<string, LayoutPoint> {
-  const clustering = clusterGraph(graph, CLOSED_VIEW);
+  return layoutClustering(clusterGraph(graph, CLOSED_VIEW), options);
+}
+
+export function layoutClustering(
+  clustering: Clustering,
+  options: LayoutOptions = MAP_LAYOUT,
+): Record<string, LayoutPoint> {
   return groupLayout(
     clustering.groups.map((group) => group.id),
     clustering.imports,

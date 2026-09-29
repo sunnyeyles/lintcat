@@ -2,6 +2,7 @@
  * How a finding reads once it leaves the pipeline. Shared so the check
  * run and the review describe a finding identically.
  */
+import { blobUrl, type CommitRef } from "@pr-review/github/links";
 import {
   categoryLabel,
   evidenceLabel,
@@ -11,11 +12,7 @@ import {
 } from "@pr-review/schemas";
 
 /** The commit evidence links point at: the one validation checked it against. */
-export interface EvidenceSource {
-  owner: string;
-  repo: string;
-  sha: string;
-}
+export type EvidenceSource = CommitRef;
 
 /** `file` alone, or `file:line` when the finding is line-anchored. */
 function location(finding: ReviewFinding): string {
@@ -37,8 +34,7 @@ function evidenceLink(entry: FindingEvidence, source: EvidenceSource | undefined
   if (source === undefined) {
     return label;
   }
-  const path = entry.file.split("/").map(encodeURIComponent).join("/");
-  return `[${label}](https://github.com/${source.owner}/${source.repo}/blob/${source.sha}/${path}#L${entry.line})`;
+  return `[${label}](${blobUrl(source, entry.file, entry.line)})`;
 }
 
 /** The "Convention seen in" line, or undefined when no evidence survived. */

@@ -9,6 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@pr-review/design";
+import type { CommitRef } from "@pr-review/github/links";
 import type { ReactNode } from "react";
 
 import { ConfidenceMeter } from "./confidence-meter";
@@ -16,7 +17,6 @@ import { ConventionEvidence } from "./convention-evidence";
 import { FilePath } from "./file-path";
 
 import { SeverityBadge } from "@/components/ui";
-import type { CommitRef } from "@/lib/github-links";
 
 export type FindingSheetProps = {
   finding: Finding | null;

@@ -23,10 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from "@pr-review/design";
+import type { CommitRef } from "@pr-review/github/links";
 import { useId, useMemo, useState } from "react";
 
 import { SeverityBadge } from "@/components/ui";
-import type { CommitRef } from "@/lib/github-links";
 import type { Severity } from "@pr-review/db/dashboard";
 
 import { ConfidenceMeter } from "./confidence-meter";

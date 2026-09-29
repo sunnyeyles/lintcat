@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { blobUrl } from "@/lib/github-links";
+import { blobUrl } from "#src/links";
 
 describe("blobUrl", () => {
   it("links one line of a file at a commit, escaping each path segment", () => {
