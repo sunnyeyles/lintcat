@@ -7,6 +7,7 @@ import path from "node:path";
 import { errorMessage } from "@pr-review/logging";
 
 import { BYPASS_ENV, installPrePushHook } from "#src/hook";
+import { runClaudeHook } from "#src/claude-hook";
 import { runSuppressCommand } from "#src/suppress-command";
 import { parseArguments, UsageError, type Command } from "#src/options";
 import {
@@ -24,6 +25,7 @@ Usage:
   pr-review [review] [options]      Review a checkout and report validated findings
   pr-review install-hook [options]  Install the pre-push hook into a checkout
   pr-review suppress <id> [options] Stop later reviews raising a finding from the last one
+  pr-review claude-hook             Claude Code PreToolUse hook: gate git push and gh pr create
   pr-review help | version
 
 Review options:
@@ -85,6 +87,9 @@ async function dispatch(command: Command, deps: CliEnvironment): Promise<number>
   }
   if (command.kind === "suppress") {
     return runSuppressCommand(command, deps);
+  }
+  if (command.kind === "claude-hook") {
+    return runClaudeHook(deps);
   }
   const installed = await installPrePushHook({
     repoPath: path.resolve(deps.environment.cwd, command.repoPath ?? "."),

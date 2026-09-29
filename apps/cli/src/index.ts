@@ -1,5 +1,6 @@
 import path from "node:path";
 import process from "node:process";
+import { text } from "node:stream/consumers";
 import { fileURLToPath } from "node:url";
 
 import { findLocalEnvFile } from "@pr-review/db";
@@ -30,5 +31,6 @@ process.exitCode = await runCli(process.argv.slice(2), {
   isTty: process.stdout.isTTY === true,
   commandLine: commandLine(),
   signal: interrupt.signal,
+  stdin: () => text(process.stdin),
 });
 interrupt.dispose();

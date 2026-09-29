@@ -56,6 +56,7 @@ export type Command =
   | ReviewOptions
   | InstallHookOptions
   | SuppressOptions
+  | { kind: "claude-hook" }
   | { kind: "help" }
   | { kind: "version" };
 
@@ -237,6 +238,10 @@ export function parseArguments(argv: readonly string[]): Command {
   }
   if (command === "install-hook") {
     return installHookOptions(flags);
+  }
+  if (command === "claude-hook") {
+    known(flags, []);
+    return { kind: "claude-hook" };
   }
   if (command === "suppress") {
     known(flags, ["repo", "reason"]);

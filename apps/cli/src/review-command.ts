@@ -31,12 +31,14 @@ export interface CliDeps {
   err: (text: string) => void;
   /** Aborting it cancels the review and its in-flight model calls. */
   signal?: AbortSignal | undefined;
+  /** The whole of standard input; only a hook reads it. */
+  stdin?: (() => Promise<string>) | undefined;
 }
 
 const CANCELLED_MESSAGE = "pr-review: review cancelled before it finished; no verdict was reached.";
 
 /** Said before any git or model work, so a keyless machine fails in a second. */
-function missingKeyMessage(): string {
+export function missingKeyMessage(): string {
   return (
     `No model API key is set, so there is nothing to run the review with. Set ` +
     `${MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ")} in your environment or in this project's .env.local.`
@@ -50,7 +52,7 @@ export async function runReviewCommand(options: ReviewOptions, deps: CliDeps): P
     return EXIT_ERROR;
   }
   try {
-    const report = await review(options, deps);
+    const report = await reviewReport(options, deps);
     if (signal?.aborted !== true) {
       if (options.format === "json") out(JSON.stringify(report, null, 2));
       else printText(report, options.color ?? false, out);
@@ -65,7 +67,7 @@ export async function runReviewCommand(options: ReviewOptions, deps: CliDeps): P
 }
 
 /** The report, or undefined when the reviewed slice holds no change. */
-async function review(
+export async function reviewReport(
   options: ReviewOptions,
   { environment, err, signal }: CliDeps,
 ): Promise<LocalReviewReport> {

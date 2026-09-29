@@ -70,6 +70,7 @@ async function run(
   argv: string[],
   overrides: Partial<McpEnvironment> = {},
   signal?: AbortSignal,
+  stdin?: string,
 ): Promise<Run> {
   const out: string[] = [];
   const err: string[] = [];
@@ -79,6 +80,7 @@ async function run(
     err: (text) => err.push(text),
     commandLine: "node /opt/pr-review/start.mjs",
     signal,
+    stdin: async () => stdin ?? "",
   };
   return { code: await runCli(argv, deps), out: out.join("\n"), err: err.join("\n") };
 }
@@ -89,6 +91,9 @@ const admin = makeFinding("naming", {
   title: "Admin is always on",
   explanation: "The flag ships enabled.",
 });
+
+// The index CI builds checks evidence, so it must cite lines the fixture has.
+const evidenced = { ...admin, evidence: [{ file: "src/api.ts", line: 1 }, { file: "package.json", line: 1 }] };
 
 describe("reviewing a working tree", () => {
   it("prints each finding with its location and blocks on a high one", async () => {
@@ -208,8 +213,6 @@ describe("the CI profile", () => {
   it("reports a finding the local memory suppresses, as CI would", async () => {
     await suppressAdmin();
 
-    // The index CI builds checks evidence, so it must cite lines the fixture has.
-    const evidenced = { ...admin, evidence: [{ file: "src/api.ts", line: 1 }, { file: "package.json", line: 1 }] };
     const { code, out } = await run(["--base", "main", "--profile", "ci"], {
       createLanguageModel: () => scriptedModel([evidenced]),
     });
@@ -419,6 +422,82 @@ describe("suppressing a finding", () => {
     const { out } = await run(["--help"]);
 
     expect(out).toContain("pr-review suppress <id>");
+  });
+});
+
+describe("the Claude Code push gate", () => {
+  function hookInput(command: string): string {
+    return JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", cwd: repo.root, tool_input: { command } });
+  }
+
+  function gate(command: string, overrides: Partial<McpEnvironment> = {}) {
+    return run(["claude-hook"], overrides, undefined, hookInput(command));
+  }
+
+  it("lets any other command through without reviewing", async () => {
+    const createLanguageModel = vi.fn(() => scriptedModel([evidenced]));
+
+    const { code } = await gate("git status && pnpm test", { createLanguageModel });
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(code).toBe(0);
+  });
+
+  it("blocks a push on a high finding and hands Claude the finding", async () => {
+    const { code, err } = await gate("git push -u origin feature", {
+      createLanguageModel: () => scriptedModel([evidenced]),
+    });
+
+    expect(err).toContain("src/sessions.ts:3");
+    expect(err).toContain("Admin is always on");
+    expect(err).toContain("node /opt/pr-review/start.mjs suppress");
+    expect(code).toBe(2);
+  });
+
+  it("gates opening a pull request too", async () => {
+    const { code } = await gate('gh pr create --title "x" --body "y"', {
+      createLanguageModel: () => scriptedModel([evidenced]),
+    });
+
+    expect(code).toBe(2);
+  });
+
+  it("lets a push through when nothing blocks", async () => {
+    const { code } = await gate("git push", {
+      createLanguageModel: () => scriptedModel([{ ...evidenced, severity: "low" }]),
+    });
+
+    expect(code).toBe(0);
+  });
+
+  it("is bypassed by PR_REVIEW_SKIP", async () => {
+    const createLanguageModel = vi.fn(() => scriptedModel([evidenced]));
+
+    const { code } = await gate("git push", {
+      env: { OPENAI_API_KEY: "sk-test", PR_REVIEW_SKIP: "1" },
+      createLanguageModel,
+    });
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(code).toBe(0);
+  });
+
+  it("answers a retry on the same tree without calling a model", async () => {
+    await gate("git push", { createLanguageModel: () => scriptedModel([evidenced]) });
+    const createLanguageModel = vi.fn(() => scriptedModel([evidenced]));
+
+    const { code } = await gate("git push", { createLanguageModel });
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(code).toBe(2);
+  });
+
+  it("does not block when the review cannot run, and says why", async () => {
+    const { code, err } = await gate("git push", { env: {} });
+
+    expect(err).toContain("No model API key is set");
+    expect(err).toContain("not reviewed");
+    expect(code).toBe(0);
   });
 });
 
