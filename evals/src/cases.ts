@@ -45,6 +45,42 @@ export const evalCases: EvalCase[] = [
     ],
   },
   {
+    fixture: "rule-doc-service-not-found",
+    expectations: [
+      {
+        kind: "finding",
+        description:
+          "reports that the payment service returns undefined for a hidden payment, citing the AGENTS.md rule that services throw HttpError(404)",
+        anchors: [
+          {
+            file: "src/services/payments.ts",
+            startMarker: "export async function getPayment(",
+            endMarker: "return payment;",
+          },
+          {
+            file: "src/routes/payments.ts",
+            startMarker: "if (payment === undefined) {",
+            endMarker: "res.status(404)",
+          },
+        ],
+        cites: [
+          { file: "AGENTS.md", marker: "It never returns `undefined` for a route to check." },
+          { file: "AGENTS.md", marker: "Routes never set an error status themselves" },
+        ],
+      },
+    ],
+  },
+  {
+    fixture: "clean-lint-only",
+    expectations: [
+      {
+        kind: "no-findings",
+        description:
+          "reports nothing on a change whose only problems — an unused import, a let, single quotes, missing semicolons — the repository's ESLint and Prettier already catch",
+      },
+    ],
+  },
+  {
     fixture: "clean-no-convention-lib",
     expectations: [
       patchesVerify,

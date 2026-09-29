@@ -2,12 +2,12 @@
 import { describe, expect, it } from "vitest";
 
 import { evalCases } from "#src/cases";
-import { resolveAnchor } from "#src/expectations";
+import { resolveAnchor, resolveCitation } from "#src/expectations";
 import { loadFixture } from "#src/fixture";
 
 describe("evalCases", () => {
   it.each(evalCases.map((evalCase) => [evalCase.fixture, evalCase] as const))(
-    "resolves every anchor of %s inside a changed file",
+    "resolves every anchor of %s inside a changed file, and every citation at base",
     (_name, evalCase) => {
       const fixture = loadFixture(evalCase.fixture);
 
@@ -16,6 +16,9 @@ describe("evalCases", () => {
         for (const anchor of expectation.anchors) {
           const { from, to } = resolveAnchor(fixture, anchor);
           expect(from).toBeLessThanOrEqual(to);
+        }
+        for (const citation of expectation.cites ?? []) {
+          expect(resolveCitation(fixture, citation).line).toBeGreaterThan(0);
         }
       }
     },

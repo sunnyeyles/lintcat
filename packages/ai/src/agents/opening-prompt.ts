@@ -1,4 +1,4 @@
-/** The opening user message every engine sends: scope, pull request, files, index, siblings, doc_mentions, config_drift, diff. */
+/** The opening user message every engine sends: scope, pull request, files, index, siblings, doc_mentions, config_drift, rules, diff. */
 import type { RepositoryIndex } from "@pr-review/index";
 
 import type { ReviewContext } from "#src/agent-contract";
@@ -9,6 +9,7 @@ import {
   renderOmitted,
   type OpeningDiffLimits,
 } from "#src/agents/opening-diff";
+import { renderLintConfig, renderRuleDocs } from "#src/agents/repo-rules";
 import {
   renderRepository,
   renderRepositoryIndex,
@@ -100,6 +101,8 @@ export function buildOpeningPrompt(
     ...renderSiblingFiles(index, context, maxListedFiles),
     ...renderDocMentions(index, context),
     ...renderConfigDrift(index, context),
+    ...renderRuleDocs(index, context, budget.tools),
+    ...renderLintConfig(index, context),
     "<diff>",
     opening.diff,
     "</diff>",
