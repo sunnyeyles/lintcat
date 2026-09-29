@@ -11,7 +11,8 @@ import {
   runReview,
   type McpEnvironment,
 } from "@pr-review/mcp/local-review";
-import { CI_REVIEW_POLICY } from "@pr-review/reviewer";
+import { CI_REVIEW_POLICY, findingId } from "@pr-review/reviewer";
+import type { LocalReviewReport } from "@pr-review/schemas";
 
 import type { ReviewOptions } from "#src/options";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
@@ -40,10 +41,18 @@ function missingKeyMessage(): string {
 }
 
 export async function runReviewCommand(options: ReviewOptions, deps: CliDeps): Promise<number> {
-  const { signal, err } = deps;
+  const { signal, out, err } = deps;
+  if (!hasModelApiKey(deps.environment)) {
+    err(missingKeyMessage());
+    return EXIT_ERROR;
+  }
   try {
-    const code = await review(options, deps);
-    if (signal?.aborted !== true) return code;
+    const report = await review(options, deps);
+    if (signal?.aborted !== true) {
+      if (options.format === "json") out(JSON.stringify(report, null, 2));
+      else printText(report, options.color ?? false, out);
+      return report.blocking > 0 ? EXIT_BLOCKED : EXIT_OK;
+    }
   } catch (error: unknown) {
     // Only our own interrupt is a cancellation; a stray AbortError is a failure.
     if (signal?.aborted !== true) throw error;
@@ -52,24 +61,35 @@ export async function runReviewCommand(options: ReviewOptions, deps: CliDeps): P
   return EXIT_CANCELLED;
 }
 
+/** The report, or undefined when the reviewed slice holds no change. */
 async function review(
   options: ReviewOptions,
-  { environment, out, err, signal }: CliDeps,
-): Promise<number> {
-  if (!hasModelApiKey(environment)) {
-    err(missingKeyMessage());
-    return EXIT_ERROR;
-  }
+  { environment, err, signal }: CliDeps,
+): Promise<LocalReviewReport> {
   const local = await openLocalRepository(
     path.resolve(environment.cwd, options.repoPath ?? "."),
     options.base,
     options.scope,
   );
+  const report = (fields: Partial<LocalReviewReport>): LocalReviewReport => ({
+    version: 1,
+    profile: options.profile,
+    model: null,
+    baseRef: local.baseRef,
+    baseSha: local.baseSha,
+    head: local.target.headSha,
+    failOn: options.failOn,
+    findings: [],
+    blocking: 0,
+    suppressed: 0,
+    summary: "",
+    ...fields,
+  });
   const changed = await local.client.listChangedFiles(local.target);
   const where = `${local.scope.headLabel} of ${local.root} against ${local.baseRef} (${local.baseSha.slice(0, 7)})`;
   if (changed.length === 0) {
-    out(`Nothing to review: no changes in ${where}.`);
-    return EXIT_OK;
+    err(`Nothing to review: no changes in ${where}.`);
+    return report({});
   }
   err(`Reviewing ${changed.length} changed file(s): ${where}.`);
 
@@ -94,12 +114,23 @@ async function review(
       signal,
     },
   );
-
-  if (signal?.aborted === true) return EXIT_CANCELLED;
   const { findings, suppressed } = result.outcome;
-  const blocking = blockingFindings(findings, options.failOn);
-  const render = { color: options.color ?? false };
-  for (const finding of orderFindings(findings)) {
+  return report({
+    model: selected.model ?? null,
+    findings: orderFindings(findings).map((finding) => ({ ...finding, id: findingId(finding) })),
+    blocking: blockingFindings(findings, options.failOn).length,
+    suppressed,
+    summary: result.summary,
+  });
+}
+
+function printText(report: LocalReviewReport, color: boolean, out: (text: string) => void): void {
+  if (report.summary === "") {
+    out("Nothing to review.");
+    return;
+  }
+  const render = { color };
+  for (const finding of report.findings) {
     out("");
     out(renderFinding(finding, render));
   }
@@ -107,13 +138,12 @@ async function review(
   out(
     renderSummary(
       {
-        findings,
-        blocking,
-        failOn: options.failOn,
-        suppressed,
+        findings: report.findings,
+        blocking: blockingFindings(report.findings, report.failOn),
+        failOn: report.failOn,
+        suppressed: report.suppressed,
       },
       render,
     ),
   );
-  return blocking.length > 0 ? EXIT_BLOCKED : EXIT_OK;
 }

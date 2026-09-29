@@ -13,6 +13,10 @@ export type Profile = "local" | "ci";
 
 const PROFILES: readonly Profile[] = ["local", "ci"];
 
+export type Format = "text" | "json";
+
+const FORMATS: readonly Format[] = ["text", "json"];
+
 export interface ReviewOptions {
   kind: "review";
   /** The checkout to review; undefined means the working directory. */
@@ -20,6 +24,7 @@ export interface ReviewOptions {
   base: string | undefined;
   scope: LocalScope;
   profile: Profile;
+  format: Format;
   index: boolean;
   failOn: FailOn;
   /** Let the review's own structured log through to stderr. */
@@ -127,6 +132,14 @@ function readProfile(flags: Flags): Profile {
   return value as Profile;
 }
 
+function readFormat(flags: Flags): Format {
+  const value = flags.values.get("format") ?? "text";
+  if (!FORMATS.includes(value as Format)) {
+    throw new UsageError(`--format must be one of ${FORMATS.join(", ")}, not ${JSON.stringify(value)}`);
+  }
+  return value as Format;
+}
+
 function readColor(flags: Flags): boolean | undefined {
   if (flags.switches.has("no-color")) return false;
   if (flags.switches.has("color")) return true;
@@ -158,6 +171,7 @@ const REVIEW_FLAGS = [
   "scope",
   "range",
   "profile",
+  "format",
   "fail-on",
   "no-index",
   "verbose",
@@ -173,6 +187,7 @@ function reviewOptions(flags: Flags): ReviewOptions {
     base: flags.values.get("base"),
     scope: readScope(flags),
     profile: readProfile(flags),
+    format: readFormat(flags),
     index: !flags.switches.has("no-index"),
     failOn: readFailOn(flags),
     verbose: flags.switches.has("verbose"),

@@ -13,6 +13,10 @@ export {
   type ReviewFinding,
 } from "#src/review-finding";
 export {
+  localReviewReportSchema,
+  type LocalReviewReport,
+} from "#src/local-review-report";
+export {
   reviewMemorySchema,
   type MemoryShape,
   type ReviewMemory,

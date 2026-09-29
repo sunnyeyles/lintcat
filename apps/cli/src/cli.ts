@@ -31,6 +31,7 @@ Review options:
   --range <range>      Commits to review, e.g. HEAD~3..HEAD; implies --scope range
   --profile <profile>  local (default), or ci: CI's policy, ignoring local suppressions
   --fail-on <level>    Exit non-zero at this severity or above: low, medium, high (default), off
+  --format <format>    text (default), or json: one document on stdout, progress on stderr
   --no-index           Skip the repository import index
   --verbose            Let the review's structured log through to stderr
   --color / --no-color Force colour on or off (default: on for a terminal, off otherwise)

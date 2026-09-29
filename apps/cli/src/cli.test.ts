@@ -13,7 +13,7 @@ import { createCapturingLogger } from "@pr-review/logging";
 import { openLocalMemoryStore, type McpEnvironment } from "@pr-review/mcp/local-review";
 import { createTestRepo, type TestRepo } from "@pr-review/mcp/test-repo";
 import { addSuppression, readMemory, writeMemory } from "@pr-review/reviewer";
-import type { ReviewFinding } from "@pr-review/schemas";
+import { localReviewReportSchema, type ReviewFinding } from "@pr-review/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runCli, type CliEnvironment } from "#src/cli";
@@ -241,6 +241,69 @@ describe("the CI profile", () => {
 
     expect(err).toContain("--no-index cannot be used with --profile ci");
     expect(code).toBe(2);
+  });
+});
+
+describe("the JSON report", () => {
+  function report(out: string) {
+    return localReviewReportSchema.parse(JSON.parse(out));
+  }
+
+  it("prints one document the report schema accepts, and keeps progress on stderr", async () => {
+    const { code, out, err } = await run(["--base", "main", "--no-index", "--format", "json"], {
+      createLanguageModel: () => scriptedModel([admin]),
+    });
+
+    const parsed = report(out);
+    expect(parsed.findings.map((finding) => finding.title)).toEqual(["Admin is always on"]);
+    expect(parsed.findings[0]!.id).toMatch(/^[0-9a-f]{12}$/);
+    expect(parsed.blocking).toBe(1);
+    expect(parsed.summary).toContain("## ");
+    expect(parsed.model).toEqual({ provider: "openai", modelId: "gpt-5.6-luna" });
+    expect(err).toContain("Reviewing 1 changed file(s)");
+    expect(code).toBe(1);
+  });
+
+  it("gives a finding the same id on every run over the same tree", async () => {
+    const first = await run(["--base", "main", "--no-index", "--format", "json"], {
+      createLanguageModel: () => scriptedModel([admin]),
+    });
+    const second = await run(["--base", "main", "--no-index", "--format", "json"], {
+      createLanguageModel: () => scriptedModel([{ ...admin, explanation: "Worded another way." }]),
+    });
+
+    expect(report(second.out).findings[0]!.id).toBe(report(first.out).findings[0]!.id);
+  });
+
+  it("carries a verified patch and drops one that does not match the file", async () => {
+    const fixable = {
+      ...admin,
+      patch: { startLine: 3, endLine: 3, expected: "export const admin = true;", replacement: "export const admin = false;" },
+    };
+    const stale = makeFinding("naming", {
+      file: "src/sessions.ts",
+      line: 2,
+      title: "Sessions never expire",
+      patch: { startLine: 2, endLine: 2, expected: "not what the file says", replacement: "x" },
+    });
+
+    const { out } = await run(["--base", "main", "--no-index", "--format", "json"], {
+      createLanguageModel: () => scriptedModel([fixable, stale]),
+    });
+
+    const byTitle = new Map(report(out).findings.map((finding) => [finding.title, finding]));
+    expect(byTitle.get("Admin is always on")?.patch?.replacement).toBe("export const admin = false;");
+    expect(byTitle.get("Sessions never expire")?.patch).toBeUndefined();
+  });
+
+  it("answers in JSON when there is nothing to review", async () => {
+    repo.commit("admin");
+    repo.git("checkout", "-q", "main");
+
+    const { code, out } = await run(["--base", "main", "--format", "json"]);
+
+    expect(report(out).findings).toEqual([]);
+    expect(code).toBe(0);
   });
 });
 

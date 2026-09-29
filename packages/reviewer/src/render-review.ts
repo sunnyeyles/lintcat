@@ -2,6 +2,8 @@
  * Renders validated findings into a review body plus inline comments; the
  * caller owns the API call. validateFindings already settles anchoring.
  */
+import { createHash } from "node:crypto";
+
 import type { ReviewComment } from "@pr-review/github";
 import type { ReviewFinding } from "@pr-review/schemas";
 
@@ -28,6 +30,11 @@ export interface RenderedReview {
  */
 export function findingKey(finding: ReviewFinding): string {
   return `${finding.file}|${normaliseTitle(finding.title)}`;
+}
+
+/** A short, stable name for a finding, for a command line to point at. */
+export function findingId(finding: ReviewFinding): string {
+  return createHash("sha256").update(findingKey(finding)).digest("hex").slice(0, 12);
 }
 
 /** Carries findingKey inside a comment; an HTML comment renders as nothing. */

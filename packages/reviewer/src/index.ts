@@ -66,6 +66,7 @@ export {
 } from "#src/memory";
 export {
   categoryMarker,
+  findingId,
   findingMarker,
   parsePostedFinding,
   postedFindingKeys,
