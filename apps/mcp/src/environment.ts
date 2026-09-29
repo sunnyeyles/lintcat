@@ -71,6 +71,8 @@ export function processEnvironment(): McpEnvironment {
 /** The run's default model, and the factory an agent's own `model` uses. */
 export interface ModelSelection {
   model: ReviewModel;
+  provider: ModelProvider;
+  modelId: string;
 }
 
 /** Unset, the default provider wins when its key is present, else any provider that has one. */
@@ -108,6 +110,8 @@ export function resolveModel(environment: McpEnvironment): ModelSelection {
       ...(baseUrl === "" ? {} : { baseUrl }),
       modelId,
     }),
+    provider,
+    modelId,
   };
 }
 

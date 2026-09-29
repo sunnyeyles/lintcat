@@ -10,8 +10,9 @@ import {
   textBlock,
 } from "@pr-review/ai/agent-test-support";
 import { createCapturingLogger } from "@pr-review/logging";
-import type { McpEnvironment } from "@pr-review/mcp/local-review";
+import { openLocalMemoryStore, type McpEnvironment } from "@pr-review/mcp/local-review";
 import { createTestRepo, type TestRepo } from "@pr-review/mcp/test-repo";
+import { addSuppression, readMemory, writeMemory } from "@pr-review/reviewer";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -184,6 +185,62 @@ describe("reviewing a working tree", () => {
     expect(err).toContain("Reviewing 1 changed file(s)");
     expect(err).toContain("the staged changes");
     expect(code).toBe(0);
+  });
+});
+
+describe("the CI profile", () => {
+  async function suppressAdmin() {
+    const store = await openLocalMemoryStore(repo.root);
+    const memory = await readMemory(store, createCapturingLogger().logger);
+    await writeMemory(store, addSuppression(memory, admin, new Date()));
+  }
+
+  it("hides a locally suppressed finding by default", async () => {
+    await suppressAdmin();
+
+    const { out } = await run(["--base", "main", "--no-index"], {
+      createLanguageModel: () => scriptedModel([admin]),
+    });
+
+    expect(out).not.toContain("Admin is always on");
+  });
+
+  it("reports a finding the local memory suppresses, as CI would", async () => {
+    await suppressAdmin();
+
+    // The index CI builds checks evidence, so it must cite lines the fixture has.
+    const evidenced = { ...admin, evidence: [{ file: "src/api.ts", line: 1 }, { file: "package.json", line: 1 }] };
+    const { code, out } = await run(["--base", "main", "--profile", "ci"], {
+      createLanguageModel: () => scriptedModel([evidenced]),
+    });
+
+    expect(out).toContain("Admin is always on");
+    expect(code).toBe(1);
+  });
+
+  it("names the model it reviews with", async () => {
+    const { err } = await run(["--base", "main", "--no-index"], {
+      createLanguageModel: () => scriptedModel([]),
+    });
+
+    expect(err).toContain("Model: openai gpt-5.6-luna");
+  });
+
+  it("warns when the model is not the one CI defaults to", async () => {
+    const { err } = await run(["--base", "main", "--profile", "ci"], {
+      env: { OPENAI_API_KEY: "sk-test", PR_REVIEW_MODEL: "gpt-5.6-luna-mini" },
+      createLanguageModel: () => scriptedModel([]),
+    });
+
+    expect(err).toContain("Model: openai gpt-5.6-luna-mini");
+    expect(err).toContain("CI reviews with gpt-5.6-luna");
+  });
+
+  it("refuses to skip the index CI always builds", async () => {
+    const { code, err } = await run(["--profile", "ci", "--no-index"]);
+
+    expect(err).toContain("--no-index cannot be used with --profile ci");
+    expect(code).toBe(2);
   });
 });
 

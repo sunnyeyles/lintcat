@@ -36,6 +36,7 @@ import {
   githubDelivery,
   isFixCommit,
   reviewCorrelation,
+  CI_REVIEW_POLICY,
   runReview,
   type ReviewTarget,
 } from "@pr-review/reviewer";
@@ -213,7 +214,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       target,
       delivery,
       engine: toolLoopEngine({ model }),
-      policy: { incremental: deps.incremental ?? true },
+      policy: { ...CI_REVIEW_POLICY, incremental: deps.incremental ?? CI_REVIEW_POLICY.incremental },
       logger,
       signal: controller.signal,
       stillRunning,

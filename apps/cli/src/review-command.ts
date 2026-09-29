@@ -1,7 +1,7 @@
 /** One `pr-review review`: the MCP server's local review path, printed to a terminal. */
 import path from "node:path";
 
-import { apiKeyEnvFor, MODEL_PROVIDERS } from "@pr-review/ai";
+import { apiKeyEnvFor, defaultModelFor, MODEL_PROVIDERS } from "@pr-review/ai";
 import { createSilentLogger } from "@pr-review/logging";
 import {
   hasModelApiKey,
@@ -11,6 +11,7 @@ import {
   runReview,
   type McpEnvironment,
 } from "@pr-review/mcp/local-review";
+import { CI_REVIEW_POLICY } from "@pr-review/reviewer";
 
 import type { ReviewOptions } from "#src/options";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
@@ -72,14 +73,24 @@ async function review(
   }
   err(`Reviewing ${changed.length} changed file(s): ${where}.`);
 
+  const selected = modelReviewEngine(environment);
+  if (selected.model !== undefined) {
+    const { provider, modelId } = selected.model;
+    err(`Model: ${provider} ${modelId}`);
+    const ciModel = defaultModelFor(provider);
+    if (options.profile === "ci" && modelId !== ciModel) {
+      err(`Warning: CI reviews with ${ciModel} unless the repository's settings choose another model.`);
+    }
+  }
+  const ci = options.profile === "ci";
   const result = await runReview(
     { ...environment, logger: options.verbose ? environment.logger : createSilentLogger() },
     {
       client: local.client,
       target: local.target,
-      selected: modelReviewEngine(environment),
+      selected,
       index: options.index,
-      memory: await openLocalMemoryStore(local.root),
+      ...(ci ? { policy: CI_REVIEW_POLICY } : { memory: await openLocalMemoryStore(local.root) }),
       signal,
     },
   );

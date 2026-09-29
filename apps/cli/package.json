@@ -22,6 +22,7 @@
     "@pr-review/db": "workspace:*",
     "@pr-review/logging": "workspace:*",
     "@pr-review/mcp": "workspace:*",
+    "@pr-review/reviewer": "workspace:*",
     "@pr-review/schemas": "workspace:*"
   },
   "devDependencies": {

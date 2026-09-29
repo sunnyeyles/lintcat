@@ -4,6 +4,7 @@ import {
   MODEL_PROVIDERS,
   samplingEngine,
   toolLoopEngine,
+  type ModelProvider,
   type ReviewEngine,
 } from "@pr-review/ai";
 
@@ -14,6 +15,8 @@ export interface SelectedEngine {
   engine: ReviewEngine;
   /** One sampling request replaced the tool-calling agent; the result must say so. */
   singleShot: boolean;
+  /** The key-backed model; absent when the client samples its own. */
+  model?: { provider: ModelProvider; modelId: string } | undefined;
 }
 
 /** Said when the machine has neither a key nor a client willing to run the model. */
@@ -27,9 +30,11 @@ function noModelAccessMessage(): string {
 
 /** The key-backed engine: the tool-calling agent over the run's model. */
 export function modelReviewEngine(environment: McpEnvironment): SelectedEngine {
+  const { model, provider, modelId } = resolveModel(environment);
   return {
-    engine: toolLoopEngine({ model: resolveModel(environment).model }),
+    engine: toolLoopEngine({ model }),
     singleShot: false,
+    model: { provider, modelId },
   };
 }
 

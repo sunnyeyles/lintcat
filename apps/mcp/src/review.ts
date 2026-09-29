@@ -7,6 +7,7 @@ import {
   type ReviewClient,
   type ReviewDelivery,
   type ReviewOutcome,
+  type ReviewPolicy,
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
@@ -19,6 +20,8 @@ export interface ReviewRequest {
   /** What runs the review; chosen by the caller. */
   selected: SelectedEngine;
   index?: boolean | undefined;
+  /** Replaces the local policy whole, `index` included. */
+  policy?: ReviewPolicy | undefined;
   /** Where the run writes back; absent is a dry run, and a local checkout has nothing to pass. */
   publishTo?: GithubDeliveryConfig["client"] | undefined;
   /** The memory whose hints and suppressions this run consults; absent reads none. */
@@ -57,6 +60,7 @@ export async function runReview(
     target,
     selected,
     index = true,
+    policy = { index },
     publishTo,
     memory,
     signal,
@@ -76,7 +80,7 @@ export async function runReview(
       },
     ),
     engine: selected.engine,
-    policy: { index },
+    policy,
     ...(memory === undefined ? {} : { memory: { store: memory } }),
     logger,
     signal,

@@ -8,12 +8,18 @@ const FAIL_ON: readonly FailOn[] = ["low", "medium", "high", "off"];
 
 const SCOPES = ["working-tree", "staged", "range"] as const;
 
+/** `ci` runs what the worker runs: its policy, and no local memory. */
+export type Profile = "local" | "ci";
+
+const PROFILES: readonly Profile[] = ["local", "ci"];
+
 export interface ReviewOptions {
   kind: "review";
   /** The checkout to review; undefined means the working directory. */
   repoPath: string | undefined;
   base: string | undefined;
   scope: LocalScope;
+  profile: Profile;
   index: boolean;
   failOn: FailOn;
   /** Let the review's own structured log through to stderr. */
@@ -110,6 +116,17 @@ function readFailOn(flags: Flags): FailOn {
   return value as FailOn;
 }
 
+function readProfile(flags: Flags): Profile {
+  const value = flags.values.get("profile") ?? "local";
+  if (!PROFILES.includes(value as Profile)) {
+    throw new UsageError(`--profile must be one of ${PROFILES.join(", ")}, not ${JSON.stringify(value)}`);
+  }
+  if (value === "ci" && flags.switches.has("no-index")) {
+    throw new UsageError("--no-index cannot be used with --profile ci: CI always builds the index");
+  }
+  return value as Profile;
+}
+
 function readColor(flags: Flags): boolean | undefined {
   if (flags.switches.has("no-color")) return false;
   if (flags.switches.has("color")) return true;
@@ -140,6 +157,7 @@ const REVIEW_FLAGS = [
   "base",
   "scope",
   "range",
+  "profile",
   "fail-on",
   "no-index",
   "verbose",
@@ -154,6 +172,7 @@ function reviewOptions(flags: Flags): ReviewOptions {
     repoPath: flags.values.get("repo"),
     base: flags.values.get("base"),
     scope: readScope(flags),
+    profile: readProfile(flags),
     index: !flags.switches.has("no-index"),
     failOn: readFailOn(flags),
     verbose: flags.switches.has("verbose"),

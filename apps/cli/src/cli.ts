@@ -29,6 +29,7 @@ Review options:
   --base <ref>         Branch or commit to compare against (default: the remote default branch)
   --scope <kind>       working-tree (default), staged, or range
   --range <range>      Commits to review, e.g. HEAD~3..HEAD; implies --scope range
+  --profile <profile>  local (default), or ci: CI's policy, ignoring local suppressions
   --fail-on <level>    Exit non-zero at this severity or above: low, medium, high (default), off
   --no-index           Skip the repository import index
   --verbose            Let the review's structured log through to stderr
