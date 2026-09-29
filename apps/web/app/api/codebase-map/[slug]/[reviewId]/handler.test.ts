@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  groupIdFor,
   mapQuery,
   sampleRepo,
   SEARCH_LIMIT,
@@ -8,6 +9,7 @@ import {
   type MapSearchAnswer,
   type MapSource,
 } from "@/lib/codebase-map";
+import { createMapSourceLoader } from "@/lib/data/map-source";
 
 import { handleCodebaseMap } from "./handler";
 
@@ -57,6 +59,20 @@ describe("handleCodebaseMap rejects", () => {
     expect(response.status).toBe(404);
   });
 
+  it("a reader who fails the access check, before any cache is read", async () => {
+    const baseGraph = vi.fn(async () => null);
+    const reviewInputs = vi.fn(async () => null);
+    const loader = createMapSourceLoader({ access: async () => null, baseGraph, reviewInputs });
+
+    const response = await handleCodebaseMap({ action: "expand", groupId: held[0]!.id }, () =>
+      loader(1),
+    );
+
+    expect(response.status).toBe(404);
+    expect(baseGraph).not.toHaveBeenCalled();
+    expect(reviewInputs).not.toHaveBeenCalled();
+  });
+
   it("a group the repo does not have", async () => {
     const response = await handleCodebaseMap(
       { action: "expand", groupId: "nope::nowhere" },
@@ -75,6 +91,18 @@ describe("handleCodebaseMap answers", () => {
     expect(response.status).toBe(200);
     expect(slice.groupId).toBe(target.id);
     expect(slice.graph.files).toHaveLength(target.fileCount);
+  });
+
+  it("an expand of a partial group with all of its files, reach included", async () => {
+    const first = mapQuery(source).first().graph;
+    const sentGroups = new Set(first.files.map((file) => groupIdFor(file)));
+    const partial = held.find((summary) => sentGroups.has(summary.id))!;
+    const response = await handleCodebaseMap({ action: "expand", groupId: partial.id }, load);
+    const slice = await json<GroupSlice>(response);
+
+    expect(partial).toBeDefined();
+    expect(slice.graph.files).toHaveLength(partial.fileCount);
+    expect(slice.graph.files.some((file) => file.reach !== undefined)).toBe(true);
   });
 
   it("a search with its results and the repo's size", async () => {

@@ -14,7 +14,6 @@ import {
 import { QueryBuilder } from "drizzle-orm/pg-core";
 
 import type { Database } from "../client";
-import { findRepositoryGraph } from "../repository-graphs";
 import {
   findings,
   repos,
@@ -410,25 +409,14 @@ export function createDbSource(
       return review ?? null;
     },
 
-    async getRepositoryGraph(id) {
+    async getMapAccess(id) {
       const [row] = await database
         .select({ repoId: reviews.repoId, baseSha: reviews.baseSha })
         .from(reviews)
         .innerJoin(repos, eq(repos.id, reviews.repoId))
         .where(and(...scopeOf({ id })))
         .limit(1);
-      if (row?.baseSha == null) return undefined;
-      return findRepositoryGraph(database, row.repoId, row.baseSha);
-    },
-
-    async getChangedFiles(id) {
-      const [row] = await database
-        .select({ changedFiles: reviews.changedFiles })
-        .from(reviews)
-        .innerJoin(repos, eq(repos.id, reviews.repoId))
-        .where(and(...scopeOf({ id })))
-        .limit(1);
-      return row?.changedFiles ?? [];
+      return row ?? null;
     },
 
     async getTrends(range, repoId) {

@@ -8,6 +8,7 @@ import type {
   ReviewRecord,
   ReviewRecordChangedFile,
   ReviewRecordGraph,
+  ReviewRecordOverlay,
   ReviewRecordRisk,
 } from "@pr-review/schemas";
 import { asc, eq, isNull } from "drizzle-orm";
@@ -450,5 +451,36 @@ describe("ingestReviewRecord, with a risk score", () => {
       reason: "invalid-record",
       issues: ["risk.factors.0.points", "risk.dependents.1"],
     });
+  });
+});
+
+const overlay: ReviewRecordOverlay = {
+  headSha: record.headSha,
+  files: [
+    { path: "src/auth/session.ts", status: "modified" },
+    { path: "src/auth/tokens.ts", status: "renamed", previousPath: "src/auth/token.ts" },
+  ],
+  added: [{ from: "src/auth/session.ts", to: "src/auth/tokens.ts" }],
+  removed: [{ from: "src/auth/session.ts", to: "src/list.ts" }],
+  unresolvedImportCount: 1,
+  partial: false,
+};
+
+describe("ingestReviewRecord, with a change overlay", () => {
+  it("stores the overlay on the review, not in the shared graph table", async () => {
+    const result = await ingestReviewRecord(database, organizationId, { ...record, overlay });
+    expect(result.ok).toBe(true);
+
+    const [review] = await database.select().from(reviews);
+    expect(review?.overlay).toEqual(overlay);
+    expect(await database.select().from(repositoryGraphs)).toEqual([]);
+  });
+
+  it("stores none, as SQL null, for a sender that predates it, and clears it on a rerun without one", async () => {
+    await ingestReviewRecord(database, organizationId, { ...record, overlay });
+    await ingestReviewRecord(database, organizationId, record);
+
+    const rows = await database.select().from(reviews).where(isNull(reviews.overlay));
+    expect(rows).toHaveLength(1);
   });
 });

@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useImperativeHandle, useRef, type Ref } from "react";
 
-import { markerParts } from "@/components/codebase-map/markers";
+import {
+  DEAD_DASH,
+  EDGE_STYLES,
+  markerParts,
+  QUIET_ALPHA,
+  QUIET_SCALE,
+  type EdgeClass,
+} from "@/components/codebase-map/markers";
 import type { MapPalette } from "@/components/codebase-map/palette";
 import type { Scene, SceneNode } from "@/lib/codebase-map";
 import { clampScale, fitView, type MapHandle, type MapView } from "@/components/codebase-map/view";
@@ -32,13 +39,24 @@ export interface MapCanvasProps {
   className?: string;
 }
 
+function edgeClass(edge: Scene["edges"][number]): EdgeClass | "base" {
+  if (edge.relation !== "base") return edge.relation;
+  return edge.change ?? "base";
+}
+
 function nodeColour(node: SceneNode, palette: MapPalette): string {
   if (node.kind === "group") return palette["--map-structure"];
   switch (node.level) {
     case "focus":
       return palette["--ring"];
     case "changed":
-      return palette["--map-module-changed"];
+      return node.change === "added"
+        ? palette["--success"]
+        : node.change === "removed"
+          ? palette["--destructive"]
+          : palette["--map-module-changed"];
+    case "reached":
+      return palette["--map-kind-2"];
     case "impacted":
       return palette["--map-module-impacted"];
     case "neighbour":
@@ -59,6 +77,7 @@ interface Batch {
   mode: "fill" | "stroke";
   width: number;
   colour: string;
+  alpha: number;
 }
 
 // Parsing a path string per node per frame is the whole frame budget at 10k, so shapes are cached.
@@ -113,20 +132,23 @@ export function MapCanvas({
     const bottom = top + height / view.scale;
     const margin = 40 / view.scale;
 
-    // Every edge class is one path, so the whole layer costs three stroke calls.
+    // Every edge class is one path, so the whole layer costs one stroke call per class.
     const base = new Path2D();
-    const dependency = new Path2D();
-    const dependent = new Path2D();
+    const paths = new Map<EdgeClass, Path2D>();
     for (const edge of current.edges) {
-      const target =
-        edge.relation === "base" ? base : edge.relation === "dependency" ? dependency : dependent;
-      if (edge.relation === "base") {
+      const kind = edgeClass(edge);
+      if (kind === "base") {
         const lo = Math.min(edge.ax, edge.bx);
         const hi = Math.max(edge.ax, edge.bx);
         if (hi < left - margin || lo > right + margin) continue;
         const loY = Math.min(edge.ay, edge.by);
         const hiY = Math.max(edge.ay, edge.by);
         if (hiY < top - margin || loY > bottom + margin) continue;
+      }
+      let target = kind === "base" ? base : paths.get(kind);
+      if (!target) {
+        target = new Path2D();
+        paths.set(kind as EdgeClass, target);
       }
       target.moveTo(edge.ax, edge.ay);
       target.lineTo(edge.bx, edge.by);
@@ -138,17 +160,19 @@ export function MapCanvas({
     context.stroke(base);
 
     context.globalAlpha = 1;
-    context.setLineDash([]);
-    context.strokeStyle = colours["--map-kind-1"];
-    context.lineWidth = 1.6 / view.scale;
-    context.stroke(dependency);
-
-    context.setLineDash([5 / view.scale, 4 / view.scale]);
-    context.strokeStyle = colours["--map-kind-3"];
-    context.stroke(dependent);
+    for (const kind of Object.keys(EDGE_STYLES) as EdgeClass[]) {
+      const path = paths.get(kind);
+      if (!path) continue;
+      const style = EDGE_STYLES[kind];
+      context.setLineDash(style.dash.map((length) => length / view.scale));
+      context.strokeStyle = colours[style.token];
+      context.lineWidth = style.width / view.scale;
+      context.stroke(path);
+    }
     context.setLineDash([]);
 
     const batches = new Map<string, Batch>();
+    const dead = new Path2D();
     const labels: SceneNode[] = [];
     const counts: SceneNode[] = [];
     const move = new DOMMatrix();
@@ -170,21 +194,28 @@ export function MapCanvas({
             ? colours["--map-module-impacted"]
             : colours["--map-structure-border"];
       // Zoomed out, a marker at its world radius is sub-pixel and the map turns to mush.
-      const radius = Math.max(node.radius, minRadius);
+      const radius = Math.max(node.radius * (node.quiet ? QUIET_SCALE : 1), minRadius);
+      const alpha = node.quiet ? QUIET_ALPHA : 1;
       const shapeKey = `${node.marker}|${node.direction ?? "-"}|${radius}`;
       const parts = markerParts(node.marker, radius, node.direction);
       for (let i = 0; i < parts.length; i += 1) {
         const part = parts[i]!;
         const colour = part.mode === "fill" ? fill : stroke;
-        const key = `${shapeKey}|${i}|${colour}`;
+        const key = `${shapeKey}|${i}|${colour}|${alpha}`;
         let batch = batches.get(key);
         if (!batch) {
-          batch = { path: new Path2D(), mode: part.mode, width: part.width, colour };
+          batch = { path: new Path2D(), mode: part.mode, width: part.width, colour, alpha };
           batches.set(key, batch);
         }
         move.e = node.x;
         move.f = node.y;
         batch.path.addPath(shapeFor(`${shapeKey}|${i}`, part.d), move);
+      }
+      if (node.dead) {
+        const [ring] = markerParts("dead", radius);
+        move.e = node.x;
+        move.f = node.y;
+        dead.addPath(shapeFor(`dead|${radius}`, ring!.d), move);
       }
       const heat = node.heat;
       if (heat.top !== null) {
@@ -193,7 +224,7 @@ export function MapCanvas({
         const key = `${ringKey}|${colour}`;
         let batch = batches.get(key);
         if (!batch) {
-          batch = { path: new Path2D(), mode: "stroke", width: 0.75 + heat.band * 0.75, colour };
+          batch = { path: new Path2D(), mode: "stroke", width: 0.75 + heat.band * 0.75, colour, alpha: 1 };
           batches.set(key, batch);
         }
         move.e = node.x;
@@ -205,6 +236,7 @@ export function MapCanvas({
         labels.length < LABEL_BUDGET &&
         (node.level === "focus" ||
           node.level === "neighbour" ||
+          (view.scale >= LABEL_SCALE && node.level === "reached" && node.depth === 1) ||
           (view.scale >= LABEL_SCALE && (node.kind === "group" || node.level === "changed")))
       ) {
         labels.push(node);
@@ -212,6 +244,7 @@ export function MapCanvas({
     }
 
     for (const batch of batches.values()) {
+      context.globalAlpha = batch.alpha;
       if (batch.mode === "fill") {
         context.fillStyle = batch.colour;
         context.fill(batch.path);
@@ -221,6 +254,13 @@ export function MapCanvas({
         context.stroke(batch.path);
       }
     }
+    context.globalAlpha = 1;
+
+    context.setLineDash(DEAD_DASH.map((length) => length / view.scale));
+    context.strokeStyle = colours["--muted-foreground"];
+    context.lineWidth = 1 / view.scale;
+    context.stroke(dead);
+    context.setLineDash([]);
 
     if (labels.length > 0 || counts.length > 0) {
       context.setTransform(dpr, 0, 0, dpr, 0, 0);

@@ -1,10 +1,15 @@
+import { groupIdFor } from "@/lib/codebase-map/clustering";
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
 
 type MapStatusKind = "empty" | "no-changes" | "partial" | "ready";
 
 type StatusReasonCode =
   | "level-of-detail"
+  | "overlay-missing"
+  | "overlay-partial"
+  | "group-imports-capped"
   | "unresolved-imports"
+  | "tests-hidden"
   | "truncated"
   | "unknown-changed-flags"
   | "unknown-dead-flags"
@@ -32,18 +37,30 @@ export interface MapStatus {
   flagCoverage: FlagCoverage;
 }
 
-export function mapStatus(graph: NormalisedGraph): MapStatus {
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** `hiddenTests` is what the view left out, so the banner never hides a gap it made. */
+export function mapStatus(graph: NormalisedGraph, hiddenTests = 0): MapStatus {
   const fileCount = graph.files.length;
   const coverage: FlagCoverage = { changed: 0, dead: 0, inCycle: 0 };
   let changedCount = 0;
 
+  const heldChanged = new Map<string, number>();
   for (const file of graph.files) {
     if (file.changed !== undefined) coverage.changed += 1;
     if (file.dead !== undefined) coverage.dead += 1;
     if (file.inCycle !== undefined) coverage.inCycle += 1;
-    if (file.changed === true) changedCount += 1;
+    if (file.changed !== true) continue;
+    changedCount += 1;
+    const id = groupIdFor(file);
+    heldChanged.set(id, (heldChanged.get(id) ?? 0) + 1);
   }
-  for (const summary of graph.summaries) changedCount += summary.changedCount;
+  // A partial group's changed files are already counted above.
+  for (const summary of graph.summaries) {
+    changedCount += Math.max(0, summary.changedCount - (heldChanged.get(summary.id) ?? 0));
+  }
 
   const reasons: StatusReason[] = [];
   if (graph.summaries.length > 0) {
@@ -53,12 +70,42 @@ export function mapStatus(graph: NormalisedGraph): MapStatus {
       message: "Large repo: showing packages, expand to see files.",
     });
   }
-  const unresolved = graph.dropped.unresolvedImports;
+  if (graph.overlay === "absent") {
+    reasons.push({
+      code: "overlay-missing",
+      count: 0,
+      message: "The PR overlay could not be built, so this is the base commit only.",
+    });
+  }
+  const overlaid = graph.files.filter((file) => file.change !== undefined).length;
+  if (graph.overlay === "partial") {
+    reasons.push({
+      code: "overlay-partial",
+      count: overlaid,
+      message: `The PR overlay covers only some of the changed files (${overlaid} drawn as merged).`,
+    });
+  }
+  if (graph.groupImportsDropped > 0) {
+    const dropped = graph.groupImportsDropped;
+    reasons.push({
+      code: "group-imports-capped",
+      count: dropped,
+      message: `${plural(dropped, "group edge")} left out to keep the map small, so some coupling is not drawn.`,
+    });
+  }
+  const unresolved = graph.unresolvedImportCount ?? 0;
   if (unresolved > 0) {
     reasons.push({
       code: "unresolved-imports",
       count: unresolved,
-      message: `${unresolved} import${unresolved === 1 ? "" : "s"} point at files this map doesn't have.`,
+      message: `${plural(unresolved, "import")} the indexer could not resolve, so those edges are missing.`,
+    });
+  }
+  if (hiddenTests > 0) {
+    reasons.push({
+      code: "tests-hidden",
+      count: hiddenTests,
+      message: `${plural(hiddenTests, "test file")} hidden. Turn on "Show tests" to see them.`,
     });
   }
   if (graph.truncated) {

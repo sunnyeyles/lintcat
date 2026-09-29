@@ -10,7 +10,6 @@ describe("normaliseGraph", () => {
     });
 
     expect(graph.files.map((f) => f.path)).toEqual(["a.ts", "b.ts"]);
-    expect(graph.dropped.duplicateFiles).toBe(1);
   });
 
   it("lets a duplicate fill in only what the first left unknown", () => {
@@ -58,8 +57,6 @@ describe("normaliseGraph", () => {
     });
 
     expect(graph.imports).toEqual([{ from: "a.ts", to: "b.ts" }]);
-    expect(graph.dropped.selfImports).toBe(1);
-    expect(graph.dropped.unresolvedImports).toBe(2);
   });
 
   it("drops repeated imports", () => {
@@ -72,7 +69,6 @@ describe("normaliseGraph", () => {
     });
 
     expect(graph.imports).toHaveLength(1);
-    expect(graph.dropped.duplicateImports).toBe(1);
   });
 
   it("drops files without a usable path and trims the rest", () => {
@@ -82,8 +78,7 @@ describe("normaliseGraph", () => {
     });
 
     expect(graph.files.map((f) => f.path)).toEqual(["a.ts"]);
-    expect(graph.dropped.invalidFiles).toBe(1);
-    expect(graph.dropped.selfImports).toBe(1);
+    expect(graph.imports).toEqual([]);
   });
 
   it("indexes both directions in sorted order", () => {

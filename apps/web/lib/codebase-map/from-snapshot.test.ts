@@ -1,5 +1,5 @@
 import type { RepositoryGraphSnapshot } from "@pr-review/index";
-import type { ReviewRecordChangedFile } from "@pr-review/schemas";
+import type { ReviewRecordChangedFile, ReviewRecordOverlay } from "@pr-review/schemas";
 import { describe, expect, it } from "vitest";
 
 import { findingHeat, mapFromSnapshot } from "@/lib/codebase-map/from-snapshot";
@@ -164,6 +164,74 @@ describe("mapFromSnapshot with a blast radius", () => {
     const source = mapFromSnapshot(three, [changed("src/a.ts")], []);
 
     expect(source.graph?.files.every((f) => !("impacted" in f))).toBe(true);
+  });
+});
+
+describe("mapFromSnapshot with an overlay", () => {
+  const overlay = (over: Partial<ReviewRecordOverlay> = {}): ReviewRecordOverlay => ({
+    headSha: "head",
+    files: [],
+    added: [],
+    removed: [],
+    unresolvedImportCount: 0,
+    partial: false,
+    ...over,
+  });
+
+  it("is exactly today's output without one", () => {
+    const before = mapFromSnapshot(snapshot(), [changed("src/a.ts")], []);
+    const after = mapFromSnapshot(snapshot(), [changed("src/a.ts")], [], [], undefined);
+
+    expect(after).toEqual(before);
+    expect(after.graph).not.toHaveProperty("overlay");
+  });
+
+  it("adds the index's unresolved count to the overlay's", () => {
+    const source = mapFromSnapshot(
+      snapshot({ unresolvedImports: 4 }),
+      [changed("src/a.ts")],
+      [],
+      [],
+      overlay({ files: [{ path: "src/a.ts", status: "modified" }], unresolvedImportCount: 2, partial: true }),
+    );
+
+    expect(source.graph?.unresolvedImportCount).toBe(6);
+    expect(source.graph?.overlay).toBe("partial");
+  });
+
+  it("folds a rename onto its new path, dependents and edges included", () => {
+    const source = mapFromSnapshot(
+      snapshot(),
+      [changed("src/b2.ts", "renamed")],
+      [],
+      ["src/b.ts"],
+      overlay({ files: [{ path: "src/b2.ts", status: "renamed", previousPath: "src/b.ts" }] }),
+    );
+
+    expect(source.graph?.files.map((f) => f.path)).toEqual(["src/a.ts", "src/b2.ts"]);
+    expect(source.graph?.files[1]).toMatchObject({
+      change: "renamed",
+      previousPath: "src/b.ts",
+      changed: true,
+    });
+    expect(source.graph?.imports).toEqual([{ from: "src/a.ts", to: "src/b2.ts" }]);
+    expect(source.changedPaths).toEqual(["src/b2.ts"]);
+  });
+
+  it("keeps a removed file, marked removed", () => {
+    const source = mapFromSnapshot(
+      snapshot(),
+      [changed("src/b.ts", "removed")],
+      [],
+      [],
+      overlay({
+        files: [{ path: "src/b.ts", status: "removed" }],
+        removed: [{ from: "src/a.ts", to: "src/b.ts" }],
+      }),
+    );
+
+    expect(source.graph?.files[1]).toMatchObject({ path: "src/b.ts", change: "removed" });
+    expect(source.graph?.imports).toEqual([{ from: "src/a.ts", to: "src/b.ts", change: "removed" }]);
   });
 });
 

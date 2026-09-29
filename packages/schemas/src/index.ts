@@ -19,6 +19,8 @@ export {
   type Suppression,
 } from "#src/review-memory";
 export {
+  MAX_OVERLAY_EDGES,
+  MAX_OVERLAY_FILES,
   MAX_REPOSITORY_GRAPH_BASE64,
   MAX_RISK_DEPENDENTS,
   MAX_RISK_FACTORS,
@@ -28,6 +30,7 @@ export {
   type ReviewRecord,
   type ReviewRecordChangedFile,
   type ReviewRecordGraph,
+  type ReviewRecordOverlay,
   type ReviewRecordRisk,
   type RiskBand,
 } from "#src/review-record";

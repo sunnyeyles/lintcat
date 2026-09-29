@@ -1,4 +1,4 @@
-import { getMapSource } from "@/lib/data/server";
+import { loadMapSource } from "@/lib/data/server";
 
 import { handleCodebaseMap } from "./handler";
 
@@ -21,5 +21,5 @@ export async function POST(request: Request, { params }: Context): Promise<Respo
     return Response.json({ error: "body is not valid JSON" }, { status: 400 });
   }
 
-  return handleCodebaseMap(body, () => getMapSource(slug, id));
+  return handleCodebaseMap(body, () => loadMapSource(slug, id));
 }

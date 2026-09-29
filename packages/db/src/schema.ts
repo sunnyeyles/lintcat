@@ -1,6 +1,7 @@
 import type {
   FindingEvidence,
   ReviewRecordChangedFile,
+  ReviewRecordOverlay,
   ReviewRecordRisk,
 } from "@pr-review/schemas";
 import { sql } from "drizzle-orm";
@@ -178,6 +179,8 @@ export const reviews = pgTable(
     outputTokens: integer("output_tokens").notNull().default(0),
     // Null for a review stored before risk scoring, or run with the index off.
     risk: jsonb("risk").$type<ReviewRecordRisk>(),
+    // Null for a review stored before overlays, or one whose overlay failed.
+    overlay: jsonb("overlay").$type<ReviewRecordOverlay>(),
     createdAt: createdAt(),
   },
   (t) => [

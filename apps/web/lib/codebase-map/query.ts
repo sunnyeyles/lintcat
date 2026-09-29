@@ -9,6 +9,7 @@ import {
   type LodOptions,
   type LodSearchResult,
 } from "@/lib/codebase-map/lod";
+import { MAX_REACH, reachOf } from "@/lib/codebase-map/neighbourhood";
 import { normaliseGraph, type NormalisedGraph } from "@/lib/codebase-map/normalise";
 import type { MapGraph } from "@/lib/codebase-map/types";
 
@@ -40,7 +41,8 @@ const NO_GRAPH: MapGraph = { files: [], imports: [] };
 
 /** Every answer a map asks of its source; the graph is normalised once, on first use. */
 export function mapQuery(source: MapSource): MapQuery {
-  let normalised = source.normalised;
+  let normalised: NormalisedGraph | undefined;
+  let reach: ReadonlyMap<string, number> | undefined;
   const graph = (): NormalisedGraph => (normalised ??= normaliseGraph(source.graph ?? NO_GRAPH));
 
   return {
@@ -73,7 +75,9 @@ export function mapQuery(source: MapSource): MapQuery {
 
     expand(groupId, loadedGroups) {
       const all = graph();
-      const slice = groupSlice(all, source.heat, groupId, pathsInGroups(all, loadedGroups));
+      reach ??= reachOf(all, source.changedPaths, MAX_REACH);
+      const held = pathsInGroups(all, loadedGroups);
+      const slice = groupSlice(all, source.heat, groupId, held, reach);
       return slice.graph.files.length > 0 ? slice : undefined;
     },
 

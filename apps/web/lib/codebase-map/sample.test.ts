@@ -33,11 +33,12 @@ describe("sampleRepo", () => {
 
   it("only ever imports files it contains", () => {
     const graph = sampleRepo(5, 300);
-    const normalised = normaliseGraph(graph);
+    const held = new Set(graph.files.map((f) => f.path));
 
-    expect(normalised.dropped.unresolvedImports).toBe(0);
-    expect(normalised.dropped.selfImports).toBe(0);
-    expect(normalised.imports.length).toBeGreaterThan(graph.files.length / 2);
+    for (const edge of graph.imports) {
+      expect(edge.from !== edge.to && held.has(edge.from) && held.has(edge.to)).toBe(true);
+    }
+    expect(normaliseGraph(graph).imports.length).toBeGreaterThan(graph.files.length / 2);
   });
 
   it("marks a few changed files and some dead ones", () => {
