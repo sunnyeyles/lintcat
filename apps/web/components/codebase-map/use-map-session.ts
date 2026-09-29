@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { MapSession, type MapSessionSource } from "@/components/codebase-map/map-session";
 import type { MapHandle } from "@/components/codebase-map/view";
@@ -11,6 +11,8 @@ export interface MapHover {
   x: number;
   y: number;
 }
+
+const UNFITTED = Symbol("unfitted");
 
 function axisOf(key: string): NavigationAxis | null {
   if (key === "ArrowRight") return "dependencies";
@@ -35,16 +37,28 @@ export function useMapSession(source: MapSessionSource | null) {
     else handle?.fit();
   }, [handle, opening]);
 
+  // Camera moves are remembered, so an effect re-run by re-showing a hidden map leaves it put.
+  const fitted = useRef<unknown>(UNFITTED);
+  const centred = useRef<{ path: string; scene: unknown } | null>(null);
+
   // Deferred a tick so a freshly mounted canvas has measured itself.
   useEffect(() => {
-    const id = setTimeout(fitOpening, 0);
+    if (!handle || fitted.current === opening) return;
+    const id = setTimeout(() => {
+      fitted.current = opening;
+      fitOpening();
+    }, 0);
     return () => clearTimeout(id);
-  }, [fitOpening]);
+  }, [handle, opening, fitOpening]);
 
   useEffect(() => {
-    if (view.focusedPath === null) return;
-    const node = scene.byId.get(view.focusedPath);
-    if (node) handle?.centreOn(node.x, node.y);
+    const path = view.focusedPath;
+    if (path === null || !handle) return;
+    if (centred.current?.path === path && centred.current.scene === scene) return;
+    const node = scene.byId.get(path);
+    if (!node) return;
+    centred.current = { path, scene };
+    handle.centreOn(node.x, node.y);
   }, [handle, view.focusedPath, scene]);
 
   const onNodeHover = useCallback(

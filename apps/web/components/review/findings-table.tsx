@@ -32,7 +32,8 @@ import type { Severity } from "@pr-review/db/dashboard";
 import { ConfidenceMeter } from "./confidence-meter";
 import { FilePath } from "./file-path";
 import { FindingSheet } from "./finding-sheet";
-import { FINDINGS_ANCHOR, useFindingsFocus } from "./findings-focus";
+import { useFindingsFocus } from "./findings-focus";
+import { FindingsSection } from "./findings-section";
 import { SEVERITIES, sortFindings } from "./sort";
 
 const ALL = "all";
@@ -66,11 +67,8 @@ export function FindingsTable({
   };
 
   return (
-    <section aria-labelledby="findings-heading">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
-        <h2 id={FINDINGS_ANCHOR} className="text-muted-foreground font-mono text-xs tracking-wide uppercase">
-          Findings
-        </h2>
+    <FindingsSection
+      action={
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex min-w-0 flex-col gap-1.5">
             <Label htmlFor={severityId}>Severity</Label>
@@ -99,10 +97,10 @@ export function FindingsTable({
             </Button>
           ) : null}
         </div>
-      </div>
-
+      }
+    >
       {file === null ? null : (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground text-xs">Showing findings on</span>
           <code className="rounded-sm border border-border bg-muted px-1 py-0.5 font-mono text-xs">
             {file}
@@ -113,7 +111,7 @@ export function FindingsTable({
         </div>
       )}
 
-      <p aria-live="polite" className="text-muted-foreground mb-3 font-mono text-xs">
+      <p aria-live="polite" className="text-muted-foreground font-mono text-xs">
         {rows.length} of {sorted.length} shown · sorted by severity, then confidence
       </p>
 
@@ -188,6 +186,6 @@ export function FindingsTable({
       )}
 
       <FindingSheet finding={selected} source={source} onClose={() => setSelected(null)} />
-    </section>
+    </FindingsSection>
   );
 }
