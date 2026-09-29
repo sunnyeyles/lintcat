@@ -117,7 +117,7 @@ END {
 [ -z "$report" ] && exit 0
 
 {
-  printf 'Comment too long. This repo caps comments at %s lines — see .claude/rules/comments.md.\n\n' "$MAX_LINES"
+  printf 'Comment too long. This repo caps comments at %s lines — see "Comments" in AGENTS.md.\n\n' "$MAX_LINES"
   printf '%s\n\n' "$report"
   printf 'Cut each block to the one non-obvious fact, or delete it. Do not restate the code.\n'
 } >&2
