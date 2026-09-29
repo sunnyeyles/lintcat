@@ -126,31 +126,28 @@ function known(flags: Flags, allowed: readonly string[]): void {
   }
 }
 
-function readFailOn(flags: Flags): FailOn {
-  const value = flags.values.get("fail-on") ?? "high";
-  if (!FAIL_ON.includes(value as FailOn)) {
-    throw new UsageError(`--fail-on must be one of ${FAIL_ON.join(", ")}, not ${JSON.stringify(value)}`);
+function readChoice<T extends string>(flags: Flags, name: string, allowed: readonly T[], fallback: T): T {
+  const value = flags.values.get(name) ?? fallback;
+  if (!allowed.includes(value as T)) {
+    throw new UsageError(`--${name} must be one of ${allowed.join(", ")}, not ${JSON.stringify(value)}`);
   }
-  return value as FailOn;
+  return value as T;
+}
+
+function readFailOn(flags: Flags): FailOn {
+  return readChoice(flags, "fail-on", FAIL_ON, "high");
 }
 
 function readProfile(flags: Flags): Profile {
-  const value = flags.values.get("profile") ?? "local";
-  if (!PROFILES.includes(value as Profile)) {
-    throw new UsageError(`--profile must be one of ${PROFILES.join(", ")}, not ${JSON.stringify(value)}`);
-  }
-  if (value === "ci" && flags.switches.has("no-index")) {
+  const profile = readChoice(flags, "profile", PROFILES, "local");
+  if (profile === "ci" && flags.switches.has("no-index")) {
     throw new UsageError("--no-index cannot be used with --profile ci: CI always builds the index");
   }
-  return value as Profile;
+  return profile;
 }
 
 function readFormat(flags: Flags): Format {
-  const value = flags.values.get("format") ?? "text";
-  if (!FORMATS.includes(value as Format)) {
-    throw new UsageError(`--format must be one of ${FORMATS.join(", ")}, not ${JSON.stringify(value)}`);
-  }
-  return value as Format;
+  return readChoice(flags, "format", FORMATS, "text");
 }
 
 function readColor(flags: Flags): boolean | undefined {

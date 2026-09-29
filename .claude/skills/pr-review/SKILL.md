@@ -28,7 +28,7 @@ Take the findings in the order given. For each one, decide and say which you cho
 2. **Fix by hand** when the finding is right but has no patch, or the patch is not the fix you want.
 3. **Suppress** when it is a false positive here:
    `node apps/cli/start.mjs suppress <id> --reason "<why it is noise in this repo>"`.
-   The reason is required in practice: a later reader has only it. Suppressions live in this checkout's local memory; CI does not read them, so a suppressed finding can still appear on the pull request.
+   The reason is required in practice: a later reader has only it. Suppressions live in this checkout's local memory. CI does not read them, so the finding is still reported (`"suppressedLocally": true`) and will still appear on the pull request, but it stops blocking here.
 
 Findings below the threshold are advice: mention them, and fix the cheap ones.
 

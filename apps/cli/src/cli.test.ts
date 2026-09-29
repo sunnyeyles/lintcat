@@ -210,15 +210,17 @@ describe("the CI profile", () => {
     expect(out).not.toContain("Admin is always on");
   });
 
-  it("reports a finding the local memory suppresses, as CI would", async () => {
+  it("still reports a finding the local memory suppresses, as CI would, without blocking on it", async () => {
     await suppressAdmin();
 
-    const { code, out } = await run(["--base", "main", "--profile", "ci"], {
+    const { code, out } = await run(["--base", "main", "--profile", "ci", "--format", "json"], {
       createLanguageModel: () => scriptedModel([evidenced]),
     });
 
-    expect(out).toContain("Admin is always on");
-    expect(code).toBe(1);
+    const [finding] = localReviewReportSchema.parse(JSON.parse(out)).findings;
+    expect(finding?.title).toBe("Admin is always on");
+    expect(finding?.suppressedLocally).toBe(true);
+    expect(code).toBe(0);
   });
 
   it("names the model it reviews with", async () => {
@@ -263,6 +265,7 @@ describe("the JSON report", () => {
     expect(parsed.blocking).toBe(1);
     expect(parsed.summary).toContain("## ");
     expect(parsed.model).toEqual({ provider: "openai", modelId: "gpt-5.6-luna" });
+    expect(parsed.head).toMatch(/^[0-9a-f]{40}$/);
     expect(err).toContain("Reviewing 1 changed file(s)");
     expect(code).toBe(1);
   });
@@ -347,6 +350,28 @@ describe("reusing an earlier review", () => {
 
     await run(review, {
       env: { OPENAI_API_KEY: "sk-test", PR_REVIEW_MODEL: "gpt-5.6-luna-mini" },
+      createLanguageModel,
+    });
+
+    expect(createLanguageModel).toHaveBeenCalled();
+  });
+
+  it("keys on the base commit, not the name it was given", async () => {
+    await run(review, { createLanguageModel: counted() });
+    repo.git("branch", "other", "main");
+    const createLanguageModel = counted();
+
+    await run(["--base", "other", "--no-index", "--format", "json"], { createLanguageModel });
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+  });
+
+  it("reviews again through another model endpoint", async () => {
+    await run(review, { createLanguageModel: counted() });
+    const createLanguageModel = counted();
+
+    await run(review, {
+      env: { OPENAI_API_KEY: "sk-test", PR_REVIEW_MODEL_BASE_URL: "http://localhost:4000" },
       createLanguageModel,
     });
 
@@ -491,6 +516,42 @@ describe("the Claude Code push gate", () => {
     expect(createLanguageModel).not.toHaveBeenCalled();
     expect(code).toBe(2);
   });
+
+  it("lets the push through once a blocking finding is suppressed", async () => {
+    await gate("git push", { createLanguageModel: () => scriptedModel([evidenced]) });
+    const first = await run(["--base", "main", "--profile", "ci", "--format", "json"]);
+    const [finding] = localReviewReportSchema.parse(JSON.parse(first.out)).findings;
+    await run(["suppress", finding!.id, "--reason", "Admin is meant to be on"]);
+    const createLanguageModel = vi.fn(() => scriptedModel([evidenced]));
+
+    const { code } = await gate("git push", { createLanguageModel });
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(code).toBe(0);
+  });
+
+  it.each([
+    'echo "git push"',
+    'git commit -m "then git push"',
+    "grep -rn 'gh pr create' docs",
+    "git log --oneline",
+  ])("does not review for %s", async (command) => {
+    const createLanguageModel = vi.fn(() => scriptedModel([evidenced]));
+
+    const { code } = await gate(command, { createLanguageModel });
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(code).toBe(0);
+  });
+
+  it.each(["git -C . push origin feature", "pnpm test && git push", "GIT_TRACE=1 git push"])(
+    "reviews for %s",
+    async (command) => {
+      const { code } = await gate(command, { createLanguageModel: () => scriptedModel([evidenced]) });
+
+      expect(code).toBe(2);
+    },
+  );
 
   it("does not block when the review cannot run, and says why", async () => {
     const { code, err } = await gate("git push", { env: {} });

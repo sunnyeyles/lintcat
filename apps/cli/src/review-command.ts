@@ -13,10 +13,10 @@ import {
   runReview,
   type McpEnvironment,
 } from "@pr-review/mcp/local-review";
-import { CI_REVIEW_POLICY, findingId } from "@pr-review/reviewer";
-import type { LocalReviewReport } from "@pr-review/schemas";
+import { CI_REVIEW_POLICY, findingId, isSuppressed, readMemory } from "@pr-review/reviewer";
+import type { LocalReviewReport, ReviewMemory } from "@pr-review/schemas";
 
-import type { ReviewOptions } from "#src/options";
+import type { FailOn, ReviewOptions } from "#src/options";
 import { readLastReview, reviewCachePath, writeLastReview } from "#src/review-cache";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
 
@@ -66,7 +66,24 @@ export async function runReviewCommand(options: ReviewOptions, deps: CliDeps): P
   return EXIT_CANCELLED;
 }
 
-/** The report, or undefined when the reviewed slice holds no change. */
+type ReportedFinding = LocalReviewReport["findings"][number];
+
+/** What blocks: findings at or above the threshold that no local suppression covers. */
+export function blockingOf(findings: readonly ReportedFinding[], failOn: FailOn): ReportedFinding[] {
+  return blockingFindings(
+    findings.filter((finding) => finding.suppressedLocally !== true),
+    failOn,
+  );
+}
+
+/** CI posts what the memory suppresses, so under its profile a suppression only unblocks. */
+function judged(report: LocalReviewReport, memory: ReviewMemory | undefined): LocalReviewReport {
+  const findings = report.findings.map((finding) =>
+    memory !== undefined && isSuppressed(memory, finding) ? { ...finding, suppressedLocally: true } : finding,
+  );
+  return { ...report, findings, blocking: blockingOf(findings, report.failOn).length };
+}
+
 export async function reviewReport(
   options: ReviewOptions,
   { environment, err, signal }: CliDeps,
@@ -99,25 +116,25 @@ export async function reviewReport(
   }
 
   const ci = options.profile === "ci";
-  const memory = ci ? undefined : await openLocalMemoryStore(local.root);
+  const logger = options.verbose ? environment.logger : createSilentLogger();
+  const store = await openLocalMemoryStore(local.root);
+  const suppressions = ci ? await readMemory(store, logger) : undefined;
+  const head = await reviewedTree(local);
   const cacheFile = await reviewCachePath(local.root);
   const key = JSON.stringify({
-    tree: await reviewedTree(local),
+    head,
     baseSha: local.baseSha,
     profile: options.profile,
     index: options.index,
     model: modelIdentity(environment),
-    memory: (await memory?.read()) ?? null,
+    endpoint: environment.env["PR_REVIEW_MODEL_BASE_URL"]?.trim() ?? "",
+    // Only the local profile hands the memory to the review itself.
+    memory: ci ? null : ((await store.read()) ?? null),
   });
   const earlier = options.cache ? readLastReview(cacheFile) : undefined;
   if (earlier?.key === key) {
     err(`Reusing the review of ${where} from the cache; --no-cache runs it again.`);
-    return report({
-      ...earlier.report,
-      failOn: options.failOn,
-      blocking: blockingFindings(earlier.report.findings, options.failOn).length,
-      cached: true,
-    });
+    return judged(report({ ...earlier.report, failOn: options.failOn, cached: true }), suppressions);
   }
   err(`Reviewing ${changed.length} changed file(s): ${where}.`);
 
@@ -126,31 +143,31 @@ export async function reviewReport(
     const { provider, modelId } = selected.model;
     err(`Model: ${provider} ${modelId}`);
     const ciModel = defaultModelFor(provider);
-    if (options.profile === "ci" && modelId !== ciModel) {
+    if (ci && modelId !== ciModel) {
       err(`Warning: CI reviews with ${ciModel} unless the repository's settings choose another model.`);
     }
   }
   const result = await runReview(
-    { ...environment, logger: options.verbose ? environment.logger : createSilentLogger() },
+    { ...environment, logger },
     {
       client: local.client,
       target: local.target,
       selected,
       index: options.index,
-      ...(ci ? { policy: CI_REVIEW_POLICY } : { memory }),
+      ...(ci ? { policy: CI_REVIEW_POLICY } : { memory: store }),
       signal,
     },
   );
   const { findings, suppressed } = result.outcome;
   const reviewed = report({
     model: selected.model ?? null,
+    head,
     findings: orderFindings(findings).map((finding) => ({ ...finding, id: findingId(finding) })),
-    blocking: blockingFindings(findings, options.failOn).length,
     suppressed,
     summary: result.summary,
   });
   if (signal?.aborted !== true) writeLastReview(cacheFile, { key, report: reviewed });
-  return reviewed;
+  return judged(reviewed, suppressions);
 }
 
 function printText(report: LocalReviewReport, color: boolean, out: (text: string) => void): void {
@@ -168,7 +185,7 @@ function printText(report: LocalReviewReport, color: boolean, out: (text: string
     renderSummary(
       {
         findings: report.findings,
-        blocking: blockingFindings(report.findings, report.failOn),
+        blocking: blockingOf(report.findings, report.failOn),
         failOn: report.failOn,
         suppressed: report.suppressed,
       },

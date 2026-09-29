@@ -4,15 +4,24 @@ import { hasModelApiKey } from "@pr-review/mcp/local-review";
 import type { LocalReviewReport } from "@pr-review/schemas";
 
 import { BYPASS_ENV } from "#src/hook";
-import type { ReviewOptions } from "#src/options";
-import { blockingFindings, renderFinding } from "#src/render";
-import { EXIT_OK, missingKeyMessage, reviewReport, type CliDeps } from "#src/review-command";
+import { parseArguments, type ReviewOptions } from "#src/options";
+import { renderFinding } from "#src/render";
+import { blockingOf, EXIT_OK, missingKeyMessage, reviewReport, type CliDeps } from "#src/review-command";
 
 /** Claude Code reads exit 2 as "blocked", and shows stderr to the model. */
 const EXIT_BLOCK_TOOL = 2;
 
-// A flag may take one argument, as in `git -C dir push`.
-const GATED = [/\bgit(?:\s+-\S+(?:\s+[^-\s]\S*)?)*\s+push\b/, /\bgh\s+pr\s+create\b/];
+// Anchored at a command's start; a flag may take one argument, as in `git -C dir push`.
+const GATED = [/^git(?:\s+-\S+(?:\s+[^-\s]\S*)?)*\s+push\b/, /^gh\s+pr\s+create\b/];
+
+/** Quoted text is blanked, so a message or pattern that mentions a push is not one. */
+function isGated(command: string): boolean {
+  const unquoted = command.replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, '""');
+  return unquoted
+    .split(/&&|\|\||[;|\n]/)
+    .map((part) => part.trim().replace(/^(?:\w+=\S*\s+)*/, ""))
+    .some((part) => GATED.some((pattern) => pattern.test(part)));
+}
 
 interface HookInput {
   cwd?: unknown;
@@ -29,7 +38,7 @@ function readInput(raw: string): HookInput {
 }
 
 function blockedMessage(report: LocalReviewReport, commandLine: string): string {
-  const blocking = blockingFindings(report.findings, report.failOn);
+  const blocking = blockingOf(report.findings, report.failOn);
   return [
     `pr-review: blocked by ${report.blocking} finding(s) at or above ${report.failOn}, from the review CI runs on the pull request.`,
     ...blocking.map((finding) => `\n[${finding.id}]\n${renderFinding(finding, { color: false })}`),
@@ -43,7 +52,7 @@ export async function runClaudeHook(deps: CliDeps & { commandLine: string }): Pr
   const { environment, err } = deps;
   const input = readInput((await deps.stdin?.()) ?? "");
   const command = input.tool_input?.command;
-  if (typeof command !== "string" || !GATED.some((pattern) => pattern.test(command))) return EXIT_OK;
+  if (typeof command !== "string" || !isGated(command)) return EXIT_OK;
   if ((environment.env[BYPASS_ENV] ?? "") !== "") {
     err(`pr-review: push gate skipped (${BYPASS_ENV} is set).`);
     return EXIT_OK;
@@ -52,19 +61,8 @@ export async function runClaudeHook(deps: CliDeps & { commandLine: string }): Pr
     err(`${missingKeyMessage()} The push was not reviewed.`);
     return EXIT_OK;
   }
-  const options: ReviewOptions = {
-    kind: "review",
-    repoPath: typeof input.cwd === "string" ? input.cwd : undefined,
-    base: undefined,
-    scope: { kind: "working-tree" },
-    profile: "ci",
-    format: "json",
-    index: true,
-    cache: true,
-    failOn: "high",
-    verbose: false,
-    color: false,
-  };
+  const repo = typeof input.cwd === "string" ? ["--repo", input.cwd] : [];
+  const options = parseArguments(["review", "--profile", "ci", "--format", "json", ...repo]) as ReviewOptions;
   let report: LocalReviewReport;
   try {
     report = await reviewReport(options, deps);
