@@ -17,7 +17,7 @@ import {
   type ReviewOutcome,
 } from "@pr-review/reviewer";
 
-import { createFixtureClient } from "#src/fixture-client";
+import { createFixtureClient, type FixtureCall } from "#src/fixture-client";
 import type { LoadedFixture } from "#src/fixture";
 import type { ModelAccess } from "#src/model-access";
 
@@ -36,6 +36,8 @@ export interface FixtureReview {
   result: ReviewOutcome;
   /** The check run a real review would have published. */
   rendered: RenderedCheckRun;
+  /** Every read of the fixture repository, the pipeline's own included. */
+  calls: readonly FixtureCall[];
 }
 
 /** The production engine, with each agent's spend also handed to `onUsage`. */
@@ -71,7 +73,7 @@ export async function runFixtureReview(
   fixture: LoadedFixture,
   deps: FixtureReviewDeps,
 ): Promise<FixtureReview> {
-  const { client } = createFixtureClient(fixture);
+  const { client, calls } = createFixtureClient(fixture);
   const { delivery, recorded } = recordingDelivery();
 
   const run = await runReview({
@@ -98,5 +100,6 @@ export async function runFixtureReview(
     fixture,
     result: run.outcome,
     rendered: recorded.checkRun,
+    calls,
   };
 }

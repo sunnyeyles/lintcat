@@ -1,8 +1,10 @@
-/** The opening user message every engine sends: scope, pull request, files, index, siblings, doc_mentions, config_drift, rules, diff. */
+/** The opening user message every engine sends: scope, pull request, files, index, siblings,
+ * doc_mentions, config_drift, rules, convention_counts, diff. */
 import type { RepositoryIndex } from "@pr-review/index";
 
 import type { ReviewContext } from "#src/agent-contract";
 import { renderConfigDrift } from "#src/agents/config-drift";
+import { renderConventionCounts } from "#src/agents/convention-counts";
 import { renderDocMentions } from "#src/agents/doc-mentions";
 import {
   buildOpeningDiff,
@@ -103,6 +105,7 @@ export function buildOpeningPrompt(
     ...renderConfigDrift(index, context),
     ...renderRuleDocs(index, context, budget.tools),
     ...renderLintConfig(index, context),
+    ...renderConventionCounts(index, context, maxListedFiles),
     "<diff>",
     opening.diff,
     "</diff>",

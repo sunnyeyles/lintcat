@@ -23,4 +23,17 @@ describe("ConventionEvidence", () => {
     );
     expect(markup.replace(/<[^>]+>/g, " ")).toContain("src/data/invoices.ts:27");
   });
+
+  it("shows a convention count as its summary, unlinked", () => {
+    const summary = "all 4 siblings of src/data/refundRequests.ts use kebab-case file names";
+    const markup = renderToStaticMarkup(
+      <ConventionEvidence
+        evidence={[{ convention: "file-name-casing", file: "src/data/refundRequests.ts", summary }]}
+        source={{ owner: "acme", repo: "billing", sha: "abc123" }}
+      />,
+    );
+
+    expect(markup).toContain(summary);
+    expect(markup).not.toContain("href=");
+  });
 });

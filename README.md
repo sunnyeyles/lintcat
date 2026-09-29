@@ -22,14 +22,15 @@ one of these categories:
 | **config** | a setting, env var or dependency added differently from the ones already there: an env var the code starts reading that neither `.env.example` nor the docs list, or a dependency doing a job one already in use does |
 
 Every finding the agent makes cites **evidence**: at least two places in files
-the pull request does not change that show the convention, or one line of the
+the pull request does not change that show the convention, one line of the
 repository's own rule docs — `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` — that
-states it. The opening message lists each changed file's siblings — the
-unchanged files in its directory with the same role — as the local convention to
-read first, and carries the rule docs and lint configuration that govern it. It
-also quotes the lines of unchanged Markdown docs that name something the diff's
-code edits or removes, so a doc the change made false can be cited as the
-evidence. Rewording
+states it, or one **convention count**. The opening message lists each changed
+file's siblings — the unchanged files in its directory with the same role — as
+the local convention to read first, counts, in code, the conventions those
+siblings clearly share ("all 4 siblings use kebab-case file names"), and
+carries the rule docs and lint configuration that govern it. It also quotes the
+lines of unchanged Markdown docs that name something the diff's code edits or
+removes, so a doc the change made false can be cited as the evidence. Rewording
 that leaves a doc less specific is not drift. Config drift is found in code
 first ([`config-drift.ts`](packages/index/src/config-drift.ts)) and handed to the
 agent as facts, each with the lines to cite: a new env var read that no env
@@ -71,9 +72,12 @@ many small ones.
   left with fewer than **two** entries is dropped — unless one of them is a line
   of a rule doc (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`), which is the
   convention stated and enough on its own
-  ([`validate-evidence.ts`](packages/reviewer/src/validate-evidence.ts)). What
-  survives is shown as "Convention seen in" links on the comment and the
-  dashboard
+  ([`validate-evidence.ts`](packages/reviewer/src/validate-evidence.ts)). A
+  cited convention count is recounted there and kept only if the opening
+  message listed it; it stands for the siblings it counts, so it is enough on
+  its own, and its measured sentence replaces anything the model wrote. What
+  survives is shown under "Convention seen in" on the comment and the
+  dashboard, lines as links and counts as their sentence
 - a Markdown link the pull request adds is resolved against its head commit
   and, when it points at a missing file or a heading the target does not have,
   reported as a `docs` finding with no model involved
@@ -397,14 +401,24 @@ does not exist. The query lives in `@pr-review/index`; the agent tool and the
 MCP tool of the same name both render what it returns, so there is one cap, one
 header and one unknown-path answer.
 
-The opening message carries five blocks. `<repository>` gives bearings in a
+The opening message carries these blocks from the index, besides the doc and
+config facts above. `<repository>` gives bearings in a
 monorepo: every workspace package with its root, the indexed commit, and what
 each language contributed, resolution rate included. `<repository_index>` is
 one line per changed file — its package, its role, its covering test and its
 importer count. `<sibling_files>` names, for each changed file, up to five
 unchanged files in the same directory with the same role
 ([`siblingsOf`](packages/index/src/siblings.ts)): the local convention the
-reviewer reads before calling anything drift. `<rule_docs>` is the text of every
+reviewer reads before calling anything drift. `<convention_counts>` measures
+that convention in code over every sibling, not just the five named
+([`conventionCounts`](packages/index/src/conventions.ts)): file-name casing,
+test-file naming (`*.test.*`, `*.spec.*`, `*_test.*`, `test_*.py`), export
+style (a default export or named exports only), and import style within the
+file's own package (relative path or alias, file extension written or left
+off). A convention is listed only when at least three siblings can be measured
+for it and at least 80% of those agree, so a directory without one produces
+nothing. A single lowercase word fits every lowercase casing and is left out of
+the casing count. `<rule_docs>` is the text of every
 `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md` at the repository root or above a
 changed file (a `CONTRIBUTING.md` in `.github/` or `docs/` counts as the
 root's), numbered by line so a finding can cite one, root first and capped at

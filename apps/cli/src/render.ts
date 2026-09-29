@@ -1,5 +1,5 @@
 /** How a validated finding reads in a terminal: one location per finding. */
-import { categoryLabel, type ReviewFinding } from "@pr-review/schemas";
+import { categoryLabel, evidenceLabel, type ReviewFinding } from "@pr-review/schemas";
 
 import type { FailOn } from "#src/options";
 
@@ -61,7 +61,7 @@ export function renderFinding(finding: ReviewFinding, options: RenderOptions): s
   ].join(" ");
   const lines = [header, ...wrap(finding.title, "  "), ...wrap(finding.explanation, "  ")];
   if (finding.evidence !== undefined && finding.evidence.length > 0) {
-    const seen = finding.evidence.map((entry) => `${entry.file}:${entry.line}`).join(", ");
+    const seen = finding.evidence.map(evidenceLabel).join(", ");
     lines.push(...wrap(`Convention seen in: ${seen}`, "  "));
   }
   if (finding.suggestedFix !== undefined) {

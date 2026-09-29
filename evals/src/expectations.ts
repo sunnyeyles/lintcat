@@ -2,7 +2,7 @@
  * What each fixture must produce: category and location, never wording.
  * Locations anchor to source markers, which must match exactly one line.
  */
-import type { ReviewFinding } from "@pr-review/schemas";
+import { evidenceLabel, isConventionCount, type ReviewFinding } from "@pr-review/schemas";
 
 import type { LoadedFixture } from "#src/fixture";
 import type { FixtureReview } from "#src/run-fixture-review";
@@ -33,7 +33,13 @@ export type FixtureExpectation =
       cites?: CitationAnchor[];
     }
   | { kind: "no-findings"; description: string }
-  | { kind: "patches-verify"; description: string };
+  | { kind: "patches-verify"; description: string }
+  | {
+      kind: "files-unread";
+      description: string;
+      /** No agent may read any of these, at either commit. */
+      files: readonly string[];
+    };
 
 /** The judgement of one expectation against one fixture review. */
 interface ExpectationOutcome {
@@ -106,7 +112,9 @@ export function resolveCitation(
 
 function cites(finding: ReviewFinding, lines: readonly { file: string; line: number }[]): boolean {
   return (finding.evidence ?? []).some((entry) =>
-    lines.some((cited) => cited.file === entry.file && cited.line === entry.line),
+    lines.some(
+      (cited) => !isConventionCount(entry) && cited.file === entry.file && cited.line === entry.line,
+    ),
   );
 }
 
@@ -124,7 +132,7 @@ function inAnchor(finding: ReviewFinding, anchor: ResolvedAnchor): boolean {
 /** One finding rendered for a failure message. */
 function describeFinding(finding: ReviewFinding): string {
   const at = finding.line === undefined ? finding.file : `${finding.file}:${finding.line}`;
-  const evidence = (finding.evidence ?? []).map((entry) => `${entry.file}:${entry.line}`);
+  const evidence = (finding.evidence ?? []).map(evidenceLabel);
   return (
     `- [${finding.category}/${finding.severity}/confidence ${finding.confidence}] ` +
     `${at} — ${finding.title}` +
@@ -159,6 +167,21 @@ export function evaluateExpectation(
           ? `${verified} of ${proposed} proposed patch(es) matched the file`
           : `${proposed - verified} of ${proposed} proposed patch(es) did not match the ` +
             `file at head and were discarded.\n\n${rendered}`,
+    };
+  }
+
+  if (expectation.kind === "files-unread") {
+    const read = review.calls
+      .filter((call) => call.method === "getFileContents")
+      .map((call) => call.detail)
+      .filter((detail) => expectation.files.some((file) => detail.startsWith(`${file} @ `)));
+    return {
+      passed: read.length === 0,
+      detail:
+        read.length === 0
+          ? `none of the ${expectation.files.length} file(s) was read`
+          : "the review read files the convention counts already stood for:\n" +
+            read.map((detail) => `  ${detail}`).join("\n"),
     };
   }
 

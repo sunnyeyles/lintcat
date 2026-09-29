@@ -1,0 +1,34 @@
+{
+  "name": "naming-drift-file-casing",
+  "title": "Naming drift — a new data module is named in camelCase where every multi-word data module is kebab-case",
+  "owner": "ledgerly",
+  "repo": "billing-api",
+  "baseSha": "5c2e8a17f04b93d6e1a7c0f28b4d95e3a6c1f072",
+  "headSha": "e91f3b06c7d25a48f0b3e6c19a7d24f85b0e3c61",
+  "pullRequest": {
+    "number": 236,
+    "title": "Let customers request a refund on an invoice",
+    "body": "Customers can ask for part of an invoice back from the portal. This stores the request, refuses one that would take the total past the invoiced amount, and adds the endpoint.",
+    "author": "priya-raman",
+    "baseRef": "main",
+    "headRef": "feature/refund-requests"
+  },
+  "changedFiles": [
+    {
+      "path": "src/data/refundRequests.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/services/refunds.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/refunds.ts",
+      "status": "added"
+    },
+    {
+      "path": "src/routes/index.ts",
+      "status": "modified"
+    }
+  ]
+}

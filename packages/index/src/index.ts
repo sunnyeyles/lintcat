@@ -24,6 +24,12 @@ export {
   type SourceLine,
   type UndocumentedEnvVar,
 } from "#src/config-drift";
+export {
+  conventionCounts,
+  conventionSentence,
+  MIN_MAJORITY,
+  type ConventionCount,
+} from "#src/conventions";
 export { nodesInCycles } from "#src/cycles";
 export {
   changedNames,
