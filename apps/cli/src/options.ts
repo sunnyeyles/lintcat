@@ -8,13 +8,26 @@ const FAIL_ON: readonly FailOn[] = ["low", "medium", "high", "off"];
 
 const SCOPES = ["working-tree", "staged", "range"] as const;
 
+/** `ci` runs what the worker runs: its policy, and no local memory. */
+type Profile = "local" | "ci";
+
+const PROFILES: readonly Profile[] = ["local", "ci"];
+
+type Format = "text" | "json";
+
+const FORMATS: readonly Format[] = ["text", "json"];
+
 export interface ReviewOptions {
   kind: "review";
   /** The checkout to review; undefined means the working directory. */
   repoPath: string | undefined;
   base: string | undefined;
   scope: LocalScope;
+  profile: Profile;
+  format: Format;
   index: boolean;
+  /** Reuse the last report when nothing it depends on has changed. */
+  cache: boolean;
   failOn: FailOn;
   /** Let the review's own structured log through to stderr. */
   verbose: boolean;
@@ -31,9 +44,19 @@ interface InstallHookOptions {
   force: boolean;
 }
 
+export interface SuppressOptions {
+  kind: "suppress";
+  /** A finding id from the last review's report. */
+  id: string;
+  repoPath: string | undefined;
+  reason: string | undefined;
+}
+
 export type Command =
   | ReviewOptions
   | InstallHookOptions
+  | SuppressOptions
+  | { kind: "claude-hook" }
   | { kind: "help" }
   | { kind: "version" };
 
@@ -54,6 +77,7 @@ interface Flags {
 
 const SWITCHES = new Set([
   "no-index",
+  "no-cache",
   "verbose",
   "force",
   "color",
@@ -102,12 +126,28 @@ function known(flags: Flags, allowed: readonly string[]): void {
   }
 }
 
-function readFailOn(flags: Flags): FailOn {
-  const value = flags.values.get("fail-on") ?? "high";
-  if (!FAIL_ON.includes(value as FailOn)) {
-    throw new UsageError(`--fail-on must be one of ${FAIL_ON.join(", ")}, not ${JSON.stringify(value)}`);
+function readChoice<T extends string>(flags: Flags, name: string, allowed: readonly T[], fallback: T): T {
+  const value = flags.values.get(name) ?? fallback;
+  if (!allowed.includes(value as T)) {
+    throw new UsageError(`--${name} must be one of ${allowed.join(", ")}, not ${JSON.stringify(value)}`);
   }
-  return value as FailOn;
+  return value as T;
+}
+
+function readFailOn(flags: Flags): FailOn {
+  return readChoice(flags, "fail-on", FAIL_ON, "high");
+}
+
+function readProfile(flags: Flags): Profile {
+  const profile = readChoice(flags, "profile", PROFILES, "local");
+  if (profile === "ci" && flags.switches.has("no-index")) {
+    throw new UsageError("--no-index cannot be used with --profile ci: CI always builds the index");
+  }
+  return profile;
+}
+
+function readFormat(flags: Flags): Format {
+  return readChoice(flags, "format", FORMATS, "text");
 }
 
 function readColor(flags: Flags): boolean | undefined {
@@ -140,8 +180,11 @@ const REVIEW_FLAGS = [
   "base",
   "scope",
   "range",
+  "profile",
+  "format",
   "fail-on",
   "no-index",
+  "no-cache",
   "verbose",
   "color",
   "no-color",
@@ -154,7 +197,10 @@ function reviewOptions(flags: Flags): ReviewOptions {
     repoPath: flags.values.get("repo"),
     base: flags.values.get("base"),
     scope: readScope(flags),
+    profile: readProfile(flags),
+    format: readFormat(flags),
     index: !flags.switches.has("no-index"),
+    cache: !flags.switches.has("no-cache"),
     failOn: readFailOn(flags),
     verbose: flags.switches.has("verbose"),
     color: readColor(flags),
@@ -176,7 +222,8 @@ function installHookOptions(flags: Flags): InstallHookOptions {
 export function parseArguments(argv: readonly string[]): Command {
   const named = argv[0] !== undefined && !argv[0].startsWith("-");
   const command = named ? argv[0]! : "review";
-  const flags = readFlags(argv.slice(named ? 1 : 0));
+  const id = command === "suppress" && argv[1] !== undefined && !argv[1].startsWith("-") ? argv[1] : undefined;
+  const flags = readFlags(argv.slice((named ? 1 : 0) + (id === undefined ? 0 : 1)));
   if (flags.switches.has("help") || flags.switches.has("h")) {
     return { kind: "help" };
   }
@@ -188,6 +235,17 @@ export function parseArguments(argv: readonly string[]): Command {
   }
   if (command === "install-hook") {
     return installHookOptions(flags);
+  }
+  if (command === "claude-hook") {
+    known(flags, []);
+    return { kind: "claude-hook" };
+  }
+  if (command === "suppress") {
+    known(flags, ["repo", "reason"]);
+    if (id === undefined) {
+      throw new UsageError("suppress needs a finding id, as the last review's JSON report gives it");
+    }
+    return { kind: "suppress", id, repoPath: flags.values.get("repo"), reason: flags.values.get("reason") };
   }
   if (command === "help") {
     return { kind: "help" };

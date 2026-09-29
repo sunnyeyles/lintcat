@@ -2,7 +2,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { MEMORY_FILE_PATH, type MemoryStore } from "@pr-review/reviewer";
+import type { StructuredLogger } from "@pr-review/logging";
+import {
+  addSuppression,
+  MEMORY_FILE_PATH,
+  readMemory,
+  titleShape,
+  writeMemory,
+  type MemoryStore,
+  type SuppressibleFinding,
+} from "@pr-review/reviewer";
 
 import { git } from "#src/git";
 
@@ -41,4 +50,25 @@ export async function openLocalMemoryStore(
       return Promise.resolve();
     },
   };
+}
+
+export interface RecordedSuppression {
+  path: string;
+  shape: string;
+  suppressions: readonly { category: string; shape: string }[];
+}
+
+/** Marks findings shaped like this one as false positives in the checkout's memory. */
+export async function recordSuppression(
+  root: string,
+  finding: SuppressibleFinding & { reason?: string | undefined },
+  logger: StructuredLogger,
+): Promise<RecordedSuppression> {
+  const store = await openLocalMemoryStore(root);
+  const memory = await readMemory(store, logger);
+  const updated = addSuppression(memory, finding, new Date());
+  await writeMemory(store, updated);
+  const shape = titleShape(finding.title);
+  logger.info("memory.suppression_recorded", { repoPath: root, category: finding.category, shape });
+  return { path: store.path, shape, suppressions: updated.suppressions };
 }

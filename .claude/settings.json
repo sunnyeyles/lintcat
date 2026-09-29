@@ -37,6 +37,19 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Running the CI review before this push",
+            "timeout": 900,
+            "command": "s=\"${CLAUDE_PROJECT_DIR:-.}/apps/cli/start.mjs\"; [ -f \"$s\" ] || exit 0; node \"$s\" claude-hook"
+          }
+        ]
+      }
     ]
   }
 }

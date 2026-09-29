@@ -7,6 +7,8 @@ import path from "node:path";
 import { errorMessage } from "@pr-review/logging";
 
 import { BYPASS_ENV, installPrePushHook } from "#src/hook";
+import { runClaudeHook } from "#src/claude-hook";
+import { runSuppressCommand } from "#src/suppress-command";
 import { parseArguments, UsageError, type Command } from "#src/options";
 import {
   EXIT_ERROR,
@@ -22,6 +24,8 @@ export const USAGE = `pr-review — review a working tree before it is pushed.
 Usage:
   pr-review [review] [options]      Review a checkout and report validated findings
   pr-review install-hook [options]  Install the pre-push hook into a checkout
+  pr-review suppress <id> [options] Stop later reviews raising a finding from the last one
+  pr-review claude-hook             Claude Code PreToolUse hook: gate git push and gh pr create
   pr-review help | version
 
 Review options:
@@ -29,8 +33,11 @@ Review options:
   --base <ref>         Branch or commit to compare against (default: the remote default branch)
   --scope <kind>       working-tree (default), staged, or range
   --range <range>      Commits to review, e.g. HEAD~3..HEAD; implies --scope range
+  --profile <profile>  local (default), or ci: CI's policy, ignoring local suppressions
   --fail-on <level>    Exit non-zero at this severity or above: low, medium, high (default), off
+  --format <format>    text (default), or json: one document on stdout, progress on stderr
   --no-index           Skip the repository import index
+  --no-cache           Review again even when this tree, base and model were just reviewed
   --verbose            Let the review's structured log through to stderr
   --color / --no-color Force colour on or off (default: on for a terminal, off otherwise)
 
@@ -39,6 +46,10 @@ install-hook options:
   --fail-on <level>    Severity the hook blocks a push on (default: high)
   --command <command>  What the hook runs (default: the command that installed it)
   --force              Replace a pre-push hook pr-review did not write
+
+suppress options:
+  --repo <path>        Checkout whose memory records it (default: the working directory)
+  --reason <text>      Why the finding is noise here, kept with the suppression
 
 Exit codes:
   0  no finding at or above --fail-on
@@ -73,6 +84,12 @@ async function dispatch(command: Command, deps: CliEnvironment): Promise<number>
   }
   if (command.kind === "review") {
     return runReviewCommand({ ...command, color: useColor(deps, command.color) }, deps);
+  }
+  if (command.kind === "suppress") {
+    return runSuppressCommand(command, deps);
+  }
+  if (command.kind === "claude-hook") {
+    return runClaudeHook(deps);
   }
   const installed = await installPrePushHook({
     repoPath: path.resolve(deps.environment.cwd, command.repoPath ?? "."),

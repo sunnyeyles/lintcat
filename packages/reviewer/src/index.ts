@@ -41,6 +41,7 @@ export {
   type ReviewPolicy,
   type ReviewRunSpec,
 } from "#src/review-run";
+export { CI_REVIEW_POLICY } from "#src/review-profile";
 export {
   buildReviewIndex,
   type ReviewIndexRequest,
@@ -65,6 +66,7 @@ export {
 } from "#src/memory";
 export {
   categoryMarker,
+  findingId,
   findingMarker,
   parsePostedFinding,
   postedFindingKeys,

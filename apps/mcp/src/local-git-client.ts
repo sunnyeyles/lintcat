@@ -1,4 +1,5 @@
-import { lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
@@ -189,6 +190,21 @@ async function resolveScope(
     commitRange: `${baseSha}..HEAD`,
     headLabel: "the working tree",
   };
+}
+
+/** The tree a review of this slice reads; for the working tree, one built through a scratch index. */
+export async function reviewedTree(repository: Pick<LocalRepository, "root" | "scope">): Promise<string> {
+  const { root, scope } = repository;
+  if (scope.headRef !== WORKING_TREE) return scope.headRef;
+  const scratch = mkdtempSync(path.join(tmpdir(), "pr-review-index-"));
+  try {
+    const env = { GIT_INDEX_FILE: path.join(scratch, "index") };
+    await git(root, ["read-tree", "HEAD"], { env });
+    await git(root, ["add", "--all"], { env });
+    return (await git(root, ["write-tree"], { env })).trim();
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 /** The checkout holding `repoPath`, with symlinks resolved. */

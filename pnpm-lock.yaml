@@ -44,6 +44,9 @@ importers:
       '@pr-review/mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@pr-review/reviewer':
+        specifier: workspace:*
+        version: link:../../packages/reviewer
       '@pr-review/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas

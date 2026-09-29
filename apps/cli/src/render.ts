@@ -81,10 +81,10 @@ export function orderFindings(findings: readonly ReviewFinding[]): ReviewFinding
 }
 
 /** The findings a `--fail-on` threshold blocks on; "off" blocks on none. */
-export function blockingFindings(
-  findings: readonly ReviewFinding[],
+export function blockingFindings<T extends ReviewFinding>(
+  findings: readonly T[],
   failOn: FailOn,
-): ReviewFinding[] {
+): T[] {
   if (failOn === "off") return [];
   const threshold = SEVERITIES.indexOf(failOn);
   return findings.filter((finding) => SEVERITIES.indexOf(finding.severity) >= threshold);
