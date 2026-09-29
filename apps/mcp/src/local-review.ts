@@ -14,6 +14,10 @@ export {
   type LocalScope,
   type ResolvedScope,
 } from "#src/local-git-client";
-export { openLocalMemoryStore, type LocalMemoryStore } from "#src/local-memory-store";
+export {
+  openLocalMemoryStore,
+  recordSuppression,
+  type LocalMemoryStore,
+} from "#src/local-memory-store";
 export { runReview, type ReviewRequest, type ReviewResult } from "#src/review";
 export { modelReviewEngine, type SelectedEngine } from "#src/review-engine";

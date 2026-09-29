@@ -382,6 +382,46 @@ describe("reusing an earlier review", () => {
   });
 });
 
+describe("suppressing a finding", () => {
+  const review = ["--base", "main", "--no-index", "--format", "json"];
+
+  it("stops a later review raising the finding it names", async () => {
+    const first = await run(review, { createLanguageModel: () => scriptedModel([admin]) });
+    const [finding] = localReviewReportSchema.parse(JSON.parse(first.out)).findings;
+
+    const suppressed = await run(["suppress", finding!.id, "--reason", "Admin is meant to be on here"]);
+    const later = await run(review, { createLanguageModel: () => scriptedModel([admin]) });
+
+    expect(suppressed.code).toBe(0);
+    expect(suppressed.out).toContain("Suppressed");
+    const report = localReviewReportSchema.parse(JSON.parse(later.out));
+    expect(report.findings).toEqual([]);
+    expect(report.suppressed).toBe(1);
+  });
+
+  it("fails clearly on an id the last review did not report", async () => {
+    await run(review, { createLanguageModel: () => scriptedModel([admin]) });
+
+    const { code, err } = await run(["suppress", "0123456789ab"]);
+
+    expect(err).toContain('no finding "0123456789ab" in the last review');
+    expect(code).toBe(2);
+  });
+
+  it("needs an id", async () => {
+    const { code, err } = await run(["suppress"]);
+
+    expect(err).toContain("suppress needs a finding id");
+    expect(code).toBe(2);
+  });
+
+  it("is documented in the help", async () => {
+    const { out } = await run(["--help"]);
+
+    expect(out).toContain("pr-review suppress <id>");
+  });
+});
+
 describe("cancelling a review", () => {
   it("aborts the in-flight model calls and prints no verdict", async () => {
     const { model, firstCall } = makeHangingModel();

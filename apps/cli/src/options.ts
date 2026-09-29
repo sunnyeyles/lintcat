@@ -44,9 +44,18 @@ interface InstallHookOptions {
   force: boolean;
 }
 
+export interface SuppressOptions {
+  kind: "suppress";
+  /** A finding id from the last review's report. */
+  id: string;
+  repoPath: string | undefined;
+  reason: string | undefined;
+}
+
 export type Command =
   | ReviewOptions
   | InstallHookOptions
+  | SuppressOptions
   | { kind: "help" }
   | { kind: "version" };
 
@@ -215,7 +224,8 @@ function installHookOptions(flags: Flags): InstallHookOptions {
 export function parseArguments(argv: readonly string[]): Command {
   const named = argv[0] !== undefined && !argv[0].startsWith("-");
   const command = named ? argv[0]! : "review";
-  const flags = readFlags(argv.slice(named ? 1 : 0));
+  const id = command === "suppress" && argv[1] !== undefined && !argv[1].startsWith("-") ? argv[1] : undefined;
+  const flags = readFlags(argv.slice((named ? 1 : 0) + (id === undefined ? 0 : 1)));
   if (flags.switches.has("help") || flags.switches.has("h")) {
     return { kind: "help" };
   }
@@ -227,6 +237,13 @@ export function parseArguments(argv: readonly string[]): Command {
   }
   if (command === "install-hook") {
     return installHookOptions(flags);
+  }
+  if (command === "suppress") {
+    known(flags, ["repo", "reason"]);
+    if (id === undefined) {
+      throw new UsageError("suppress needs a finding id, as the last review's JSON report gives it");
+    }
+    return { kind: "suppress", id, repoPath: flags.values.get("repo"), reason: flags.values.get("reason") };
   }
   if (command === "help") {
     return { kind: "help" };

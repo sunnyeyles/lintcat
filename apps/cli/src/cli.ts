@@ -7,6 +7,7 @@ import path from "node:path";
 import { errorMessage } from "@pr-review/logging";
 
 import { BYPASS_ENV, installPrePushHook } from "#src/hook";
+import { runSuppressCommand } from "#src/suppress-command";
 import { parseArguments, UsageError, type Command } from "#src/options";
 import {
   EXIT_ERROR,
@@ -22,6 +23,7 @@ export const USAGE = `pr-review — review a working tree before it is pushed.
 Usage:
   pr-review [review] [options]      Review a checkout and report validated findings
   pr-review install-hook [options]  Install the pre-push hook into a checkout
+  pr-review suppress <id> [options] Stop later reviews raising a finding from the last one
   pr-review help | version
 
 Review options:
@@ -42,6 +44,10 @@ install-hook options:
   --fail-on <level>    Severity the hook blocks a push on (default: high)
   --command <command>  What the hook runs (default: the command that installed it)
   --force              Replace a pre-push hook pr-review did not write
+
+suppress options:
+  --repo <path>        Checkout whose memory records it (default: the working directory)
+  --reason <text>      Why the finding is noise here, kept with the suppression
 
 Exit codes:
   0  no finding at or above --fail-on
@@ -76,6 +82,9 @@ async function dispatch(command: Command, deps: CliEnvironment): Promise<number>
   }
   if (command.kind === "review") {
     return runReviewCommand({ ...command, color: useColor(deps, command.color) }, deps);
+  }
+  if (command.kind === "suppress") {
+    return runSuppressCommand(command, deps);
   }
   const installed = await installPrePushHook({
     repoPath: path.resolve(deps.environment.cwd, command.repoPath ?? "."),

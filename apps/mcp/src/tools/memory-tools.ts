@@ -1,18 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import {
-  addSuppression,
-  readMemory,
-  titleShape,
-  writeMemory,
-} from "@pr-review/reviewer";
 import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
 import type { McpEnvironment } from "#src/environment";
 import { repositoryRoot } from "#src/local-git-client";
-import { openLocalMemoryStore } from "#src/local-memory-store";
+import { recordSuppression } from "#src/local-memory-store";
 import { repoPathSchema } from "#src/tools/shared";
 
 /** No base branch is resolved here: suppressing needs the checkout, not a diff. */
@@ -64,28 +58,20 @@ export function registerMemoryTools(
     },
     async ({ repoPath, category, title, reason }): Promise<CallToolResult> => {
       const root = await checkoutRoot(environment, client, repoPath);
-      const store = await openLocalMemoryStore(root);
-      const memory = await readMemory(store, environment.logger);
-      const updated = addSuppression(
-        memory,
+      const recorded = await recordSuppression(
+        root,
         { category, title, ...(reason === undefined ? {} : { reason }) },
-        new Date(),
+        environment.logger,
       );
-      await writeMemory(store, updated);
-      environment.logger.info("memory.suppression_recorded", {
-        repoPath: root,
-        category,
-        shape: titleShape(title),
-      });
       return {
         content: [
           {
             type: "text",
             text:
-              `Suppressed ${category} findings shaped like "${titleShape(title)}" in ${root}. ` +
-              `${updated.suppressions.length} suppression(s) now live in ${store.path}.`,
+              `Suppressed ${category} findings shaped like "${recorded.shape}" in ${root}. ` +
+              `${recorded.suppressions.length} suppression(s) now live in ${recorded.path}.`,
           },
-          { type: "text", text: JSON.stringify(updated.suppressions, null, 2) },
+          { type: "text", text: JSON.stringify(recorded.suppressions, null, 2) },
         ],
       };
     },
