@@ -110,7 +110,7 @@ Good:
 
 ### Issue tracker
 
-GitHub Issues on `sunnyeyles/pr-review-agents`, via the `gh` CLI. See
+GitHub Issues on `sunnyeyles/lintcat`, via the `gh` CLI. See
 `docs/agents/issue-tracker.md`.
 
 ### Triage labels
