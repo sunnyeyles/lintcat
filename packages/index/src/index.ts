@@ -15,7 +15,32 @@ export {
   parseCodeowners,
   type CodeownersRule,
 } from "#src/codeowners";
+export {
+  findConfigDrift,
+  type ConfigDrift,
+  type DeclaredDependency,
+  type DuplicateDependency,
+  type EnvExampleEntry,
+  type SourceLine,
+  type UndocumentedEnvVar,
+} from "#src/config-drift";
 export { nodesInCycles } from "#src/cycles";
+export {
+  changedNames,
+  docLinesMentioning,
+  type ChangedNames,
+  type DocLineMention,
+} from "#src/doc-mentions";
+export {
+  isDocPath,
+  readDoc,
+  resolveDocLink,
+  type DocLink,
+  type DocMention,
+  type IndexedDoc,
+  type LinkDestination,
+  type MentionKind,
+} from "#src/docs";
 export {
   collectEntryPoints,
   isEntryPoint,
@@ -60,6 +85,12 @@ export {
   type PathAlias,
 } from "#src/manifests";
 export { coveredSourcePaths } from "#src/pairing";
+export {
+  patchLines,
+  type PatchedFile,
+  type PatchLine,
+  type PatchLines,
+} from "#src/patch-lines";
 export {
   referencesTo,
   type Reference,

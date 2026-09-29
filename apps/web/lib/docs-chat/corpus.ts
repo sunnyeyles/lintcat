@@ -152,8 +152,8 @@ Drift: places where a change departs from how the rest of your repository alread
 - **Naming:** a function, type, file or export named differently from how its neighbours name the same kind of thing.
 - **Patterns:** a helper written again when the repository already has one, a layer the other files go through and this one skips.
 - **Style:** export style, error shapes or module layout the neighbouring files share and no formatter or linter enforces.
-- **Documentation:** a README, doc or comment the change made wrong.
-- **Config:** a setting or dependency added differently from the ones already there.
+- **Documentation:** a README, doc or comment the change made wrong, and a doc link the change adds to a file or heading that doesn’t exist. Broken links are found by LintCat itself, not the AI, so they need no cited examples. Rewording that makes a doc say less is not drift.
+- **Config:** a setting or dependency added differently from the ones already there, such as an environment variable your \`.env.example\` and docs don’t list, or a second library for a job one you already use does.
 
 Every finding cites at least two places in your existing code that show the convention, and each is checked before the finding posts. Where the existing files disagree among themselves there is no convention, and nothing is reported.
 
@@ -167,7 +167,9 @@ A diff only shows what changed. Before the reviewer starts, LintCat maps the rep
 - how many files import it;
 - whether it is dead, with nothing importing it and no entry point reaching it;
 - whether it sits in an import cycle;
-- which unchanged files sit beside it and play the same role: the local convention it is compared against.
+- which unchanged files sit beside it and play the same role: the local convention it is compared against;
+- which lines of your Markdown docs name something the change edits or removes;
+- which new environment variables nothing documents, and which new dependencies duplicate one you already use.
 
 It can also look up which files use a name, and which files have historically changed alongside this one. That is how it finds the helper the change wrote again, the convention three other files follow, and the doc that now describes something else.
 
@@ -204,6 +206,7 @@ Before anything is posted, every finding has to pass these checks:
 - It points at a line this pull request added or changed.
 - The reviewer is confident in it.
 - It cites at least two places in your existing code that show the convention your change departs from. Each must exist and sit outside this pull request; a reference that doesn’t check out is removed, and so is a finding left with fewer than two.
+- A broken doc link is the one finding LintCat makes itself: the link is resolved at the pull request’s latest commit, so it needs no cited examples.
 - It doesn’t repeat another finding.
 - It makes the cut of at most 10 per review, most important first.
 

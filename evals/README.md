@@ -12,12 +12,15 @@ project; `vitest.eval.config.ts` still matches only `*.eval.ts`.
 ## What is evaluated
 
 Codebase drift: a change that names or does something differently from how the
-rest of the repository already does it. Nine fixtures, twelve assertions. Three
-are recall signals, one per planted drift; the rest are precision signals.
+rest of the repository already does it. Sixteen fixtures, nineteen assertions.
+Seven are recall signals, one per planted drift; the rest are precision signals.
 
 Five fixtures are the same small billing API (`ledgerly/billing-api`): routes,
 services, data and db layers, with the boundaries written down in its
-`ARCHITECTURE.md`. The other four are small services of their own.
+`ARCHITECTURE.md`. Seven are a notification worker (`harbourline/notify-worker`)
+whose README and runbook document its configuration; the three config fixtures
+add a `package.json` and a `.env.example`. The other four are small services of
+their own.
 
 | Fixture | Planted problem | Assertion | Signal |
 | --- | --- | --- | --- |
@@ -29,6 +32,13 @@ services, data and db layers, with the boundaries written down in its
 | `clean-no-convention-lib` | | every proposed patch matches the file at head | precision |
 | `clean-shared-money-format` | none: two drifted formatters become one shared helper that imports from a file outside the diff | zero findings | precision |
 | `clean-shared-money-format` | | every proposed patch matches the file at head | precision |
+| `docs-drift-retry-budget` | the retry attempt count becomes a time budget, and `NOTIFY_MAX_RETRIES` goes, while the README and the runbook still document it | a finding lands on the new budget variable or the retry loop | recall |
+| `docs-broken-anchor` | a new README link names a runbook heading that does not exist | a finding lands on the link | recall |
+| `clean-docs-valid-anchor` | none: a new README link lands on a runbook heading outside the diff | zero findings | precision |
+| `clean-docs-reword` | none: the README's delivery section is reworded to say less, and stays true | zero findings | precision |
+| `config-undocumented-env-var` | signed deliveries read `NOTIFY_SIGNING_SECRET`, which neither `.env.example` nor the README lists beside the other variables | a finding lands on the read | recall |
+| `config-duplicate-dependency` | quiet hours add `dayjs` to a worker that does its date work with `date-fns` | a finding lands on the manifest entry or the import | recall |
+| `clean-config-env-var-documented` | none: the same signing secret, added to `.env.example` and the README with the code | zero findings | precision |
 | `correctness-admin-check` | a `since` filter keeps the events before the timestamp; the route otherwise follows its siblings | zero findings | precision |
 | `correctness-cross-file-caller` | a quote's total becomes `Money`, as the pricing code already uses, and an untouched caller still renders it as a string | zero findings | precision |
 | `security-open-redirect` | a new route redirects wherever its query string says; no other route redirects | zero findings | precision |
@@ -47,7 +57,22 @@ None of the recall fixtures can be solved from the diff alone. A convention is
 only a convention once the reviewer has read the files that follow it, and a
 finding survives validation only with two pieces of evidence in files the pull
 request does not change. `drift-fixtures.test.ts` checks, in `pnpm test`, that
-the naming fixture's convention is citable that way.
+the naming and retry-budget fixtures' evidence is citable that way, and that the
+retry-budget doc lines reach the opening message.
+
+The link fixtures are decided in code, not by the model: a doc link the pull
+request adds is resolved against head, and one pointing at a missing file or
+heading is a finding before the agent's are merged in. `drift-fixtures.test.ts`
+runs `docs-broken-anchor`, `clean-docs-valid-anchor` and `clean-docs-reword`
+through the pipeline with an agent that reports nothing, and holds each to its
+expectations. In the paid run they measure only that the model does not add a
+finding of its own.
+
+The config fixtures are found in code and reported by the model: the opening
+message states each undocumented env var and duplicate dependency with the lines
+to cite. `drift-fixtures.test.ts` checks that both recall fixtures produce that
+fact, that a finding citing it survives validation, and that the documented
+variable produces none.
 
 `patches-verify` is precision only: proposing no patch passes it. What fails is
 a patch whose quoted `expected` lines do not match the file, which is the one
@@ -76,11 +101,13 @@ much `pattern` as `naming` drift, and either is right.
 The index is kept only if it is measured to help, and this is where that is
 decided.
 
-**The fixtures.** The three recall fixtures. With the index, the opening
-message lists each changed file's siblings, and validation checks every piece
-of evidence against the base commit. Without it, the reviewer has to find the
-convention with `search_repository` alone, and validation can only reject
-evidence that names a changed file.
+**The fixtures.** The recall fixtures. With the index, the opening message
+lists each changed file's siblings and the doc lines naming what the diff
+changes, and validation checks every piece of evidence against the base commit.
+Without it, the reviewer has to find the convention with `search_repository`
+alone, validation can only reject evidence that names a changed file, and a
+link into a file the diff does not show goes unchecked — so
+`docs-broken-anchor` is expected to fail the control arm.
 
 **The control switch.** `EVAL_INDEX=off` makes the fixture client report the
 archive unavailable. `buildReviewIndex` then logs `index.failed` and returns
@@ -92,7 +119,7 @@ MODEL_PROVIDER=anthropic MODEL_ID=claude-sonnet-5 pnpm eval                 # in
 MODEL_PROVIDER=anthropic MODEL_ID=claude-sonnet-5 EVAL_INDEX=off pnpm eval  # control
 ```
 
-**The gate.** Recall on the three recall fixtures with the index on versus
+**The gate.** Recall on the recall fixtures with the index on versus
 off. If it does not move, the feature stops here: no persistence, no SCIP, no
 second language.
 
@@ -106,12 +133,12 @@ when a run is meant as evidence, so a cost change has a before and an after.
 
 ## Known gaps
 
-- **No fixture has reached a model.** The nine fixtures load, diff and resolve
+- **No fixture has reached a model.** The sixteen fixtures load, diff and resolve
   their anchors in `pnpm test`, but none has been reviewed by a model yet, so
   whether each planted problem is findable, and each out-of-scope bug left
   alone, is unproven.
-- **Only naming and pattern drift are measured.** The reviewer's categories
-  also cover docs, style and config drift, but no fixture checks them yet.
+- **Style drift is unmeasured.** Naming, pattern, docs and config drift have
+  fixtures; the reviewer's style category does not yet.
 - **No fixture requires a patch.** `patches-verify` catches a wrong patch but
   cannot notice a reviewer that never proposes one, so fix recall is unmeasured.
 - **`claude-haiku-4-5` does not clear the suite**, which is why the Anthropic

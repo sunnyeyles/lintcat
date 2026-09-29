@@ -1,0 +1,22 @@
+{
+  "name": "docs-broken-anchor",
+  "title": "Docs drift \u2014 a new README link names a runbook heading that does not exist",
+  "owner": "harbourline",
+  "repo": "notify-worker",
+  "baseSha": "3f5a1c8e07b249d6a1e4f0c72b8d95e3a6417cb0",
+  "headSha": "5d0b8f3e2a71c94e6b0d3f58a2c7e1941b6d0a83",
+  "pullRequest": {
+    "number": 275,
+    "title": "Point the README at the runbook",
+    "body": "Operators keep asking in chat what to do when deliveries stall. The runbook already covers it, so the README now links there.",
+    "author": "j-okafor",
+    "baseRef": "main",
+    "headRef": "docs/readme-troubleshooting"
+  },
+  "changedFiles": [
+    {
+      "path": "README.md",
+      "status": "modified"
+    }
+  ]
+}

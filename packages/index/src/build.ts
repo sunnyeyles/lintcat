@@ -2,7 +2,15 @@
  * The repository index: a pure function over an in-memory file map, so it can
  * be tested with inline fixtures and reused unchanged anywhere the files come from.
  */
+import {
+  isEnvExamplePath,
+  readDependencies,
+  readEnvExample,
+  type DeclaredDependency,
+  type EnvExampleEntry,
+} from "#src/config-drift";
 import { nodesInCycles } from "#src/cycles";
+import { isDocPath, readDoc, type IndexedDoc } from "#src/docs";
 import { collectEntryPoints, isEntryPoint } from "#src/entry-points";
 import { parseImports, type ImportedName } from "#src/imports";
 import {
@@ -12,6 +20,7 @@ import {
   type LanguageCoverage,
 } from "#src/languages";
 import { coveredSourcePaths } from "#src/pairing";
+import { basenameOf } from "#src/paths";
 import { createImportResolver } from "#src/resolve";
 import { classifyFileRole, type FileRole } from "#src/roles";
 import {
@@ -69,6 +78,12 @@ export interface RepositoryIndex {
   readonly importers: ReadonlyMap<string, readonly ImportEdge[]>;
   /** Manifests and aliases, read again for entry points and package ownership. */
   readonly workspace: WorkspaceModel;
+  /** Every Markdown file, by path: anchors, links and mentions. */
+  readonly docs: ReadonlyMap<string, IndexedDoc>;
+  /** Variables declared in `.env.example` and its equivalents. */
+  readonly envExamples: readonly EnvExampleEntry[];
+  /** Every dependency entry of every package.json outside vendored and generated trees. */
+  readonly dependencies: readonly DeclaredDependency[];
 }
 
 export interface RepositoryIndexInput {
@@ -237,6 +252,26 @@ export function buildRepositoryIndex(
     }
   }
   flagFiles(files, edges, workspace);
+  const docs = new Map<string, IndexedDoc>();
+  const envExamples: EnvExampleEntry[] = [];
+  const dependencies: DeclaredDependency[] = [];
+  for (const file of files.values()) {
+    const contents = input.files.get(file.path);
+    if (contents === undefined) {
+      continue;
+    }
+    if (isDocPath(file.path)) {
+      docs.set(file.path, readDoc(file.path, contents));
+    } else if (isEnvExamplePath(file.path)) {
+      envExamples.push(...readEnvExample(file.path, contents));
+    } else if (
+      basenameOf(file.path) === "package.json" &&
+      file.role !== "vendored" &&
+      file.role !== "generated"
+    ) {
+      dependencies.push(...readDependencies(file.path, contents));
+    }
+  }
 
   return {
     sha: input.sha,
@@ -250,5 +285,8 @@ export function buildRepositoryIndex(
     edges,
     importers,
     workspace,
+    docs,
+    envExamples,
+    dependencies,
   };
 }

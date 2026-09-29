@@ -1,0 +1,22 @@
+{
+  "name": "clean-docs-reword",
+  "title": "Clean \u2014 the README's delivery section is reworded to say less, and stays true",
+  "owner": "harbourline",
+  "repo": "notify-worker",
+  "baseSha": "3f5a1c8e07b249d6a1e4f0c72b8d95e3a6417cb0",
+  "headSha": "c41e7a2d9b05f38e6a1d4c7b0f29e85a3d6c1b47",
+  "pullRequest": {
+    "number": 274,
+    "title": "Trim the delivery section of the README",
+    "body": "The delivery section spelled out the backoff arithmetic, which nobody reads and which goes stale the moment a constant moves. It now says what happens without the numbers.",
+    "author": "j-okafor",
+    "baseRef": "main",
+    "headRef": "docs/trim-delivery"
+  },
+  "changedFiles": [
+    {
+      "path": "README.md",
+      "status": "modified"
+    }
+  ]
+}
