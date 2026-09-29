@@ -5,8 +5,9 @@ export { expandGroup } from "@/lib/codebase-map/merge";
 export { resolveLodThreshold } from "@/lib/codebase-map/lod";
 export type { GroupSlice, LodSearchResult } from "@/lib/codebase-map/lod";
 
+export { NO_GRAPH_CODE } from "@/lib/codebase-map/endpoint";
 export { mapQuery, SEARCH_LIMIT } from "@/lib/codebase-map/query";
-export type { MapQuery, MapSearchAnswer } from "@/lib/codebase-map/query";
+export type { MapPayload, MapQuery, MapSearchAnswer } from "@/lib/codebase-map/query";
 
 export { normaliseGraph } from "@/lib/codebase-map/normalise";
 export type { NormalisedGraph } from "@/lib/codebase-map/normalise";

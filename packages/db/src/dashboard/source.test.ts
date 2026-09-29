@@ -1,5 +1,5 @@
 import type { ReviewRecord, ReviewRecordRisk } from "@pr-review/schemas";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { authorize } from "../authorize";
@@ -270,6 +270,44 @@ describe("createDbSource", () => {
     expect(await source.getMapAccess(mine)).toMatchObject({ baseSha: null });
     expect(await source.getMapAccess(theirs)).toBeNull();
     expect(await source.getMapAccess(999_999)).toBeNull();
+  });
+
+  it("finds a review's neighbours as the repo's whole history orders them", async () => {
+    const stamps = [
+      "2026-01-01T00:00:00.000100Z",
+      "2026-01-01T00:00:00.000900Z",
+      "2026-01-01T00:00:00.000900Z",
+      "2026-01-02T00:00:00Z",
+      "2025-12-31T00:00:00Z",
+    ];
+    const ids: number[] = [];
+    for (const [i, stamp] of stamps.entries()) {
+      const id = await ingest(acme, record({ headSha: String(i).repeat(40), prNumber: 10 + i }));
+      await database
+        .update(reviews)
+        .set({ createdAt: sql`${stamp}::timestamptz` })
+        .where(eq(reviews.id, id));
+      ids.push(id);
+    }
+    await ingest(acme, record({ repo: "gadgets", headSha: "f".repeat(40) }));
+    const theirs = await ingest(globex, record({ owner: "globex", repo: "secret" }));
+    const source = await sourceFor(acme);
+
+    const history = await source.listReviews({ repoId: (await source.getReview(ids[0]!))!.repoId });
+    const link = (at: number) => {
+      const review = history[at];
+      return review
+        ? { id: review.id, prNumber: review.prNumber, repo: { owner: "acme", name: "widgets" } }
+        : null;
+    };
+    expect(history).toHaveLength(stamps.length);
+    for (const [at, review] of history.entries()) {
+      expect(await source.getAdjacentReviews(review.id)).toEqual({
+        newer: link(at - 1),
+        older: link(at + 1),
+      });
+    }
+    expect(await source.getAdjacentReviews(theirs)).toEqual({ newer: null, older: null });
   });
 
   it("carries each review's risk on lists and on the review, null for one stored without", async () => {

@@ -12,7 +12,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { QueryBuilder } from "drizzle-orm/pg-core";
+import { alias, QueryBuilder } from "drizzle-orm/pg-core";
 
 import type { Database } from "../client";
 import {
@@ -37,6 +37,7 @@ import type {
   DataSource,
   RepoSummary,
   ReviewDetail,
+  ReviewLink,
   ReviewStat,
   ReviewSummary,
   Severity,
@@ -277,6 +278,37 @@ export function createDbSource(
     return pending;
   }
 
+  // Compared in SQL: a JS Date drops the microseconds that order same-millisecond reviews.
+  async function fetchNeighbour(id: number, newer: boolean): Promise<ReviewLink | null> {
+    const at = alias(reviews, "at");
+    const [row] = await database
+      .select({
+        id: reviews.id,
+        prNumber: reviews.prNumber,
+        owner: repos.owner,
+        name: repos.name,
+      })
+      .from(reviews)
+      .innerJoin(repos, eq(repos.id, reviews.repoId))
+      .innerJoin(at, and(eq(at.id, id), eq(at.repoId, reviews.repoId)))
+      .where(
+        and(
+          liveRepos,
+          newer
+            ? sql`(${reviews.createdAt}, ${reviews.id}) > (${at.createdAt}, ${at.id})`
+            : sql`(${reviews.createdAt}, ${reviews.id}) < (${at.createdAt}, ${at.id})`,
+        ),
+      )
+      .orderBy(
+        ...(newer
+          ? [asc(reviews.createdAt), asc(reviews.id)]
+          : [desc(reviews.createdAt), desc(reviews.id)]),
+      )
+      .limit(1);
+    if (!row) return null;
+    return { id: row.id, prNumber: row.prNumber, repo: { owner: row.owner, name: row.name } };
+  }
+
   // One round trip carrying only the columns the trend and usage rollups read.
   async function fetchReviewStats(filter: ReviewFilter): Promise<ReviewStat[]> {
     const rows = await database
@@ -443,6 +475,14 @@ export function createDbSource(
     async getReview(id) {
       const [review] = await loadReviews({ id }, true);
       return review ?? null;
+    },
+
+    async getAdjacentReviews(id) {
+      const [newer, older] = await Promise.all([
+        fetchNeighbour(id, true),
+        fetchNeighbour(id, false),
+      ]);
+      return { newer, older };
     },
 
     async getMapAccess(id) {

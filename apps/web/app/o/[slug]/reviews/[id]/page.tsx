@@ -60,19 +60,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: `${review.repo.owner}/${review.repo.name} #${review.prNumber}` };
 }
 
-async function AdjacentReviews({
-  slug,
-  repoId,
-  reviewId,
-}: {
-  slug: string;
-  repoId: number;
-  reviewId: number;
-}) {
-  const siblings = await (await data(slug)).listReviews({ repoId });
-  const at = siblings.findIndex((r) => r.id === reviewId);
-  const newer = at > 0 ? (siblings[at - 1] ?? null) : null;
-  const older = at >= 0 ? (siblings[at + 1] ?? null) : null;
+async function AdjacentReviews({ slug, reviewId }: { slug: string; reviewId: number }) {
+  const { newer, older } = await (await data(slug)).getAdjacentReviews(reviewId);
   return <ReviewPager slug={slug} newer={newer} older={older} />;
 }
 
@@ -157,7 +146,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
       />
 
       <Suspense fallback={null}>
-        <AdjacentReviews slug={slug} repoId={review.repoId} reviewId={review.id} />
+        <AdjacentReviews slug={slug} reviewId={review.id} />
       </Suspense>
     </div>
   );
