@@ -11,3 +11,4 @@ next-env.d.ts
 .env*
 !evals/fixtures/**/.env.example
 docs/anidoodle/.engine/
+.DS_Store
