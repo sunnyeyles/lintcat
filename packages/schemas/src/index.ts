@@ -14,7 +14,6 @@ export {
 } from "#src/review-finding";
 export {
   reviewMemorySchema,
-  type MemoryShape,
   type ReviewMemory,
   type Suppression,
 } from "#src/review-memory";

@@ -1,8 +1,8 @@
 # The LintCat loop
 
 A ten-second pixel-art loop of how a review happens, drawn in code with
-[anidoodle](https://github.com/alexgreensh/anidoodle). It is the picture in the README, on the
-Pages walkthrough and on the dashboard's *How it works* page.
+[anidoodle](https://github.com/alexgreensh/anidoodle). It is the picture in the README and on
+the dashboard's *How it works* page.
 
 **The brief.** Kind: loop, silent. Style: anidoodle's pixel art (the cell is the mark, staircase
 edges, dither for tone, cels held three frames). Shape: 16x9, 1920x1080 from a 160x90 grid.
@@ -29,7 +29,7 @@ as comments and light the check run.
 - `src/hosts/page-lintcatLoop.ts` — the host page the engine's tools drive.
 - `render.mjs` — fetches the engine at a pinned commit into `.engine/` (gitignored), scaffolds a
   project there, copies `src/` in, renders, runs anidoodle's gate, and writes the outputs to
-  `docs/assets/lintcat-how-it-works.{gif,png}` and `apps/web/public/brand/how-it-works.{gif,png}`.
+  `docs/assets/lintcat-how-it-works.gif` and `apps/web/public/brand/how-it-works.{gif,png}`.
 
 ## Rendering
 

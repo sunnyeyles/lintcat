@@ -17,9 +17,3 @@ export function isCancellation(
   }
   return error instanceof Error && error.name === "AbortError";
 }
-
-export function throwIfCancelled(signal: AbortSignal | undefined): void {
-  if (signal?.aborted === true) {
-    throw new ReviewCancelledError();
-  }
-}

@@ -1,34 +1,15 @@
 /**
- * What a repository has done with our findings, aggregated per (category,
- * title shape). The stored file is untrusted: a bad read degrades to empty.
+ * The findings a repository has marked as noise, keyed by title shape. The
+ * stored file is untrusted: a bad read degrades to empty.
  */
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import {
   reviewMemorySchema,
-  type MemoryShape,
   type ReviewMemory,
   type Suppression,
 } from "@pr-review/schemas";
 
-export type FindingOutcome = "resolved" | "outdated" | "ignored";
-
-export interface FindingSignal {
-  category: string;
-  title: string;
-  outcome: FindingOutcome;
-}
-
-/** A shape needs this many ignores, and no resolve, before it earns a hint. */
-const HINT_IGNORED_THRESHOLD = 5;
-
-/** At most this many hints reach the prompt. */
-export const HINT_CAP = 10;
-
-/** A shape with no fresh signal for this long is forgotten. */
-const MEMORY_TTL_DAYS = 90;
-
 const MAX_SHAPE_LENGTH = 200;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Path-, dotted- and camelCase tokens name one call site, not a pattern. */
 function isSpecific(token: string): boolean {
@@ -66,7 +47,7 @@ export interface MemoryStore {
 export const MEMORY_FILE_PATH = "memory.json";
 
 export function emptyMemory(): ReviewMemory {
-  return { version: 1, shapes: [], suppressions: [] };
+  return { version: 1, suppressions: [] };
 }
 
 export async function readMemory(
@@ -107,45 +88,6 @@ export async function writeMemory(
   memory: ReviewMemory,
 ): Promise<void> {
   await store.write(`${JSON.stringify(memory, null, 2)}\n`);
-}
-
-function isFresh(shape: MemoryShape, now: Date): boolean {
-  const at = Date.parse(shape.lastSignalAt);
-  return Number.isFinite(at) && now.getTime() - at <= MEMORY_TTL_DAYS * DAY_MS;
-}
-
-/** Folds signals into the memory and forgets shapes past the TTL. */
-export function recordSignals(
-  memory: ReviewMemory,
-  signals: readonly FindingSignal[],
-  now: Date,
-): ReviewMemory {
-  const byKey = new Map<string, MemoryShape>();
-  for (const shape of memory.shapes) {
-    byKey.set(`${shape.category}|${shape.shape}`, { ...shape });
-  }
-
-  for (const signal of signals) {
-    const shape = titleShape(signal.title);
-    const key = `${signal.category}|${shape}`;
-    const existing = byKey.get(key) ?? {
-      category: signal.category,
-      shape,
-      resolved: 0,
-      ignored: 0,
-      outdated: 0,
-      lastSignalAt: now.toISOString(),
-    };
-    const updated: MemoryShape = { ...existing, lastSignalAt: now.toISOString() };
-    updated[signal.outcome] += 1;
-    byKey.set(key, updated);
-  }
-
-  return {
-    version: 1,
-    shapes: [...byKey.values()].filter((shape) => isFresh(shape, now)),
-    suppressions: memory.suppressions,
-  };
 }
 
 /** What a suppression is matched against: one finding, or one recorded title. */
@@ -193,23 +135,4 @@ export function partitionSuppressed<T extends SuppressibleFinding>(
     (isSuppressed(memory, finding) ? suppressed : kept).push(finding);
   }
   return { kept, suppressed };
-}
-
-function hintSentence(shape: string): string {
-  const quoted = shape.replace(/["\r\n]/g, "");
-  return `Findings like "${quoted}".`;
-}
-
-/** Deprioritise hints, most-ignored first, capped. */
-export function computeHints(memory: ReviewMemory, now: Date): string[] {
-  return memory.shapes
-    .filter(
-      (shape) =>
-        shape.ignored >= HINT_IGNORED_THRESHOLD &&
-        shape.resolved === 0 &&
-        isFresh(shape, now),
-    )
-    .sort((a, b) => b.ignored - a.ignored)
-    .slice(0, HINT_CAP)
-    .map((shape) => hintSentence(shape.shape));
 }

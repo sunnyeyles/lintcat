@@ -20,39 +20,10 @@ export interface AgentDefinition {
   categories: readonly [CategoryDefinition, ...CategoryDefinition[]];
   /** Optional agent-specific addition to "# Context and tools". */
   contextGuidance?: string;
-  /** Deprioritisation sentences attached per run; never read from config. */
-  repositoryHints?: readonly string[];
-}
-
-/** The "# Repository history" block, or "" when there is nothing to say. */
-function renderRepositoryHints(
-  hints: readonly string[] | undefined,
-): string {
-  if (hints === undefined || hints.length === 0) {
-    return "";
-  }
-  return [
-    "",
-    "",
-    "# Repository history",
-    "Findings like these have repeatedly been left unaddressed in this repository. They are deprioritised, not banned: report one only if it is clearly severe.",
-    ...hints.map((hint) => `- ${hint}`),
-  ].join("\n");
 }
 
 export function categorySlugs(agent: AgentDefinition): FindingCategory[] {
   return agent.categories.map((category) => category.slug);
-}
-
-/** The same agent carrying `hints`; the input itself when there are none. */
-export function withRepositoryHints(
-  agent: AgentDefinition,
-  hints: readonly string[],
-): AgentDefinition {
-  if (hints.length === 0) {
-    return agent;
-  }
-  return { ...agent, repositoryHints: hints };
 }
 
 /** The rules no agent may bend, whatever it can read and however it is run. */
@@ -101,7 +72,7 @@ function composeSystemPrompt(agent: AgentDefinition, context: string): string {
 # Role
 ${agent.focus}
 
-${context}${renderRepositoryHints(agent.repositoryHints)}
+${context}
 
 ${renderSecurityRules(agent.role)}
 

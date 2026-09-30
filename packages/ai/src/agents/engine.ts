@@ -14,7 +14,6 @@ import type { ReviewModel } from "#src/model";
 
 /** One review's agent request; the scope arrives with the context `run` is given. */
 export interface AgentRequest {
-  /** Carries this run's repository hints. */
   agent: AgentDefinition;
   github: ReviewToolsClient;
   index: RepositoryIndex | undefined;

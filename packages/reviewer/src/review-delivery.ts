@@ -33,7 +33,7 @@ export interface FinishedReviewRun {
 }
 
 /** Mirrors a finished run somewhere that is not the pull request. */
-export type PublishReviewRun = (
+type PublishReviewRun = (
   target: ReviewTarget,
   run: FinishedReviewRun,
 ) => Promise<void>;
@@ -72,7 +72,7 @@ export function githubDelivery({
 }
 
 /** What a recording delivery kept instead of publishing it. */
-export interface RecordedDelivery {
+interface RecordedDelivery {
   checkRun: RenderedCheckRun | undefined;
   review: RenderedReview | undefined;
   runs: FinishedReviewRun[];

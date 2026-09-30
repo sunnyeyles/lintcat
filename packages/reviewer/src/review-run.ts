@@ -7,8 +7,6 @@ import {
   GENERAL_AGENT,
   isCancellation,
   ReviewCancelledError,
-  withRepositoryHints,
-  type AgentDefinition,
   type ReviewEngine,
 } from "@pr-review/ai";
 import {
@@ -40,7 +38,6 @@ import { buildDiffLineIndex } from "#src/diff-lines";
 import { checkDocLinks, mergeCheckedFindings } from "#src/doc-links";
 import { countLabel } from "#src/finding-format";
 import {
-  computeHints,
   emptyMemory,
   partitionSuppressed,
   readMemory,
@@ -78,7 +75,7 @@ export interface ReviewPolicy {
   suggestReviewers?: boolean | undefined;
 }
 
-/** Repository memory, with the clock that decides what counts as fresh. */
+/** Repository memory, with the run's clock. */
 export interface ReviewMemory {
   store: MemoryStore;
   /** Defaults to the wall clock; a test pins it. */
@@ -92,7 +89,7 @@ export interface ReviewRunSpec {
   delivery: ReviewDelivery;
   engine: ReviewEngine;
   policy?: ReviewPolicy | undefined;
-  /** Omitted, the run reads no memory and attaches no hints. */
+  /** Omitted, the run reads no memory and suppresses nothing. */
   memory?: ReviewMemory | undefined;
   logger?: StructuredLogger | undefined;
   /** Aborting it stops the agent and publishes nothing. */
@@ -218,32 +215,12 @@ async function openEarlierFindings(
   }
 }
 
-/** One memory read serves both readers: the agent's hints and suppressions. */
-interface HintedRun {
-  agent: AgentDefinition;
-  memory: MemoryContents;
-}
-
-/** The run's hints; unhinted when there is no store, and `readMemory` never throws. */
-async function attachRepositoryHints(
-  agent: AgentDefinition,
+/** Empty when there is no store; `readMemory` never throws. */
+async function loadMemory(
   store: MemoryStore | undefined,
-  target: ReviewTarget,
   logger: StructuredLogger,
-  now: Date,
-): Promise<HintedRun> {
-  if (store === undefined) {
-    return { agent, memory: emptyMemory() };
-  }
-
-  const memory = await readMemory(store, logger);
-
-  const hints = computeHints(memory, now);
-  logger.info("memory.hints_attached", {
-    ...reviewCorrelation(target),
-    hintCount: hints.length,
-  });
-  return { agent: withRepositoryHints(agent, hints), memory };
+): Promise<MemoryContents> {
+  return store === undefined ? emptyMemory() : readMemory(store, logger);
 }
 
 function stillOpen(
@@ -357,13 +334,7 @@ async function review(
     return unreviewed(tree);
   }
 
-  const { agent: hinted, memory } = await attachRepositoryHints(
-    GENERAL_AGENT,
-    memorySpec?.store,
-    target,
-    logger,
-    now(),
-  );
+  const memory = await loadMemory(memorySpec?.store, logger);
 
   // Built once, before the agent starts, and serialised onto the outcome.
   const { index: repositoryIndex, codeowners } = await buildReviewIndex({
@@ -382,7 +353,7 @@ async function review(
 
   cancelled.check("agent");
   const agent = engine.createAgent({
-    agent: hinted,
+    agent: GENERAL_AGENT,
     github: client,
     index: repositoryIndex,
     logger,
@@ -426,7 +397,7 @@ async function review(
   const validated = validateFindings(
     candidates,
     scope.changedFiles,
-    categorySlugs(hinted),
+    categorySlugs(GENERAL_AGENT),
     { index: repositoryIndex, changedPaths: changedPaths(changedFiles) },
   );
   const brokenLinks = await checkDocLinks({

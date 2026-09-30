@@ -165,6 +165,6 @@ A bug introduced in an earlier commit, but only visible given the context the
 newest commit adds, is now outside the diff the agent is handed. `get_diff`
 means they *can* still reach it; nothing makes them.
 
-That is a real loss of recall, mitigated and not removed, and it is what the
-`incremental` input buys with its cost saving. A repository that would rather
-pay leaves it off, which is where it ships.
+That is a real loss of recall, mitigated and not removed, and it is what
+incremental review buys with its cost saving. A deployment that would rather
+pay sets `REVIEW_INCREMENTAL=false`.
