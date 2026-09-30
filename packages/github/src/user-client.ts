@@ -8,7 +8,7 @@ import {
   type RepositoryPermission,
 } from "#src/app-client";
 
-export interface UserInstallation {
+interface UserInstallation {
   id: number;
   account: { id: number; login: string; type: string };
 }
