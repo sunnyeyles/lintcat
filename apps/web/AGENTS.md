@@ -22,6 +22,3 @@ Brand assets (the LintCat mark and lockup, colour and mono, and the animated
 loaders) live in `public/brand/`. `components/shell/logo-mark.tsx` draws the
 same mark from the `--brand-*` tokens for inline use, with `animate="hover"`
 (the topbar) or `animate="always"` (a loading state).
-
-`docs/tokens.css` at the repo root is a separate, unrelated palette for the
-standalone `docs/index.html` explainer page.

@@ -23,7 +23,7 @@ model key. One pipeline, four front ends:
 The pipeline lives in `packages/reviewer` (`review-run.ts`). It builds a
 repository index at the base commit (`packages/index`), then runs **one**
 `general` agent (`packages/ai/src/agents/`) through a capped tool loop with
-read-only tools only (ADR `0002-single-general-agent`).
+read-only tools only.
 
 **The trust boundary is the core invariant:** agent output is untrusted until
 deterministic code validates it. `validateFindings()` (schema, own category,
@@ -35,8 +35,7 @@ check run is always advisory (`neutral`).
 Other packages: `db` (Drizzle/Postgres schema, job queue, encrypted model
 keys), `github` (installation-token Octokit client), `schemas` (Zod contracts),
 `logging` (single-line JSON). `evals/` runs the real pipeline against fixture
-repos without touching GitHub. `apps/action` holds only untracked build
-leftovers from the removed GitHub Action; ignore it.
+repos without touching GitHub.
 
 ## Commands
 
@@ -120,6 +119,5 @@ The five canonical roles, each label string equal to its name. See
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` (not written yet) and `docs/adr/` at the repo
-root. See `docs/agents/domain.md`. Two ADRs share the number 0002; the next
-one is 0004.
+Single-context: `CONTEXT.md` (not written yet) at the repo root. See
+`docs/agents/domain.md`. This repo keeps no ADRs; don't create `docs/adr/`.

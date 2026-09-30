@@ -23,7 +23,6 @@ export type {
 export {
   ReviewCancelledError,
   isCancellation,
-  throwIfCancelled,
 } from "#src/cancellation";
 export { addTokenUsage, emptyTokenUsage, type TokenUsage } from "#src/usage";
 export type { AgentUsageReport } from "#src/agents/runtime";
@@ -33,17 +32,13 @@ export {
   type AgentRequest,
   type ReviewEngine,
 } from "#src/agents/engine";
-export type { SamplingRequest, SampleText } from "#src/agents/sampling-agent";
+export type { SampleText } from "#src/agents/sampling-agent";
 export { GENERAL_AGENT } from "#src/agents/general-agent";
 export { renderConventionCounts } from "#src/agents/convention-counts";
-export {
-  renderRepository,
-  INDEX_ABSENT_LINE,
-} from "#src/agents/repository-index";
+export { renderRepository } from "#src/agents/repository-index";
 export { renderConfigDrift } from "#src/agents/config-drift";
 export { renderDocMentions } from "#src/agents/doc-mentions";
 export {
   categorySlugs,
-  withRepositoryHints,
   type AgentDefinition,
 } from "#src/agents/definition";

@@ -67,14 +67,16 @@ if (size > GIF_LIMIT) {
   console.error(`render: GIF is ${(size / 1024).toFixed(0)} KB, over the ${GIF_LIMIT / 1024} KB budget`);
   process.exit(1);
 }
+// The README embeds only the GIF; the dashboard also shows the poster to reduced-motion readers.
 const targets = [
-  [join(ROOT, "docs/assets"), "lintcat-how-it-works"],
-  [join(ROOT, "apps/web/public/brand"), "how-it-works"],
+  [join(ROOT, "docs/assets"), "lintcat-how-it-works", ["gif"]],
+  [join(ROOT, "apps/web/public/brand"), "how-it-works", ["gif", "png"]],
 ];
-for (const [dir, base] of targets) {
+for (const [dir, base, exts] of targets) {
   mkdirSync(dir, { recursive: true });
-  copyFileSync(gif, join(dir, `${base}.gif`));
-  copyFileSync(join(PROJECT, "out/how-it-works.png"), join(dir, `${base}.png`));
-  console.log(`wrote ${join(dir, base)}.{gif,png}`);
+  for (const ext of exts) {
+    copyFileSync(join(PROJECT, `out/how-it-works.${ext}`), join(dir, `${base}.${ext}`));
+  }
+  console.log(`wrote ${join(dir, base)}.{${exts.join(",")}}`);
 }
 console.log(`gif ${(size / 1024).toFixed(0)} KB`);

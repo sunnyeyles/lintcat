@@ -114,7 +114,7 @@ and sign-in share.
 have a row for; an organization owner reads every repo. A **collaborator** (rows
 but no membership, as on someone else's personal repo or as an outside
 collaborator) reads exactly the repos they have rows for; the role is derived by
-`authorize`, never stored (see `docs/adr/0003-repository-collaborators.md`). A
+`authorize`, never stored. A
 **repository owner** is an organization owner, or `admin`/`maintain` on the repo. `lib/repo-access-sync.ts`
 holds the lookups the webhook and sign-in share.
 

@@ -23,8 +23,7 @@ CSS motion each; apps import them from `@pr-review/design/icons`.
 
 ## Colour
 
-Colour comes from `@primer/primitives` (GitHub's tokens), in three layers
-(see `docs/adr/0002-primer-tokens-under-shadcn.md`):
+Colour comes from `@primer/primitives` (GitHub's tokens), in three layers:
 
 1. Primer's `light.css` and `dark.css`, imported by `src/theme.css`. Never
    edited; upgrade the package to move.

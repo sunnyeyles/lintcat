@@ -15,7 +15,6 @@ import {
   message,
   textBlock,
 } from "#src/agent-test-support";
-import { withRepositoryHints } from "#src/agents/definition";
 import {
   samplingEngine,
   toolLoopEngine,
@@ -86,8 +85,6 @@ const sampling: MakeHarness = (reply) => {
   };
 };
 
-const HINT = 'Findings like "assignment instead of comparison in".';
-
 const incremental: ReviewContext = {
   ...context,
   diff: "@@ -2 +2 @@\n+const limit = 0;\n",
@@ -130,21 +127,6 @@ function runEngineConformance(name: string, make: MakeHarness): void {
       );
       return { ...harness.sent(), reports, outcome };
     }
-
-    it("puts the agent's repository hints in front of the model", async () => {
-      const { system } = await review(context, {
-        agent: withRepositoryHints(GENERAL_AGENT, [HINT]),
-      });
-
-      expect(system).toContain("# Repository history");
-      expect(system).toContain(`- ${HINT}`);
-    });
-
-    it("says nothing of repository history when the agent carries no hints", async () => {
-      const { system } = await review(context);
-
-      expect(system).not.toContain("# Repository history");
-    });
 
     it("notes the narrowed scope of an incremental review, and sends only its diff", async () => {
       const { opening } = await review(incremental);

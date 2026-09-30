@@ -36,7 +36,6 @@ import { createCapturingLogger } from "@pr-review/logging";
 import {
   MAX_OVERLAY_FILES,
   reviewMemorySchema,
-  type MemoryShape,
   type ReviewFinding,
   type ReviewRecord,
 } from "@pr-review/schemas";
@@ -811,26 +810,6 @@ describe("runReview: fixes", () => {
 
 const NOW = new Date("2026-09-13T12:00:00.000Z");
 
-/** A memory file holding one shape, built through the schema the reader parses. */
-function memoryFile(overrides: Partial<MemoryShape> = {}): string {
-  return JSON.stringify(
-    reviewMemorySchema.parse({
-      version: 1,
-      shapes: [
-        {
-          category: "correctness",
-          shape: "assignment instead of comparison in",
-          resolved: 0,
-          ignored: 5,
-          outdated: 0,
-          lastSignalAt: NOW.toISOString(),
-          ...overrides,
-        },
-      ],
-    }),
-  );
-}
-
 function readOnlyStore(content: string): MemoryStore {
   return {
     read: () => Promise.resolve(content),
@@ -838,66 +817,22 @@ function readOnlyStore(content: string): MemoryStore {
   };
 }
 
-describe("runReview: repository hints", () => {
-  it("hands the engine an agent carrying the memory's qualifying shapes", async () => {
-    const { spec, requests } = makeRun([], {
-      memoryStore: readOnlyStore(memoryFile()),
+describe("runReview: repository memory", () => {
+  it("hands the engine the general agent whether or not there is a memory", async () => {
+    const withMemory = makeRun([], {
+      memoryStore: readOnlyStore(suppressionFile("Unbounded query in the session list")),
       now: () => NOW,
     });
+    const without = makeRun();
 
-    await runReview(spec);
+    await runReview(withMemory.spec);
+    await runReview(without.spec);
 
-    const agent = requests[0]?.agent;
-    expect(agent?.repositoryHints).toHaveLength(1);
-    expect(agent?.repositoryHints?.[0]).toContain(
-      '"assignment instead of comparison in"',
-    );
+    expect(withMemory.requests[0]?.agent).toBe(GENERAL_AGENT);
+    expect(without.requests[0]?.agent).toBe(GENERAL_AGENT);
   });
 
-  it("logs how many hints reached the agent", async () => {
-    const { spec, entries } = makeRun([], {
-      memoryStore: readOnlyStore(memoryFile()),
-      now: () => NOW,
-    });
-
-    await runReview(spec);
-
-    expect(entries).toContainEqual(
-      expect.objectContaining({
-        event: "memory.hints_attached",
-        repository: "octo-org/example-service",
-        hintCount: 1,
-      }),
-    );
-  });
-
-  it("logs an empty attachment when no shape qualifies", async () => {
-    const { spec, requests, entries } = makeRun([], {
-      memoryStore: readOnlyStore(memoryFile({ ignored: 1 })),
-      now: () => NOW,
-    });
-
-    await runReview(spec);
-
-    const agent = requests[0]?.agent;
-    expect(agent?.repositoryHints).toBeUndefined();
-    expect(entries).toContainEqual(
-      expect.objectContaining({ event: "memory.hints_attached", hintCount: 0 }),
-    );
-  });
-
-  it("passes the agent through untouched when there is no memory store", async () => {
-    const { spec, requests, entries } = makeRun();
-
-    await runReview(spec);
-
-    expect(requests[0]?.agent).toBe(GENERAL_AGENT);
-    expect(entries.map((entry) => entry["event"])).not.toContain(
-      "memory.hints_attached",
-    );
-  });
-
-  it("reviews without hints when the memory cannot be read", async () => {
+  it("reviews anyway when the memory cannot be read", async () => {
     const { spec, client, requests, entries } = makeRun([finding], {
       memoryStore: {
         read: () => Promise.reject(new Error("branch unreachable")),
@@ -1356,7 +1291,6 @@ function suppressionFile(title: string): string {
   return JSON.stringify(
     reviewMemorySchema.parse({
       version: 1,
-      shapes: [],
       suppressions: [
         {
           category: "correctness",

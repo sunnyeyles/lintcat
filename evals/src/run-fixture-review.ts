@@ -13,7 +13,6 @@ import {
   recordingDelivery,
   runReview,
   type RenderedCheckRun,
-  type ReviewMemory,
   type ReviewOutcome,
 } from "@pr-review/reviewer";
 
@@ -25,8 +24,6 @@ import type { ModelAccess } from "#src/model-access";
 export interface FixtureReviewDeps {
   engine: ReviewEngine;
   logger: StructuredLogger;
-  /** The repository memory the fixture reviews against; absent means none. */
-  memory?: ReviewMemory | undefined;
 }
 
 /** Everything one fixture review produced, for expectations to judge. */
@@ -87,7 +84,6 @@ export async function runFixtureReview(
     delivery,
     engine: deps.engine,
     logger: deps.logger,
-    ...(deps.memory === undefined ? {} : { memory: deps.memory }),
   });
 
   if (recorded.checkRun === undefined) {

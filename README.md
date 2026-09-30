@@ -232,10 +232,9 @@ packages/
   logging/    Structured single-line JSON logger
 evals/        Fixture repositories and the harness that runs the real
               pipeline against them without touching GitHub
-docs/         index.html — the architecture walkthrough, published to
-              Pages and now also served by apps/web at /docs/walkthrough;
-              claude/ — how the agent skills read this repo
-              (.nojekyll beside it, so Pages serves the file as written)
+docs/         adr/ — architecture decision records; agents/ — how the
+              agent skills read this repo; anidoodle/ — the README's
+              animated loop and its renderer
 scripts/      esbuild bundler for the cli, mcp and worker, and their
               smoke tests
 ```
@@ -250,13 +249,9 @@ three times before publishing a `failure` check run.
 
 ### Review memory
 
-The [MCP server](#mcp-server) keeps a review memory with its checkout: shapes
-this repository has repeatedly left alone (five ignores, no resolves) are named
-to the agent in a `# Repository history` block, and suppressed findings are
-hidden. They are evidence, not rules: the prompt still forbids inventing a
-finding, and a shape with no signal for 90 days is forgotten. Suppressions match
-on title shape alone. `memory.hints_attached` logs how many hints reached the
-agent.
+The [MCP server](#mcp-server) keeps a review memory with its checkout: findings
+a human marked as noise are suppressed on later reviews. Suppressions match on
+title shape alone and never expire.
 
 ---
 
@@ -657,13 +652,9 @@ counters: `inputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`,
 
 ## Further reading
 
-- **Propose, refine, decide** — the pipeline traced stage by stage, with a
-  diagram, the file that owns each step, and the failure modes. It lives in the
-  dashboard's documentation at `/docs/walkthrough`
-  ([`apps/web/app/(docs)/`](apps/web/app/(docs))), and the standalone
-  [`docs/index.html`](docs/index.html) still serves the same walkthrough on
-  [Pages](https://sunnyeyles.github.io/pr-review-agents/) until that site has a
-  public URL to retire it to.
+- **How LintCat works** — how a review runs and what it looks for, in the
+  dashboard's documentation at `/docs/how-it-works`
+  ([`apps/web/app/(docs)/`](apps/web/app/(docs))).
 - **[Incremental review](docs/incremental-review.md)** — the design behind
   incremental review: where the baseline comes from, every way it widens back
   to a full review, and what recall it costs.
