@@ -1,7 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": [".agents/**", "docs/**", "evals/fixtures/**"],
   "workspaces": {
+    ".": {
+      "ignoreFiles": [".agents/**", "docs/**"]
+    },
     "apps/web": {
       "next": true,
       "entry": ["components/shell/logo-mark.tsx"]
@@ -13,7 +15,10 @@
       "entry": ["brand/cli/lintcat-spinner.js"]
     },
     "evals": {
-      "entry": ["src/**/*.ts"]
+      "vitest": {
+        "config": ["vitest.config.ts", "vitest.eval.config.ts"]
+      },
+      "project": ["**/*.ts", "!fixtures/**"]
     }
   }
 }
