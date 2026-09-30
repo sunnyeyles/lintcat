@@ -1,16 +1,15 @@
 # Work in a worktree
 
-**Before making any code change, call `EnterWorktree` and work there.** Do not
+**Before making any change, call `EnterWorktree` and work there.** Do not
 edit files in the main checkout while it is on the default branch (`main`).
 `EnterWorktree` is opt-in by design, so this standing instruction is what turns
 it on for this repo and authorises it without asking the user first. Use a
 short kebab-case `name` describing the task.
 
-The exceptions are narrow, and they are about the change not being code:
-answering a question, reading the tree or git history, or editing `AGENTS.md`
-files and `.claude/`. A session already pinned to a directory (a background
-job, or a subagent launched with an explicit cwd) cannot move, and should say so
-rather than silently editing the main checkout.
+The only exceptions are answering a question and reading the tree or git
+history. A session already pinned to a directory (a background job, or a
+subagent launched with an explicit cwd) cannot move, and should say so rather
+than silently editing the main checkout.
 
 Worktrees live at `.claude/worktrees/<name>`, gitignored, one per branch.
 
