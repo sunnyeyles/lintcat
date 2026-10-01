@@ -9,6 +9,7 @@ import { INSTALL_APP_URL } from "@/lib/github-app";
 export const metadata: Metadata = {
   title: "Quickstart",
   description: "Install the GitHub App, add a model key, and label a pull request.",
+  alternates: { canonical: "/docs/quickstart" },
 };
 
 const HEADINGS: Heading[] = [

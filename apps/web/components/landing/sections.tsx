@@ -13,6 +13,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { DOCS_HOME, LOOKS_FOR } from "@/lib/docs";
+import { HOME_FAQ } from "@/lib/faq";
 import { INSTALL_APP_URL } from "@/lib/github-app";
 
 function Block({
@@ -165,6 +166,21 @@ export function Steps() {
         <Link href="/docs/how-it-works" className="text-link">
           How a review works
         </Link>
+      </div>
+    </Block>
+  );
+}
+
+export function Faq() {
+  return (
+    <Block eyebrow="FAQ" title="Frequently asked questions" className="border-t border-border">
+      <div className="grid gap-8 md:grid-cols-2">
+        {HOME_FAQ.map(({ question, answer }) => (
+          <div key={question} className="grid gap-1">
+            <h3 className="text-body font-semibold">{question}</h3>
+            <p className="text-label text-muted-foreground">{answer}</p>
+          </div>
+        ))}
       </div>
     </Block>
   );

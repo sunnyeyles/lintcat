@@ -17,10 +17,13 @@ import { PageHeader } from "@/components/shell";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { signInErrorMessage } from "@/lib/auth-errors";
 import { appDomain } from "@/lib/host";
-import { DASHBOARD_PATH, returnUrl, safeCallbackUrl } from "@/lib/paths";
+import { DASHBOARD_PATH, returnUrl, safeCallbackUrl, SIGN_IN_PATH } from "@/lib/paths";
 import { currentSession } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = {
+  title: "Sign in",
+  alternates: { canonical: SIGN_IN_PATH },
+};
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

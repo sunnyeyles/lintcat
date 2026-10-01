@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { Heading } from "@/lib/docs";
+import type { FaqItem } from "@/lib/faq";
 
 export function Section({ id, title, children }: Heading & { children: ReactNode }) {
   return (
@@ -59,5 +60,22 @@ export function Note({ title, children }: { title: string; children: ReactNode }
       <p className="eyebrow text-link">{title}</p>
       <p className="mt-1.5 text-body text-muted-foreground">{children}</p>
     </aside>
+  );
+}
+
+export const FAQ_HEADING: Heading = { id: "faq", title: "Frequently asked questions" };
+
+export function Faq({ items }: { items: FaqItem[] }) {
+  return (
+    <Section {...FAQ_HEADING}>
+      <div className="flex max-w-measure flex-col gap-5">
+        {items.map(({ question, answer }) => (
+          <div key={question} className="flex flex-col gap-1.5">
+            <h3 className="text-body font-semibold text-foreground">{question}</h3>
+            <p className="text-body text-muted-foreground">{answer}</p>
+          </div>
+        ))}
+      </div>
+    </Section>
   );
 }

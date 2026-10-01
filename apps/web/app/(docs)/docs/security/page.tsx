@@ -3,10 +3,12 @@ import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
 import type { Heading } from "@/lib/docs";
+import { SECURITY_FAQ } from "@/lib/faq";
 
 export const metadata: Metadata = {
   title: "Security",
   description: "What LintCat can access, what it never does, and how it keeps noise off your pull requests.",
+  alternates: { canonical: "/docs/security" },
 };
 
 const HEADINGS: Heading[] = [
@@ -25,6 +27,7 @@ export default function SecurityPage() {
       title="Security"
       description="LintCat reads your code to review it, and that is all the AI part can do. Everything it posts is checked first, and it never approves, merges or blocks anything."
       headings={HEADINGS}
+      faq={SECURITY_FAQ}
     >
       <Section id="access" title="What LintCat can access">
         <Bullets>
