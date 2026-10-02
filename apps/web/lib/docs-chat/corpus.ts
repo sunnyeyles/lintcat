@@ -42,7 +42,21 @@ By default every pull request is reviewed when it is opened, and again on every 
 
 [Security: What LintCat can access, and what it never does.](/docs/security)
 
-[MCP server: The same review over a working tree, inside your coding agent.](/docs/mcp-server)`,
+[MCP server: The same review over a working tree, inside your coding agent.](/docs/mcp-server)
+
+## Frequently asked questions {#faq}
+
+Which repositories does LintCat review?
+
+Only the ones you pick when you install the GitHub App, on your personal account or an organization.
+
+When does a review run?
+
+By default when a pull request is opened, and again on every push. A repository can instead be reviewed only on the ai-review label, or turned off, from its settings page.
+
+Can I review changes before I push?
+
+Yes. The MCP server runs the same reviewer inside a coding agent such as Claude Code, over your local working tree.`,
   },
   {
     href: "/docs/quickstart",
@@ -220,7 +234,21 @@ A suggested fix is offered only when the lines it replaces match the file at the
 
 ## Prompt injection {#injection}
 
-Pull requests can contain text written to steer an AI. LintCat treats everything in the repository, including the title, description, diff and files, as code to review and never as instructions. And since the reviewer can only read, text like that has nothing it could make LintCat do.`,
+Pull requests can contain text written to steer an AI. LintCat treats everything in the repository, including the title, description, diff and files, as code to review and never as instructions. And since the reviewer can only read, text like that has nothing it could make LintCat do.
+
+## Frequently asked questions {#faq}
+
+Does my model provider see my code?
+
+Yes, the code it reviews. Reviews run on your account's own Anthropic or OpenAI key, under your agreement with that provider.
+
+How is my API key stored?
+
+Encrypted. Only the review service reads it back; the dashboard shows its last four characters and nothing more.
+
+Can text in a pull request steer the reviewer?
+
+No. LintCat treats everything in the repository as code to review, never as instructions, and the reviewer can only read.`,
   },
   {
     href: "/docs/mcp-server",

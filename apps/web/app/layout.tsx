@@ -2,9 +2,12 @@ import { TooltipProvider } from "@pr-review/design";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { siteUrl } from "@/lib/site";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: { default: "LintCat", template: "%s · LintCat" },
   description:
     "AI code review for people and coding agents: pull request reviews from a GitHub App, the same reviewer over MCP, and a dashboard of findings and cost.",

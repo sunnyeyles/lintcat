@@ -3,8 +3,12 @@ import { ArrowLeft, ArrowRight } from "@pr-review/design/icons";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { Faq, FAQ_HEADING } from "@/components/docs/prose";
 import { Toc } from "@/components/docs/toc";
-import { docsNeighbours, type DocsPage, type Heading } from "@/lib/docs";
+import { JsonLd } from "@/components/json-ld";
+import { DOCS_PAGES, docsNeighbours, type DocsPage, type Heading } from "@/lib/docs";
+import type { FaqItem } from "@/lib/faq";
+import { faqPage, techArticle } from "@/lib/structured-data";
 
 function Neighbour({ page, direction }: { page: DocsPage; direction: "previous" | "next" }) {
   const next = direction === "next";
@@ -32,6 +36,7 @@ export type DocsArticleProps = {
   title: string;
   description: ReactNode;
   headings: Heading[];
+  faq?: FaqItem[];
   children: ReactNode;
 };
 
@@ -41,11 +46,15 @@ export function DocsArticle({
   title,
   description,
   headings,
+  faq,
   children,
 }: DocsArticleProps) {
   const { previous, next } = docsNeighbours(href);
+  const summary = DOCS_PAGES.find((page) => page.href === href)?.summary ?? "";
+  const structured = [techArticle(href, title, summary), ...(faq ? [faqPage(faq)] : [])];
   return (
     <div className="mx-auto flex w-full max-w-[72rem] gap-10 px-6 py-8 sm:px-8">
+      <JsonLd nodes={structured} />
       <article className="flex min-w-0 flex-1 flex-col gap-8 [&>section:first-of-type]:border-t-0 [&>section:first-of-type]:pt-0">
         <header className="flex flex-col gap-3 border-b border-border pb-6">
           <p className="eyebrow">{eyebrow}</p>
@@ -55,6 +64,7 @@ export function DocsArticle({
           </p>
         </header>
         {children}
+        {faq ? <Faq items={faq} /> : null}
         {previous || next ? (
           <nav
             aria-label="Pagination"
@@ -65,7 +75,7 @@ export function DocsArticle({
           </nav>
         ) : null}
       </article>
-      <Toc headings={headings} />
+      <Toc headings={faq ? [...headings, FAQ_HEADING] : headings} />
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { REPO_MODEL_CHOICES } from "@/lib/repo-settings";
 export const metadata: Metadata = {
   title: "Configuration",
   description: "The model key, when each repository is reviewed, which model runs it, and fixes.",
+  alternates: { canonical: "/docs/configuration" },
 };
 
 const HEADINGS: Heading[] = [

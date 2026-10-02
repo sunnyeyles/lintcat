@@ -4,12 +4,14 @@ import Link from "next/link";
 
 import { Bullet, Bullets, DocsArticle, Note, P, Section } from "@/components/docs";
 import { DOCS_HOME, DOCS_PAGES, type Heading, LOOKS_FOR } from "@/lib/docs";
+import { DOCS_FAQ } from "@/lib/faq";
 import { INSTALL_APP_URL } from "@/lib/github-app";
 
 export const metadata: Metadata = {
   title: "Introduction",
   description:
     "LintCat reviews your pull requests and leaves inline comments. Install the GitHub App; there is nothing to add to your CI.",
+  alternates: { canonical: DOCS_HOME },
 };
 
 const HEADINGS: Heading[] = [
@@ -27,6 +29,7 @@ export default function IntroductionPage() {
       title="LintCat"
       description="An AI reviewer that reads your pull requests and leaves inline review comments, plus an AI PR Review check run with the full summary. Install the GitHub App and add a model key. Nothing goes in your CI."
       headings={HEADINGS}
+      faq={DOCS_FAQ}
     >
       <div className="flex flex-wrap gap-3">
         <Button asChild>

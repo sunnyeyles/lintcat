@@ -16,6 +16,7 @@ import type { Heading } from "@/lib/docs";
 export const metadata: Metadata = {
   title: "MCP server",
   description: "Run the reviewer over a working tree, inside your coding agent, before you push.",
+  alternates: { canonical: "/docs/mcp-server" },
 };
 
 const HEADINGS: Heading[] = [

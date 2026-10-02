@@ -7,6 +7,7 @@ import type { Heading } from "@/lib/docs";
 export const metadata: Metadata = {
   title: "How LintCat works",
   description: "What LintCat reads, what it looks for, and what makes it different.",
+  alternates: { canonical: "/docs/how-it-works" },
 };
 
 const HEADINGS: Heading[] = [
