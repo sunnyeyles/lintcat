@@ -23,6 +23,55 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/**"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
-    "dev": { "cache": false, "persistent": true }
+    "dev": { "cache": false, "persistent": true },
+    "//#debt:scan": {
+      "inputs": [
+        "apps/*/src/**",
+        "apps/web/app/**",
+        "apps/web/components/**",
+        "apps/web/lib/**",
+        "packages/*/src/**",
+        "evals/src/**",
+        "*/*/package.json",
+        "evals/package.json",
+        "pnpm-workspace.yaml",
+        "tooling/debt/src/**",
+        "tooling/debt/debt.config.json"
+      ],
+      "outputs": ["tooling/debt/.out/scan/**", "tooling/debt/.out/graph.json"]
+    },
+    "//#debt:metrics": {
+      "dependsOn": ["@pr-review/cli#build", "@pr-review/mcp#build", "@pr-review/worker#build"],
+      "inputs": [
+        "apps/**",
+        "packages/**",
+        "evals/src/**",
+        "evals/package.json",
+        "evals/vitest.config.ts",
+        "!**/node_modules/**",
+        "!**/dist/**",
+        "!**/.next/**",
+        "pnpm-workspace.yaml",
+        "pnpm-lock.yaml",
+        "knip.json",
+        "vitest.config.ts",
+        "tsconfig.base.json",
+        "tooling/debt/src/**",
+        "tooling/debt/debt.config.json"
+      ],
+      "outputs": ["tooling/debt/.out/metrics/**"],
+      "env": ["TURBO_SCM_BASE"]
+    },
+    "//#debt:gate": {
+      "dependsOn": ["//#debt:scan", "//#debt:metrics"],
+      "inputs": ["tooling/debt/.out/**", "tooling/debt/baseline/**", "tooling/debt/debt.config.json", "tooling/debt/src/**"],
+      "outputs": ["tooling/debt/.out/gate/**"],
+      "env": ["TURBO_SCM_BASE", "GITHUB_STEP_SUMMARY"]
+    },
+    "//#debt:baseline": {
+      "cache": false,
+      "dependsOn": ["@pr-review/cli#build", "@pr-review/mcp#build", "@pr-review/worker#build"],
+      "env": ["TURBO_SCM_BASE", "GITHUB_STEP_SUMMARY", "GITHUB_SHA"]
+    }
   }
 }

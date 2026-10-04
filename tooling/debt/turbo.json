@@ -1,0 +1,11 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tags": ["tooling"],
+  "tasks": {
+    "debt": {
+      "cache": false,
+      "env": ["TURBO_SCM_BASE", "GITHUB_STEP_SUMMARY", "GITHUB_SHA"]
+    }
+  }
+}
