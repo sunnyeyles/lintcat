@@ -1,0 +1,88 @@
+{
+  "dir": "apps/worker",
+  "exports": [
+    "."
+  ],
+  "metrics": {
+    "bundleBytes": 2756604,
+    "coverage": {
+      "branches": 76.09,
+      "functions": 55.81,
+      "lines": 68.07,
+      "statements": 65.95
+    },
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 0,
+      "externalDev": 0,
+      "workspace": 7
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 4,
+      "passed": 34,
+      "tests": 34
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/worker",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 0,
+        "files": {}
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 10,
+        "files": {
+          "apps/worker/src/record-review.test.ts": 3,
+          "apps/worker/src/run-job.test.ts": 5,
+          "apps/worker/src/worker.test.ts": 2
+        }
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 1,
+        "files": {
+          "apps/worker/src/redact.ts": 1
+        }
+      }
+    },
+    "files": 10,
+    "lines": 1340
+  }
+}
