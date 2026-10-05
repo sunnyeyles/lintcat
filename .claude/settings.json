@@ -1,6 +1,19 @@
 {
   "outputStyle": "default",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Guarding the debt baseline",
+            "timeout": 10,
+            "command": "r=\".claude/hooks/debt-baseline-guard.sh\"; s=\"${CLAUDE_PROJECT_DIR:-.}/$r\"; [ -f \"$s\" ] || { g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null </dev/null); s=\"${g%/.git}/$r\"; }; [ -f \"$s\" ] || exit 0; bash \"$s\""
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
@@ -10,6 +23,18 @@
             "statusMessage": "Checking comment length",
             "timeout": 20,
             "command": "r=\".claude/hooks/comment-length.sh\"; s=\"${CLAUDE_PROJECT_DIR:-.}/$r\"; [ -f \"$s\" ] || { g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null </dev/null); s=\"${g%/.git}/$r\"; }; [ -f \"$s\" ] || exit 0; bash \"$s\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Running the debt gate",
+            "timeout": 900,
+            "command": "r=\".claude/hooks/debt-gate-on-stop.sh\"; s=\"${CLAUDE_PROJECT_DIR:-.}/$r\"; [ -f \"$s\" ] || { g=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null </dev/null); s=\"${g%/.git}/$r\"; }; [ -f \"$s\" ] || exit 0; bash \"$s\""
           }
         ]
       }

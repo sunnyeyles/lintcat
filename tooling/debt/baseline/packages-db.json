@@ -1,0 +1,110 @@
+{
+  "dir": "packages/db",
+  "exports": [
+    ".",
+    "./dashboard",
+    "./test-database"
+  ],
+  "metrics": {
+    "bundleBytes": null,
+    "coverage": {
+      "branches": 85.5,
+      "functions": 87.57,
+      "lines": 92.23,
+      "statements": 90.04
+    },
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 2,
+      "externalDev": 2,
+      "workspace": 3
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 10,
+      "passed": 106,
+      "tests": 106
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/db",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 1,
+        "files": {
+          "packages/db/src/dashboard/source.ts": 519
+        }
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 63,
+        "files": {
+          "packages/db/src/dashboard/aggregate.ts": 3,
+          "packages/db/src/dashboard/source.test.ts": 16,
+          "packages/db/src/dashboard/source.ts": 2,
+          "packages/db/src/ingest.test.ts": 5,
+          "packages/db/src/migrations.test.ts": 8,
+          "packages/db/src/model-keys.test.ts": 5,
+          "packages/db/src/repo-settings.test.ts": 2,
+          "packages/db/src/repository-graphs.test.ts": 4,
+          "packages/db/src/review-jobs.test.ts": 16,
+          "packages/db/src/review-map.test.ts": 1,
+          "packages/db/src/secret-box.test.ts": 1
+        }
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 11,
+        "files": {
+          "packages/db/src/authorize.ts": 1,
+          "packages/db/src/client.ts": 1,
+          "packages/db/src/dashboard/aggregate.ts": 1,
+          "packages/db/src/dashboard/types.ts": 1,
+          "packages/db/src/env.ts": 1,
+          "packages/db/src/installations.ts": 1,
+          "packages/db/src/memberships.ts": 1,
+          "packages/db/src/repo-access.ts": 1,
+          "packages/db/src/schema.ts": 1,
+          "packages/db/src/slugs.ts": 1,
+          "packages/db/src/test-database.ts": 1
+        }
+      }
+    },
+    "files": 33,
+    "lines": 5009
+  }
+}

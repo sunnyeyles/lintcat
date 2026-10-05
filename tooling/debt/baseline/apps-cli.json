@@ -1,0 +1,86 @@
+{
+  "dir": "apps/cli",
+  "exports": [
+    "."
+  ],
+  "metrics": {
+    "bundleBytes": 2686956,
+    "coverage": {
+      "branches": 77.24,
+      "functions": 90.48,
+      "lines": 90.65,
+      "statements": 88.74
+    },
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 0,
+      "externalDev": 0,
+      "workspace": 6
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 5,
+      "passed": 52,
+      "tests": 52
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/cli",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 0,
+        "files": {}
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 3,
+        "files": {
+          "apps/cli/src/options.ts": 3
+        }
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 1,
+        "files": {
+          "apps/cli/src/review-command.ts": 1
+        }
+      }
+    },
+    "files": 12,
+    "lines": 1385
+  }
+}
