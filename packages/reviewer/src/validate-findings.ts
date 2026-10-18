@@ -3,7 +3,7 @@
  * confidence, evidence, dedupe, cap. Dedupe runs before the cap so it cannot waste cap slots.
  */
 import type { ChangedFile } from "@pr-review/github";
-import { wellFormedFindings, type ReviewFinding } from "@pr-review/schemas";
+import { reviewFindingSchema, type ReviewFinding } from "@pr-review/schemas";
 
 import { buildChangedLineIndex } from "#src/diff-lines";
 import {
@@ -52,8 +52,22 @@ function duplicateKeys(finding: ReviewFinding): [string, string] {
   ];
 }
 
+/** The validation step that dropped a candidate. */
+export type RejectionStage =
+  | "schema"
+  | "category"
+  | "not-in-diff"
+  | "line-not-added"
+  | "low-confidence"
+  | "evidence"
+  | "duplicate"
+  | "over-cap";
+
+/** Told about each dropped candidate, in chain order. */
+export type OnRejected = (candidate: unknown, stage: RejectionStage) => void;
+
 /**
- * Runs raw candidates through the validation chain. Pure: no I/O, no mutation.
+ * Runs raw candidates through the validation chain, with no I/O; `onRejected` is its only effect.
  * Returns the survivors, strongest first.
  */
 export function validateFindings(
@@ -61,55 +75,64 @@ export function validateFindings(
   changedFiles: readonly ChangedFile[],
   allowedCategories: readonly string[],
   evidenceBase: EvidenceBase,
+  onRejected: OnRejected = () => {},
 ): ReviewFinding[] {
+  const keep = <T>(items: readonly T[], stage: RejectionStage, test: (item: T) => boolean) =>
+    items.filter((item) => {
+      if (test(item)) return true;
+      onRejected(item, stage);
+      return false;
+    });
+
   // 1. Schema validity.
-  const wellFormed = wellFormedFindings(candidates);
+  const wellFormed = candidates.flatMap((candidate) => {
+    const parsed = reviewFindingSchema.safeParse(candidate);
+    if (!parsed.success) onRejected(candidate, "schema");
+    return parsed.success ? [parsed.data] : [];
+  });
 
   // 2. Category is one the run's agents own. The schema cannot check
   // this: the agent set is configurable and known only at runtime.
   const allowed = new Set(allowedCategories);
-  const inCategory = wellFormed.filter((finding) =>
-    allowed.has(finding.category),
-  );
+  const inCategory = keep(wellFormed, "category", (finding) => allowed.has(finding.category));
 
   // 3 + 4. File exists in the PR; line (when present) is an added line
   // in that file's diff.
   const changedLines = buildChangedLineIndex(changedFiles);
-  const anchored = inCategory.filter((finding) => {
-    const lines = changedLines.get(finding.file);
-    if (lines === undefined) {
-      return false;
-    }
-    return finding.line === undefined || lines.has(finding.line);
-  });
+  const inDiff = keep(inCategory, "not-in-diff", (finding) => changedLines.has(finding.file));
+  const anchored = keep(
+    inDiff,
+    "line-not-added",
+    (finding) => finding.line === undefined || changedLines.get(finding.file)?.has(finding.line) === true,
+  );
 
   // 5. Confidence threshold.
-  const confident = anchored.filter(
+  const confident = keep(
+    anchored,
+    "low-confidence",
     (finding) => finding.confidence >= CONFIDENCE_THRESHOLD,
   );
 
   // 6. Evidence entries the base commit cannot vouch for are removed,
   // then a finding left without enough evidence goes with them.
-  const evidenced = confident
-    .map((finding) => withVerifiedEvidence(finding, evidenceBase))
-    .filter(hasEnoughEvidence);
+  const evidenced = keep(
+    confident.map((finding) => withVerifiedEvidence(finding, evidenceBase)),
+    "evidence",
+    hasEnoughEvidence,
+  );
 
   // 7. Duplicate removal. Sorted first, so the strongest of each group
   // is the one that survives.
   const strongestFirst = [...evidenced].sort(compareFindingStrength);
   const seen = new Set<string>();
-  const distinct: ReviewFinding[] = [];
-  for (const finding of strongestFirst) {
+  const distinct = keep(strongestFirst, "duplicate", (finding) => {
     const keys = duplicateKeys(finding);
-    if (keys.some((key) => seen.has(key))) {
-      continue;
-    }
-    for (const key of keys) {
-      seen.add(key);
-    }
-    distinct.push(finding);
-  }
+    if (keys.some((key) => seen.has(key))) return false;
+    for (const key of keys) seen.add(key);
+    return true;
+  });
 
   // 8. Cap at MAX_FINDINGS, keeping the strongest.
+  for (const finding of distinct.slice(MAX_FINDINGS)) onRejected(finding, "over-cap");
   return distinct.slice(0, MAX_FINDINGS);
 }

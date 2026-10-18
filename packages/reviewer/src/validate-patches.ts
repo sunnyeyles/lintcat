@@ -26,12 +26,21 @@ export interface PatchSummary {
   verified: number;
 }
 
+type PatchRejection =
+  | "outside-diff"
+  | "file-cap"
+  | "line-cap"
+  | "overlap"
+  | "unreadable"
+  | "expected-mismatch";
+
 export interface PatchVerification {
   /** The input findings, with every unverifiable patch stripped. */
   findings: ReviewFinding[];
   files: PatchedFile[];
   patchCount: number;
   summary: PatchSummary;
+  rejected: { finding: ReviewFinding; reason: PatchRejection }[];
 }
 
 interface VerifyPatchDeps {
@@ -175,6 +184,7 @@ export async function verifyPatches(
   const readFile = fileReader(deps);
   const kept = new Map<string, FindingPatch[]>();
   const verified = new Set<ReviewFinding>();
+  const rejected: PatchVerification["rejected"] = [];
   let patchedLines = 0;
 
   for (const finding of [...findings].sort(compareFindingStrength)) {
@@ -183,30 +193,38 @@ export async function verifyPatches(
       continue;
     }
 
+    const reject = (reason: PatchRejection) => rejected.push({ finding, reason });
+
     const changed = changedLines.get(finding.file);
     if (changed === undefined || !touchesDiff(patch, changed)) {
+      reject("outside-diff");
       continue;
     }
 
     const lineCount = patch.endLine - patch.startLine + 1;
     const newFile = !kept.has(finding.file);
     if (newFile && kept.size >= MAX_PATCHED_FILES) {
+      reject("file-cap");
       continue;
     }
     if (patchedLines + lineCount > MAX_PATCHED_LINES) {
+      reject("line-cap");
       continue;
     }
 
     const existing = kept.get(finding.file) ?? [];
     if (existing.some((other) => overlaps(other, patch))) {
+      reject("overlap");
       continue;
     }
 
     const text = await readFile(finding.file);
     if (text === undefined) {
+      reject("unreadable");
       continue;
     }
     if (!matchesExpected(text, patch)) {
+      reject("expected-mismatch");
       continue;
     }
 
@@ -236,6 +254,7 @@ export async function verifyPatches(
       proposed: findings.filter((finding) => finding.patch !== undefined).length,
       verified: verified.size,
     },
+    rejected,
   };
 }
 

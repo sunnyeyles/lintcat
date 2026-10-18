@@ -12,7 +12,12 @@
     "GITHUB_APP_SLUG",
     "WORKER_URL",
     "ANTHROPIC_API_KEY",
-    "AUTH_SECRET"
+    "AUTH_SECRET",
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY",
+    "LANGFUSE_BASE_URL",
+    "LANGFUSE_ENVIRONMENT",
+    "LANGFUSE_RELEASE"
   ],
   "tasks": {
     "transit": { "dependsOn": ["^transit"] },

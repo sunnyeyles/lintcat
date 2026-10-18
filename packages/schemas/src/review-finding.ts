@@ -86,20 +86,3 @@ export function categoryLabel(category: string): string {
   const words = category.replace(/-/g, " ");
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
-
-/**
- * Keeps only candidates matching the finding contract. Dropping silently is
- * deliberate: malformed model output is an ordinary outcome.
- */
-export function wellFormedFindings(
-  candidates: readonly unknown[],
-): ReviewFinding[] {
-  const wellFormed: ReviewFinding[] = [];
-  for (const candidate of candidates) {
-    const parsed = reviewFindingSchema.safeParse(candidate);
-    if (parsed.success) {
-      wellFormed.push(parsed.data);
-    }
-  }
-  return wellFormed;
-}

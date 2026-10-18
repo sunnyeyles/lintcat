@@ -17,7 +17,10 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.49",
     "@ai-sdk/openai": "^4.0.59",
+    "@langfuse/otel": "^5.14.0",
     "@langfuse/tracing": "^5.11.0",
+    "@langfuse/vercel-ai-sdk": "^5.14.0",
+    "@opentelemetry/sdk-trace-node": "^2.12.0",
     "@pr-review/github": "workspace:*",
     "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",

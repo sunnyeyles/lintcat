@@ -13,9 +13,12 @@ export interface StructuredLogger {
   error(event: string, fields?: LogFields): void;
 }
 
+// Cloud Logging classifies lines by `severity`, not `level`.
+const SEVERITY: Record<LogLevel, string> = { info: "INFO", error: "ERROR" };
+
 function logLine(level: LogLevel, event: string, fields: LogFields): string {
   // JSON.stringify drops undefined-valued fields, keeping lines clean.
-  return JSON.stringify({ level, event, ...fields });
+  return JSON.stringify({ level, severity: SEVERITY[level], event, ...fields });
 }
 
 /** The production logger: info to stdout, error to stderr. */
@@ -45,6 +48,14 @@ export function createStderrLogger(): StructuredLogger {
 /** Drops every line, for a command whose own output is the only thing worth reading. */
 export function createSilentLogger(): StructuredLogger {
   return { info() {}, error() {} };
+}
+
+/** Adds `fields`, read at log time, to every event; an event's own field of the same name wins. */
+export function withFields(logger: StructuredLogger, fields: LogFields): StructuredLogger {
+  return {
+    info: (event, own = {}) => logger.info(event, { ...fields, ...own }),
+    error: (event, own = {}) => logger.error(event, { ...fields, ...own }),
+  };
 }
 
 /** One event recorded by the capturing logger: level + event + fields, flattened. */

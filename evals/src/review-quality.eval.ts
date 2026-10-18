@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { startTracing } from "@pr-review/ai";
 import { createConsoleLogger } from "@pr-review/logging";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
@@ -32,7 +33,12 @@ const access = requireModelAccess(process.env);
 const collector = createUsageCollector(access.model);
 const startedAt = new Date().toISOString();
 // A full review takes minutes, and silence looks like a hang.
-const deps = modelBackedDeps(access, createConsoleLogger(), collector.onUsage);
+const logger = createConsoleLogger();
+const deps = modelBackedDeps(access, logger, collector.onUsage);
+const tracing = startTracing(
+  { ...process.env, LANGFUSE_ENVIRONMENT: process.env.LANGFUSE_ENVIRONMENT?.trim() || "eval" },
+  logger,
+);
 
 for (const evalCase of evalCases) {
   const fixture = loadFixture(evalCase.fixture);
@@ -58,7 +64,8 @@ for (const evalCase of evalCases) {
   });
 }
 
-afterAll(() => {
+afterAll(async () => {
+  await tracing?.flush();
   const rows = collector.rows();
   const report = {
     provider: access.provider,

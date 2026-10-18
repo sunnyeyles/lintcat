@@ -2,7 +2,9 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { startTracing } from "@pr-review/ai";
 import { findLocalEnvFile } from "@pr-review/db";
+import { createStderrLogger } from "@pr-review/logging";
 import { processEnvironment } from "@pr-review/mcp/local-review";
 
 import { runCli } from "#src/cli";
@@ -21,14 +23,19 @@ function commandLine(): string {
 const err = (text: string): void => {
   process.stderr.write(`${text}\n`);
 };
+const tracing = startTracing(process.env, createStderrLogger());
 const interrupt = cancelOnInterrupt({ source: process, err, exit: (code) => process.exit(code) });
 
-process.exitCode = await runCli(process.argv.slice(2), {
-  environment: processEnvironment(),
-  out: (text) => process.stdout.write(`${text}\n`),
-  err,
-  isTty: process.stdout.isTTY === true,
-  commandLine: commandLine(),
-  signal: interrupt.signal,
-});
-interrupt.dispose();
+try {
+  process.exitCode = await runCli(process.argv.slice(2), {
+    environment: processEnvironment(),
+    out: (text) => process.stdout.write(`${text}\n`),
+    err,
+    isTty: process.stdout.isTTY === true,
+    commandLine: commandLine(),
+    signal: interrupt.signal,
+  });
+} finally {
+  await tracing?.flush();
+  interrupt.dispose();
+}

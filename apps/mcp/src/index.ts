@@ -3,6 +3,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { startTracing } from "@pr-review/ai";
 import { findLocalEnvFile } from "@pr-review/db";
 
 import { processEnvironment } from "#src/environment";
@@ -14,5 +15,13 @@ if (envFile !== undefined) process.loadEnvFile(envFile);
 
 // stdout carries the protocol, so every log line goes to stderr.
 const environment = processEnvironment();
+const tracing = startTracing(process.env, environment.logger);
+if (tracing) {
+  // The client ends this server by closing stdin or by a signal, either of which would drop the last batch.
+  process.once("beforeExit", () => void tracing.flush());
+  for (const [signal, code] of [["SIGINT", 130], ["SIGTERM", 143]] as const) {
+    process.once(signal, () => void tracing.flush().finally(() => process.exit(code)));
+  }
+}
 await createServer(environment).connect(new StdioServerTransport());
 environment.logger.info("mcp.started", { cwd: environment.cwd, envFile });

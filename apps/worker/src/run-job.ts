@@ -8,6 +8,7 @@ import {
   resolveModelId,
   resolveModelProvider,
   toolLoopEngine,
+  traceStage,
   type LanguageModelConfig,
   type ReviewModel,
 } from "@pr-review/ai";
@@ -30,7 +31,7 @@ import type {
   RepositoryHistoryClient,
   ReviewPublishClient,
 } from "@pr-review/github";
-import { errorMessage, type StructuredLogger } from "@pr-review/logging";
+import { errorMessage, withFields, type StructuredLogger } from "@pr-review/logging";
 import {
   dashboardDelivery,
   githubDelivery,
@@ -124,7 +125,8 @@ async function fixesAllowed(
 export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise<JobOutcome> {
   const { database, lease, retry } = deps;
   const secrets: (string | undefined)[] = [];
-  const logger = redactingLogger(deps.logger, secrets);
+  const traceFields: { traceId?: string } = {};
+  const logger = withFields(redactingLogger(deps.logger, secrets), traceFields);
   const context = await findReviewJobContext(database, job.repoId);
   const organization = context?.organization;
   const fields = { jobId: job.id, attempt: job.attempts };
@@ -144,117 +146,135 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
     return "failed";
   }
 
-  const target: ReviewTarget = {
-    owner: context.repo.owner,
-    repo: context.repo.name,
-    pullRequestNumber: job.prNumber,
-    headSha: job.headSha,
-  };
-  const correlation = { ...fields, ...reviewCorrelation(target) };
-  const controller = new AbortController();
-  const stillRunning = async () => {
-    const running = await renewReviewJobLease(database, job.id, lease.leaseMs);
-    if (!running) controller.abort();
-    return running;
-  };
-  const heartbeat = setInterval(() => {
-    stillRunning().catch((error: unknown) =>
-      logger.error("review_job.heartbeat_failed", { ...correlation, error: errorMessage(error) }),
-    );
-  }, lease.heartbeatMs);
+  const { installationId } = organization;
+  let failure: string | undefined;
+  const settle = async (): Promise<JobOutcome> => {
+    const target: ReviewTarget = {
+      owner: context.repo.owner,
+      repo: context.repo.name,
+      pullRequestNumber: job.prNumber,
+      headSha: job.headSha,
+    };
+    const correlation = { ...fields, ...reviewCorrelation(target) };
+    const controller = new AbortController();
+    const stillRunning = async () => {
+      const running = await renewReviewJobLease(database, job.id, lease.leaseMs);
+      if (!running) controller.abort();
+      return running;
+    };
+    const heartbeat = setInterval(() => {
+      stillRunning().catch((error: unknown) =>
+        logger.error("review_job.heartbeat_failed", { ...correlation, error: errorMessage(error) }),
+      );
+    }, lease.heartbeatMs);
 
-  let client: HostedClient | undefined;
-  try {
-    const token = await deps.github.createInstallationToken(organization.installationId);
-    secrets.push(token);
-    client = deps.createClient(token);
+    let client: HostedClient | undefined;
+    try {
+      const token = await deps.github.createInstallationToken(installationId);
+      secrets.push(token);
+      client = deps.createClient(token);
 
-    const pullRequest = await client.getPullRequest(target);
-    if (pullRequest.headSha !== job.headSha) {
-      await supersedeReviewJob(database, job.id);
-      logger.info("review_job.superseded", { ...correlation, reason: "head_moved" });
-      return "superseded";
-    }
+      const pullRequest = await client.getPullRequest(target);
+      if (pullRequest.headSha !== job.headSha) {
+        await supersedeReviewJob(database, job.id);
+        logger.info("review_job.superseded", { ...correlation, reason: "head_moved" });
+        return "superseded";
+      }
 
-    const key = await readModelKey(database, organization.id, deps.encryptionKey);
-    secrets.push(key?.apiKey);
-    if (!key) {
-      if (!(await stillRunning())) return "superseded";
-      await client.createCheckRun({
-        owner: target.owner,
-        repo: target.repo,
-        headSha: target.headSha,
-        conclusion: "neutral",
-        output: noKeyOutput(organization.slug, deps.settingsUrl(organization.slug)),
-      });
-      await completeReviewJob(database, job.id);
-      logger.info("review_job.no_model_key", correlation);
-      return "no-key";
-    }
-
-    const settings = await effectiveRepoSettings(database, context.repo.id);
-    const provider = resolveModelProvider(key.provider);
-    const modelId = resolveModelId(provider, settings.model ?? "");
-    const model = deps.createLanguageModel({ provider, apiKey: key.apiKey, modelId });
-    logger.info("review_job.started", {
-      ...correlation,
-      provider,
-      model: model.modelId,
-      fixes: settings.fixes,
-    });
-    const commitFixes = settings.fixes && (await fixesAllowed(client, target, logger));
-    const delivery = dashboardDelivery(
-      githubDelivery({ client, logger, commitFixes }),
-      createDatabaseReviewPublisher(database, organization.id, logger),
-      logger,
-    );
-    await runReview({
-      client,
-      target,
-      delivery,
-      engine: toolLoopEngine({ model }),
-      policy: { incremental: deps.incremental ?? true },
-      logger,
-      signal: controller.signal,
-      stillRunning,
-    });
-    if (!(await completeReviewJob(database, job.id))) return "superseded";
-    logger.info("review_job.succeeded", correlation);
-    return "succeeded";
-  } catch (error: unknown) {
-    if (controller.signal.aborted || isCancellation(error)) {
-      logger.info("review_job.superseded", { ...correlation, reason: "newer_job" });
-      return "superseded";
-    }
-    const message = redact(errorMessage(error), secrets);
-    // The same settings would fail every retry, so an unknown model gets none.
-    const unknownModel = error instanceof ModelProviderError;
-    const outcome = await failReviewJob(
-      database,
-      job.id,
-      message,
-      unknownModel ? { ...retry, maxAttempts: 0 } : retry,
-    );
-    if (outcome === "superseded") return "superseded";
-    logger.error(`review_job.${outcome}`, { ...correlation, error: message });
-    if (outcome === "failed" && client) {
-      await client
-        .createCheckRun({
+      const key = await readModelKey(database, organization.id, deps.encryptionKey);
+      secrets.push(key?.apiKey);
+      if (!key) {
+        if (!(await stillRunning())) return "superseded";
+        await client.createCheckRun({
           owner: target.owner,
           repo: target.repo,
           headSha: target.headSha,
-          conclusion: "failure",
-          output: unknownModel ? unknownModelOutput(message) : failureOutput(job.attempts),
-        })
-        .catch((publishError: unknown) =>
-          logger.error("review_job.failure_unpublished", {
-            ...correlation,
-            error: redact(errorMessage(publishError), secrets),
-          }),
-        );
+          conclusion: "neutral",
+          output: noKeyOutput(organization.slug, deps.settingsUrl(organization.slug)),
+        });
+        await completeReviewJob(database, job.id);
+        logger.info("review_job.no_model_key", correlation);
+        return "no-key";
+      }
+
+      const settings = await effectiveRepoSettings(database, context.repo.id);
+      const provider = resolveModelProvider(key.provider);
+      const modelId = resolveModelId(provider, settings.model ?? "");
+      const model = deps.createLanguageModel({ provider, apiKey: key.apiKey, modelId });
+      logger.info("review_job.started", {
+        ...correlation,
+        provider,
+        model: model.modelId,
+        fixes: settings.fixes,
+      });
+      const commitFixes = settings.fixes && (await fixesAllowed(client, target, logger));
+      const delivery = dashboardDelivery(
+        githubDelivery({ client, logger, commitFixes }),
+        createDatabaseReviewPublisher(database, organization.id, logger),
+        logger,
+      );
+      await runReview({
+        client,
+        target,
+        delivery,
+        engine: toolLoopEngine({ model }),
+        policy: { incremental: deps.incremental ?? true },
+        logger,
+        signal: controller.signal,
+        stillRunning,
+      });
+      if (!(await completeReviewJob(database, job.id))) return "superseded";
+      logger.info("review_job.succeeded", correlation);
+      return "succeeded";
+    } catch (error: unknown) {
+      if (controller.signal.aborted || isCancellation(error)) {
+        logger.info("review_job.superseded", { ...correlation, reason: "newer_job" });
+        return "superseded";
+      }
+      const message = redact(errorMessage(error), secrets);
+      failure = message;
+      // The same settings would fail every retry, so an unknown model gets none.
+      const unknownModel = error instanceof ModelProviderError;
+      const outcome = await failReviewJob(
+        database,
+        job.id,
+        message,
+        unknownModel ? { ...retry, maxAttempts: 0 } : retry,
+      );
+      if (outcome === "superseded") return "superseded";
+      logger.error(`review_job.${outcome}`, { ...correlation, error: message });
+      if (outcome === "failed" && client) {
+        await client
+          .createCheckRun({
+            owner: target.owner,
+            repo: target.repo,
+            headSha: target.headSha,
+            conclusion: "failure",
+            output: unknownModel ? unknownModelOutput(message) : failureOutput(job.attempts),
+          })
+          .catch((publishError: unknown) =>
+            logger.error("review_job.failure_unpublished", {
+              ...correlation,
+              error: redact(errorMessage(publishError), secrets),
+            }),
+          );
+      }
+      return outcome;
+    } finally {
+      clearInterval(heartbeat);
     }
-    return outcome;
-  } finally {
-    clearInterval(heartbeat);
-  }
+  };
+
+  return traceStage("review-job", { ...fields, prNumber: job.prNumber, headSha: job.headSha }, settle, {
+    output: (outcome) => ({ outcome, error: failure }),
+    level: (outcome) => (outcome === "failed" ? "ERROR" : outcome === "retrying" ? "WARNING" : undefined),
+    attributes: {
+      sessionId: `${context.repo.owner}/${context.repo.name}#${job.prNumber}`,
+      userId: organization.slug,
+      metadata: { jobId: String(job.id), attempt: String(job.attempts), headSha: job.headSha },
+    },
+    onTraceId: (traceId) => {
+      traceFields.traceId = traceId;
+    },
+  });
 }
