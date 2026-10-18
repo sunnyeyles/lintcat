@@ -34,6 +34,7 @@ async function main(): Promise<void> {
     createLanguageModel,
     encryptionKey: modelKeyEncryptionKey(),
     logger,
+    ...(tracing ? { traceSecrets: tracing.withSecrets } : {}),
     settingsUrl: (slug) => (appDomain ? `https://${slug}.${appDomain}/settings` : undefined),
     lease: { leaseMs: LEASE_MS, heartbeatMs: HEARTBEAT_MS },
     retry: { maxAttempts: MAX_ATTEMPTS, retryDelayMs: RETRY_DELAY_MS },

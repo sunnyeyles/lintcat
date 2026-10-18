@@ -48,6 +48,11 @@ export const SECURITY_FAQ: FaqItem[] = [
       "Yes, the code it reviews. Reviews run on your account's own Anthropic or OpenAI key, under your agreement with that provider.",
   },
   {
+    question: "Do you keep my code?",
+    answer:
+      "Only in debugging traces. A trace of each review, including the code the reviewer read, goes to Langfuse in the EU. Keys and tokens are masked first, and traces are deleted after 30 days.",
+  },
+  {
     question: "How is my API key stored?",
     answer:
       "Encrypted. Only the review service reads it back; the dashboard shows its last four characters and nothing more.",
