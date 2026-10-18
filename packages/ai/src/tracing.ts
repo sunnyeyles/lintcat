@@ -11,11 +11,15 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { registerTelemetry, type Telemetry } from "ai";
 
+import { scrubbingProcessor, secretScrubber } from "#src/scrub-spans";
+
 const DEFAULT_BASE_URL = "https://cloud.langfuse.com";
 
 export interface Tracing {
   /** Never throws: a lost trace must not fail the work it traced. */
   flush(): Promise<void>;
+  /** Masks these values in every span until the returned function runs; read at export, so the list can grow. */
+  withSecrets(secrets: readonly (string | undefined)[]): () => void;
 }
 
 /** The AI SDK integration: every model call, tool call and payload becomes a span. */
@@ -47,7 +51,8 @@ export function startTracing(
     environment: env.LANGFUSE_ENVIRONMENT?.trim() || undefined,
     release: env.LANGFUSE_RELEASE?.trim() || undefined,
   });
-  new NodeTracerProvider({ spanProcessors: [spanProcessor] }).register();
+  const scrubber = secretScrubber();
+  new NodeTracerProvider({ spanProcessors: [scrubbingProcessor(spanProcessor, scrubber.scrub)] }).register();
   // From v7 the SDK emits spans only to a registered integration.
   registerTelemetry(createTelemetryIntegration());
 
@@ -59,5 +64,6 @@ export function startTracing(
         logger.error("tracing.flush_failed", { error: errorMessage(error) });
       }
     },
+    withSecrets: scrubber.withSecrets,
   };
 }

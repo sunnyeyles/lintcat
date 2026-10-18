@@ -105,6 +105,12 @@ encrypted; the worker is the only reader of the plaintext). The worker mints a
 short-lived GitHub installation token per job, holds it in memory only, and
 publishes the check run and inline comments; it writes nothing to disk.
 
+For debugging, each review's trace (the prompt, the diff, the files the agent
+read, tool results and the model's output) also goes to
+[Langfuse](https://langfuse.com), hosted in the EU. The job's own token and
+model key, and known credential formats anywhere in the trace, are masked
+first, and traces are deleted after 30 days.
+
 The review is recorded on the dashboard ([`apps/web`](apps/web)): owner, repo,
 PR number, head SHA, timings, token counts, and every published finding. The
 patch itself — its `expected` and `replacement` text, verbatim lines of your

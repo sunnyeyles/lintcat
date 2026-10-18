@@ -33,6 +33,8 @@ Run — nothing here changes them.
 | `REVIEW_INCREMENTAL` | Optional. `false` makes every review read the whole pull request; by default a push is reviewed from the last reviewed commit on |
 | `PORT` | Switches to server mode and sets its listen port; set by Cloud Run |
 | `WORKER_PING_SECRET` | Server mode only. Bearer token an inbound request must carry; shared with `apps/web`'s `WORKER_URL`/`WORKER_PING_SECRET` |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` | Optional. Sends each job's trace to Langfuse (see Tracing, below); off unless both are set |
+| `LANGFUSE_ENVIRONMENT` | Optional. Tags traces, e.g. `production`; `LANGFUSE_BASE_URL` defaults to Langfuse Cloud EU |
 
 ## What one job does
 
@@ -157,3 +159,25 @@ reviews:
 8. Set `WORKER_URL` (the Cloud Run service URL) and `WORKER_PING_SECRET` (the
    same value as step 4) on the Vercel production project, so `apps/web` can
    ping it.
+
+### Tracing
+
+Each job's trace (model calls, tool calls with their results, pipeline stages)
+goes to Langfuse Cloud EU. The job's installation token and model key, and
+known credential formats anywhere in a trace, are masked before export
+(`packages/ai/src/scrub-spans.ts`). The public docs promise EU hosting, masking
+and 30-day deletion, so all three must hold before the keys are attached:
+
+1. Create a Langfuse Cloud **EU** organization with a `prod` and a `dev`
+   project. Set each project's data retention to 30 days, and sign Langfuse's
+   DPA.
+2. Put the `prod` secret key in Secret Manager and attach both keys to the
+   service:
+   `gcloud run services update <service> --region=<region>
+   --update-secrets=LANGFUSE_SECRET_KEY=LANGFUSE_SECRET_KEY:latest
+   --update-env-vars=LANGFUSE_PUBLIC_KEY=<pk-lf-…>,LANGFUSE_ENVIRONMENT=production`.
+   Like the other secrets, the deploy workflow leaves them untouched.
+3. Use the `dev` keys in `.env.local` for local runs and `pnpm eval`.
+
+Removing the two variables (`--remove-env-vars`, `--remove-secrets`) turns
+tracing off again.

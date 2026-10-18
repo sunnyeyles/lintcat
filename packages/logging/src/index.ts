@@ -95,3 +95,5 @@ export function errorMessage(error: unknown): string {
 export function errorName(error: unknown): string {
   return error instanceof Error ? error.name : "Error";
 }
+
+export { redact, redactValue } from "#src/redact";

@@ -245,6 +245,37 @@ describe("runReviewJob", () => {
     expectNoSecretsLogged();
   });
 
+  it.each([
+    ["succeeds", () => answering(), "succeeded"],
+    [
+      "fails",
+      () => {
+        const failing = makeModel([]).model;
+        failing.doGenerate = async () => {
+          throw new Error("overloaded");
+        };
+        return failing;
+      },
+      "retrying",
+    ],
+  ] as const)("masks the token and key in traces until a job that %s settles", async (_, model, outcome) => {
+    await withKey();
+    const job = await claim();
+    let registered: readonly (string | undefined)[] = [];
+    const untrace = vi.fn();
+    const traceSecrets = vi.fn((secrets: readonly (string | undefined)[]) => {
+      registered = secrets;
+      return untrace;
+    });
+    const { deps: d } = deps({ createLanguageModel: model, traceSecrets });
+
+    expect(await runReviewJob(d, job)).toBe(outcome);
+
+    expect(traceSecrets).toHaveBeenCalledOnce();
+    expect(registered).toEqual(expect.arrayContaining([TOKEN, API_KEY]));
+    expect(untrace).toHaveBeenCalledOnce();
+  });
+
   it("shows the final failure on the check run once the retries run out", async () => {
     await withKey();
     const job = await claim();

@@ -31,7 +31,7 @@ import type {
   RepositoryHistoryClient,
   ReviewPublishClient,
 } from "@pr-review/github";
-import { errorMessage, withFields, type StructuredLogger } from "@pr-review/logging";
+import { errorMessage, redact, withFields, type StructuredLogger } from "@pr-review/logging";
 import {
   dashboardDelivery,
   githubDelivery,
@@ -42,7 +42,7 @@ import {
 } from "@pr-review/reviewer";
 
 import { createDatabaseReviewPublisher } from "#src/record-review";
-import { redact, redactingLogger } from "#src/redact";
+import { redactingLogger } from "#src/redact";
 
 type HostedClient = PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
 
@@ -56,6 +56,8 @@ export interface JobRunnerDeps {
   /** The key that opens stored model keys. */
   encryptionKey: Uint8Array;
   logger: StructuredLogger;
+  /** Masks the job's token and model key in exported traces until the returned function runs. */
+  traceSecrets?: (secrets: readonly (string | undefined)[]) => () => void;
   /** Where an owner adds a model key; undefined leaves the link out. */
   settingsUrl: (slug: string) => string | undefined;
   /** The lease is renewed every `heartbeatMs`, which is also how soon a superseded run stops. */
@@ -265,16 +267,21 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
     }
   };
 
-  return traceStage("review-job", { ...fields, prNumber: job.prNumber, headSha: job.headSha }, settle, {
-    output: (outcome) => ({ outcome, error: failure }),
-    level: (outcome) => (outcome === "failed" ? "ERROR" : outcome === "retrying" ? "WARNING" : undefined),
-    attributes: {
-      sessionId: `${context.repo.owner}/${context.repo.name}#${job.prNumber}`,
-      userId: organization.slug,
-      metadata: { jobId: String(job.id), attempt: String(job.attempts), headSha: job.headSha },
-    },
-    onTraceId: (traceId) => {
-      traceFields.traceId = traceId;
-    },
-  });
+  const untrace = deps.traceSecrets?.(secrets);
+  try {
+    return await traceStage("review-job", { ...fields, prNumber: job.prNumber, headSha: job.headSha }, settle, {
+      output: (outcome) => ({ outcome, error: failure }),
+      level: (outcome) => (outcome === "failed" ? "ERROR" : outcome === "retrying" ? "WARNING" : undefined),
+      attributes: {
+        sessionId: `${context.repo.owner}/${context.repo.name}#${job.prNumber}`,
+        userId: organization.slug,
+        metadata: { jobId: String(job.id), attempt: String(job.attempts), headSha: job.headSha },
+      },
+      onTraceId: (traceId) => {
+        traceFields.traceId = traceId;
+      },
+    });
+  } finally {
+    untrace?.();
+  }
 }

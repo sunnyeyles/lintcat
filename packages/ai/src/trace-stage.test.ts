@@ -8,8 +8,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { traceStage } from "#src/trace-stage";
 
-const SECRET = "ghs_SECRET-SENTINEL";
-
 let provider: NodeTracerProvider | undefined;
 afterEach(async () => {
   setLangfuseTracerProvider(null);
@@ -25,9 +23,9 @@ function recording(): InMemorySpanExporter {
 }
 
 describe("traceStage", () => {
-  it("rethrows a failure but exports only the error's name, never its message", async () => {
+  it("rethrows a failure and records its message on an ERROR span", async () => {
     const exporter = recording();
-    const failure = new TypeError(`token ${SECRET} rejected`);
+    const failure = new TypeError("the diff is too large");
 
     await expect(
       traceStage("load", undefined, () => {
@@ -37,8 +35,7 @@ describe("traceStage", () => {
 
     const [span] = exporter.getFinishedSpans();
     expect(span?.attributes["langfuse.observation.level"]).toBe("ERROR");
-    expect(span?.attributes["langfuse.observation.status_message"]).toBe("TypeError");
-    expect(JSON.stringify(span?.attributes) + JSON.stringify(span?.status)).not.toContain(SECRET);
+    expect(span?.attributes["langfuse.observation.status_message"]).toBe("the diff is too large");
   });
 
   it("marks a result that returned but went wrong with its level", async () => {
