@@ -1,7 +1,7 @@
 /** The worker entrypoint. Wiring only: read the environment, build clients, run the loop. */
 import process from "node:process";
 
-import { createLanguageModel } from "@pr-review/ai";
+import { createLanguageModel, startTracing } from "@pr-review/ai";
 import { db, findLocalEnvFile, modelKeyEncryptionKey, requiredEnv } from "@pr-review/db";
 import { createGithubAppClient, createTokenClient } from "@pr-review/github";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
@@ -19,6 +19,7 @@ async function main(): Promise<void> {
   const envFile = findLocalEnvFile();
   if (envFile) process.loadEnvFile(envFile);
   const logger = createConsoleLogger();
+  const tracing = startTracing(process.env, logger);
   const database = db();
   const appDomain = process.env.APP_DOMAIN?.trim();
 
@@ -33,6 +34,7 @@ async function main(): Promise<void> {
     createLanguageModel,
     encryptionKey: modelKeyEncryptionKey(),
     logger,
+    ...(tracing ? { traceSecrets: tracing.withSecrets } : {}),
     settingsUrl: (slug) => (appDomain ? `https://${slug}.${appDomain}/settings` : undefined),
     lease: { leaseMs: LEASE_MS, heartbeatMs: HEARTBEAT_MS },
     retry: { maxAttempts: MAX_ATTEMPTS, retryDelayMs: RETRY_DELAY_MS },
@@ -57,7 +59,14 @@ async function main(): Promise<void> {
   // Cloud Run sets PORT; local dev leaves it unset and keeps the poll loop below.
   const port = process.env.PORT;
   if (port) {
-    const drain = createDrainer(() => runWorker(workerDeps, { once: true, pollMs: 0 }));
+    // Flushed before the response: Cloud Run may freeze the instance once it is sent.
+    const drain = createDrainer(async () => {
+      try {
+        return await runWorker(workerDeps, { once: true, pollMs: 0 });
+      } finally {
+        await tracing?.flush();
+      }
+    });
     const server = createHttpServer(drain, { secret: requiredEnv("WORKER_PING_SECRET") }, logger);
     stop.signal.addEventListener("abort", () => server.close());
     await listen(server, Number(port));
@@ -72,6 +81,7 @@ async function main(): Promise<void> {
     pollMs: Number(process.env.WORKER_POLL_MS ?? 5_000),
     signal: stop.signal,
   });
+  await tracing?.flush();
   logger.info("worker.stopped", { processed });
 }
 

@@ -209,6 +209,7 @@ LintCat reads your code to review it, and that is all the AI part can do. Everyt
 ## What LintCat can access {#access}
 - **Only the repositories you pick** when you install the GitHub App. The permissions it asks for, and why, are listed under [Configuration](/docs/configuration#permissions).
 - **Your model provider sees the code it reviews.** Reviews run on your account’s own Anthropic or OpenAI key, under your agreement with that provider.
+- **Review traces go to Langfuse, in the EU.** We keep a trace of each review (the prompt, the code the reviewer read and its answer) to debug reviews. Keys and tokens are masked first, and traces are deleted after 30 days.
 - **Your key stays encrypted.** Only the review service reads it back; the dashboard shows its last four characters and nothing more.
 
 ## What it never does {#never}
@@ -241,6 +242,10 @@ Pull requests can contain text written to steer an AI. LintCat treats everything
 Does my model provider see my code?
 
 Yes, the code it reviews. Reviews run on your account's own Anthropic or OpenAI key, under your agreement with that provider.
+
+Do you keep my code?
+
+Only in debugging traces. A trace of each review, including the code the reviewer read, goes to Langfuse in the EU. Keys and tokens are masked first, and traces are deleted after 30 days.
 
 How is my API key stored?
 

@@ -25,6 +25,8 @@ export {
   isCancellation,
 } from "#src/cancellation";
 export { addTokenUsage, emptyTokenUsage, type TokenUsage } from "#src/usage";
+export { traceStage } from "#src/trace-stage";
+export { startTracing, type Tracing } from "#src/tracing";
 export type { AgentUsageReport } from "#src/agents/runtime";
 export {
   samplingEngine,

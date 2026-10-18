@@ -113,6 +113,7 @@ describe("verifyPatches", () => {
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0]?.patch).toBeUndefined();
     expect(result.findings[0]?.title).toBe("Wrong flag");
+    expect(result.rejected.map((r) => r.reason)).toEqual(["expected-mismatch"]);
   });
 
   it("drops a patch whose range runs past the end of the file", async () => {
@@ -123,6 +124,7 @@ describe("verifyPatches", () => {
     const result = await verifyPatches([overrun], changedFiles, makeDeps());
 
     expect(result.patchCount).toBe(0);
+    expect(result.rejected.map((r) => r.reason)).toEqual(["expected-mismatch"]);
   });
 
   it("drops a patch that touches no line the pull request adds", async () => {
@@ -134,6 +136,7 @@ describe("verifyPatches", () => {
     const result = await verifyPatches([outside], changedFiles, makeDeps());
 
     expect(result.patchCount).toBe(0);
+    expect(result.rejected.map((r) => r.reason)).toEqual(["outside-diff"]);
   });
 
   it("drops a patch on a file the pull request does not change", async () => {
@@ -142,6 +145,7 @@ describe("verifyPatches", () => {
     const result = await verifyPatches([elsewhere], changedFiles, makeDeps());
 
     expect(result.patchCount).toBe(0);
+    expect(result.rejected.map((r) => r.reason)).toEqual(["outside-diff"]);
   });
 
   it("keeps only the strongest of two patches whose ranges overlap", async () => {
@@ -159,6 +163,7 @@ describe("verifyPatches", () => {
       result.findings.find((f) => f.title === "Strong")?.patch,
     ).toBeDefined();
     expect(result.findings.find((f) => f.title === "Weak")?.patch).toBeUndefined();
+    expect(result.rejected.map((r) => r.reason)).toEqual(["overlap"]);
   });
 
   it("applies two non-overlapping patches to one file", async () => {
@@ -215,6 +220,7 @@ describe("verifyPatches", () => {
 
     expect(result.patchCount).toBe(0);
     expect(result.findings[0]?.patch).toBeUndefined();
+    expect(result.rejected.map((r) => r.reason)).toEqual(["unreadable"]);
   });
 
   it("reads each patched file once, however many patches it carries", async () => {
@@ -276,6 +282,7 @@ describe("verifyPatches", () => {
 
     expect(result.files).toHaveLength(MAX_PATCHED_FILES);
     expect(result.patchCount).toBe(MAX_PATCHED_FILES);
+    expect(result.rejected.map((r) => r.reason)).toContain("file-cap");
   });
 
   it("caps the number of replaced lines", async () => {
@@ -306,6 +313,7 @@ describe("verifyPatches", () => {
     );
 
     expect(result.patchCount).toBe(0);
+    expect(result.rejected.map((r) => r.reason)).toContain("line-cap");
   });
 });
 

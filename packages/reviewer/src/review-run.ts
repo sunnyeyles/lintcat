@@ -7,6 +7,7 @@ import {
   GENERAL_AGENT,
   isCancellation,
   ReviewCancelledError,
+  traceStage,
   type ReviewEngine,
 } from "@pr-review/ai";
 import {
@@ -55,7 +56,7 @@ import type { FinishedReviewRun, ReviewDelivery } from "#src/review-delivery";
 import { resolveReviewScope, wholePullRequest } from "#src/review-scope";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 import { suggestReviewers } from "#src/suggest-reviewers";
-import { validateFindings } from "#src/validate-findings";
+import { validateFindings, type RejectionStage } from "#src/validate-findings";
 import { verifyPatches, type PatchSummary } from "#src/validate-patches";
 
 /** What one review reads. The optional methods are absent on an adapter with no commit graph. */
@@ -250,13 +251,50 @@ function unreviewed(tree: ReviewedTree): ReviewOutcome {
   };
 }
 
+interface RejectedCandidate {
+  stage: RejectionStage;
+  title?: unknown;
+  file?: unknown;
+  line?: unknown;
+  confidence?: unknown;
+  candidate?: unknown;
+}
+
+// A candidate that failed the schema may have any shape, so it is kept whole.
+function describeRejection(candidate: unknown, stage: RejectionStage): RejectedCandidate {
+  if (stage === "schema" || candidate === null || typeof candidate !== "object") {
+    return { stage, candidate };
+  }
+  const { title, file, line, confidence } = candidate as Record<string, unknown>;
+  return { stage, title, file, line, confidence };
+}
+
+function countByStage(rejected: readonly RejectedCandidate[]): Partial<Record<RejectionStage, number>> {
+  const counts: Partial<Record<RejectionStage, number>> = {};
+  for (const { stage } of rejected) counts[stage] = (counts[stage] ?? 0) + 1;
+  return counts;
+}
+
 /** Runs one review. Throws when the agent or a publish step fails; retries are the caller's. */
 export async function runReview(spec: ReviewRunSpec): Promise<FinishedReviewRun> {
   let usage = emptyTokenUsage();
   const startedAt = Date.now();
-  const outcome = await review(spec, (spent) => {
-    usage = addTokenUsage(usage, spent);
-  });
+  const outcome = await traceStage(
+    "review",
+    { ...reviewCorrelation(spec.target), incremental: spec.policy?.incremental ?? false },
+    () =>
+      review(spec, (spent) => {
+        usage = addTokenUsage(usage, spent);
+      }),
+    {
+      output: (reviewed) => ({
+        candidateCount: reviewed.candidates.length,
+        findingCount: reviewed.findings.length,
+        patches: reviewed.patches,
+        suppressed: reviewed.suppressed,
+      }),
+    },
+  );
   const run: FinishedReviewRun = {
     outcome,
     usage,
@@ -291,11 +329,22 @@ async function review(
   const delivery = guarded(unguarded, cancelled.beforeWrite);
 
   cancelled.check("before start");
-  const [pullRequest, changedFiles, diff] = await Promise.all([
-    client.getPullRequest(target),
-    client.listChangedFiles(target),
-    client.getDiff(target),
-  ]);
+  const [pullRequest, changedFiles, diff] = await traceStage(
+    "load",
+    undefined,
+    () =>
+      Promise.all([
+        client.getPullRequest(target),
+        client.listChangedFiles(target),
+        client.getDiff(target),
+      ]),
+    {
+      output: ([, files, loadedDiff]) => ({
+        changedFiles: files.map((file) => file.filename),
+        diffLength: loadedDiff.length,
+      }),
+    },
+  );
   logger.info("review.loaded", {
     ...fields,
     changedFileCount: changedFiles.length,
@@ -303,13 +352,18 @@ async function review(
   });
   const tree: ReviewedTree = { baseSha: pullRequest.baseSha, changedFiles };
 
-  const scope = await resolveReviewScope(target, {
-    client,
-    incremental,
-    diff,
-    changedFiles,
-    logger,
-  });
+  const scope = await traceStage(
+    "scope",
+    { incremental },
+    () => resolveReviewScope(target, { client, incremental, diff, changedFiles, logger }),
+    {
+      output: (resolved) => ({
+        kind: resolved.kind,
+        changedFileCount: resolved.changedFiles.length,
+        ...(resolved.kind === "incremental" ? { sinceSha: resolved.sinceSha } : {}),
+      }),
+    },
+  );
   const whole = wholePullRequest(scope);
   // The agent sees the scope; publishing sees the whole PR, so comments anchor anywhere.
   const carriedForward =
@@ -337,13 +391,12 @@ async function review(
   const memory = await loadMemory(memorySpec?.store, logger);
 
   // Built once, before the agent starts, and serialised onto the outcome.
-  const { index: repositoryIndex, codeowners } = await buildReviewIndex({
-    client,
-    target,
-    baseSha: pullRequest.baseSha,
-    enabled: index,
-    logger,
-  });
+  const { index: repositoryIndex, codeowners } = await traceStage(
+    "index",
+    { baseSha: pullRequest.baseSha, enabled: index },
+    () => buildReviewIndex({ client, target, baseSha: pullRequest.baseSha, enabled: index, logger }),
+    { output: (built) => ({ built: built.index !== undefined }) },
+  );
   const blastRadius = assessBlastRadius({
     index: repositoryIndex,
     changedFiles,
@@ -394,11 +447,19 @@ async function review(
   cancelled.check("agent");
 
   // The AI boundary: only what passes validation reaches GitHub.
-  const validated = validateFindings(
-    candidates,
-    scope.changedFiles,
-    categorySlugs(GENERAL_AGENT),
-    { index: repositoryIndex, changedPaths: changedPaths(changedFiles) },
+  const rejected: RejectedCandidate[] = [];
+  const validated = await traceStage(
+    "validate",
+    { candidates },
+    () =>
+      validateFindings(
+        candidates,
+        scope.changedFiles,
+        categorySlugs(GENERAL_AGENT),
+        { index: repositoryIndex, changedPaths: changedPaths(changedFiles) },
+        (candidate, stage) => rejected.push(describeRejection(candidate, stage)),
+      ),
+    { output: (survivors) => ({ findings: survivors, rejected }) },
   );
   const brokenLinks = await checkDocLinks({
     index: repositoryIndex,
@@ -413,6 +474,7 @@ async function review(
     candidateCount: candidates.length,
     brokenLinkCount: brokenLinks.length,
     findingCount: findings.length,
+    rejectedByStage: countByStage(rejected),
   });
 
   const { kept, suppressed } = partitionSuppressed(memory, findings);
@@ -425,12 +487,28 @@ async function review(
   }
 
   // A patch is proved against the head commit before any of it can be committed or offered.
-  const verified = await verifyPatches(kept, whole.changedFiles, {
-    client,
-    owner: target.owner,
-    repo: target.repo,
-    headSha: target.headSha,
-  });
+  const verified = await traceStage(
+    "verify-patches",
+    { proposed: kept.filter((finding) => finding.patch !== undefined).length },
+    () =>
+      verifyPatches(kept, whole.changedFiles, {
+        client,
+        owner: target.owner,
+        repo: target.repo,
+        headSha: target.headSha,
+      }),
+    {
+      output: (result) => ({
+        verified: result.summary.verified,
+        files: result.files.map((file) => file.path),
+        rejected: result.rejected.map(({ finding, reason }) => ({
+          title: finding.title,
+          file: finding.file,
+          reason,
+        })),
+      }),
+    },
+  );
   logger.info("patches.verified", {
     ...fields,
     proposedCount: verified.summary.proposed,
@@ -439,33 +517,38 @@ async function review(
   });
 
   cancelled.check("before publish");
-  await deliverReview(
-    target,
-    {
-      findings: verified.findings,
-      diffLines: buildDiffLineIndex(whole.changedFiles),
-      patches: {
-        branch: pullRequest.headRef,
-        files: verified.files,
-        patchCount: verified.patchCount,
-      },
-      alreadyPosted: postedFindingKeys(
-        await listPostedComments(client, target, logger),
+  await traceStage(
+    "publish",
+    { findingCount: verified.findings.length, patchCount: verified.patchCount },
+    async () =>
+      deliverReview(
+        target,
+        {
+          findings: verified.findings,
+          diffLines: buildDiffLineIndex(whole.changedFiles),
+          patches: {
+            branch: pullRequest.headRef,
+            files: verified.files,
+            patchCount: verified.patchCount,
+          },
+          alreadyPosted: postedFindingKeys(
+            await listPostedComments(client, target, logger),
+          ),
+          carriedForward: stillOpen(carriedForward, verified.findings),
+          scopeNote:
+            scope.kind === "incremental"
+              ? incrementalNote(scope.sinceSha, scope.changedFiles.length)
+              : undefined,
+          blastRadius,
+          suggestedReviewers,
+          evidenceSource: {
+            owner: target.owner,
+            repo: target.repo,
+            sha: pullRequest.baseSha,
+          },
+        },
+        { ...delivery, logger },
       ),
-      carriedForward: stillOpen(carriedForward, verified.findings),
-      scopeNote:
-        scope.kind === "incremental"
-          ? incrementalNote(scope.sinceSha, scope.changedFiles.length)
-          : undefined,
-      blastRadius,
-      suggestedReviewers,
-      evidenceSource: {
-        owner: target.owner,
-        repo: target.repo,
-        sha: pullRequest.baseSha,
-      },
-    },
-    { ...delivery, logger },
   );
 
   return {

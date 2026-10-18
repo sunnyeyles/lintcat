@@ -5,7 +5,6 @@ export {
   findingCategorySchema,
   isConventionCount,
   reviewFindingSchema,
-  wellFormedFindings,
   type ConventionCountEvidence,
   type FindingCategory,
   type FindingEvidence,

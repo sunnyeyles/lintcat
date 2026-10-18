@@ -467,4 +467,44 @@ describe("validateFindings", () => {
       validateFindings([withTwo, leftWithOne, repeatedOne, unevidenced], changedFiles, CATEGORIES, base),
     ).toEqual([withTwo]);
   });
+
+  it("reports each dropped candidate with the step that dropped it", () => {
+    // Twelve distinct anchors: three lines and file level, in each category.
+    const distinct = [10, 11, 12, undefined].flatMap((line, i) =>
+      CATEGORIES.map((category, j) =>
+        finding({ line, category, title: `Finding ${i * 3 + j}`, confidence: 0.99 - (i * 3 + j) * 0.01 }),
+      ),
+    );
+    const rejected: [string, string][] = [];
+
+    validateFindings(
+      [
+        "not-a-finding",
+        finding({ category: "performance", title: "Invented category" }),
+        finding({ file: "src/not-in-this-pr.ts", title: "Wrong file" }),
+        finding({ line: 9, title: "Context line" }),
+        finding({ line: 11, confidence: CONFIDENCE_THRESHOLD - 0.01, title: "Unsure" }),
+        finding({ line: 12, evidence: [{ file: "src/a.ts", line: 1 }], title: "One example" }),
+        finding({ title: "Finding 0", confidence: 0.75 }),
+        ...distinct,
+      ],
+      changedFiles,
+      CATEGORIES,
+      BLIND,
+      (candidate, stage) =>
+        rejected.push([typeof candidate === "string" ? candidate : (candidate as ReviewFinding).title, stage]),
+    );
+
+    expect(rejected).toEqual([
+      ["not-a-finding", "schema"],
+      ["Invented category", "category"],
+      ["Wrong file", "not-in-diff"],
+      ["Context line", "line-not-added"],
+      ["Unsure", "low-confidence"],
+      ["One example", "evidence"],
+      ["Finding 0", "duplicate"],
+      ["Finding 10", "over-cap"],
+      ["Finding 11", "over-cap"],
+    ]);
+  });
 });

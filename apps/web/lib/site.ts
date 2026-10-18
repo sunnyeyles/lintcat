@@ -22,7 +22,7 @@ export const PAGE_DATES: Record<string, PageDates> = {
   "/docs/quickstart": { published: "2026-09-22", modified: "2026-09-25" },
   "/docs/configuration": { published: "2026-09-22", modified: "2026-09-25" },
   "/docs/how-it-works": { published: "2026-09-22", modified: "2026-09-29" },
-  "/docs/security": { published: "2026-09-23", modified: "2026-10-01" },
+  "/docs/security": { published: "2026-09-23", modified: "2026-10-18" },
   "/docs/mcp-server": { published: "2026-09-22", modified: "2026-09-25" },
 };
 

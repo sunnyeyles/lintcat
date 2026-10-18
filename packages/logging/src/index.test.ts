@@ -5,6 +5,7 @@ import {
   createConsoleLogger,
   errorMessage,
   errorName,
+  withFields,
 } from "#src/index";
 
 afterEach(() => {
@@ -27,6 +28,7 @@ describe("createConsoleLogger", () => {
     expect(line).not.toContain("\n");
     expect(JSON.parse(line)).toEqual({
       level: "info",
+      severity: "INFO",
       event: "review.started",
       repository: "octo-org/example-service",
       pullRequestNumber: 42,
@@ -43,6 +45,7 @@ describe("createConsoleLogger", () => {
     const line = error.mock.calls[0]?.[0] as string;
     expect(JSON.parse(line)).toEqual({
       level: "error",
+      severity: "ERROR",
       event: "review.failed",
       error: "boom",
       errorName: "Error",
@@ -57,6 +60,7 @@ describe("createConsoleLogger", () => {
 
     expect(JSON.parse(log.mock.calls[0]?.[0] as string)).toEqual({
       level: "info",
+      severity: "INFO",
       event: "review.started",
     });
   });
@@ -72,6 +76,7 @@ describe("createConsoleLogger", () => {
 
     expect(JSON.parse(log.mock.calls[0]?.[0] as string)).toEqual({
       level: "info",
+      severity: "INFO",
       event: "review.completed",
       refinedCount: 2,
     });
@@ -110,6 +115,21 @@ describe("createCapturingLogger", () => {
 
     expect(log).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
+  });
+});
+
+describe("withFields", () => {
+  it("adds the fields to every event, letting an event's own field win", () => {
+    const { logger, entries } = createCapturingLogger();
+    const traced = withFields(logger, { traceId: "abc", jobId: "job-1" });
+
+    traced.info("review.loaded", { changedFileCount: 3 });
+    traced.error("review.failed", { jobId: "job-2" });
+
+    expect(entries).toEqual([
+      { level: "info", event: "review.loaded", traceId: "abc", jobId: "job-1", changedFileCount: 3 },
+      { level: "error", event: "review.failed", traceId: "abc", jobId: "job-2" },
+    ]);
   });
 });
 
