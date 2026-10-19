@@ -1,0 +1,90 @@
+{
+  "dir": "evals",
+  "exports": [],
+  "metrics": {
+    "bundleBytes": null,
+    "coverage": {
+      "branches": 82.87,
+      "functions": 89.69,
+      "lines": 85.88,
+      "statements": 86.35
+    },
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 1,
+      "externalDev": 0,
+      "workspace": 6
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 10,
+      "passed": 234,
+      "tests": 234
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/evals",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 2,
+        "files": {
+          "evals/src/model-access.setup.ts": 1,
+          "evals/src/review-quality.eval.ts": 1
+        }
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 0,
+        "files": {}
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 7,
+        "files": {
+          "evals/src/fixture-client.test.ts": 1,
+          "evals/src/unified-diff.test.ts": 6
+        }
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 3,
+        "files": {
+          "evals/src/model-access.setup.ts": 1,
+          "evals/src/model-access.ts": 1,
+          "evals/src/review-quality.eval.ts": 1
+        }
+      }
+    },
+    "files": 22,
+    "lines": 3249
+  }
+}

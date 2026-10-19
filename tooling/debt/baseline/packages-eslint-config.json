@@ -1,0 +1,69 @@
+{
+  "dir": "packages/eslint-config",
+  "exports": [
+    "./base",
+    "./next-js",
+    "./react-internal"
+  ],
+  "metrics": {
+    "bundleBytes": null,
+    "coverage": null,
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 6,
+      "externalDev": 0,
+      "workspace": 0
+    },
+    "lint": null,
+    "tests": null,
+    "typecheck": null
+  },
+  "package": "@pr-review/eslint-config",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 0,
+        "files": {}
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 0,
+        "files": {}
+      }
+    },
+    "files": 0,
+    "lines": 0
+  }
+}

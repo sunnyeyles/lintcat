@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": ">=22 <26",
+    "node": ">=22.18 <26",
     "pnpm": ">=10"
   },
   "scripts": {
@@ -20,7 +20,12 @@
     "db:studio": "pnpm --filter @pr-review/db db:studio",
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dead-code": "knip"
+    "dead-code": "knip",
+    "debt": "pnpm --filter @pr-review/debt debt",
+    "debt:scan": "pnpm --filter @pr-review/debt debt scan",
+    "debt:metrics": "pnpm --filter @pr-review/debt debt metrics",
+    "debt:gate": "pnpm --filter @pr-review/debt debt gate --no-measure",
+    "debt:baseline": "pnpm --filter @pr-review/debt debt baseline"
   },
   "devDependencies": {
     "@types/node": "^25.9.5",

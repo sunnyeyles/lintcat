@@ -19,9 +19,15 @@ jobs:
   ci:
     name: Typecheck, lint, and test
     runs-on: ubuntu-latest
+    env:
+      # The debt gate scopes itself to packages changed against main.
+      TURBO_SCM_BASE: origin/main
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # Full history: `turbo ls --affected` and the debt gate diff against main.
+          fetch-depth: 0
 
       - name: Setup workspace
         uses: ./.github/actions/setup
@@ -45,3 +51,23 @@ jobs:
       - name: Smoke-test cli and mcp bundles
         run: node scripts/smoke-cli-mcp.mjs
 
+      # Blocks regressions against tooling/debt/baseline on the affected packages; see tooling/debt/README.md.
+      - name: Debt gate
+        run: pnpm turbo run //#debt:gate
+
+      # The baseline is generated; a hand edit or a stale regeneration fails here.
+      # _meta.json and _overall.json (registry data) change on their own, so they are not compared.
+      - name: Debt baseline is fresh
+        if: github.ref != 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          if ! git cat-file -e origin/main:tooling/debt/baseline/_meta.json 2>/dev/null; then
+            echo "first baseline; refresh it with the Debt baseline workflow once merged"
+            exit 0
+          fi
+          if git diff --quiet origin/main...HEAD -- tooling/debt/baseline; then
+            echo "baseline unchanged"
+            exit 0
+          fi
+          pnpm debt baseline --force "ci freshness check" --skip network
+          git diff --exit-code -- tooling/debt/baseline ':!tooling/debt/baseline/_meta.json' ':!tooling/debt/baseline/_overall.json'

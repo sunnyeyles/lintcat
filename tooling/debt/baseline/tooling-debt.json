@@ -1,0 +1,75 @@
+{
+  "dir": "tooling/debt",
+  "exports": [],
+  "metrics": {
+    "bundleBytes": null,
+    "coverage": null,
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 0,
+      "externalDev": 1,
+      "workspace": 1
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 7,
+      "passed": 26,
+      "tests": 26
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/debt",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 0,
+        "files": {}
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 0,
+        "files": {}
+      }
+    },
+    "files": 0,
+    "lines": 0
+  }
+}

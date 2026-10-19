@@ -1,0 +1,107 @@
+{
+  "dir": "packages/index",
+  "exports": [
+    ".",
+    "./impact"
+  ],
+  "metrics": {
+    "bundleBytes": null,
+    "coverage": {
+      "branches": 90.41,
+      "functions": 98.44,
+      "lines": 97,
+      "statements": 97.01
+    },
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 0,
+      "externalDev": 0,
+      "workspace": 1
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 20,
+      "passed": 379,
+      "tests": 379
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/index",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 1,
+        "files": {
+          "packages/index/src/manifests.ts": 402
+        }
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 28,
+        "files": {
+          "packages/index/src/codeowners.ts": 2,
+          "packages/index/src/config-drift.ts": 3,
+          "packages/index/src/cycles.ts": 10,
+          "packages/index/src/dependency-purposes.ts": 1,
+          "packages/index/src/impact.ts": 1,
+          "packages/index/src/imports.ts": 4,
+          "packages/index/src/manifests.ts": 2,
+          "packages/index/src/snapshot.test.ts": 1,
+          "packages/index/src/test-names.ts": 2,
+          "packages/index/src/workspace.ts": 2
+        }
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 10,
+        "files": {
+          "packages/index/src/dependency-purposes.ts": 1,
+          "packages/index/src/languages.ts": 1,
+          "packages/index/src/manifests.ts": 1,
+          "packages/index/src/pairing.ts": 1,
+          "packages/index/src/patch-lines.ts": 1,
+          "packages/index/src/paths.ts": 1,
+          "packages/index/src/references.ts": 1,
+          "packages/index/src/roles.ts": 1,
+          "packages/index/src/test-names.ts": 1,
+          "packages/index/src/workspace.ts": 1
+        }
+      }
+    },
+    "files": 50,
+    "lines": 7432
+  }
+}

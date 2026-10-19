@@ -1,0 +1,98 @@
+{
+  "dir": "packages/ai",
+  "exports": [
+    ".",
+    "./agent-test-support"
+  ],
+  "metrics": {
+    "bundleBytes": null,
+    "coverage": {
+      "branches": 93.58,
+      "functions": 98.09,
+      "lines": 98.54,
+      "statements": 98.58
+    },
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 5,
+      "externalDev": 0,
+      "workspace": 5
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 14,
+      "passed": 228,
+      "tests": 228
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/ai",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 1,
+        "files": {
+          "packages/ai/src/agents/runtime.test.ts": 1256
+        }
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 2,
+        "files": {
+          "packages/ai/src/agents/sampling-agent.test.ts": 1,
+          "packages/ai/src/agents/tools.test.ts": 1
+        }
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 9,
+        "files": {
+          "packages/ai/src/agent-contract.ts": 1,
+          "packages/ai/src/agent-test-support.ts": 1,
+          "packages/ai/src/agents/definition.ts": 1,
+          "packages/ai/src/agents/engine.ts": 1,
+          "packages/ai/src/agents/general-agent.ts": 1,
+          "packages/ai/src/agents/opening-prompt.ts": 1,
+          "packages/ai/src/agents/repository-index.ts": 1,
+          "packages/ai/src/agents/truncate.ts": 1,
+          "packages/ai/src/cancellation.ts": 1
+        }
+      }
+    },
+    "files": 36,
+    "lines": 5353
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "dir": "apps/web",
+  "exports": [],
+  "metrics": {
+    "bundleBytes": null,
+    "coverage": {
+      "branches": 56.04,
+      "functions": 50.21,
+      "lines": 59.07,
+      "statements": 59.37
+    },
+    "deadCode": {
+      "dependencies": 0,
+      "exports": 0,
+      "files": 0,
+      "types": 0
+    },
+    "deps": {
+      "external": 12,
+      "externalDev": 3,
+      "workspace": 8
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "tests": {
+      "failed": 0,
+      "files": 52,
+      "passed": 549,
+      "tests": 549
+    },
+    "typecheck": {
+      "errors": 0
+    }
+  },
+  "package": "@pr-review/web",
+  "scan": {
+    "categories": {
+      "as-any": {
+        "count": 0,
+        "files": {}
+      },
+      "console-outside-logging": {
+        "count": 0,
+        "files": {}
+      },
+      "eslint-disable": {
+        "count": 0,
+        "files": {}
+      },
+      "long-file": {
+        "count": 3,
+        "files": {
+          "apps/web/app/api/github/webhook/handler.test.ts": 1410,
+          "apps/web/app/api/github/webhook/handler.ts": 561,
+          "apps/web/components/codebase-map/map-canvas.tsx": 483
+        }
+      },
+      "marker": {
+        "count": 0,
+        "files": {}
+      },
+      "non-null-assertion": {
+        "count": 179,
+        "files": {
+          "apps/web/app/api/codebase-map/[slug]/[reviewId]/handler.test.ts": 4,
+          "apps/web/app/api/docs-chat/handler.test.ts": 1,
+          "apps/web/app/api/github/webhook/handler.test.ts": 6,
+          "apps/web/components/codebase-map/fixtures.ts": 4,
+          "apps/web/components/codebase-map/group-list.tsx": 1,
+          "apps/web/components/codebase-map/map-canvas.tsx": 2,
+          "apps/web/components/codebase-map/map-legend.tsx": 1,
+          "apps/web/components/codebase-map/map-session.test.ts": 7,
+          "apps/web/components/codebase-map/view.test.ts": 2,
+          "apps/web/components/overview/reviews-table.tsx": 2,
+          "apps/web/lib/authorize.test.ts": 3,
+          "apps/web/lib/codebase-map/change-diagram.ts": 1,
+          "apps/web/lib/codebase-map/clustering.test.ts": 3,
+          "apps/web/lib/codebase-map/cycles.ts": 7,
+          "apps/web/lib/codebase-map/emphasis.ts": 1,
+          "apps/web/lib/codebase-map/layout.test.ts": 4,
+          "apps/web/lib/codebase-map/layout.ts": 12,
+          "apps/web/lib/codebase-map/lod.test.ts": 19,
+          "apps/web/lib/codebase-map/lod.ts": 4,
+          "apps/web/lib/codebase-map/merge.test.ts": 5,
+          "apps/web/lib/codebase-map/navigation.ts": 3,
+          "apps/web/lib/codebase-map/normalise.test.ts": 3,
+          "apps/web/lib/codebase-map/normalise.ts": 2,
+          "apps/web/lib/codebase-map/query.test.ts": 20,
+          "apps/web/lib/codebase-map/sample.ts": 16,
+          "apps/web/lib/codebase-map/scene.test.ts": 9,
+          "apps/web/lib/codebase-map/scene.ts": 3,
+          "apps/web/lib/docs.test.ts": 1,
+          "apps/web/lib/membership-sync.test.ts": 4,
+          "apps/web/lib/organization.test.ts": 3,
+          "apps/web/lib/organization.ts": 1,
+          "apps/web/lib/repo-access-sync.test.ts": 19,
+          "apps/web/lib/repo-access-sync.ts": 4,
+          "apps/web/lib/repo-settings.test.ts": 1,
+          "apps/web/lib/users.test.ts": 1
+        }
+      },
+      "ts-expect-error": {
+        "count": 0,
+        "files": {}
+      },
+      "ts-ignore": {
+        "count": 0,
+        "files": {}
+      },
+      "untested-module": {
+        "count": 97,
+        "files": {
+          "apps/web/app/auth-actions.ts": 1,
+          "apps/web/app/dev/codebase-map/map-explorer.tsx": 1,
+          "apps/web/app/o/[slug]/repos/[owner]/[name]/settings/actions.ts": 1,
+          "apps/web/app/o/[slug]/repos/[owner]/[name]/settings/repo-settings-form.tsx": 1,
+          "apps/web/app/o/[slug]/settings/actions.ts": 1,
+          "apps/web/app/o/[slug]/settings/model-key-form.tsx": 1,
+          "apps/web/components/charts/category-severity-chart.tsx": 1,
+          "apps/web/components/charts/chart-data-table.tsx": 1,
+          "apps/web/components/charts/chart-frame.tsx": 1,
+          "apps/web/components/charts/cost-by-repo-table.tsx": 1,
+          "apps/web/components/charts/review-volume-chart.tsx": 1,
+          "apps/web/components/charts/series.ts": 1,
+          "apps/web/components/charts/severity-trend-chart.tsx": 1,
+          "apps/web/components/charts/spend-trend-chart.tsx": 1,
+          "apps/web/components/charts/token-composition-chart.tsx": 1,
+          "apps/web/components/charts/tooltip-format.tsx": 1,
+          "apps/web/components/codebase-map/change-diagram-svg.tsx": 1,
+          "apps/web/components/codebase-map/diagram-frame.tsx": 1,
+          "apps/web/components/codebase-map/file-details.tsx": 1,
+          "apps/web/components/codebase-map/fixtures.ts": 1,
+          "apps/web/components/codebase-map/group-list.tsx": 1,
+          "apps/web/components/codebase-map/map-canvas.tsx": 1,
+          "apps/web/components/codebase-map/map-hover-card.tsx": 1,
+          "apps/web/components/codebase-map/map-reach-controls.tsx": 1,
+          "apps/web/components/codebase-map/map-search.tsx": 1,
+          "apps/web/components/codebase-map/map-status-banner.tsx": 1,
+          "apps/web/components/codebase-map/markers.ts": 1,
+          "apps/web/components/codebase-map/palette.ts": 1,
+          "apps/web/components/codebase-map/use-map-session.ts": 1,
+          "apps/web/components/docs-chat/answer.tsx": 1,
+          "apps/web/components/docs-chat/ask-ai-button.tsx": 1,
+          "apps/web/components/docs-chat/chat-panel.tsx": 1,
+          "apps/web/components/docs-chat/use-docs-chat.ts": 1,
+          "apps/web/components/docs/article.tsx": 1,
+          "apps/web/components/docs/docs-nav.tsx": 1,
+          "apps/web/components/docs/how-it-works-loop.tsx": 1,
+          "apps/web/components/docs/prose.tsx": 1,
+          "apps/web/components/docs/toc.tsx": 1,
+          "apps/web/components/insights/insights-scope.tsx": 1,
+          "apps/web/components/insights/range-empty.tsx": 1,
+          "apps/web/components/insights/skeletons.tsx": 1,
+          "apps/web/components/json-ld.tsx": 1,
+          "apps/web/components/landing/hero.tsx": 1,
+          "apps/web/components/landing/map-preview.tsx": 1,
+          "apps/web/components/landing/sections.tsx": 1,
+          "apps/web/components/overview/empty-notice.tsx": 1,
+          "apps/web/components/overview/repo-table.tsx": 1,
+          "apps/web/components/overview/review-filter-scope.tsx": 1,
+          "apps/web/components/overview/reviews-table.tsx": 1,
+          "apps/web/components/overview/row-link.tsx": 1,
+          "apps/web/components/overview/section.tsx": 1,
+          "apps/web/components/overview/severity-mix.tsx": 1,
+          "apps/web/components/overview/sparkline.tsx": 1,
+          "apps/web/components/overview/view-all-link.tsx": 1,
+          "apps/web/components/review/blast-radius-card.tsx": 1,
+          "apps/web/components/review/change-diagram-section.tsx": 1,
+          "apps/web/components/review/change-diagram.tsx": 1,
+          "apps/web/components/review/confidence-meter.tsx": 1,
+          "apps/web/components/review/file-path.tsx": 1,
+          "apps/web/components/review/finding-sheet.tsx": 1,
+          "apps/web/components/review/findings-focus.tsx": 1,
+          "apps/web/components/review/findings-section.tsx": 1,
+          "apps/web/components/review/findings-table.tsx": 1,
+          "apps/web/components/review/review-map-lazy.tsx": 1,
+          "apps/web/components/review/review-map-section.tsx": 1,
+          "apps/web/components/review/review-map-skeleton.tsx": 1,
+          "apps/web/components/review/review-map.tsx": 1,
+          "apps/web/components/review/review-pager.tsx": 1,
+          "apps/web/components/review/sort.ts": 1,
+          "apps/web/components/shell/color-mode-toggle.tsx": 1,
+          "apps/web/components/shell/docs-topbar.tsx": 1,
+          "apps/web/components/shell/logo-mark.tsx": 1,
+          "apps/web/components/shell/main-column.tsx": 1,
+          "apps/web/components/shell/page-header.tsx": 1,
+          "apps/web/components/shell/sidebar.tsx": 1,
+          "apps/web/components/shell/site-footer.tsx": 1,
+          "apps/web/components/shell/topbar-frame.tsx": 1,
+          "apps/web/components/shell/topbar.tsx": 1,
+          "apps/web/components/shell/user-menu.tsx": 1,
+          "apps/web/components/ui/level-tone.ts": 1,
+          "apps/web/components/ui/risk-badge.tsx": 1,
+          "apps/web/components/ui/section-heading.tsx": 1,
+          "apps/web/components/ui/severity-badge.tsx": 1,
+          "apps/web/components/ui/stat.tsx": 1,
+          "apps/web/components/ui/submit-button.tsx": 1,
+          "apps/web/lib/auth.ts": 1,
+          "apps/web/lib/codebase-map/cycles.ts": 1,
+          "apps/web/lib/codebase-map/emphasis.ts": 1,
+          "apps/web/lib/codebase-map/endpoint.ts": 1,
+          "apps/web/lib/codebase-map/types.ts": 1,
+          "apps/web/lib/data/server.ts": 1,
+          "apps/web/lib/docs-chat/limits.ts": 1,
+          "apps/web/lib/faq.ts": 1,
+          "apps/web/lib/request.ts": 1,
+          "apps/web/lib/session.ts": 1,
+          "apps/web/lib/sign-in.ts": 1,
+          "apps/web/lib/structured-data.ts": 1
+        }
+      }
+    },
+    "files": 252,
+    "lines": 24667
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "$comment": "Deterministic debt rules. Categories are ratchets: counts may fall, never rise. See AGENTS.md.",
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.next/**",
+    "**/*.d.ts",
+    "evals/fixtures/**",
+    "tooling/**",
+    "packages/db/drizzle/**",
+    "packages/design/brand/**"
+  ],
+  "testFilePattern": "\\.test\\.tsx?$",
+  "lineRules": {
+    "non-null-assertion": {
+      "severity": "medium",
+      "scope": "code",
+      "pattern": "(?<=[\\w\\])'\"`])!(?![=.]?=)",
+      "why": "Hides a null the type system found; replace with a check or a narrower type."
+    },
+    "marker": {
+      "severity": "low",
+      "scope": "text",
+      "pattern": "\\b(TODO|FIXME|HACK|XXX)\\b",
+      "why": "Unfinished work belongs in an issue, not a comment."
+    },
+    "as-any": {
+      "severity": "high",
+      "scope": "code",
+      "pattern": "\\bas\\s+any\\b|:\\s*any\\b|<any>",
+      "why": "Opts out of the type system."
+    },
+    "eslint-disable": {
+      "severity": "medium",
+      "scope": "text",
+      "pattern": "eslint-disable",
+      "why": "A disabled rule is a debt marker; fix the code or the rule."
+    },
+    "ts-ignore": {
+      "severity": "high",
+      "scope": "text",
+      "pattern": "@ts-ignore|@ts-nocheck",
+      "why": "Silences the compiler without an expectation; use @ts-expect-error in tests only."
+    },
+    "ts-expect-error": {
+      "severity": "medium",
+      "scope": "text",
+      "pattern": "@ts-expect-error",
+      "excludeTests": true,
+      "why": "Expected type errors belong in tests, not production code."
+    },
+    "console-outside-logging": {
+      "severity": "low",
+      "scope": "code",
+      "pattern": "\\bconsole\\.(log|warn|error|info|debug)\\(",
+      "excludeTests": true,
+      "excludePackages": ["@pr-review/logging", "@pr-review/cli"],
+      "why": "Output goes through @pr-review/logging so it stays single-line JSON."
+    }
+  },
+  "fileRules": {
+    "long-file": {
+      "severity": "medium",
+      "maxLines": 400,
+      "maxTestLines": 800,
+      "allowedGrowthPct": 5,
+      "why": "A file past this size is doing more than one job."
+    },
+    "untested-module": {
+      "severity": "medium",
+      "exclude": [
+        "**/index.ts",
+        "**/index.tsx",
+        "**/*.config.ts",
+        "apps/web/app/**/page.tsx",
+        "apps/web/app/**/layout.tsx",
+        "apps/web/app/**/loading.tsx",
+        "apps/web/app/**/error.tsx",
+        "apps/web/app/**/not-found.tsx",
+        "apps/web/app/**/route.ts",
+        "apps/web/app/**/sitemap.ts",
+        "apps/web/app/**/robots.ts",
+        "apps/web/app/**/opengraph-image.tsx",
+        "apps/web/middleware.ts",
+        "apps/web/proxy.ts",
+        "packages/design/src/components/**",
+        "packages/design/src/icons/**"
+      ],
+      "why": "A source file with no sibling *.test.ts has no safety net for refactoring."
+    }
+  },
+  "gate": {
+    "coverageDropPct": 0.5,
+    "bundleGrowthPct": 5,
+    "toolingMayDependOn": ["@pr-review/eslint-config"]
+  },
+  "metrics": {
+    "bundles": {
+      "@pr-review/cli": "apps/cli/dist/index.mjs",
+      "@pr-review/mcp": "apps/mcp/dist/index.mjs",
+      "@pr-review/worker": "apps/worker/dist/index.mjs"
+    },
+    "coverageInclude": [
+      "apps/*/src/**",
+      "apps/web/app/**",
+      "apps/web/components/**",
+      "apps/web/lib/**",
+      "packages/*/src/**",
+      "evals/src/**"
+    ]
+  }
+}

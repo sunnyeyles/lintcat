@@ -22,7 +22,10 @@ files and nothing else.
   entries pointing at real files.
 - `node_modules` does not. Run `pnpm install --frozen-lockfile` before the first
   command that needs it. A worktree is never the place to resolve new versions,
-  so a drifted `pnpm-lock.yaml` should fail there rather than be rewritten.
+  so a drifted `pnpm-lock.yaml` should fail there rather than be rewritten. The
+  one exception is a PR whose purpose is to add a workspace or a dependency:
+  run `pnpm install --lockfile-only` once, then `--frozen-lockfile`, and say so
+  in the PR.
 
 Because worktrees sit _inside_ the main checkout, pnpm walks up to the outer
 `pnpm-workspace.yaml` and warns about multiple lockfiles. That warning is how
