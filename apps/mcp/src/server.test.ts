@@ -1,4 +1,4 @@
-import { chmodSync, readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -35,6 +35,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { McpEnvironment } from "#src/environment";
 import { createServer, type ServerOptions } from "#src/server";
 import { createTestRepo, type TestRepo } from "#src/test-repo";
+
+// File modes do not stop root, so a failing write is injected instead.
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, writeFileSync: vi.fn(actual.writeFileSync) };
+});
 
 let repo: TestRepo;
 
@@ -514,7 +520,11 @@ describe("apply_fix", () => {
     repo.write("src/api.ts", 'import { createSession } from "./sessions";\nexport const port = 80;\n');
     const locked = path.join(repo.root, "src/api.ts");
     const before = { sessions: read("src/sessions.ts"), api: read("src/api.ts") };
-    chmodSync(locked, 0o444);
+    const { writeFileSync: realWrite } = await vi.importActual<typeof import("node:fs")>("node:fs");
+    vi.mocked(writeFileSync).mockImplementation((file, ...rest) => {
+      if (file === locked) throw new Error(`EACCES: permission denied, open '${locked}'`);
+      realWrite(file, ...rest);
+    });
     const client = await connect(environment());
 
     const { isError, texts } = await call(client, "apply_fix", {
@@ -529,7 +539,7 @@ describe("apply_fix", () => {
         },
       ],
     });
-    chmodSync(locked, 0o644);
+    vi.mocked(writeFileSync).mockImplementation(realWrite);
 
     expect(isError).toBe(true);
     expect(texts[0]).toContain("put back as it was");
