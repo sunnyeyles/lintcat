@@ -189,8 +189,20 @@ export async function supersedePullRequestJobs(
 
 /** Whether a job for this pull request head has succeeded or is queued or running. */
 export async function headJobSucceededOrActive(
-  _database: Database,
-  _head: { repoId: number; prNumber: number; headSha: string },
+  database: Database,
+  { repoId, prNumber, headSha }: { repoId: number; prNumber: number; headSha: string },
 ): Promise<boolean> {
-  throw new Error("not implemented");
+  const rows = await database
+    .select({ id: reviewJobs.id })
+    .from(reviewJobs)
+    .where(
+      and(
+        eq(reviewJobs.repoId, repoId),
+        eq(reviewJobs.prNumber, prNumber),
+        eq(reviewJobs.headSha, headSha),
+        inArray(reviewJobs.status, [...ACTIVE, "succeeded"]),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
 }
