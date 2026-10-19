@@ -41,14 +41,16 @@ import {
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
-import { createDatabaseReviewPublisher } from "#src/record-review";
+import { createDatabaseReviewPublisher, type WriteDatabaseRunner } from "#src/record-review";
 import { redactingLogger } from "#src/redact";
 
 type HostedClient = PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
 
 export interface JobRunnerDeps {
-  /** Single statements only: the worker never needs a transaction. */
+  /** Single statements only: transactions go through `withWriteDatabase`. */
   database: Database;
+  /** Opens a transaction-capable database for dashboard ingest. */
+  withWriteDatabase: WriteDatabaseRunner;
   github: Pick<GithubAppClient, "createInstallationToken">;
   /** Builds the job's GitHub client over its installation token. */
   createClient: (token: string) => HostedClient;
@@ -212,7 +214,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       const commitFixes = settings.fixes && (await fixesAllowed(client, target, logger));
       const delivery = dashboardDelivery(
         githubDelivery({ client, logger, commitFixes }),
-        createDatabaseReviewPublisher(database, organization.id, logger),
+        createDatabaseReviewPublisher(deps.withWriteDatabase, organization.id, logger),
         logger,
       );
       await runReview({

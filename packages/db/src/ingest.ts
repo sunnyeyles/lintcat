@@ -18,6 +18,7 @@ export type IngestResult =
   | { ok: false; reason: "invalid-record"; issues: string[] }
   | { ok: false; reason: IngestFailure };
 
+/** Needs `.transaction()`: a failed write keeps the review's previous findings. */
 export async function ingestReviewRecord(
   database: Database,
   organizationId: number,
@@ -38,11 +39,15 @@ export async function ingestReviewRecord(
 
   const repoId = await findOrCreateRepo(database, organizationId, record);
   if (repoId === undefined) return { ok: false, reason: "repo-removed" };
-  const reviewId = await upsertReview(database, repoId, record);
-  await replaceFindings(database, reviewId, record);
-  if (record.graph !== undefined && record.baseSha !== undefined) {
-    await saveRepositoryGraph(database, repoId, record.baseSha, record.graph);
-  }
+  // The upsert locks the review row, so concurrent ingests of one review serialise.
+  const reviewId = await database.transaction(async (tx) => {
+    const id = await upsertReview(tx, repoId, record);
+    await replaceFindings(tx, id, record);
+    if (record.graph !== undefined && record.baseSha !== undefined) {
+      await saveRepositoryGraph(tx, repoId, record.baseSha, record.graph);
+    }
+    return id;
+  });
   return { ok: true, reviewId };
 }
 

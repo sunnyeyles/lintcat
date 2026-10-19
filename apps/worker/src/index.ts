@@ -2,7 +2,13 @@
 import process from "node:process";
 
 import { createLanguageModel, startTracing } from "@pr-review/ai";
-import { db, findLocalEnvFile, modelKeyEncryptionKey, requiredEnv } from "@pr-review/db";
+import {
+  db,
+  findLocalEnvFile,
+  modelKeyEncryptionKey,
+  requiredEnv,
+  withWriteDatabase,
+} from "@pr-review/db";
 import { createGithubAppClient, createTokenClient } from "@pr-review/github";
 import { createConsoleLogger, errorMessage } from "@pr-review/logging";
 
@@ -25,6 +31,7 @@ async function main(): Promise<void> {
 
   const jobDeps: JobRunnerDeps = {
     database,
+    withWriteDatabase,
     // Single-line env values carry the PEM's newlines as literal `\n`.
     github: createGithubAppClient({
       appId: requiredEnv("GITHUB_APP_ID"),
