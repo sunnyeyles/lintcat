@@ -165,6 +165,8 @@ export function loadFixture(name: string): LoadedFixture {
     baseSha: manifest.baseSha,
     headRef: manifest.pullRequest.headRef,
     headSha: manifest.headSha,
+    state: "open",
+    labels: [],
   };
 
   return {

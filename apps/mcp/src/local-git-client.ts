@@ -420,6 +420,8 @@ function createLocalGitClient(
         baseSha,
         headRef: scope.kind === "range" ? headRef : branch,
         headSha: headRef,
+        state: "open",
+        labels: [],
       };
     },
     async listChangedFiles() {

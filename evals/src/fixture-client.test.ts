@@ -23,6 +23,8 @@ const pullRequest: PullRequestDetails = {
   baseSha: BASE_SHA,
   headRef: "refactor/shared-pagination",
   headSha: HEAD_SHA,
+  state: "open",
+  labels: [],
 };
 
 function makeFixture(

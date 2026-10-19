@@ -214,6 +214,8 @@ const pullResponseSchema = z.object({
   number: z.number(),
   title: z.string(),
   body: z.string().nullable(),
+  state: z.enum(["open", "closed"]),
+  labels: z.array(z.object({ name: z.string() })),
   user: z.object({ login: z.string() }).nullable(),
   base: z.object({ ref: z.string(), sha: z.string() }),
   head: z.object({ ref: z.string(), sha: z.string() }),
@@ -540,6 +542,8 @@ export function createInstallationClient(
         baseSha: data.base.sha,
         headRef: data.head.ref,
         headSha: data.head.sha,
+        state: data.state,
+        labels: data.labels.map((label) => label.name),
       };
     },
 

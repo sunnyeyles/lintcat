@@ -47,6 +47,8 @@ export const pullRequest: PullRequestDetails = {
   baseSha,
   headRef: "feature/admin-gate",
   headSha,
+  state: "open",
+  labels: [],
 };
 
 export const changedFiles: ChangedFile[] = [

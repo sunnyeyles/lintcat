@@ -43,6 +43,8 @@ const pullRequest: PullRequestDetails = {
   baseSha: BASE_SHA,
   headRef: "refactor/unique-token",
   headSha: HEAD_SHA,
+  state: "open",
+  labels: [],
 };
 
 const changedFiles: ChangedFile[] = [

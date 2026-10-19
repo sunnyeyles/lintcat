@@ -38,6 +38,8 @@ const pullRequest: PullRequestDetails = {
   baseSha: "a".repeat(40),
   headRef: "feature",
   headSha: "b".repeat(40),
+  state: "open",
+  labels: [],
 };
 
 const changedFiles: ChangedFile[] = [
