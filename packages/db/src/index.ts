@@ -43,6 +43,7 @@ export {
   enqueueReviewJob,
   failReviewJob,
   findReviewJobContext,
+  headJobSucceededOrActive,
   renewReviewJobLease,
   supersedePullRequestJobs,
   supersedeReviewJob,

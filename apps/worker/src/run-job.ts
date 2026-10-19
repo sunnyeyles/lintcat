@@ -41,6 +41,7 @@ import {
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
+import { supersedeForLiveHead } from "#src/head-repair";
 import { createDatabaseReviewPublisher, type WriteDatabaseRunner } from "#src/record-review";
 import { redactingLogger } from "#src/redact";
 
@@ -49,7 +50,7 @@ type HostedClient = PullRequestReadClient & RepositoryHistoryClient & ReviewPubl
 export interface JobRunnerDeps {
   /** Single statements only: transactions go through `withWriteDatabase`. */
   database: Database;
-  /** Opens a transaction-capable database for dashboard ingest. */
+  /** Opens a transaction-capable database for dashboard ingest and head-repair enqueue. */
   withWriteDatabase: WriteDatabaseRunner;
   github: Pick<GithubAppClient, "createInstallationToken">;
   /** Builds the job's GitHub client over its installation token. */
@@ -179,9 +180,19 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       client = deps.createClient(token);
 
       const pullRequest = await client.getPullRequest(target);
-      if (pullRequest.headSha !== job.headSha) {
+      if (pullRequest.state !== "open") {
         await supersedeReviewJob(database, job);
-        logger.info("review_job.superseded", { ...correlation, reason: "head_moved" });
+        logger.info("review_job.superseded", { ...correlation, reason: "pr_closed" });
+        return "superseded";
+      }
+      if (pullRequest.headSha !== job.headSha) {
+        const { requeued } = await supersedeForLiveHead(deps.withWriteDatabase, job, pullRequest);
+        logger.info("review_job.superseded", {
+          ...correlation,
+          reason: "head_moved",
+          liveHeadSha: pullRequest.headSha,
+          requeued,
+        });
         return "superseded";
       }
 
