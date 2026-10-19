@@ -140,7 +140,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
     organization.uninstalledAt ||
     organization.suspendedAt
   ) {
-    await failReviewJob(database, job.id, "the installation no longer covers this repository", {
+    await failReviewJob(database, job, "the installation no longer covers this repository", {
       ...retry,
       maxAttempts: 0,
     });
@@ -160,7 +160,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
     const correlation = { ...fields, ...reviewCorrelation(target) };
     const controller = new AbortController();
     const stillRunning = async () => {
-      const running = await renewReviewJobLease(database, job.id, lease.leaseMs);
+      const running = await renewReviewJobLease(database, job, lease.leaseMs);
       if (!running) controller.abort();
       return running;
     };
@@ -178,7 +178,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
 
       const pullRequest = await client.getPullRequest(target);
       if (pullRequest.headSha !== job.headSha) {
-        await supersedeReviewJob(database, job.id);
+        await supersedeReviewJob(database, job);
         logger.info("review_job.superseded", { ...correlation, reason: "head_moved" });
         return "superseded";
       }
@@ -194,7 +194,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
           conclusion: "neutral",
           output: noKeyOutput(organization.slug, deps.settingsUrl(organization.slug)),
         });
-        await completeReviewJob(database, job.id);
+        await completeReviewJob(database, job);
         logger.info("review_job.no_model_key", correlation);
         return "no-key";
       }
@@ -225,7 +225,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
         signal: controller.signal,
         stillRunning,
       });
-      if (!(await completeReviewJob(database, job.id))) return "superseded";
+      if (!(await completeReviewJob(database, job))) return "superseded";
       logger.info("review_job.succeeded", correlation);
       return "succeeded";
     } catch (error: unknown) {
@@ -239,7 +239,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       const unknownModel = error instanceof ModelProviderError;
       const outcome = await failReviewJob(
         database,
-        job.id,
+        job,
         message,
         unknownModel ? { ...retry, maxAttempts: 0 } : retry,
       );
