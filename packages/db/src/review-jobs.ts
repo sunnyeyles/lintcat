@@ -100,42 +100,45 @@ export async function claimReviewJob(
   return job;
 }
 
-const running = (jobId: number) =>
-  and(eq(reviewJobs.id, jobId), eq(reviewJobs.status, "running"));
+/** The job as its worker claimed it; `attempts` fences out a worker whose lease was reclaimed. */
+type ClaimedReviewJob = Pick<ReviewJob, "id" | "attempts">;
 
-/** False once the job is no longer running, such as when a newer push superseded it. */
+const running = ({ id, attempts }: ClaimedReviewJob) =>
+  and(eq(reviewJobs.id, id), eq(reviewJobs.status, "running"), eq(reviewJobs.attempts, attempts));
+
+/** False once the job is no longer running, or another worker reclaimed it. */
 export async function renewReviewJobLease(
   database: Database,
-  jobId: number,
+  job: ClaimedReviewJob,
   leaseMs: number,
 ): Promise<boolean> {
   const rows = await database
     .update(reviewJobs)
     .set({ leaseExpiresAt: lease(leaseMs) })
-    .where(running(jobId))
+    .where(running(job))
     .returning({ id: reviewJobs.id });
   return rows.length > 0;
 }
 
 async function settle(
   database: Database,
-  jobId: number,
+  job: ClaimedReviewJob,
   set: PgUpdateSetSource<typeof reviewJobs>,
 ): Promise<boolean> {
   const rows = await database
     .update(reviewJobs)
     .set({ leaseExpiresAt: null, ...set })
-    .where(running(jobId))
+    .where(running(job))
     .returning({ id: reviewJobs.id });
   return rows.length > 0;
 }
 
-export function completeReviewJob(database: Database, jobId: number): Promise<boolean> {
-  return settle(database, jobId, { status: "succeeded", finishedAt: sql`now()` });
+export function completeReviewJob(database: Database, job: ClaimedReviewJob): Promise<boolean> {
+  return settle(database, job, { status: "succeeded", finishedAt: sql`now()` });
 }
 
-export function supersedeReviewJob(database: Database, jobId: number): Promise<boolean> {
-  return settle(database, jobId, { status: "superseded", finishedAt: sql`now()` });
+export function supersedeReviewJob(database: Database, job: ClaimedReviewJob): Promise<boolean> {
+  return settle(database, job, { status: "superseded", finishedAt: sql`now()` });
 }
 
 export interface RetryPolicy {
@@ -146,7 +149,7 @@ export interface RetryPolicy {
 /** Requeues until `maxAttempts` claims have failed; `error` must already be free of secrets. */
 export async function failReviewJob(
   database: Database,
-  jobId: number,
+  job: ClaimedReviewJob,
   error: string,
   { maxAttempts, retryDelayMs }: RetryPolicy,
 ): Promise<"retrying" | "failed" | "superseded"> {
@@ -159,7 +162,7 @@ export async function failReviewJob(
       finishedAt: sql`case when ${reviewJobs.attempts} >= ${maxAttempts} then now() end`,
       runAfter: sql`now() + ${`${retryDelayMs} milliseconds`}::interval`,
     })
-    .where(running(jobId))
+    .where(running(job))
     .returning({ status: reviewJobs.status });
   if (!row) return "superseded";
   return row.status === "failed" ? "failed" : "retrying";

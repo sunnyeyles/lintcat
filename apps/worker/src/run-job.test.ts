@@ -553,3 +553,142 @@ describe("runReviewJob dashboard recording", () => {
     expect(await database.select().from(reviews)).toEqual([]);
   });
 });
+
+describe("runReviewJob fencing by the claimed attempt", () => {
+  // Worker B reclaims the only row after worker A's lease lapsed.
+  async function reclaim(job: ReviewJob): Promise<ReviewJob> {
+    await database.update(reviewJobs).set({ leaseExpiresAt: new Date(Date.now() - 1_000) });
+    const workerB = await claimReviewJob(database, { leaseMs: 60_000 });
+    if (!workerB || workerB.id !== job.id) throw new Error("reclaim failed");
+    return workerB;
+  }
+
+  const FILE = Array.from({ length: 41 }, (_, i) =>
+    i === 40 ? "const target = 1;" : `line ${i + 1}`,
+  ).join("\n");
+
+  function answeringWithFix(): ReviewModel {
+    const finding = makeFinding("naming", {
+      line: 41,
+      patch: {
+        startLine: 41,
+        endLine: 41,
+        expected: "const target = 1;",
+        replacement: "// patched\nconst target = 1;",
+      },
+    });
+    return makeModel([message([textBlock(finalFindingsJson([finding]))], "end_turn")]).model;
+  }
+
+  function expectNothingPublished() {
+    expect(github.createReview).not.toHaveBeenCalled();
+    expect(github.createCheckRun).not.toHaveBeenCalled();
+    expect(github.createCommitOnBranch).not.toHaveBeenCalled();
+    expect(github.writeFileOnBranch).not.toHaveBeenCalled();
+  }
+
+  it("AC3: publishes nothing and returns superseded when the job is reclaimed just before publishing", async () => {
+    await withKey();
+    await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: true });
+    github.getFileContents.mockResolvedValue(FILE);
+    const job = await claim();
+    let workerB: ReviewJob | undefined;
+    github.listReviewComments.mockImplementation(async () => {
+      workerB = await reclaim(job);
+      return [];
+    });
+    const { deps: d } = deps({ createLanguageModel: () => answeringWithFix() });
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expect(workerB).toBeDefined();
+    expectNothingPublished();
+    expect(await database.select().from(reviews)).toEqual([]);
+    expect(await database.select().from(findings)).toEqual([]);
+    expect(await status(job.id)).toMatchObject({
+      status: "running",
+      attempts: workerB!.attempts,
+      leaseExpiresAt: workerB!.leaseExpiresAt,
+    });
+  });
+
+  it(
+    "AC3: a stale heartbeat aborts a review that was reclaimed mid-review, posting nothing",
+    async () => {
+      await withKey();
+      const job = await claim();
+      const hanging = makeHangingModel();
+      const { deps: d } = deps({
+        createLanguageModel: () => hanging.model,
+        lease: { leaseMs: 60_000, heartbeatMs: 5 },
+      });
+
+      const run = runReviewJob(d, job);
+      await hanging.firstCall;
+      const workerB = await reclaim(job);
+
+      expect(await run).toBe("superseded");
+      expectNothingPublished();
+      expect(await database.select().from(reviews)).toEqual([]);
+      expect(await status(job.id)).toMatchObject({ status: "running", attempts: workerB.attempts });
+    },
+    20_000,
+  );
+
+  it("AC2: a stale worker on the not-installed path leaves the reclaimed row alone", async () => {
+    await withKey();
+    const job = await claim();
+    const workerB = await reclaim(job);
+    await markUninstalled(database, 1);
+    const { deps: d } = deps();
+
+    await runReviewJob(d, job);
+
+    expect(await status(job.id)).toMatchObject({
+      status: "running",
+      attempts: workerB.attempts,
+      leaseExpiresAt: workerB.leaseExpiresAt,
+      lastError: null,
+    });
+  });
+
+  it("AC2: a stale worker that finds the head moved does not supersede the reclaimed row", async () => {
+    await withKey();
+    const job = await claim("0".repeat(40));
+    const workerB = await reclaim(job);
+    const { deps: d } = deps();
+
+    await runReviewJob(d, job);
+
+    expect(github.createCheckRun).not.toHaveBeenCalled();
+    expect(await status(job.id)).toMatchObject({
+      status: "running",
+      attempts: workerB.attempts,
+      leaseExpiresAt: workerB.leaseExpiresAt,
+    });
+  });
+
+  it("AC2: a stale worker whose review fails neither requeues nor fails the reclaimed row", async () => {
+    await withKey();
+    const job = await claim();
+    const failing = makeModel([]).model;
+    let workerB: ReviewJob | undefined;
+    failing.doGenerate = async () => {
+      workerB = await reclaim(job);
+      throw new Error("overloaded");
+    };
+    const { deps: d } = deps({
+      createLanguageModel: () => failing,
+      retry: { maxAttempts: 1, retryDelayMs: 0 },
+    });
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expect(github.createCheckRun).not.toHaveBeenCalled();
+    expect(await status(job.id)).toMatchObject({
+      status: "running",
+      attempts: workerB!.attempts,
+      lastError: null,
+    });
+  });
+});

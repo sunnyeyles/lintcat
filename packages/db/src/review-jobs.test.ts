@@ -62,7 +62,7 @@ describe("enqueueReviewJob", () => {
   it("queues the same head again once the earlier job has finished", async () => {
     await enqueueReviewJob(database, request());
     const job = await claimReviewJob(database, LEASE);
-    await completeReviewJob(database, job!.id);
+    await completeReviewJob(database, job!);
     const again = await enqueueReviewJob(database, request({ deliveryId: "delivery-2" }));
     expect(again.status).toBe("queued");
   });
@@ -113,7 +113,7 @@ describe("claimReviewJob", () => {
   it("leaves a job alone until its retry is due", async () => {
     await enqueueReviewJob(database, request());
     const job = await claimReviewJob(database, LEASE);
-    await failReviewJob(database, job!.id, "boom", { maxAttempts: 3, retryDelayMs: 60_000 });
+    await failReviewJob(database, job!, "boom", { maxAttempts: 3, retryDelayMs: 60_000 });
     expect(await claimReviewJob(database, LEASE)).toBeUndefined();
   });
 });
@@ -122,16 +122,16 @@ describe("finishing a job", () => {
   it("renews the lease only while the job is still running", async () => {
     await enqueueReviewJob(database, request());
     const job = await claimReviewJob(database, LEASE);
-    expect(await renewReviewJobLease(database, job!.id, LEASE.leaseMs)).toBe(true);
+    expect(await renewReviewJobLease(database, job!, LEASE.leaseMs)).toBe(true);
     await enqueueReviewJob(database, request({ headSha: "bbb", deliveryId: "d2" }));
-    expect(await renewReviewJobLease(database, job!.id, LEASE.leaseMs)).toBe(false);
+    expect(await renewReviewJobLease(database, job!, LEASE.leaseMs)).toBe(false);
   });
 
   it("completes a running job, but not a superseded one", async () => {
     await enqueueReviewJob(database, request());
     const job = await claimReviewJob(database, LEASE);
-    expect(await supersedeReviewJob(database, job!.id)).toBe(true);
-    expect(await completeReviewJob(database, job!.id)).toBe(false);
+    expect(await supersedeReviewJob(database, job!)).toBe(true);
+    expect(await completeReviewJob(database, job!)).toBe(false);
     expect(await statuses()).toEqual([{ headSha: "aaa", status: "superseded" }]);
   });
 
@@ -139,10 +139,10 @@ describe("finishing a job", () => {
     await enqueueReviewJob(database, request());
     const retry = { maxAttempts: 2, retryDelayMs: 0 };
     let job = await claimReviewJob(database, LEASE);
-    expect(await failReviewJob(database, job!.id, "first", retry)).toBe("retrying");
+    expect(await failReviewJob(database, job!, "first", retry)).toBe("retrying");
     job = await claimReviewJob(database, LEASE);
     expect(job).toMatchObject({ attempts: 2, lastError: "first" });
-    expect(await failReviewJob(database, job!.id, "second", retry)).toBe("failed");
+    expect(await failReviewJob(database, job!, "second", retry)).toBe("failed");
     expect(await claimReviewJob(database, LEASE)).toBeUndefined();
     const [row] = await database.select().from(reviewJobs);
     expect(row).toMatchObject({ status: "failed", lastError: "second" });
@@ -154,7 +154,68 @@ describe("finishing a job", () => {
     const job = await claimReviewJob(database, LEASE);
     await enqueueReviewJob(database, request({ headSha: "bbb", deliveryId: "d2" }));
     expect(
-      await failReviewJob(database, job!.id, "boom", { maxAttempts: 1, retryDelayMs: 0 }),
+      await failReviewJob(database, job!, "boom", { maxAttempts: 1, retryDelayMs: 0 }),
     ).toBe("superseded");
+  });
+});
+
+describe("fencing a worker whose lease was reclaimed", () => {
+  async function reclaimed() {
+    await enqueueReviewJob(database, request());
+    const workerA = await claimReviewJob(database, LEASE);
+    await database
+      .update(reviewJobs)
+      .set({ leaseExpiresAt: sql`now() - interval '1 second'` })
+      .where(eq(reviewJobs.id, workerA!.id));
+    const workerB = await claimReviewJob(database, LEASE);
+    expect(workerB).toMatchObject({ id: workerA!.id, attempts: 2, status: "running" });
+    const [row] = await database.select().from(reviewJobs);
+    return { workerA: workerA!, before: row! };
+  }
+
+  async function expectUnchanged(before: typeof reviewJobs.$inferSelect) {
+    const [row] = await database.select().from(reviewJobs);
+    expect(row).toEqual(before);
+    expect(row).toMatchObject({ status: "running", attempts: 2 });
+  }
+
+  it("AC1: a stale worker's lease renewal returns false and leaves the row unchanged", async () => {
+    const { workerA, before } = await reclaimed();
+    expect(await renewReviewJobLease(database, workerA, 10 * LEASE.leaseMs)).toBe(false);
+    await expectUnchanged(before);
+  });
+
+  it("AC1: the reclaiming worker can still renew its own lease", async () => {
+    const { before } = await reclaimed();
+    expect(await renewReviewJobLease(database, before, LEASE.leaseMs)).toBe(true);
+  });
+
+  it("AC2: a stale worker cannot complete the reclaimed job", async () => {
+    const { workerA, before } = await reclaimed();
+    expect(await completeReviewJob(database, workerA)).toBe(false);
+    await expectUnchanged(before);
+  });
+
+  it("AC2: a stale worker cannot supersede the reclaimed job", async () => {
+    const { workerA, before } = await reclaimed();
+    expect(await supersedeReviewJob(database, workerA)).toBe(false);
+    await expectUnchanged(before);
+  });
+
+  it("AC2: a stale worker's failReviewJob returns superseded and does not requeue or fail the job", async () => {
+    const { workerA, before } = await reclaimed();
+    expect(
+      await failReviewJob(database, workerA, "stale", { maxAttempts: 3, retryDelayMs: 0 }),
+    ).toBe("superseded");
+    expect(
+      await failReviewJob(database, workerA, "stale", { maxAttempts: 0, retryDelayMs: 0 }),
+    ).toBe("superseded");
+    await expectUnchanged(before);
+  });
+
+  it("AC2: fencing matches on id and attempts, not only on attempts", async () => {
+    const { before } = await reclaimed();
+    expect(await completeReviewJob(database, { id: before.id + 1, attempts: 2 })).toBe(false);
+    expect(await completeReviewJob(database, { id: before.id, attempts: 2 })).toBe(true);
   });
 });
