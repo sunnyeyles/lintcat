@@ -279,7 +279,7 @@ describe("runReviewJob", () => {
     expect(untrace).toHaveBeenCalledOnce();
   });
 
-  it("shows the final failure on the check run once the retries run out", async () => {
+  it("AC16: shows the final failure on a neutral check run once the retries run out", async () => {
     await withKey();
     const job = await claim();
     const { deps: d } = deps({
@@ -291,7 +291,7 @@ describe("runReviewJob", () => {
 
     expect(github.createReview).not.toHaveBeenCalled();
     expect(github.createCheckRun).toHaveBeenCalledWith(
-      expect.objectContaining({ headSha, conclusion: "failure" }),
+      expect.objectContaining({ headSha, conclusion: "neutral" }),
     );
     expect(await status(job.id)).toMatchObject({ status: "failed" });
   });
@@ -379,7 +379,7 @@ describe("runReviewJob repo settings", () => {
     );
   });
 
-  it("fails without a retry and with a clear check run message on an unknown model", async () => {
+  it("AC16: fails without a retry and with a clear neutral check run message on an unknown model", async () => {
     await withKey();
     await saveRepoSettings(database, repoId, {
       mode: "label",
@@ -393,8 +393,9 @@ describe("runReviewJob repo settings", () => {
 
     expect(createLanguageModel).not.toHaveBeenCalled();
     expect(await status(job.id)).toMatchObject({ status: "failed" });
+    expect(github.createCheckRun).toHaveBeenCalledOnce();
     expect(github.createCheckRun).toHaveBeenCalledWith(
-      expect.objectContaining({ conclusion: "failure" }),
+      expect.objectContaining({ conclusion: "neutral" }),
     );
     const [input] = github.createCheckRun.mock.calls[0] as unknown as [
       { output: { title: string; summary: string } },
@@ -937,5 +938,176 @@ describe("runReviewJob head repair", () => {
     const active = (await jobsFor(H2)).filter((row) => row.status === "queued");
     expect(active).toMatchObject([{ deliveryId: null }]);
     expect(await jobsFor(H1)).toMatchObject([{ id: job.id, status: "superseded" }]);
+  });
+});
+
+describe("runReviewJob attempt limit", () => {
+  const retry = { maxAttempts: 2, retryDelayMs: 0 };
+
+  async function lapseAndReclaim(job: ReviewJob): Promise<ReviewJob> {
+    await database.update(reviewJobs).set({ leaseExpiresAt: new Date(Date.now() - 1_000) });
+    const next = await claimReviewJob(database, { leaseMs: 60_000 });
+    if (!next || next.id !== job.id) throw new Error("reclaim failed");
+    return next;
+  }
+
+  // Each claim's worker crashed and its lease lapsed, until the claim exceeds the limit.
+  async function overLimit(sha = headSha): Promise<ReviewJob> {
+    let job = await claim(sha);
+    while (job.attempts <= retry.maxAttempts) job = await lapseAndReclaim(job);
+    expect(job.attempts).toBe(retry.maxAttempts + 1);
+    return job;
+  }
+
+  function checkRuns() {
+    const calls = github.createCheckRun.mock.calls as unknown as [
+      { headSha: string; conclusion: string; output: { title: string; summary: string } },
+    ][];
+    return calls.map(([input]) => input);
+  }
+
+  it("AC4: a job reclaimed past its final allowed attempt fails without a model and posts one neutral check run", async () => {
+    await withKey();
+    const job = await overLimit();
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(github.createReview).not.toHaveBeenCalled();
+    expect(await status(job.id)).toMatchObject({
+      status: "failed",
+      lastError: "stopped without finishing on every attempt",
+      leaseExpiresAt: null,
+    });
+    expect(log).toContainEqual(expect.objectContaining({ event: "review_job.attempts_exhausted" }));
+    const runs = checkRuns();
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      owner: "octo-org",
+      repo: "example-service",
+      headSha,
+      conclusion: "neutral",
+      output: { title: "The AI review could not finish" },
+    });
+    const summary = runs[0]!.output.summary;
+    expect(summary).toMatch(/stopped without finishing on every attempt/i);
+    expect(summary).toMatch(/push a commit/i);
+    expect(summary).toContain("ai-review");
+    expect(await database.select().from(reviews)).toEqual([]);
+  });
+
+  it("AC4: the job is not requeued after the attempt limit, so nothing is left to claim", async () => {
+    await withKey();
+    const job = await overLimit();
+
+    expect(await runReviewJob(deps({ retry }).deps, job)).toBe("failed");
+
+    await database.update(reviewJobs).set({ leaseExpiresAt: new Date(Date.now() - 1_000) });
+    expect(await claimReviewJob(database, { leaseMs: 60_000 })).toBeUndefined();
+  });
+
+  it("AC4: still ends failed when posting the attempt-limit check run fails, keeping secrets out of the log", async () => {
+    await withKey();
+    const job = await overLimit();
+    github.createCheckRun.mockRejectedValue(new Error(`GitHub said no to ${TOKEN}`));
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(await status(job.id)).toMatchObject({
+      status: "failed",
+      lastError: "stopped without finishing on every attempt",
+    });
+    expectNoSecretsLogged();
+  });
+
+  it("AC4: also stops a job past its limit when the org has no model key, without the no-key check run", async () => {
+    const job = await overLimit();
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    const runs = checkRuns();
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ conclusion: "neutral", output: { title: "The AI review could not finish" } });
+  });
+
+  it("AC5: a job reclaimed after a lapsed lease on its final allowed attempt runs normally", async () => {
+    await withKey();
+    const job = await lapseAndReclaim(await claim());
+    expect(job.attempts).toBe(retry.maxAttempts);
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(createLanguageModel).toHaveBeenCalledOnce();
+    expect(github.createReview).toHaveBeenCalledOnce();
+    expect(await status(job.id)).toMatchObject({ status: "succeeded" });
+    expect(log).not.toContainEqual(expect.objectContaining({ event: "review_job.attempts_exhausted" }));
+  });
+
+  it("AC5: a first claim at attempts 1 runs normally", async () => {
+    await withKey();
+    const job = await claim();
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+    expect(createLanguageModel).toHaveBeenCalledOnce();
+  });
+
+  it("AC6: a job past its limit whose pull request is closed ends superseded and posts no check run", async () => {
+    await withKey();
+    const job = await overLimit();
+    github.getPullRequest.mockResolvedValue({ ...pullRequest, state: "closed" });
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(github.createCheckRun).not.toHaveBeenCalled();
+    expect(await status(job.id)).toMatchObject({ status: "superseded" });
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "review_job.superseded", reason: "pr_closed" }),
+    );
+    expect(log).not.toContainEqual(expect.objectContaining({ event: "review_job.attempts_exhausted" }));
+  });
+
+  it("AC6: a job past its limit whose head moved ends superseded and posts no check run", async () => {
+    await withKey();
+    const job = await overLimit("0".repeat(40));
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(github.createCheckRun).not.toHaveBeenCalled();
+    const rows = await database.select().from(reviewJobs);
+    expect(rows.find((row) => row.id === job.id)).toMatchObject({ status: "superseded" });
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "review_job.superseded", reason: "head_moved" }),
+    );
+    expect(log).not.toContainEqual(expect.objectContaining({ event: "review_job.attempts_exhausted" }));
+  });
+
+  it("AC16: the attempt-limit check run is neutral", async () => {
+    await withKey();
+    const job = await overLimit();
+
+    expect(await runReviewJob(deps({ retry }).deps, job)).toBe("failed");
+
+    expect(checkRuns()).toMatchObject([
+      { conclusion: "neutral", output: { title: "The AI review could not finish" } },
+    ]);
+  });
+
+  it("AC16: the no-key check run is neutral", async () => {
+    const job = await claim();
+
+    expect(await runReviewJob(deps({ retry }).deps, job)).toBe("no-key");
+
+    expect(checkRuns().map((run) => run.conclusion)).toEqual(["neutral"]);
   });
 });
