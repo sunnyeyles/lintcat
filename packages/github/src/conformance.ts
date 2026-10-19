@@ -312,6 +312,9 @@ export function runClientConformance(
       expect(pullRequest.number).toBe(ref.pullRequestNumber);
       expect(pullRequest.baseRef).not.toBe("");
       expect(pullRequest.headSha).not.toBe("");
+      expect(pullRequest.state).toBe("open");
+      expect(Array.isArray(pullRequest.labels)).toBe(true);
+      for (const label of pullRequest.labels) expect(typeof label).toBe("string");
     });
 
     it("lists the changed files with counts and an optional patch", async () => {

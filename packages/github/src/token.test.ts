@@ -24,6 +24,7 @@ const pullResponse = {
   title: "Add rate limiting to the sessions endpoint",
   body: "Adds a token bucket to the sessions endpoint.",
   state: "open",
+  labels: [{ id: 7, name: "ai-review", color: "ededed", default: false }],
   user: { login: "octocat" },
   base: { ref: "main", sha: "0000000000000000000000000000000000000000" },
   head: { ref: "feature/rate-limit", sha: headSha },
@@ -402,7 +403,36 @@ describe("getPullRequest", () => {
       baseSha: "0000000000000000000000000000000000000000",
       headRef: "feature/rate-limit",
       headSha,
+      state: "open",
+      labels: ["ai-review"],
     });
+  });
+
+  it("maps a closed PR's state and every label name", async () => {
+    const { client } = makeClient({
+      pullData: {
+        ...pullResponse,
+        state: "closed",
+        labels: [
+          { id: 1, name: "ai-review", color: "ededed" },
+          { id: 2, name: "needs-tests", color: "d73a4a" },
+        ],
+      },
+    });
+
+    const pullRequest = await client.getPullRequest(ref);
+
+    expect(pullRequest.state).toBe("closed");
+    expect(pullRequest.labels).toEqual(["ai-review", "needs-tests"]);
+  });
+
+  it("maps an unlabelled PR to an empty label list", async () => {
+    const { client } = makeClient({ pullData: { ...pullResponse, labels: [] } });
+
+    const pullRequest = await client.getPullRequest(ref);
+
+    expect(pullRequest.state).toBe("open");
+    expect(pullRequest.labels).toEqual([]);
   });
 
   it("maps a null description and missing author", async () => {
