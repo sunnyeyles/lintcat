@@ -8,6 +8,7 @@ import {
   completeReviewJob,
   enqueueReviewJob,
   failReviewJob,
+  headJobSucceededOrActive,
   renewReviewJobLease,
   supersedePullRequestJobs,
   supersedeReviewJob,
@@ -287,5 +288,59 @@ describe("supersedePullRequestJobs", () => {
     expect(await supersedePullRequestJobs(database, { repoId, prNumber: 7 })).toBe(0);
     expect(await supersedePullRequestJobs(database, { repoId, prNumber: 99 })).toBe(0);
     expect(await statuses()).toEqual([{ headSha: "aaa", status: "succeeded" }]);
+  });
+});
+
+describe("headJobSucceededOrActive", () => {
+  const head = (headSha: string, prNumber = 7) => ({ repoId, prNumber, headSha });
+
+  it("AC8: is false when no job exists for the head", async () => {
+    expect(await headJobSucceededOrActive(database, head("aaa"))).toBe(false);
+  });
+
+  it("AC8: is true while a job for the head is queued", async () => {
+    await enqueueReviewJob(database, request());
+    expect(await headJobSucceededOrActive(database, head("aaa"))).toBe(true);
+  });
+
+  it("AC8: is true while a job for the head is running", async () => {
+    await enqueueReviewJob(database, request());
+    await claimReviewJob(database, LEASE);
+    expect(await headJobSucceededOrActive(database, head("aaa"))).toBe(true);
+  });
+
+  it("AC8: is true once a job for the head has succeeded", async () => {
+    await enqueueReviewJob(database, request());
+    await completeReviewJob(database, (await claimReviewJob(database, LEASE))!);
+    expect(await headJobSucceededOrActive(database, head("aaa"))).toBe(true);
+  });
+
+  it("AC8: is false when the head's only jobs were superseded or failed", async () => {
+    await enqueueReviewJob(database, request({ deliveryId: "d1" }));
+    await supersedeReviewJob(database, (await claimReviewJob(database, LEASE))!);
+    await enqueueReviewJob(database, request({ deliveryId: "d2" }));
+    await failReviewJob(database, (await claimReviewJob(database, LEASE))!, "boom", {
+      maxAttempts: 0,
+      retryDelayMs: 0,
+    });
+    expect(await statuses()).toEqual([
+      { headSha: "aaa", status: "superseded" },
+      { headSha: "aaa", status: "failed" },
+    ]);
+    expect(await headJobSucceededOrActive(database, head("aaa"))).toBe(false);
+  });
+
+  it("AC8: only counts jobs for the same repo, pull request and head", async () => {
+    const [otherRepo] = await database
+      .insert(repos)
+      .values({ organizationId: (await database.select().from(organizations))[0]!.id, owner: "acme", name: "gadgets" })
+      .returning();
+    await enqueueReviewJob(database, request({ headSha: "aaa", deliveryId: "d1" }));
+    await enqueueReviewJob(database, request({ prNumber: 8, headSha: "bbb", deliveryId: "d2" }));
+    await enqueueReviewJob(database, request({ repoId: otherRepo!.id, headSha: "ccc", deliveryId: "d3" }));
+    expect(await headJobSucceededOrActive(database, head("bbb"))).toBe(false);
+    expect(await headJobSucceededOrActive(database, head("ccc"))).toBe(false);
+    expect(await headJobSucceededOrActive(database, head("aaa", 8))).toBe(false);
+    expect(await headJobSucceededOrActive(database, head("bbb", 8))).toBe(true);
   });
 });

@@ -11,10 +11,12 @@ import {
   makeHangingModel,
   makeModel,
   message,
+  pullRequest,
   textBlock,
 } from "@pr-review/ai/agent-test-support";
 import {
   claimReviewJob,
+  completeReviewJob,
   enqueueReviewJob,
   findings,
   markUninstalled,
@@ -655,6 +657,8 @@ describe("runReviewJob fencing by the claimed attempt", () => {
 
   it("AC2: a stale worker that finds the head moved does not supersede the reclaimed row", async () => {
     await withKey();
+    // Mode off skips head repair, whose enqueue would rightly supersede the row.
+    await saveRepoSettings(database, repoId, { mode: "off", model: null, fixes: false });
     const job = await claim("0".repeat(40));
     const workerB = await reclaim(job);
     const { deps: d } = deps();
@@ -739,5 +743,199 @@ describe("runReviewJob recording through the write database", () => {
     expect(github.createReview).toHaveBeenCalledOnce();
     expect(await status(job.id)).toMatchObject({ status: "succeeded" });
     expect(await database.select().from(reviews)).toEqual([]);
+  });
+});
+
+describe("runReviewJob on a closed pull request", () => {
+  function expectNothingPosted() {
+    expect(github.createReview).not.toHaveBeenCalled();
+    expect(github.createCheckRun).not.toHaveBeenCalled();
+    expect(github.createCommitOnBranch).not.toHaveBeenCalled();
+    expect(github.writeFileOnBranch).not.toHaveBeenCalled();
+  }
+
+  it.each(["closed", "merged"])(
+    "AC10: a job whose pull request was %s ends superseded with reason pr_closed, creating no model and posting nothing",
+    async () => {
+      await withKey();
+      const job = await claim();
+      github.getPullRequest.mockResolvedValue({ ...pullRequest, state: "closed" });
+      const { deps: d, createLanguageModel } = deps();
+
+      expect(await runReviewJob(d, job)).toBe("superseded");
+
+      expect(createLanguageModel).not.toHaveBeenCalled();
+      expectNothingPosted();
+      expect(await status(job.id)).toMatchObject({ status: "superseded", leaseExpiresAt: null });
+      expect(log).toContainEqual(
+        expect.objectContaining({ event: "review_job.superseded", reason: "pr_closed" }),
+      );
+      expect(await database.select().from(reviews)).toEqual([]);
+    },
+  );
+
+  it("AC10: a closed pull request whose head also moved is not re-enqueued", async () => {
+    await withKey();
+    const job = await claim();
+    github.getPullRequest.mockResolvedValue({ ...pullRequest, headSha: "f".repeat(40), state: "closed" });
+    const { deps: d, createLanguageModel } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expectNothingPosted();
+    const rows = await database.select().from(reviewJobs);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: job.id, status: "superseded" });
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "review_job.superseded", reason: "pr_closed" }),
+    );
+  });
+});
+
+describe("runReviewJob head repair", () => {
+  const H1 = "1".repeat(40);
+  const H2 = "2".repeat(40);
+
+  function liveHead(sha: string, labels: string[] = []) {
+    github.getPullRequest.mockResolvedValue({ ...pullRequest, headSha: sha, labels });
+  }
+
+  async function enqueue(sha: string) {
+    return enqueueReviewJob(database, { repoId, prNumber: 42, headSha: sha, deliveryId: `d-${++deliveries}` });
+  }
+
+  async function claimNext(): Promise<ReviewJob> {
+    const job = await claimReviewJob(database, { leaseMs: 60_000 });
+    if (!job) throw new Error("nothing to claim");
+    return job;
+  }
+
+  async function jobsFor(sha: string) {
+    return (await database.select().from(reviewJobs)).filter((row) => row.headSha === sha);
+  }
+
+  // H2's webhook is enqueued first, then H1's supersedes it.
+  async function outOfOrder(): Promise<ReviewJob> {
+    await enqueue(H2);
+    await enqueue(H1);
+    const job = await claimNext();
+    expect(job.headSha).toBe(H1);
+    expect(await jobsFor(H2)).toMatchObject([{ status: "superseded" }]);
+    return job;
+  }
+
+  function expectNoReview(createLanguageModel: ReturnType<typeof vi.fn>) {
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(github.createReview).not.toHaveBeenCalled();
+    expect(github.createCheckRun).not.toHaveBeenCalled();
+  }
+
+  it("AC7: re-enqueues the live head H2 when H1's job finds the head moved, and supersedes H1", async () => {
+    await withKey();
+    const job = await outOfOrder();
+    liveHead(H2);
+    const withWriteDatabase = vi.fn(<T,>(run: (db: Database) => Promise<T>) => run(database));
+    const { deps: d, createLanguageModel } = deps({ withWriteDatabase });
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expectNoReview(createLanguageModel);
+    expect(withWriteDatabase).toHaveBeenCalled();
+    const h1 = await jobsFor(H1);
+    expect(h1).toMatchObject([{ id: job.id, status: "superseded", leaseExpiresAt: null }]);
+    const active = (await jobsFor(H2)).filter((row) => row.status === "queued" || row.status === "running");
+    expect(active).toHaveLength(1);
+    expect(active[0]).toMatchObject({ repoId, prNumber: 42, status: "queued", deliveryId: null });
+  });
+
+  it("AC7: the re-enqueued H2 job is the next one claimed", async () => {
+    await withKey();
+    const job = await outOfOrder();
+    liveHead(H2);
+
+    await runReviewJob(deps().deps, job);
+
+    expect(await claimReviewJob(database, { leaseMs: 60_000 })).toMatchObject({ headSha: H2, prNumber: 42 });
+  });
+
+  it("AC8: enqueues nothing when a job for the live head has already succeeded", async () => {
+    await withKey();
+    await enqueue(H2);
+    await completeReviewJob(database, await claimNext());
+    await enqueue(H1);
+    const job = await claimNext();
+    liveHead(H2);
+    const { deps: d, createLanguageModel } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expectNoReview(createLanguageModel);
+    expect(await jobsFor(H2)).toMatchObject([{ status: "succeeded" }]);
+    expect(await jobsFor(H1)).toMatchObject([{ id: job.id, status: "superseded" }]);
+  });
+
+  it.each(["queued", "running"] as const)(
+    "AC8: enqueues nothing when a job for the live head is already %s",
+    async (activeStatus) => {
+      await withKey();
+      await enqueue(H1);
+      const job = await claimNext();
+      // Inserted directly: enqueueing H2 would supersede the running H1 job.
+      const [h2] = await database
+        .insert(reviewJobs)
+        .values({ repoId, prNumber: 42, headSha: H2, deliveryId: "h2", status: activeStatus })
+        .returning();
+      liveHead(H2);
+      const { deps: d, createLanguageModel } = deps();
+
+      expect(await runReviewJob(d, job)).toBe("superseded");
+
+      expectNoReview(createLanguageModel);
+      expect(await jobsFor(H2)).toMatchObject([{ id: h2!.id, status: activeStatus }]);
+      expect(await jobsFor(H1)).toMatchObject([{ id: job.id, status: "superseded" }]);
+    },
+  );
+
+  it("AC9: enqueues nothing when the repo's mode is now off", async () => {
+    await withKey();
+    const job = await outOfOrder();
+    await saveRepoSettings(database, repoId, { mode: "off", model: null, fixes: false });
+    liveHead(H2, ["ai-review"]);
+    const { deps: d, createLanguageModel } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expectNoReview(createLanguageModel);
+    expect(await jobsFor(H2)).toMatchObject([{ status: "superseded" }]);
+    expect(await jobsFor(H1)).toMatchObject([{ id: job.id, status: "superseded" }]);
+  });
+
+  it("AC9: enqueues nothing in label mode when the pull request lacks the ai-review label", async () => {
+    await withKey();
+    const job = await outOfOrder();
+    await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: false });
+    liveHead(H2, ["bug"]);
+    const { deps: d, createLanguageModel } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    expectNoReview(createLanguageModel);
+    expect(await jobsFor(H2)).toMatchObject([{ status: "superseded" }]);
+    expect(await jobsFor(H1)).toMatchObject([{ id: job.id, status: "superseded" }]);
+  });
+
+  it("AC9: still enqueues the live head in label mode when the pull request has the ai-review label", async () => {
+    await withKey();
+    const job = await outOfOrder();
+    await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: false });
+    liveHead(H2, ["ai-review"]);
+    const { deps: d } = deps();
+
+    expect(await runReviewJob(d, job)).toBe("superseded");
+
+    const active = (await jobsFor(H2)).filter((row) => row.status === "queued");
+    expect(active).toMatchObject([{ deliveryId: null }]);
+    expect(await jobsFor(H1)).toMatchObject([{ id: job.id, status: "superseded" }]);
   });
 });

@@ -186,3 +186,11 @@ export async function supersedePullRequestJobs(
     .returning({ id: reviewJobs.id });
   return rows.length;
 }
+
+/** Whether a job for this pull request head has succeeded or is queued or running. */
+export async function headJobSucceededOrActive(
+  _database: Database,
+  _head: { repoId: number; prNumber: number; headSha: string },
+): Promise<boolean> {
+  throw new Error("not implemented");
+}
