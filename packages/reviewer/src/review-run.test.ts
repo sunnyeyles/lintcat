@@ -74,6 +74,8 @@ const pullRequest: PullRequestDetails = {
   baseSha: "0000000000000000000000000000000000000000",
   headRef: "feature/rate-limit",
   headSha: target.headSha,
+  state: "open",
+  labels: [],
 };
 
 const changedFiles: ChangedFile[] = [

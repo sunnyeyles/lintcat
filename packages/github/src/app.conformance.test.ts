@@ -91,6 +91,8 @@ function stubOctokit(): OctokitLike {
                     number: params.pull_number,
                     title: "Extract the unique token",
                     body: null,
+                    state: "open",
+                    labels: [{ name: "ai-review" }],
                     user: { login: "octocat" },
                     base: { ref: "main", sha: "0".repeat(40) },
                     head: { ref: "feature/unique", sha: HEAD_SHA },

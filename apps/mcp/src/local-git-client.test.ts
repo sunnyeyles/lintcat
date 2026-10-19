@@ -91,6 +91,8 @@ describe("openLocalRepository", () => {
       baseRef: "main",
       headRef: "feature",
       headSha: WORKING_TREE,
+      state: "open",
+      labels: [],
     });
     expect(pullRequest.body).toContain("- count sessions");
   });

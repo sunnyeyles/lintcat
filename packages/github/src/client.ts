@@ -23,6 +23,8 @@ export interface PullRequestDetails {
   baseSha: string;
   headRef: string;
   headSha: string;
+  state: "open" | "closed";
+  labels: string[];
 }
 
 /** A request for one file's contents at a specific commit SHA or ref. */

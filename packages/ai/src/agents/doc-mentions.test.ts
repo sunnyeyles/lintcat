@@ -34,6 +34,8 @@ const context: ReviewContext = {
     baseSha: "0".repeat(40),
     headRef: "budget",
     headSha: "1".repeat(40),
+    state: "open",
+    labels: [],
   },
   changedFiles: [configChange],
   diff: "",
