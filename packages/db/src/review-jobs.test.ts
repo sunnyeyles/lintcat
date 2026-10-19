@@ -9,6 +9,7 @@ import {
   enqueueReviewJob,
   failReviewJob,
   renewReviewJobLease,
+  supersedePullRequestJobs,
   supersedeReviewJob,
   type ReviewJobRequest,
 } from "./review-jobs";
@@ -217,5 +218,74 @@ describe("fencing a worker whose lease was reclaimed", () => {
     const { before } = await reclaimed();
     expect(await completeReviewJob(database, { id: before.id + 1, attempts: 2 })).toBe(false);
     expect(await completeReviewJob(database, { id: before.id, attempts: 2 })).toBe(true);
+  });
+});
+
+describe("supersedePullRequestJobs", () => {
+  async function seedPullRequest() {
+    const [otherRepo] = await database
+      .insert(repos)
+      .values({ organizationId: (await database.select().from(organizations))[0]!.id, owner: "acme", name: "gadgets" })
+      .returning();
+    await enqueueReviewJob(database, request({ headSha: "done", deliveryId: "d0" }));
+    await completeReviewJob(database, (await claimReviewJob(database, LEASE))!);
+    await enqueueReviewJob(database, request({ headSha: "run", deliveryId: "d1" }));
+    const runningJob = await claimReviewJob(database, LEASE);
+    expect(runningJob).toMatchObject({ headSha: "run", status: "running" });
+    // A second active head for the same PR, inserted directly since enqueue would supersede it.
+    await database.insert(reviewJobs).values(request({ headSha: "wait", deliveryId: "d2" }));
+    await enqueueReviewJob(database, request({ prNumber: 8, headSha: "other-pr", deliveryId: "d3" }));
+    await enqueueReviewJob(
+      database,
+      request({ repoId: otherRepo!.id, headSha: "other-repo", deliveryId: "d4" }),
+    );
+  }
+
+  async function rows() {
+    return database
+      .select({
+        headSha: reviewJobs.headSha,
+        status: reviewJobs.status,
+        leaseExpiresAt: reviewJobs.leaseExpiresAt,
+        finishedAt: reviewJobs.finishedAt,
+      })
+      .from(reviewJobs)
+      .orderBy(asc(reviewJobs.id));
+  }
+
+  it("AC11: supersedes the pull request's queued and running jobs and returns the count", async () => {
+    await seedPullRequest();
+    const before = Date.now();
+    expect(await supersedePullRequestJobs(database, { repoId, prNumber: 7 })).toBe(2);
+    const after = await rows();
+    expect(after.map(({ headSha, status }) => ({ headSha, status }))).toEqual([
+      { headSha: "done", status: "succeeded" },
+      { headSha: "run", status: "superseded" },
+      { headSha: "wait", status: "superseded" },
+      { headSha: "other-pr", status: "queued" },
+      { headSha: "other-repo", status: "queued" },
+    ]);
+    for (const row of after.filter((row) => row.status === "superseded")) {
+      expect(row.leaseExpiresAt).toBeNull();
+      expect(row.finishedAt).not.toBeNull();
+      expect(row.finishedAt!.getTime()).toBeGreaterThan(before - 60_000);
+    }
+  });
+
+  it("AC11: a superseded running job can no longer renew its lease or complete", async () => {
+    await enqueueReviewJob(database, request());
+    const job = await claimReviewJob(database, LEASE);
+    expect(await supersedePullRequestJobs(database, { repoId, prNumber: 7 })).toBe(1);
+    expect(await renewReviewJobLease(database, job!, LEASE.leaseMs)).toBe(false);
+    expect(await completeReviewJob(database, job!)).toBe(false);
+    expect(await statuses()).toEqual([{ headSha: "aaa", status: "superseded" }]);
+  });
+
+  it("AC11: returns 0 and changes nothing when the pull request has no active job", async () => {
+    await enqueueReviewJob(database, request());
+    await completeReviewJob(database, (await claimReviewJob(database, LEASE))!);
+    expect(await supersedePullRequestJobs(database, { repoId, prNumber: 7 })).toBe(0);
+    expect(await supersedePullRequestJobs(database, { repoId, prNumber: 99 })).toBe(0);
+    expect(await statuses()).toEqual([{ headSha: "aaa", status: "succeeded" }]);
   });
 });

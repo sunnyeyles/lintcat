@@ -167,3 +167,11 @@ export async function failReviewJob(
   if (!row) return "superseded";
   return row.status === "failed" ? "failed" : "retrying";
 }
+
+/** Supersedes every queued or running job for a pull request; returns how many. */
+export async function supersedePullRequestJobs(
+  _database: Database,
+  _pullRequest: { repoId: number; prNumber: number },
+): Promise<number> {
+  throw new Error("not implemented");
+}
