@@ -10,7 +10,9 @@ import {
   removeRepositories,
   removeRepository,
   replaceRepoAccess,
+  reviewsPullRequestNow,
   setInstallationSuspended,
+  supersedePullRequestJobs,
   updateRepository,
   upsertAccountUser,
   upsertInstallation,
@@ -124,9 +126,6 @@ const pullRequestEventSchema = z.object({
   }),
   repository: z.object({ id: z.number() }),
 });
-
-/** Adding this label to a pull request asks for a hosted review. */
-const REVIEW_LABEL = "ai-review";
 
 const MEMBER_ACTIONS: Record<string, readonly string[]> = {
   organization: ["member_added", "member_removed"],
@@ -392,26 +391,25 @@ async function onMemberChanged(
 }
 
 // Every mode's actions of interest; anything else is skipped before the repo is even looked up.
-const RELEVANT_ACTIONS = new Set(["opened", "labeled", "synchronize", "reopened"]);
+const RELEVANT_ACTIONS = new Set(["opened", "labeled", "synchronize", "reopened", "closed"]);
 
 function wantsReview(
   payload: z.infer<typeof pullRequestEventSchema>,
   mode: RepoReviewMode,
 ): boolean {
-  if (payload.pull_request.state !== "open" || mode === "off") return false;
-  if (mode === "every_pr") {
-    return (
-      payload.action === "opened" ||
-      payload.action === "synchronize" ||
-      payload.action === "reopened"
-    );
-  }
+  if (payload.pull_request.state !== "open") return false;
   switch (payload.action) {
+    case "opened":
+      return mode === "every_pr";
+    // Only the label just added counts, so labelling something else never re-enqueues.
     case "labeled":
-      return payload.label?.name === REVIEW_LABEL;
+      return mode === "label" && reviewsPullRequestNow(mode, payload.label ? [payload.label.name] : []);
     case "synchronize":
     case "reopened":
-      return payload.pull_request.labels.some((label) => label.name === REVIEW_LABEL);
+      return reviewsPullRequestNow(
+        mode,
+        payload.pull_request.labels.map((label) => label.name),
+      );
     default:
       return false;
   }
@@ -433,12 +431,21 @@ async function onPullRequest(
     deliveryId,
   };
   const repo = await findRepoByGithubId(deps.database, payload.repository.id);
-  const organization = repo && (await findOrganizationById(deps.database, repo.organizationId));
   const skip = (reason: string) => {
     deps.logger.info("review_job.skipped", { ...fields, reason });
     return false;
   };
   if (!repo || repo.removedAt) return skip("repository_not_tracked");
+  // Ahead of every gate: a closed PR's jobs must stop whatever the settings say.
+  if (payload.action === "closed") {
+    const superseded = await supersedePullRequestJobs(deps.database, {
+      repoId: repo.id,
+      prNumber: pullRequest.number,
+    });
+    deps.logger.info("review_job.superseded", { ...fields, reason: "pr_closed", superseded });
+    return true;
+  }
+  const organization = await findOrganizationById(deps.database, repo.organizationId);
   if (!organization || !installedAccount(organization)) return skip("organization_not_installed");
   if (organization.suspendedAt) return skip("installation_suspended");
   const settings = await effectiveRepoSettings(deps.database, repo.id);

@@ -44,11 +44,13 @@ export {
   failReviewJob,
   findReviewJobContext,
   renewReviewJobLease,
+  supersedePullRequestJobs,
   supersedeReviewJob,
   type EnqueueResult,
   type RetryPolicy,
   type ReviewJobRequest,
 } from "./review-jobs";
+export { REVIEW_LABEL, reviewsPullRequestNow } from "./review-rule";
 export {
   consumeRateLimit,
   pruneRateLimits,

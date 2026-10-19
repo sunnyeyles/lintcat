@@ -170,8 +170,19 @@ export async function failReviewJob(
 
 /** Supersedes every queued or running job for a pull request; returns how many. */
 export async function supersedePullRequestJobs(
-  _database: Database,
-  _pullRequest: { repoId: number; prNumber: number },
+  database: Database,
+  { repoId, prNumber }: { repoId: number; prNumber: number },
 ): Promise<number> {
-  throw new Error("not implemented");
+  const rows = await database
+    .update(reviewJobs)
+    .set({ status: "superseded", finishedAt: sql`now()`, leaseExpiresAt: null })
+    .where(
+      and(
+        eq(reviewJobs.repoId, repoId),
+        eq(reviewJobs.prNumber, prNumber),
+        inArray(reviewJobs.status, [...ACTIVE]),
+      ),
+    )
+    .returning({ id: reviewJobs.id });
+  return rows.length;
 }
