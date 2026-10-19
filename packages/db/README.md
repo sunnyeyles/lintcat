@@ -217,7 +217,10 @@ takes the test client as readily as the Neon one.
 reads or writes anything: a record that fails returns `invalid-record` with the
 failing field paths, never their values, and nothing is stored.
 
-`ingestReviewRecord` runs its writes one by one: the Neon HTTP driver behind
-`db()` has no interactive transactions. Writes that must be atomic go through
-`withWriteDatabase(run)`, a Neon WebSocket pool opened for `run` and closed
-after; `.transaction()` works there and on the test database.
+`ingestReviewRecord` upserts the review, replaces its findings and saves the
+graph in one transaction: a failed re-ingest keeps the previous findings, and
+concurrent ingests of one review serialise on its locked row. Like
+`enqueueReviewJob` it needs a transaction-capable database, which `db()` is not:
+the Neon HTTP driver behind it has no interactive transactions. Such writes go
+through `withWriteDatabase(run)`, a Neon WebSocket pool opened for `run` and
+closed after; `.transaction()` works there and on the test database.
