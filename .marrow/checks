@@ -1,0 +1,8 @@
+!install: pnpm install --frozen-lockfile
+typecheck: pnpm typecheck
+lint: pnpm lint
+dead-code: pnpm dead-code
+test: pnpm test
+# The bundles CI ships; tsc and vitest never read them.
+build: pnpm turbo run build --filter=@pr-review/cli --filter=@pr-review/mcp --filter=@pr-review/worker
+smoke: node scripts/smoke-cli-mcp.mjs

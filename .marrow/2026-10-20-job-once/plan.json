@@ -1,0 +1,436 @@
+{
+  "feature": "job-once",
+  "lanes": 3,
+  "criteria": [
+    {
+      "id": "AC1",
+      "text": "Given a job claimed by worker A whose lease lapsed and was reclaimed by worker B, when A renews the lease, then the renewal returns false and the job's row is unchanged.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC2",
+      "text": "Given the AC1 state, when A calls `completeReviewJob` or `supersedeReviewJob` they return false, and `failReviewJob` returns `\"superseded\"`; the row keeps B's status, lease and attempts.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC3",
+      "text": "Given a running job whose lease renewal starts returning false mid-review because it was reclaimed, when the review reaches publishing, then nothing is posted to GitHub (no review, no comments, no check run, no fix commit), no dashboard ingest runs, and the run returns `superseded`.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC4",
+      "text": "Given a job on an open PR whose live head is the job's head, whose lease lapsed on its final allowed attempt, when a worker claims it (so `attempts > maxAttempts`), then no model is created or called, the job ends `failed` with `lastError` \"stopped without finishing on every attempt\", event `review_job.attempts_exhausted` is logged, and one `neutral` check run titled \"The AI review could not finish\" is posted on its head, with a summary saying the review stopped without finishing on every attempt and to push a commit or re-add the `ai-review` label to try again.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC5",
+      "text": "Given a job with `attempts <= maxAttempts`, when it is claimed after a lapsed lease, then it runs normally.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC6",
+      "text": "Given a job with `attempts > maxAttempts` whose PR is closed or whose head moved, when it runs, then it ends `superseded` (per AC10 or AC7) and posts no check run.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC7",
+      "text": "Given webhooks for head H2 (newer) then H1 (older) are enqueued in that order, so H1's job superseded H2's, when the worker runs H1's job and finds the PR's live head is H2, then an active job for H2 exists and H1's job ends `superseded`.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC8",
+      "text": "Given a job finds the head moved and a job for (repo, PR, live head) has already succeeded or is active, when it supersedes itself, then no new job is enqueued.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC9",
+      "text": "Given a job finds the head moved and the repo's current settings would not review that PR now (mode `off`, or label mode without the `ai-review` label), when it supersedes itself, then no new job is enqueued.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC10",
+      "text": "Given a claimed job whose PR is not open by the time the worker fetches it, when the job runs, then it ends `superseded` with reason `pr_closed`, no model is created and nothing is posted to GitHub.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC11",
+      "text": "Given a tracked repo's PR with a queued and a running job, when a `pull_request.closed` webhook (merged or not) arrives, then both jobs end `superseded`, regardless of the repo's mode, label or the org's suspension, and the worker is not pinged.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC12",
+      "text": "Given a closed PR, when a `pull_request.reopened` webhook arrives, then a job is enqueued for its head as today.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC13",
+      "text": "Given a review already recorded with findings, when re-ingesting it fails after the old findings are deleted, then the review's previous findings are still stored.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC14",
+      "text": "Given two ingests of the same review started together (`Promise.all`), when both finish, then the review holds exactly one copy of one record's findings.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC15",
+      "text": "Given the write-database runner rejects or ingest throws during a hosted job, when the job finishes, then the GitHub review was still published and the job still succeeds.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC16",
+      "text": "Given any job path that posts a check run (retries exhausted, unknown model, attempt limit, unreadable key, no key), then its conclusion is `neutral`.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC17",
+      "text": "Given an org whose stored key can't be decrypted (wrong or rotated encryption key, or an unknown sealed format), when its job runs, then it ends `failed` on that attempt without retrying, logs `review_job.model_key_unreadable`, and posts a `neutral` check run telling an owner to re-add the key under Settings → Model key, with the settings link when one is configured.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC18",
+      "text": "Given a job whose token was minted 49 minutes ago (by the injected clock), when it makes a GitHub call, then no new token is minted.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC19",
+      "text": "Given a job whose token was minted 51 minutes ago, when it makes the next GitHub call, then a second token is minted and that call uses it.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC20",
+      "text": "Given both tokens from AC19, when an error containing either is logged or a trace span is scrubbed, then both are masked.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC21",
+      "text": "Given a dependency used after the token is minted (for example `failReviewJob` or `createCheckRun`) rejects with a message containing the token or the model key, when `runReviewJob` rejects, then its error message has both masked, and so does the `worker.job_crashed` log.",
+      "verify": "auto"
+    }
+  ],
+  "tickets": [
+    {
+      "id": "01",
+      "title": "Fence every job settle and lease renewal by the claimed attempt",
+      "goal": "A worker whose lease lapsed and was reclaimed must not renew, complete, supersede or fail the reclaimed row. Renew, complete, supersede and fail match on id, status 'running' and the attempts value the worker claimed, and the job runner passes its claimed job to every one of them, including the not-installed path. A stale heartbeat then aborts the run through the existing cancellation path, so nothing is published.",
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "blocked_by": [],
+      "owns": [
+        "packages/db/src/review-jobs.ts",
+        "packages/db/src/review-jobs.test.ts",
+        "apps/worker/src/run-job.ts",
+        "apps/worker/src/run-job.test.ts"
+      ],
+      "tests": {
+        "paths": [
+          "packages/db/src/review-jobs.test.ts",
+          "apps/worker/src/run-job.test.ts"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run packages/db/src/review-jobs.test.ts apps/worker/src/run-job.test.ts"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "Change renewReviewJobLease, completeReviewJob, supersedeReviewJob and failReviewJob to take the claimed job (`Pick<ReviewJob, \"id\" | \"attempts\">`) instead of the id; return types unchanged.",
+        "Make the shared `running` predicate also match `attempts` equal to the claimed value.",
+        "AC1/AC2 tests: claim, expire the lease, reclaim as worker B, then call each function with A's job and assert false / \"superseded\" and that B's status, lease and attempts are untouched.",
+        "Update every call in run-job.ts to pass `job`, including the not-installed failReviewJob.",
+        "AC3 test in run-job.test.ts: reclaim the row mid-review (e.g. from inside a fake GitHub/model call) and assert no review, comments, check run or fix commit were posted, no review row was ingested, and the outcome is `superseded`.",
+        "Update existing review-jobs.test.ts call sites to the new signature."
+      ],
+      "human_steps": [],
+      "notes": "Fencing token is `attempts`, which claimReviewJob already increments. Claim, heartbeat and settle stay on the HTTP driver."
+    },
+    {
+      "id": "02",
+      "title": "Report pull request state and labels from every GitHub client",
+      "goal": "The worker needs to know whether a PR is still open and, for head repair in label mode, whether it carries the `ai-review` label. `PullRequestDetails` gains a required `state` (\"open\" | \"closed\") and `labels` (label names), mapped from the pulls.get response, and every fake and local client returns them so the contract stays one shape everywhere.",
+      "criteria": [],
+      "blocked_by": [],
+      "owns": [
+        "packages/github/src/client.ts",
+        "packages/github/src/app.ts",
+        "packages/github/src/conformance.ts",
+        "packages/github/src/token.test.ts",
+        "packages/github/src/app.conformance.test.ts",
+        "packages/github/src/client-groups.test.ts",
+        "packages/ai/src/agent-test-support.ts",
+        "packages/ai/src/agents/doc-mentions.test.ts",
+        "packages/reviewer/src/review-run.test.ts",
+        "apps/mcp/src/local-git-client.ts",
+        "apps/mcp/src/local-git-client.test.ts",
+        "evals/src/fixture-client.ts",
+        "evals/src/fixture.ts",
+        "evals/src/fixture-client.test.ts",
+        "evals/src/fixture-client.conformance.test.ts",
+        "evals/src/expectations.test.ts"
+      ],
+      "tests": {
+        "paths": [
+          "packages/github/src/token.test.ts",
+          "packages/github/src/app.conformance.test.ts"
+        ],
+        "helpers": [
+          "packages/github/src/conformance.ts"
+        ],
+        "command": "pnpm vitest run packages/github/src/token.test.ts packages/github/src/app.conformance.test.ts evals/src/fixture-client.conformance.test.ts apps/mcp/src/local-git-client.test.ts"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "Add `state: \"open\" | \"closed\"` and `labels: string[]` to PullRequestDetails in client.ts.",
+        "Extend pullResponseSchema in app.ts with `state` and `labels[].name`, and map them in getPullRequest.",
+        "Test in token.test.ts that a closed PR with labels maps both fields; make the shared conformance suite assert `state` is \"open\" for its sample PR.",
+        "Return state \"open\" and labels [] from the local git client, the eval fixture client (fixture.ts builds the details) and agent-test-support's `pullRequest`.",
+        "Fix any PullRequestDetails literals in tests that no longer typecheck."
+      ],
+      "human_steps": [],
+      "notes": "The spec's contract names only `state`; `labels` is added because AC9's label-mode rule cannot be decided without them. Run `pnpm typecheck` to catch every literal. The new state and labels fields also appear in the get_pull_request tool output; that is accepted."
+    },
+    {
+      "id": "03",
+      "title": "Make dashboard ingest atomic and run it on the write database",
+      "goal": "Ingest's review upsert, findings replace and graph save run in one transaction, so a failed re-ingest keeps the previous findings and concurrent ingests serialise on the locked review row. The worker gains a `withWriteDatabase` runner dependency and records reviews through it, so the transaction works in production, and a rejecting runner or ingest never fails a published review.",
+      "criteria": [
+        "AC13",
+        "AC14",
+        "AC15"
+      ],
+      "blocked_by": [
+        "01"
+      ],
+      "owns": [
+        "packages/db/src/ingest.ts",
+        "packages/db/src/ingest.test.ts",
+        "apps/worker/src/record-review.ts",
+        "apps/worker/src/record-review.test.ts",
+        "apps/worker/src/run-job.ts",
+        "apps/worker/src/run-job.test.ts",
+        "apps/worker/src/index.ts",
+        "packages/db/README.md"
+      ],
+      "tests": {
+        "paths": [
+          "packages/db/src/ingest.test.ts",
+          "apps/worker/src/record-review.test.ts",
+          "apps/worker/src/run-job.test.ts"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run packages/db/src/ingest.test.ts apps/worker/src/record-review.test.ts apps/worker/src/run-job.test.ts"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "Wrap upsertReview, replaceFindings and saveRepositoryGraph in `database.transaction`; document that ingestReviewRecord needs `.transaction()` like enqueueReviewJob. Invalid records and owner mismatches still return before writing.",
+        "AC13 test: ingest a review with findings, then re-ingest with a record that makes the findings insert fail after the delete (for example a finding the database rejects), and assert the old findings remain.",
+        "AC14 test: `Promise.all` two ingests of the same review with different findings; assert exactly one record's findings, once.",
+        "Add `withWriteDatabase: <T>(run: (database: Database) => Promise<T>) => Promise<T>` to JobRunnerDeps; createDatabaseReviewPublisher takes the runner instead of the database and stays never-throwing.",
+        "Wire `withWriteDatabase` from @pr-review/db in apps/worker/src/index.ts; tests pass `(run) => run(database)`.",
+        "AC15 tests: a runner that rejects, and an ingest that throws, both leave the GitHub review published and the job `succeeded`.",
+        "Update packages/db/README.md: ingest runs in one transaction and needs a transaction-capable database."
+      ],
+      "human_steps": [],
+      "notes": "Postgres row locking for AC14 is a manual concern; PGlite serialises anyway. Only ingest and (later) head-repair enqueue use the write pool."
+    },
+    {
+      "id": "04",
+      "title": "Supersede a pull request's jobs when it closes",
+      "goal": "A `pull_request.closed` webhook supersedes every queued or running job for that PR as soon as the repo is tracked, ahead of the mode, label and suspension gates, without pinging the worker. The webhook's \"would this PR be reviewed now\" rule moves into a shared pure function so the worker's head repair can use the same one later.",
+      "criteria": [
+        "AC11",
+        "AC12"
+      ],
+      "blocked_by": [
+        "01"
+      ],
+      "owns": [
+        "packages/db/src/review-jobs.ts",
+        "packages/db/src/review-jobs.test.ts",
+        "packages/db/src/review-rule.ts",
+        "packages/db/src/review-rule.test.ts",
+        "packages/db/src/index.ts",
+        "apps/web/app/api/github/webhook/handler.ts",
+        "apps/web/app/api/github/webhook/handler.test.ts"
+      ],
+      "tests": {
+        "paths": [
+          "apps/web/app/api/github/webhook/handler.test.ts",
+          "packages/db/src/review-jobs.test.ts"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run apps/web/app/api/github/webhook/handler.test.ts packages/db/src/review-jobs.test.ts"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "Add `supersedePullRequestJobs(database, { repoId, prNumber })` to review-jobs.ts: marks every queued or running job superseded (finishedAt now, lease cleared) and returns the count; export it.",
+        "Add a pure shared rule in packages/db/src/review-rule.ts, e.g. `reviewsPullRequestNow(mode, labels)`: false for `off`, true for `every_pr`, label mode needs the `ai-review` label; export it and the label constant.",
+        "Refactor the webhook's wantsReview to use the shared rule for its label/mode decision, keeping its per-action behaviour.",
+        "Handle action `closed` before the mode, label and suspension gates: require only a tracked repo, call supersedePullRequestJobs, log `review_job.superseded` with reason `pr_closed` and the count, do not ping the worker.",
+        "AC11 test: a queued and a running job for the PR (with mode off and a suspended org in one case) both end superseded and pingWorker is not called; AC12 test: `reopened` still enqueues."
+      ],
+      "human_steps": [],
+      "notes": "apps/web follows the vercel-react-best-practices skill, though this is a route handler with no React. Running jobs stop at their next heartbeat."
+    },
+    {
+      "id": "05",
+      "title": "Skip closed pull requests and re-enqueue the live head in the worker",
+      "goal": "After fetching the PR, a job whose PR is no longer open ends superseded with reason `pr_closed` before any model is created. A job whose head moved enqueues the live head on the write database (unless a job for it already succeeded or is active, or current settings would not review the PR) and then supersedes itself, so out-of-order pushes still leave the newest commit reviewed.",
+      "criteria": [
+        "AC7",
+        "AC8",
+        "AC9",
+        "AC10"
+      ],
+      "blocked_by": [
+        "02",
+        "03",
+        "04"
+      ],
+      "owns": [
+        "packages/db/src/review-jobs.ts",
+        "packages/db/src/review-jobs.test.ts",
+        "packages/db/src/index.ts",
+        "apps/worker/src/run-job.ts",
+        "apps/worker/src/run-job.test.ts",
+        "apps/worker/src/head-repair.ts"
+      ],
+      "tests": {
+        "paths": [
+          "apps/worker/src/run-job.test.ts",
+          "packages/db/src/review-jobs.test.ts"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run apps/worker/src/run-job.test.ts packages/db/src/review-jobs.test.ts"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "Add a query to review-jobs.ts for whether a job for (repo, PR, head) has succeeded or is queued/running; export it.",
+        "In run-job.ts after getPullRequest: if `state !== \"open\"`, fenced supersede, log `review_job.superseded` reason `pr_closed`, return `superseded`.",
+        "On a moved head: inside `deps.withWriteDatabase`, skip if the query says the live head already succeeded or is active (AC8) or the shared rule with current settings and the PR's labels says no (AC9); otherwise enqueueReviewJob with `deliveryId: null`. Then the fenced self-supersede (a no-op if the enqueue already superseded it).",
+        "AC7 test: enqueue H2 then H1, claim H1 with the fake PR head at H2; assert an active H2 job exists and H1 is superseded.",
+        "AC8/AC9 tests: no new job when H2 already succeeded or is active, or when mode is off / label mode without the label.",
+        "AC10 test: a closed PR ends superseded with reason pr_closed, createLanguageModel is not called and nothing is posted."
+      ],
+      "human_steps": [],
+      "notes": "Keep the repair in its own small module (head-repair.ts) if it reads better than inline. Order at job start per spec: installation checks, token, fetch PR, closed check, head check, then (ticket 06) attempt limit."
+    },
+    {
+      "id": "06",
+      "title": "Fail jobs past their attempt limit and make every failure check run neutral",
+      "goal": "A job reclaimed after crashing on its final allowed attempt (attempts > maxAttempts) ends failed without creating a model, logs `review_job.attempts_exhausted` and posts one neutral check run saying it stopped without finishing on every attempt. Every check run the job runner posts becomes `neutral`, restoring the always-advisory rule.",
+      "criteria": [
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC16"
+      ],
+      "blocked_by": [
+        "05"
+      ],
+      "owns": [
+        "apps/worker/src/run-job.ts",
+        "apps/worker/src/run-job.test.ts",
+        "apps/worker/README.md"
+      ],
+      "tests": {
+        "paths": [
+          "apps/worker/src/run-job.test.ts"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run apps/worker/src/run-job.test.ts"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "After the closed and head checks, if `job.attempts > retry.maxAttempts`: fenced failReviewJob with lastError \"stopped without finishing on every attempt\" and no retry; return `superseded` if the fence says so; log `review_job.attempts_exhausted`; post the neutral check run titled \"The AI review could not finish\" with the summary from AC4. If posting fails, log it redacted and still return `failed`.",
+        "Change the existing failure path's check run conclusion from `failure` to `neutral`.",
+        "AC4 test: claim, expire the lease, reclaim until attempts exceeds maxAttempts; assert no model created, row failed with that lastError, the event logged, one neutral check run with that title.",
+        "AC5 test: a reclaim at attempts <= maxAttempts runs normally; AC6 tests: same over-limit job with a closed PR or moved head ends superseded with no check run.",
+        "AC16 tests: retries-exhausted and unknown-model check runs are neutral (no-key already is).",
+        "Update apps/worker/README.md: check runs are neutral, the attempt limit, closed PRs and head repair."
+      ],
+      "human_steps": [],
+      "notes": "Settle before posting so a stale worker posts nothing, matching the existing failure path."
+    },
+    {
+      "id": "07",
+      "title": "Fail an unreadable model key once with an advisory check run",
+      "goal": "A stored key that cannot be decrypted is a configuration problem, not a transient one. readModelKey raises a distinct exported error, and the worker ends the job failed on that attempt without retrying, logs `review_job.model_key_unreadable` and posts a neutral check run telling an owner to re-add the key under Settings → Model key.",
+      "criteria": [
+        "AC16",
+        "AC17"
+      ],
+      "blocked_by": [
+        "06"
+      ],
+      "owns": [
+        "packages/db/src/model-keys.ts",
+        "packages/db/src/model-keys.test.ts",
+        "packages/db/src/index.ts",
+        "apps/worker/src/run-job.ts",
+        "apps/worker/src/run-job.test.ts",
+        "apps/worker/README.md"
+      ],
+      "tests": {
+        "paths": [
+          "packages/db/src/model-keys.test.ts",
+          "apps/worker/src/run-job.test.ts"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run packages/db/src/model-keys.test.ts apps/worker/src/run-job.test.ts"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "Add and export `ModelKeyUnreadableError`; readModelKey wraps any openSecret failure (wrong key, foreign org context, unknown sealed format) in it. No row still returns undefined.",
+        "model-keys.test.ts: a wrong encryption key and a corrupted sealed format both reject with ModelKeyUnreadableError.",
+        "In run-job.ts catch it around readModelKey: fenced failReviewJob with maxAttempts 0, log `review_job.model_key_unreadable`, post a neutral check run with the settings link when settingsUrl returns one, and return `failed`.",
+        "AC17 tests in run-job.test.ts: key saved under one encryption key, deps use another; assert failed on the first attempt, the event, and a neutral check run with the link (and without it when settingsUrl returns undefined).",
+        "Update apps/worker/README.md: the unreadable-key path."
+      ],
+      "human_steps": [],
+      "notes": "A missing MODEL_KEY_ENCRYPTION_KEY already fails at worker boot and is untouched."
+    },
+    {
+      "id": "08",
+      "title": "Refresh the installation token after 50 minutes and redact crashes",
+      "goal": "Long jobs keep a working GitHub token: on the next GitHub call after 50 minutes by the injected `now()`, the job mints a new token, rebuilds its client and pushes the token into the secrets list the logger and traceSecrets read. Any rejection escaping runReviewJob has the tokens and model key masked, so the `worker.job_crashed` log is clean.",
+      "criteria": [
+        "AC18",
+        "AC19",
+        "AC20",
+        "AC21"
+      ],
+      "blocked_by": [
+        "07"
+      ],
+      "owns": [
+        "apps/worker/src/run-job.ts",
+        "apps/worker/src/run-job.test.ts",
+        "apps/worker/src/job-client.ts",
+        "apps/worker/src/worker.test.ts",
+        "apps/worker/README.md"
+      ],
+      "tests": {
+        "paths": [
+          "apps/worker/src/run-job.test.ts",
+          "apps/worker/src/worker.test.ts"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run apps/worker/src/run-job.test.ts apps/worker/src/worker.test.ts"
+      },
+      "difficulty": "hard",
+      "steps": [
+        "Add `now?: () => number` to JobRunnerDeps, defaulting to Date.now.",
+        "In job-client.ts build a client for the job that forwards each HostedClient method to a client built by `deps.createClient(token)`, minting a new token first when `now() - mintedAt >= 50 minutes`; each minted token is pushed to `secrets`.",
+        "AC18/AC19 tests: advance the injected clock to 49 and 51 minutes before a GitHub call (e.g. from inside the fake model); assert createInstallationToken call counts and that the later call went to the client built with the second token.",
+        "AC20 test: an error containing either token is masked in logs and in the traceSecrets list.",
+        "Wrap the body of runReviewJob so any rejection is rethrown as an Error whose message is redacted with the current secrets.",
+        "AC21 tests: failReviewJob/createCheckRun stand-ins that reject with the token and key; assert runReviewJob's rejection and runWorker's `worker.job_crashed` log are masked.",
+        "Update apps/worker/README.md: tokens refresh after 50 minutes."
+      ],
+      "human_steps": [],
+      "notes": "Refresh lives in the worker, so packages/github is unchanged. failReviewJob is a direct import; injecting a rejection may need a database wrapper whose update throws, or vi.mock of @pr-review/db for that one test."
+    }
+  ]
+}
