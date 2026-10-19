@@ -1218,6 +1218,7 @@ describe("handleGithubWebhook pull_request", () => {
       headSha = "head-1",
       number = 7,
       state = "open",
+      merged,
       repo = widgets,
       deliveryId = `delivery-${++deliveries}`,
     }: {
@@ -1226,6 +1227,7 @@ describe("handleGithubWebhook pull_request", () => {
       headSha?: string;
       number?: number;
       state?: string;
+      merged?: boolean;
       repo?: InstallationRepository;
       deliveryId?: string;
     } = {},
@@ -1237,6 +1239,7 @@ describe("handleGithubWebhook pull_request", () => {
       pull_request: {
         number,
         state,
+        ...(merged === undefined ? {} : { merged }),
         head: { sha: headSha },
         labels: labels.map((name) => ({ name })),
       },
@@ -1313,7 +1316,7 @@ describe("handleGithubWebhook pull_request", () => {
   });
 
   it("ignores every other action, and a closed pull request", async () => {
-    for (const action of ["opened", "edited", "closed", "unlabeled"]) {
+    for (const action of ["opened", "edited", "unlabeled"]) {
       expect((await deliver(pullRequestEvent(action, { label: "ai-review" }))).status).toBe(204);
     }
     const closed = pullRequestEvent("labeled", { label: "ai-review", state: "closed" });
@@ -1362,6 +1365,132 @@ describe("handleGithubWebhook pull_request", () => {
   it("400s a malformed pull_request payload", async () => {
     const response = await deliver(delivery("pull_request", { action: "labeled" }));
     expect(response.status).toBe(400);
+  });
+
+  describe("closing a pull request", () => {
+    async function repoId(repo: InstallationRepository): Promise<number> {
+      const [row] = await database
+        .select({ id: repos.id })
+        .from(repos)
+        .where(eq(repos.githubRepoId, repo.id));
+      return row!.id;
+    }
+
+    // A queued and a running job on PR 7, plus a queued job on PR 8 that must survive.
+    async function seedActiveJobs(): Promise<void> {
+      const id = await repoId(widgets);
+      await database.insert(reviewJobs).values([
+        {
+          repoId: id,
+          prNumber: 7,
+          headSha: "head-run",
+          deliveryId: "seed-1",
+          status: "running",
+          attempts: 1,
+          leaseExpiresAt: sql`now() + interval '10 minutes'`,
+        },
+        { repoId: id, prNumber: 7, headSha: "head-wait", deliveryId: "seed-2" },
+        { repoId: id, prNumber: 8, headSha: "head-other", deliveryId: "seed-3" },
+      ]);
+    }
+
+    async function jobRows() {
+      return database
+        .select({
+          prNumber: reviewJobs.prNumber,
+          headSha: reviewJobs.headSha,
+          status: reviewJobs.status,
+          leaseExpiresAt: reviewJobs.leaseExpiresAt,
+          finishedAt: reviewJobs.finishedAt,
+        })
+        .from(reviewJobs)
+        .orderBy(asc(reviewJobs.id));
+    }
+
+    async function expectPullRequestSuperseded(): Promise<void> {
+      const rows = await jobRows();
+      expect(rows.map(({ prNumber, headSha, status }) => ({ prNumber, headSha, status }))).toEqual([
+        { prNumber: 7, headSha: "head-run", status: "superseded" },
+        { prNumber: 7, headSha: "head-wait", status: "superseded" },
+        { prNumber: 8, headSha: "head-other", status: "queued" },
+      ]);
+      for (const row of rows.slice(0, 2)) {
+        expect(row.leaseExpiresAt).toBeNull();
+        expect(row.finishedAt).not.toBeNull();
+      }
+      expect(pingCalls).toBe(0);
+    }
+
+    it("AC11: a merged close supersedes the PR's queued and running jobs without pinging the worker", async () => {
+      await seedActiveJobs();
+      const response = await deliver(
+        pullRequestEvent("closed", { state: "closed", merged: true, headSha: "head-wait" }),
+      );
+      expect(response.ok).toBe(true);
+      await expectPullRequestSuperseded();
+      expect(log).toContainEqual(
+        expect.objectContaining({ event: "review_job.superseded", reason: "pr_closed" }),
+      );
+    });
+
+    it("AC11: an unmerged close supersedes them too", async () => {
+      await seedActiveJobs();
+      const response = await deliver(
+        pullRequestEvent("closed", { state: "closed", merged: false, headSha: "head-wait" }),
+      );
+      expect(response.ok).toBe(true);
+      await expectPullRequestSuperseded();
+    });
+
+    it("AC11: supersedes even without the ai-review label in label mode", async () => {
+      await seedActiveJobs();
+      await deliver(
+        pullRequestEvent("closed", { state: "closed", merged: false, labels: [], headSha: "head-wait" }),
+      );
+      await expectPullRequestSuperseded();
+    });
+
+    it("AC11: supersedes with mode off and a suspended organization", async () => {
+      await setMode(widgets, "off");
+      await deliver(
+        delivery("installation", {
+          action: "suspend",
+          installation: installation("Organization", "Acme", SUSPENDED_AT),
+        }),
+      );
+      await seedActiveJobs();
+      await deliver(
+        pullRequestEvent("closed", { state: "closed", merged: true, labels: [], headSha: "head-wait" }),
+      );
+      await expectPullRequestSuperseded();
+    });
+
+    it("AC11: supersedes in every_pr mode", async () => {
+      await setMode(widgets, "every_pr");
+      await seedActiveJobs();
+      await deliver(pullRequestEvent("closed", { state: "closed", labels: [], headSha: "head-wait" }));
+      await expectPullRequestSuperseded();
+    });
+
+    it("AC12: a reopen after the close enqueues a job for the head again", async () => {
+      await deliver(pullRequestEvent("labeled", { label: "ai-review" }));
+      await deliver(pullRequestEvent("closed", { state: "closed", merged: false }));
+      expect(await jobs()).toEqual([{ ...queued("head-1"), status: "superseded" }]);
+      expect(pingCalls).toBe(1);
+      const response = await deliver(pullRequestEvent("reopened"));
+      expect(response.status).toBe(200);
+      expect(await jobs()).toEqual([{ ...queued("head-1"), status: "superseded" }, queued("head-1")]);
+      expect(pingCalls).toBe(2);
+    });
+
+    it("AC12: a reopen enqueues in every_pr mode without the label", async () => {
+      await setMode(widgets, "every_pr");
+      await deliver(pullRequestEvent("closed", { state: "closed", labels: [] }));
+      const response = await deliver(pullRequestEvent("reopened", { labels: [] }));
+      expect(response.status).toBe(200);
+      expect(await jobs()).toEqual([queued("head-1")]);
+      expect(pingCalls).toBe(1);
+    });
   });
 
   describe("mode off", () => {
