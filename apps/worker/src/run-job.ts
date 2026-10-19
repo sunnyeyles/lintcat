@@ -41,7 +41,7 @@ import {
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
-import { enqueueLiveHead } from "#src/head-repair";
+import { supersedeForLiveHead } from "#src/head-repair";
 import { createDatabaseReviewPublisher, type WriteDatabaseRunner } from "#src/record-review";
 import { redactingLogger } from "#src/redact";
 
@@ -186,14 +186,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
         return "superseded";
       }
       if (pullRequest.headSha !== job.headSha) {
-        // Enqueueing first means an out-of-order push still leaves the newest head reviewed.
-        const requeued = await enqueueLiveHead(deps.withWriteDatabase, {
-          repoId: job.repoId,
-          prNumber: job.prNumber,
-          headSha: pullRequest.headSha,
-          labels: pullRequest.labels,
-        });
-        await supersedeReviewJob(database, job);
+        const { requeued } = await supersedeForLiveHead(deps.withWriteDatabase, job, pullRequest);
         logger.info("review_job.superseded", {
           ...correlation,
           reason: "head_moved",
