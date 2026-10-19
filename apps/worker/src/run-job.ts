@@ -91,6 +91,17 @@ function failureOutput(attempts: number): CheckRunOutput {
   };
 }
 
+const ATTEMPTS_EXHAUSTED = "stopped without finishing on every attempt";
+
+function attemptsExhaustedOutput(): CheckRunOutput {
+  return {
+    title: "The AI review could not finish",
+    summary:
+      "The review stopped without finishing on every attempt and will not be retried. " +
+      "Push a commit or re-add the `ai-review` label to try again.",
+  };
+}
+
 function unknownModelOutput(message: string): CheckRunOutput {
   return {
     title: "The chosen model is not recognized",
@@ -174,6 +185,22 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
     }, lease.heartbeatMs);
 
     let client: HostedClient | undefined;
+    const publishFailure = async (publisher: HostedClient, output: CheckRunOutput) => {
+      await publisher
+        .createCheckRun({
+          owner: target.owner,
+          repo: target.repo,
+          headSha: target.headSha,
+          conclusion: "neutral",
+          output,
+        })
+        .catch((publishError: unknown) =>
+          logger.error("review_job.failure_unpublished", {
+            ...correlation,
+            error: redact(errorMessage(publishError), secrets),
+          }),
+        );
+    };
     try {
       const token = await deps.github.createInstallationToken(installationId);
       secrets.push(token);
@@ -194,6 +221,16 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
           requeued,
         });
         return "superseded";
+      }
+
+      // Each earlier claim crashed without settling, so another run would too.
+      if (job.attempts > retry.maxAttempts) {
+        failure = ATTEMPTS_EXHAUSTED;
+        const outcome = await failReviewJob(database, job, ATTEMPTS_EXHAUSTED, { ...retry, maxAttempts: 0 });
+        if (outcome === "superseded") return "superseded";
+        logger.error("review_job.attempts_exhausted", { ...correlation, maxAttempts: retry.maxAttempts });
+        await publishFailure(client, attemptsExhaustedOutput());
+        return "failed";
       }
 
       const key = await readModelKey(database, organization.id, deps.encryptionKey);
@@ -259,20 +296,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       if (outcome === "superseded") return "superseded";
       logger.error(`review_job.${outcome}`, { ...correlation, error: message });
       if (outcome === "failed" && client) {
-        await client
-          .createCheckRun({
-            owner: target.owner,
-            repo: target.repo,
-            headSha: target.headSha,
-            conclusion: "failure",
-            output: unknownModel ? unknownModelOutput(message) : failureOutput(job.attempts),
-          })
-          .catch((publishError: unknown) =>
-            logger.error("review_job.failure_unpublished", {
-              ...correlation,
-              error: redact(errorMessage(publishError), secrets),
-            }),
-          );
+        await publishFailure(client, unknownModel ? unknownModelOutput(message) : failureOutput(job.attempts));
       }
       return outcome;
     } finally {
