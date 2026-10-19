@@ -484,3 +484,92 @@ describe("ingestReviewRecord, with a change overlay", () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+const replacement: ReviewRecord = {
+  ...record,
+  summary: "A rerun whose findings the database rejects.",
+  findings: [
+    {
+      file: "src/auth/session.ts",
+      line: 12,
+      category: "correctness",
+      severity: "medium",
+      title: "Rejected finding",
+      // Postgres text cannot hold a NUL byte, so this insert fails after the delete.
+      explanation: "Contains a NUL \u0000 byte.",
+      confidence: 0.8,
+    },
+  ],
+};
+
+async function storedTitles(): Promise<string[]> {
+  const rows = await database
+    .select({ title: findings.title })
+    .from(findings)
+    .orderBy(asc(findings.id));
+  return rows.map((row) => row.title);
+}
+
+describe("ingestReviewRecord, atomically", () => {
+  it("AC13: keeps the previous findings when a re-ingest fails after deleting them", async () => {
+    const first = await ingestReviewRecord(database, organizationId, record);
+    expect(first.ok).toBe(true);
+
+    let failed = false;
+    try {
+      const second = await ingestReviewRecord(database, organizationId, replacement);
+      failed = !second.ok;
+    } catch {
+      failed = true;
+    }
+    expect(failed).toBe(true);
+
+    expect(await storedTitles()).toEqual(["Missing tenant validation", "Quadratic scan"]);
+    expect(await database.select().from(reviews)).toHaveLength(1);
+  });
+
+  const onlyFirst: ReviewRecord = {
+    ...record,
+    summary: "Concurrent ingest A.",
+    findings: [
+      { ...record.findings[0]!, title: "From A, one" },
+      { ...record.findings[1]!, title: "From A, two" },
+    ],
+  };
+  const onlySecond: ReviewRecord = {
+    ...record,
+    summary: "Concurrent ingest B.",
+    findings: [{ ...record.findings[1]!, title: "From B" }],
+  };
+
+  function expectOneRecordsFindings(titles: string[]) {
+    const fromA = ["From A, one", "From A, two"];
+    const fromB = ["From B"];
+    expect([fromA, fromB]).toContainEqual([...titles].sort());
+  }
+
+  it("AC14: two concurrent ingests of an already recorded review leave exactly one record's findings, once", async () => {
+    await ingestReviewRecord(database, organizationId, record);
+
+    const results = await Promise.all([
+      ingestReviewRecord(database, organizationId, onlyFirst),
+      ingestReviewRecord(database, organizationId, onlySecond),
+    ]);
+
+    expect(results.every((result) => result.ok)).toBe(true);
+    expect(await database.select().from(reviews)).toHaveLength(1);
+    expectOneRecordsFindings(await storedTitles());
+  });
+
+  it("AC14: two concurrent first ingests of the same review leave exactly one record's findings, once", async () => {
+    const results = await Promise.all([
+      ingestReviewRecord(database, organizationId, onlyFirst),
+      ingestReviewRecord(database, organizationId, onlySecond),
+    ]);
+
+    expect(results.every((result) => result.ok)).toBe(true);
+    expect(await database.select().from(reviews)).toHaveLength(1);
+    expect(await database.select().from(repos)).toHaveLength(1);
+    expectOneRecordsFindings(await storedTitles());
+  });
+});

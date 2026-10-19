@@ -89,6 +89,7 @@ function deps(overrides: Partial<JobRunnerDeps> = {}) {
   const createLanguageModel = vi.fn((_config: LanguageModelConfig) => answering());
   const built: JobRunnerDeps = {
     database,
+    withWriteDatabase: (run) => run(database),
     github: { createInstallationToken },
     createClient,
     createLanguageModel,
@@ -690,5 +691,53 @@ describe("runReviewJob fencing by the claimed attempt", () => {
       attempts: workerB!.attempts,
       lastError: null,
     });
+  });
+});
+
+describe("runReviewJob recording through the write database", () => {
+  it("records the review through withWriteDatabase", async () => {
+    await withKey();
+    const job = await claim();
+    const withWriteDatabase = vi.fn(<T,>(run: (db: Database) => Promise<T>) => run(database));
+    const { deps: d } = deps({ withWriteDatabase });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(withWriteDatabase).toHaveBeenCalled();
+    expect(await database.select().from(reviews)).toMatchObject([{ repoId, prNumber: 42, headSha }]);
+  });
+
+  it("AC15: still publishes the GitHub review and succeeds when the write-database runner rejects", async () => {
+    await withKey();
+    const job = await claim();
+    const { deps: d } = deps({
+      withWriteDatabase: async () => {
+        throw new Error("could not open the write pool");
+      },
+    });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.createReview).toHaveBeenCalledOnce();
+    expect(await status(job.id)).toMatchObject({ status: "succeeded" });
+    expect(await database.select().from(reviews)).toEqual([]);
+  });
+
+  it("AC15: still publishes the GitHub review and succeeds when ingest throws", async () => {
+    await withKey();
+    const job = await claim();
+    // Every query on it throws, as a dropped connection would.
+    const broken = new Proxy({} as Database, {
+      get() {
+        throw new Error("connection terminated");
+      },
+    });
+    const { deps: d } = deps({ withWriteDatabase: (run) => run(broken) });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(github.createReview).toHaveBeenCalledOnce();
+    expect(await status(job.id)).toMatchObject({ status: "succeeded" });
+    expect(await database.select().from(reviews)).toEqual([]);
   });
 });
