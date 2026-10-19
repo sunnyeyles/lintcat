@@ -44,17 +44,24 @@ Run — nothing here changes them.
    worker died is claimable again once its lease lapses.
 2. Mints a fresh installation token. It lives in memory for this job only and
    is never written anywhere.
-3. Checks the pull request's head on GitHub. If it has moved past the job's
-   commit, the job is superseded and nothing is published.
-4. Opens the organization's model key. With no key saved, it publishes a
+3. Checks the pull request on GitHub. If it is closed, the job is superseded
+   and nothing is published. If its head has moved past the job's commit, the
+   job is superseded, a job for the live head is queued unless one already
+   ran or is active, and nothing is published.
+4. Checks the attempt limit. A claim past the last allowed attempt means every
+   earlier run stopped without settling (its worker crashed and the lease
+   lapsed), so the job fails with no model called, logs
+   `review_job.attempts_exhausted`, and publishes a neutral check run saying
+   the review stopped without finishing on every attempt.
+5. Opens the organization's model key. With no key saved, it publishes a
    neutral check run asking an owner to add one, and calls no model.
-5. Reads the repo's settings. The model is the repo's choice or the key's
+6. Reads the repo's settings. The model is the repo's choice or the key's
    provider default; a model the provider does not offer fails the job at once,
-   with no retry, and a `failure` check run naming it.
-6. Runs `runReview` from `@pr-review/reviewer` with the GitHub delivery. With
+   with no retry, and a neutral check run naming it.
+7. Runs `runReview` from `@pr-review/reviewer` with the GitHub delivery. With
    the repo's fixes on, verified patches are committed to the head branch under
    the same limits, unless the head commit is our own fix; otherwise they arrive as suggested changes.
-7. Writes the review straight to the database through ingest's write path, so a
+8. Writes the review straight to the database through ingest's write path, so a
    rerun of the same commit replaces its findings and its blast radius (risk
    score and band, factors, and dependent file paths and counts; never source
    text). A record the schema rejects is logged as `review_job.record_invalid`
@@ -71,7 +78,12 @@ run publishes nothing even if it finished.
 ## Retries
 
 A failed job is requeued a minute later, up to three attempts in all. The last
-failure publishes a `failure` check run saying the review gave up. Errors are
+failure publishes a check run saying the review gave up. Every check run the
+worker publishes is `neutral`: the review is advisory and never blocks a merge.
+A job whose worker crashes is reclaimed once its lease lapses, and counts an
+attempt each time, so a job that crashes on every attempt stops at the limit
+(step 4) rather than being reclaimed forever. Every settle is fenced by the
+claimed attempt, so a stale worker publishes nothing. Errors are
 logged and stored with the model key and the installation token redacted.
 
 ## Deploy
