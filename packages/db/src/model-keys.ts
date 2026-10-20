@@ -17,6 +17,8 @@ export interface ModelKeySummary {
 }
 
 // Binds each ciphertext to its organization, so a copied row will not open.
+export class ModelKeyUnreadableError extends Error {}
+
 const context = (organizationId: number) => `model-key:${organizationId}`;
 
 const summaryColumns = {

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "./client";
 import {
   findModelKeySummary,
+  ModelKeyUnreadableError,
   readModelKey,
   removeModelKey,
   saveModelKey,
@@ -93,5 +94,44 @@ describe("model keys", () => {
     await expect(
       saveModelKey(database, organizationId, { provider: "openai", apiKey: "  " }, encryptionKey),
     ).rejects.toThrow();
+  });
+
+  it("AC17: a key sealed under another encryption key rejects with ModelKeyUnreadableError", async () => {
+    await saveModelKey(database, organizationId, { provider: "openai", apiKey: API_KEY }, encryptionKey);
+    await expect(readModelKey(database, organizationId, randomBytes(32))).rejects.toBeInstanceOf(
+      ModelKeyUnreadableError,
+    );
+  });
+
+  it("AC17: an unknown sealed format rejects with ModelKeyUnreadableError", async () => {
+    await saveModelKey(database, organizationId, { provider: "openai", apiKey: API_KEY }, encryptionKey);
+    await database.update(modelKeys).set({ sealedKey: Buffer.from([9, 1, 2, 3]) });
+    await expect(readModelKey(database, organizationId, encryptionKey)).rejects.toBeInstanceOf(
+      ModelKeyUnreadableError,
+    );
+  });
+
+  it("AC17: another organization's copied key rejects with ModelKeyUnreadableError", async () => {
+    await saveModelKey(database, organizationId, { provider: "openai", apiKey: API_KEY }, encryptionKey);
+    const [other] = await database
+      .insert(organizations)
+      .values({ githubAccountId: 2, accountType: "organization", slug: "globex", name: "Globex" })
+      .returning();
+    const [row] = await database.select().from(modelKeys);
+    await database.insert(modelKeys).values({ ...row!, id: undefined, organizationId: other!.id });
+    await expect(readModelKey(database, other!.id, encryptionKey)).rejects.toBeInstanceOf(
+      ModelKeyUnreadableError,
+    );
+  });
+
+  it("AC17: the unreadable-key error does not carry the plaintext key", async () => {
+    await saveModelKey(database, organizationId, { provider: "openai", apiKey: API_KEY }, encryptionKey);
+    const error = await readModelKey(database, organizationId, randomBytes(32)).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ModelKeyUnreadableError);
+    expect(String((error as Error).message)).not.toContain(API_KEY);
+  });
+
+  it("AC17: no stored key still reads as undefined, not an error", async () => {
+    expect(await readModelKey(database, organizationId, encryptionKey)).toBeUndefined();
   });
 });
