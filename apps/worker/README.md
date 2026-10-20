@@ -28,7 +28,7 @@ Run — nothing here changes them.
 | `DATABASE_URL` | The Neon database the webhook writes jobs to |
 | `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` | Minting an installation token for each job |
 | `MODEL_KEY_ENCRYPTION_KEY` | Opening the organization's model key; must match the dashboard's |
-| `APP_DOMAIN` | Optional. Links the "add a model key" check run to `https://<slug>.<APP_DOMAIN>/settings` |
+| `APP_DOMAIN` | Optional. Links the "add a model key" and "re-add the model key" check runs to `https://<slug>.<APP_DOMAIN>/settings` |
 | `WORKER_POLL_MS` | Optional. How often an idle worker checks for work; 5000 by default |
 | `REVIEW_INCREMENTAL` | Optional. `false` makes every review read the whole pull request; by default a push is reviewed from the last reviewed commit on |
 | `PORT` | Switches to server mode and sets its listen port; set by Cloud Run |
@@ -54,7 +54,12 @@ Run — nothing here changes them.
    `review_job.attempts_exhausted`, and publishes a neutral check run saying
    the review stopped without finishing on every attempt.
 5. Opens the organization's model key. With no key saved, it publishes a
-   neutral check run asking an owner to add one, and calls no model.
+   neutral check run asking an owner to add one, and calls no model. A saved
+   key that will not decrypt (a wrong or rotated `MODEL_KEY_ENCRYPTION_KEY`,
+   or an unknown sealed format) cannot be fixed by retrying, so the job fails
+   on that attempt with no model called, logs `review_job.model_key_unreadable`,
+   and publishes a neutral check run asking an owner to re-add the key under
+   Settings → Model key, linked when `APP_DOMAIN` is set.
 6. Reads the repo's settings. The model is the repo's choice or the key's
    provider default; a model the provider does not offer fails the job at once,
    with no retry, and a neutral check run naming it.

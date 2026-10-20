@@ -16,9 +16,12 @@ export interface ModelKeySummary {
   updatedAt: Date;
 }
 
-// Binds each ciphertext to its organization, so a copied row will not open.
-export class ModelKeyUnreadableError extends Error {}
+/** The stored key exists but will not open: a wrong or rotated encryption key, or a foreign format. */
+export class ModelKeyUnreadableError extends Error {
+  override name = "ModelKeyUnreadableError";
+}
 
+// Binds each ciphertext to its organization, so a copied row will not open.
 const context = (organizationId: number) => `model-key:${organizationId}`;
 
 const summaryColumns = {
@@ -77,7 +80,7 @@ export async function findModelKeySummary(
   return row;
 }
 
-/** The plaintext key, for the worker only. Throws when it cannot be opened. */
+/** The plaintext key, for the worker only. Throws `ModelKeyUnreadableError` when it cannot be opened. */
 export async function readModelKey(
   database: Database,
   organizationId: number,
@@ -89,8 +92,12 @@ export async function readModelKey(
     .where(eq(modelKeys.organizationId, organizationId))
     .limit(1);
   if (!row) return undefined;
-  return {
-    provider: row.provider,
-    apiKey: openSecret(encryptionKey, row.sealedKey, context(organizationId)),
-  };
+  try {
+    return {
+      provider: row.provider,
+      apiKey: openSecret(encryptionKey, row.sealedKey, context(organizationId)),
+    };
+  } catch (error: unknown) {
+    throw new ModelKeyUnreadableError("the stored model key could not be decrypted", { cause: error });
+  }
 }

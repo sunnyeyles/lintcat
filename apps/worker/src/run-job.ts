@@ -17,6 +17,7 @@ import {
   effectiveRepoSettings,
   failReviewJob,
   findReviewJobContext,
+  ModelKeyUnreadableError,
   readModelKey,
   renewReviewJobLease,
   supersedeReviewJob,
@@ -82,6 +83,16 @@ function noKeyOutput(slug: string, url: string | undefined): CheckRunOutput {
   };
 }
 
+function unreadableKeyOutput(slug: string, url: string | undefined): CheckRunOutput {
+  const where = url ? `[Settings → Model key](${url})` : "Settings → Model key in the LintCat dashboard";
+  return {
+    title: "The saved model key could not be read",
+    summary:
+      `The model key saved for **${slug}** could not be decrypted, so no review ran and no model was called. ` +
+      `An owner of the account can re-add the key under ${where}, then push a commit or re-add the \`ai-review\` label.`,
+  };
+}
+
 function failureOutput(attempts: number): CheckRunOutput {
   return {
     title: "The AI review could not finish",
@@ -92,6 +103,7 @@ function failureOutput(attempts: number): CheckRunOutput {
 }
 
 const ATTEMPTS_EXHAUSTED = "stopped without finishing on every attempt";
+const MODEL_KEY_UNREADABLE = "the stored model key could not be decrypted";
 
 function attemptsExhaustedOutput(): CheckRunOutput {
   return {
@@ -233,7 +245,19 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
         return "failed";
       }
 
-      const key = await readModelKey(database, organization.id, deps.encryptionKey);
+      const key = await readModelKey(database, organization.id, deps.encryptionKey).catch((error: unknown) => {
+        if (error instanceof ModelKeyUnreadableError) return null;
+        throw error;
+      });
+      // Retrying cannot open a key sealed under another encryption key.
+      if (key === null) {
+        failure = MODEL_KEY_UNREADABLE;
+        const outcome = await failReviewJob(database, job, MODEL_KEY_UNREADABLE, { ...retry, maxAttempts: 0 });
+        if (outcome === "superseded") return "superseded";
+        logger.error("review_job.model_key_unreadable", correlation);
+        await publishFailure(client, unreadableKeyOutput(organization.slug, deps.settingsUrl(organization.slug)));
+        return "failed";
+      }
       secrets.push(key?.apiKey);
       if (!key) {
         if (!(await stillRunning())) return "superseded";
