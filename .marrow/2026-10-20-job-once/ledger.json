@@ -1,0 +1,260 @@
+{
+  "exit_code": 1,
+  "ok": false,
+  "criteria": [
+    {
+      "id": "AC1",
+      "text": "Given a job claimed by worker A whose lease lapsed and was reclaimed by worker B, when A renews the lease, then the renewal returns false and the job's row is unchanged.",
+      "verify": "auto",
+      "tickets": [
+        "01"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC2",
+      "text": "Given the AC1 state, when A calls `completeReviewJob` or `supersedeReviewJob` they return false, and `failReviewJob` returns `\"superseded\"`; the row keeps B's status, lease and attempts.",
+      "verify": "auto",
+      "tickets": [
+        "01"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC3",
+      "text": "Given a running job whose lease renewal starts returning false mid-review because it was reclaimed, when the review reaches publishing, then nothing is posted to GitHub (no review, no comments, no check run, no fix commit), no dashboard ingest runs, and the run returns `superseded`.",
+      "verify": "auto",
+      "tickets": [
+        "01"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC4",
+      "text": "Given a job on an open PR whose live head is the job's head, whose lease lapsed on its final allowed attempt, when a worker claims it (so `attempts > maxAttempts`), then no model is created or called, the job ends `failed` with `lastError` \"stopped without finishing on every attempt\", event `review_job.attempts_exhausted` is logged, and one `neutral` check run titled \"The AI review could not finish\" is posted on its head, with a summary saying the review stopped without finishing on every attempt and to push a commit or re-add the `ai-review` label to try again.",
+      "verify": "auto",
+      "tickets": [
+        "06"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC5",
+      "text": "Given a job with `attempts <= maxAttempts`, when it is claimed after a lapsed lease, then it runs normally.",
+      "verify": "auto",
+      "tickets": [
+        "06"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC6",
+      "text": "Given a job with `attempts > maxAttempts` whose PR is closed or whose head moved, when it runs, then it ends `superseded` (per AC10 or AC7) and posts no check run.",
+      "verify": "auto",
+      "tickets": [
+        "06"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC7",
+      "text": "Given webhooks for head H2 (newer) then H1 (older) are enqueued in that order, so H1's job superseded H2's, when the worker runs H1's job and finds the PR's live head is H2, then an active job for H2 exists and H1's job ends `superseded`.",
+      "verify": "auto",
+      "tickets": [
+        "05"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC8",
+      "text": "Given a job finds the head moved and a job for (repo, PR, live head) has already succeeded or is active, when it supersedes itself, then no new job is enqueued.",
+      "verify": "auto",
+      "tickets": [
+        "05"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC9",
+      "text": "Given a job finds the head moved and the repo's current settings would not review that PR now (mode `off`, or label mode without the `ai-review` label), when it supersedes itself, then no new job is enqueued.",
+      "verify": "auto",
+      "tickets": [
+        "05"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC10",
+      "text": "Given a claimed job whose PR is not open by the time the worker fetches it, when the job runs, then it ends `superseded` with reason `pr_closed`, no model is created and nothing is posted to GitHub.",
+      "verify": "auto",
+      "tickets": [
+        "05"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC11",
+      "text": "Given a tracked repo's PR with a queued and a running job, when a `pull_request.closed` webhook (merged or not) arrives, then both jobs end `superseded`, regardless of the repo's mode, label or the org's suspension, and the worker is not pinged.",
+      "verify": "auto",
+      "tickets": [
+        "04"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC12",
+      "text": "Given a closed PR, when a `pull_request.reopened` webhook arrives, then a job is enqueued for its head as today.",
+      "verify": "auto",
+      "tickets": [
+        "04"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC13",
+      "text": "Given a review already recorded with findings, when re-ingesting it fails after the old findings are deleted, then the review's previous findings are still stored.",
+      "verify": "auto",
+      "tickets": [
+        "03"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC14",
+      "text": "Given two ingests of the same review started together (`Promise.all`), when both finish, then the review holds exactly one copy of one record's findings.",
+      "verify": "auto",
+      "tickets": [
+        "03"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC15",
+      "text": "Given the write-database runner rejects or ingest throws during a hosted job, when the job finishes, then the GitHub review was still published and the job still succeeds.",
+      "verify": "auto",
+      "tickets": [
+        "03"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC16",
+      "text": "Given any job path that posts a check run (retries exhausted, unknown model, attempt limit, unreadable key, no key), then its conclusion is `neutral`.",
+      "verify": "auto",
+      "tickets": [
+        "06",
+        "07"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC17",
+      "text": "Given an org whose stored key can't be decrypted (wrong or rotated encryption key, or an unknown sealed format), when its job runs, then it ends `failed` on that attempt without retrying, logs `review_job.model_key_unreadable`, and posts a `neutral` check run telling an owner to re-add the key under Settings → Model key, with the settings link when one is configured.",
+      "verify": "auto",
+      "tickets": [
+        "07"
+      ],
+      "status": "tampered"
+    },
+    {
+      "id": "AC18",
+      "text": "Given a job whose token was minted 49 minutes ago (by the injected clock), when it makes a GitHub call, then no new token is minted.",
+      "verify": "auto",
+      "tickets": [
+        "08"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC19",
+      "text": "Given a job whose token was minted 51 minutes ago, when it makes the next GitHub call, then a second token is minted and that call uses it.",
+      "verify": "auto",
+      "tickets": [
+        "08"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC20",
+      "text": "Given both tokens from AC19, when an error containing either is logged or a trace span is scrubbed, then both are masked.",
+      "verify": "auto",
+      "tickets": [
+        "08"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC21",
+      "text": "Given a dependency used after the token is minted (for example `failReviewJob` or `createCheckRun`) rejects with a message containing the token or the model key, when `runReviewJob` rejects, then its error message has both masked, and so does the `worker.job_crashed` log.",
+      "verify": "auto",
+      "tickets": [
+        "08"
+      ],
+      "status": "pass"
+    }
+  ],
+  "tickets": [
+    {
+      "id": "01",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/01.log",
+      "tests_changed": [
+        "apps/worker/src/run-job.test.ts",
+        "packages/db/src/review-jobs.test.ts"
+      ]
+    },
+    {
+      "id": "02",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/02.log",
+      "tests_changed": []
+    },
+    {
+      "id": "03",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/03.log",
+      "tests_changed": [
+        "apps/worker/src/run-job.test.ts"
+      ]
+    },
+    {
+      "id": "04",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/04.log",
+      "tests_changed": [
+        "packages/db/src/review-jobs.test.ts"
+      ]
+    },
+    {
+      "id": "05",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/05.log",
+      "tests_changed": [
+        "apps/worker/src/run-job.test.ts"
+      ]
+    },
+    {
+      "id": "06",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/06.log",
+      "tests_changed": [
+        "apps/worker/src/run-job.test.ts"
+      ]
+    },
+    {
+      "id": "07",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/07.log",
+      "tests_changed": [
+        "apps/worker/src/run-job.test.ts"
+      ]
+    },
+    {
+      "id": "08",
+      "exit": 0,
+      "log": "/tmp/marrow-ledger.y9B80N/08.log",
+      "tests_changed": []
+    }
+  ],
+  "logs": "/tmp/marrow-ledger.y9B80N"
+}

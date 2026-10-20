@@ -1,0 +1,137 @@
+{
+  "feature": "job-once",
+  "status": "red",
+  "why": "criteria AC1 tampered, AC2 tampered, AC3 tampered, AC4 tampered, AC5 tampered, AC6 tampered, AC7 tampered, AC8 tampered, AC9 tampered, AC10 tampered, AC11 tampered, AC12 tampered, AC13 tampered, AC14 tampered, AC15 tampered, AC16 tampered, AC17 tampered; finalize: blocked Blocked by pr-guard (exit 1). All of its hits are in commit messages; the title and body passed. Eight 'Add acceptance tests' commits carry 'Co-Authored-By: Claude Opus 5.5' and 'Claude-Session:' trailers: da5f1b58416e, 876e6046d40a, 11102fc7cc7b, b78b35aac613, 7ff5490a3a3e, 020aa86b20f4, 26424176af91, 7e895e7cdf59. I left the commits as they are. Removing the trailers means rewriting history from 7e895e7 onward, which changes every SHA after it, including the locked tests commits the ledger compares against. The branch would then need a force-with-lease push.; The branch was pushed before the guard ran, as the step order says: origin/marrow/job-once is now 2e26dca7cb4bdcc100760a9d6a860432d6a72dff (it did not exist before). Pushing does not open a PR.; The ledger is red, with AC1-AC17 'tampered'. From git history I found no implementation or fix commit that changed a *.test.ts file. The final run-job.test.ts is identical to the last tests commit, da5f1b5. The flag appears to come from later tickets' tests commits adding to the shared test files (ticket 06's tests changed two 'failure' conclusions to 'neutral' for AC16). Implementation commits also filled in source stubs that tests commits had added (model-keys.ts, review-jobs.ts, index.ts). This looks like a false positive in ledger.sh's per-ticket comparison, but a human should confirm. The PR body says so.; Steps 1-2 were skipped as instructed, so 'base' is left empty.; PR body written to /home/user/lintcat/.marrow/2026-10-20-job-once/pr.md. No AI attribution, per the hard rule.",
+  "branch": "marrow/job-once",
+  "pushed": true,
+  "head": "2e26dca7cb4bdcc100760a9d6a860432d6a72dff",
+  "base_branch": "main",
+  "checks_ok": true,
+  "open": 8,
+  "open_high": 0,
+  "fixed": 2,
+  "refuted": 0,
+  "tickets": [
+    {
+      "id": "01",
+      "status": "merged"
+    },
+    {
+      "id": "02",
+      "status": "merged"
+    },
+    {
+      "id": "03",
+      "status": "merged"
+    },
+    {
+      "id": "04",
+      "status": "merged"
+    },
+    {
+      "id": "05",
+      "status": "merged"
+    },
+    {
+      "id": "06",
+      "status": "merged"
+    },
+    {
+      "id": "07",
+      "status": "merged"
+    },
+    {
+      "id": "08",
+      "status": "merged"
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC1",
+      "status": "tampered"
+    },
+    {
+      "id": "AC2",
+      "status": "tampered"
+    },
+    {
+      "id": "AC3",
+      "status": "tampered"
+    },
+    {
+      "id": "AC4",
+      "status": "tampered"
+    },
+    {
+      "id": "AC5",
+      "status": "tampered"
+    },
+    {
+      "id": "AC6",
+      "status": "tampered"
+    },
+    {
+      "id": "AC7",
+      "status": "tampered"
+    },
+    {
+      "id": "AC8",
+      "status": "tampered"
+    },
+    {
+      "id": "AC9",
+      "status": "tampered"
+    },
+    {
+      "id": "AC10",
+      "status": "tampered"
+    },
+    {
+      "id": "AC11",
+      "status": "tampered"
+    },
+    {
+      "id": "AC12",
+      "status": "tampered"
+    },
+    {
+      "id": "AC13",
+      "status": "tampered"
+    },
+    {
+      "id": "AC14",
+      "status": "tampered"
+    },
+    {
+      "id": "AC15",
+      "status": "tampered"
+    },
+    {
+      "id": "AC16",
+      "status": "tampered"
+    },
+    {
+      "id": "AC17",
+      "status": "tampered"
+    },
+    {
+      "id": "AC18",
+      "status": "pass"
+    },
+    {
+      "id": "AC19",
+      "status": "pass"
+    },
+    {
+      "id": "AC20",
+      "status": "pass"
+    },
+    {
+      "id": "AC21",
+      "status": "pass"
+    }
+  ],
+  "human_steps": 3,
+  "labels": [],
+  "run_id": "wf_b54c12f2-18c"
+}
