@@ -6,7 +6,7 @@ import {
 } from "@opentelemetry/sdk-trace-node";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { traceStage } from "#src/trace-stage";
+import { traceStage, traceStream, type StreamEnd } from "#src/trace-stage";
 
 let provider: NodeTracerProvider | undefined;
 afterEach(async () => {
@@ -60,5 +60,29 @@ describe("traceStage", () => {
     const recorded = vi.fn();
     await traceStage("review-job", undefined, () => 1, { onTraceId: recorded });
     expect(recorded).toHaveBeenCalledWith(exporter.getFinishedSpans()[0]?.spanContext().traceId);
+  });
+});
+
+describe("traceStream", () => {
+  it("keeps the span open after start returns, until the first end", async () => {
+    const exporter = recording();
+
+    let end: ((result: StreamEnd) => void) | undefined;
+    const value = traceStream("answer-docs-question", "what is lintcat?", (finish) => {
+      end = finish;
+      return "streaming";
+    });
+    await provider!.forceFlush();
+    expect(value).toBe("streaming");
+    expect(exporter.getFinishedSpans()).toEqual([]);
+
+    end!({ output: "a reviewer" });
+    end!({ output: "ignored", level: "ERROR" });
+    await provider!.forceFlush();
+
+    const spans = exporter.getFinishedSpans();
+    expect(spans.map((span) => span.name)).toEqual(["answer-docs-question"]);
+    expect(spans[0]!.attributes["langfuse.observation.output"]).toBe("a reviewer");
+    expect(spans[0]!.attributes["langfuse.observation.level"]).toBeUndefined();
   });
 });

@@ -1,7 +1,7 @@
 import type { SpanProcessor } from "@opentelemetry/sdk-trace-node";
 
 /** The front end a process traces for, stamped on every trace as its tag. */
-export type TraceSource = "worker" | "cli" | "mcp" | "eval";
+export type TraceSource = "worker" | "cli" | "mcp" | "eval" | "web";
 
 // The AI SDK names spans `<operation> <model>` and `step <n>`: a model swap would orphan every filter.
 const MODEL_SUFFIXED = /^(chat|embeddings|rerank|invoke_agent) /;

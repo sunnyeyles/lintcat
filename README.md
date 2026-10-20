@@ -109,7 +109,8 @@ For debugging, each review's trace (the prompt, the diff, the files the agent
 read, tool results and the model's output) also goes to
 [Langfuse](https://langfuse.com), hosted in the EU. The job's own token and
 model key, and known credential formats anywhere in the trace, are masked
-first, and traces are deleted after 30 days.
+first, and traces are deleted after 30 days. The docs' Ask AI chat traces
+each question and its answer the same way, without the asker's address.
 
 The review is recorded on the dashboard ([`apps/web`](apps/web)): owner, repo,
 PR number, head SHA, timings, token counts, and every published finding. The

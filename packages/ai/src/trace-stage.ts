@@ -40,3 +40,26 @@ export function traceStage<T>(
     });
   return options.attributes ? propagateAttributes(options.attributes, traced) : traced();
 }
+
+export interface StreamEnd {
+  output?: unknown;
+  level?: Level;
+  statusMessage?: string;
+}
+
+/** Like `traceStage`, but the span ends at the first `end` call: for an answer still streaming after `start` returns. */
+export function traceStream<T>(name: string, input: unknown, start: (end: (result: StreamEnd) => void) => T): T {
+  return startActiveObservation(
+    name,
+    (span) => {
+      span.update({ input });
+      let ended = false;
+      return start((result) => {
+        if (ended) return;
+        ended = true;
+        span.update(result).end();
+      });
+    },
+    { endOnExit: false },
+  );
+}

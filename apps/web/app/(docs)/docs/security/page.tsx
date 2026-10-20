@@ -43,8 +43,9 @@ export default function SecurityPage() {
           </Bullet>
           <Bullet>
             <strong>Review traces go to Langfuse, in the EU.</strong> We keep a trace of each
-            review (the prompt, the code the reviewer read and its answer) to debug reviews.
-            Keys and tokens are masked first, and traces are deleted after 30 days.
+            review (the prompt, the code the reviewer read and its answer) to debug reviews,
+            and of each question asked through Ask AI, with its answer but not your IP
+            address. Keys and tokens are masked first, and traces are deleted after 30 days.
           </Bullet>
           <Bullet>
             <strong>Your key stays encrypted.</strong> Only the review service reads it back;

@@ -1,9 +1,10 @@
+import { traceStream, type StreamEnd } from "@pr-review/ai";
 import { consumeRateLimit, type Database } from "@pr-review/db";
 import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { streamText, type LanguageModel } from "ai";
 import { z } from "zod";
 
-import { clientAddress, rateLimitKey } from "@/lib/docs-chat/client-key";
+import { clientAddress, rateLimitKey, type ClientAddress } from "@/lib/docs-chat/client-key";
 import {
   GLOBAL_RULE,
   IP_RULE,
@@ -32,6 +33,8 @@ const requestSchema = z.object({
       "turns must alternate, starting and ending with the user",
     ),
 });
+
+type Turn = z.infer<typeof requestSchema>["messages"][number];
 
 export type DocsChatDeps = {
   database: Database;
@@ -109,6 +112,18 @@ export async function handleDocsChat(request: Request, deps: DocsChatDeps): Prom
     return tooManyRequests("global", global.resetAt, started);
   }
 
+  return traceStream("answer-docs-question", messages.at(-1)!.content, (end) =>
+    streamAnswer(request, deps, { messages, started, ipSource: client.source }, end),
+  );
+}
+
+async function streamAnswer(
+  request: Request,
+  deps: DocsChatDeps,
+  { messages, started, ipSource }: { messages: Turn[]; started: Date; ipSource: ClientAddress["source"] },
+  end: (result: StreamEnd) => void,
+): Promise<Response> {
+  const { logger } = deps;
   const result = streamText({
     model: deps.model,
     instructions: { role: "system", content: DOCS_CHAT_SYSTEM_PROMPT, providerOptions: CACHE_BREAKPOINT },
@@ -123,7 +138,7 @@ export async function handleDocsChat(request: Request, deps: DocsChatDeps): Prom
       logger.info("docs_chat.completed", {
         durationMs: deps.now().getTime() - started.getTime(),
         turns: messages.length,
-        ipSource: client.source,
+        ipSource,
         finishReason,
         inputTokens: totalUsage.inputTokens,
         cacheReadTokens: totalUsage.inputTokenDetails.cacheReadTokens,
@@ -145,11 +160,13 @@ export async function handleDocsChat(request: Request, deps: DocsChatDeps): Prom
     }
   } catch (error) {
     logger.error("docs_chat.failed", { stage: "start", error: errorMessage(error) });
+    end({ level: "ERROR", statusMessage: errorMessage(error) });
     return Response.json({ error: "the assistant is unavailable right now" }, { status: 502 });
   }
 
   const encoder = new TextEncoder();
   let cancelled = false;
+  let answer = first;
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(encoder.encode(first));
@@ -159,18 +176,26 @@ export async function handleDocsChat(request: Request, deps: DocsChatDeps): Prom
         for (;;) {
           const next = await parts.next();
           if (cancelled) return;
-          if (next.done) return controller.close();
+          if (next.done) {
+            end({ output: answer });
+            return controller.close();
+          }
           if (next.value.type === "error") throw next.value.error;
-          if (next.value.type === "text-delta") return controller.enqueue(encoder.encode(next.value.text));
+          if (next.value.type === "text-delta") {
+            answer += next.value.text;
+            return controller.enqueue(encoder.encode(next.value.text));
+          }
         }
       } catch (error) {
         if (cancelled) return;
         logger.error("docs_chat.failed", { stage: "stream", error: errorMessage(error) });
+        end({ output: answer, level: "ERROR", statusMessage: errorMessage(error) });
         controller.error(error);
       }
     },
     async cancel() {
       cancelled = true;
+      end({ output: answer, level: "WARNING", statusMessage: "the reader closed the answer early" });
       await parts.return?.();
     },
   });
