@@ -166,7 +166,7 @@ export function createReviewAgent(
               tools: createReviewTools(deps.github, context, deps.index),
               maxOutputTokens: MAX_OUTPUT_TOKENS,
               providerOptions: callProviderOptions(context, agent.name),
-              telemetry: { functionId: `review-agent-${agent.name}` },
+              telemetry: { functionId: "find-issues" },
               onStepEnd: (step: { usage: Parameters<typeof toTokenUsage>[0] }) => {
                 steps += 1;
                 usage = addTokenUsage(usage, toTokenUsage(step.usage));
@@ -214,6 +214,7 @@ export function createReviewAgent(
                 ],
                 toolChoice: "none",
                 stopWhen: isStepCount(1),
+                telemetry: { functionId: "repair-output" },
               });
               output = extractAgentOutput(repaired.text);
               if (!output.ok) {
@@ -240,7 +241,7 @@ export function createReviewAgent(
             });
             deps.onUsage?.(report(durationMs));
             agentObservation.update({
-              output: { findingCount: findings.length },
+              output: { findings },
               metadata: {
                 steps,
                 salvaged,

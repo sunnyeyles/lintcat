@@ -15,7 +15,7 @@ if (envFile !== undefined) process.loadEnvFile(envFile);
 
 // stdout carries the protocol, so every log line goes to stderr.
 const environment = processEnvironment();
-const tracing = startTracing(process.env, environment.logger);
+const tracing = startTracing(process.env, environment.logger, "mcp");
 if (tracing) {
   // The client ends this server by closing stdin or by a signal, either of which would drop the last batch.
   process.once("beforeExit", () => void tracing.flush());

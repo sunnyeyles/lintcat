@@ -23,7 +23,7 @@ function commandLine(): string {
 const err = (text: string): void => {
   process.stderr.write(`${text}\n`);
 };
-const tracing = startTracing(process.env, createStderrLogger());
+const tracing = startTracing(process.env, createStderrLogger(), "cli");
 const interrupt = cancelOnInterrupt({ source: process, err, exit: (code) => process.exit(code) });
 
 try {
