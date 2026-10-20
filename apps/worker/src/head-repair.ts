@@ -15,7 +15,7 @@ export interface LiveHead {
   labels: readonly string[];
 }
 
-/** One transaction; skips a head already succeeded or active, or one settings would not review now. */
+/** One transaction; the enqueue skips a head already succeeded or active, or one settings would not review now. */
 export async function supersedeForLiveHead(
   withWriteDatabase: WriteDatabaseRunner,
   job: Pick<ReviewJob, "id" | "attempts" | "repoId" | "prNumber">,
@@ -25,8 +25,8 @@ export async function supersedeForLiveHead(
   const { repoId, prNumber } = job;
   await withWriteDatabase((database) =>
     database.transaction(async (tx) => {
-      // A stale worker leaves the repair to whoever now holds the job.
-      if (!(await supersedeReviewJob(tx, job))) return;
+      // Fenced, so a no-op for a stale worker or once a newer enqueue superseded it; the enqueue runs either way.
+      await supersedeReviewJob(tx, job);
       if (await headJobSucceededOrActive(tx, { repoId, prNumber, headSha })) return;
       const { mode } = await effectiveRepoSettings(tx, repoId);
       if (!reviewsPullRequestNow(mode, labels)) return;

@@ -160,6 +160,7 @@ async function runJob(
   secrets: (string | undefined)[],
 ): Promise<JobOutcome> {
   const { database, lease, retry } = deps;
+  const noRetry = { ...retry, maxAttempts: 0 };
   const traceFields: { traceId?: string } = {};
   const logger = withFields(redactingLogger(deps.logger, secrets), traceFields);
   const context = await findReviewJobContext(database, job.repoId);
@@ -173,10 +174,7 @@ async function runJob(
     organization.uninstalledAt ||
     organization.suspendedAt
   ) {
-    await failReviewJob(database, job, "the installation no longer covers this repository", {
-      ...retry,
-      maxAttempts: 0,
-    });
+    await failReviewJob(database, job, "the installation no longer covers this repository", noRetry);
     logger.info("review_job.dropped", { ...fields, reason: "not_installed" });
     return "failed";
   }
@@ -220,6 +218,20 @@ async function runJob(
           }),
         );
     };
+    // Ends the job without retry, unless the fence finds it already taken.
+    const failOnce = async (
+      publisher: HostedClient,
+      reason: string,
+      event: string,
+      output: CheckRunOutput,
+      extra: Record<string, unknown> = {},
+    ): Promise<JobOutcome> => {
+      failure = reason;
+      if ((await failReviewJob(database, job, reason, noRetry)) === "superseded") return "superseded";
+      logger.error(event, { ...correlation, ...extra });
+      await publishFailure(publisher, output);
+      return "failed";
+    };
     try {
       client = await createJobClient({ ...deps, now: deps.now ?? Date.now }, installationId, secrets);
 
@@ -242,12 +254,9 @@ async function runJob(
 
       // Each earlier claim crashed without settling, so another run would too.
       if (job.attempts > retry.maxAttempts) {
-        failure = ATTEMPTS_EXHAUSTED;
-        const outcome = await failReviewJob(database, job, ATTEMPTS_EXHAUSTED, { ...retry, maxAttempts: 0 });
-        if (outcome === "superseded") return "superseded";
-        logger.error("review_job.attempts_exhausted", { ...correlation, maxAttempts: retry.maxAttempts });
-        await publishFailure(client, attemptsExhaustedOutput());
-        return "failed";
+        return await failOnce(client, ATTEMPTS_EXHAUSTED, "review_job.attempts_exhausted", attemptsExhaustedOutput(), {
+          maxAttempts: retry.maxAttempts,
+        });
       }
 
       const key = await readModelKey(database, organization.id, deps.encryptionKey).catch((error: unknown) => {
@@ -256,12 +265,8 @@ async function runJob(
       });
       // Retrying cannot open a key sealed under another encryption key.
       if (key === null) {
-        failure = MODEL_KEY_UNREADABLE;
-        const outcome = await failReviewJob(database, job, MODEL_KEY_UNREADABLE, { ...retry, maxAttempts: 0 });
-        if (outcome === "superseded") return "superseded";
-        logger.error("review_job.model_key_unreadable", correlation);
-        await publishFailure(client, unreadableKeyOutput(organization.slug, deps.settingsUrl(organization.slug)));
-        return "failed";
+        const output = unreadableKeyOutput(organization.slug, deps.settingsUrl(organization.slug));
+        return await failOnce(client, MODEL_KEY_UNREADABLE, "review_job.model_key_unreadable", output);
       }
       secrets.push(key?.apiKey);
       if (!key) {
@@ -316,12 +321,7 @@ async function runJob(
       failure = message;
       // The same settings would fail every retry, so an unknown model gets none.
       const unknownModel = error instanceof ModelProviderError;
-      const outcome = await failReviewJob(
-        database,
-        job,
-        message,
-        unknownModel ? { ...retry, maxAttempts: 0 } : retry,
-      );
+      const outcome = await failReviewJob(database, job, message, unknownModel ? noRetry : retry);
       if (outcome === "superseded") return "superseded";
       logger.error(`review_job.${outcome}`, { ...correlation, error: message });
       if (outcome === "failed" && client) {
