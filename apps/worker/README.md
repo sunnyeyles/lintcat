@@ -43,7 +43,10 @@ Run — nothing here changes them.
    five-minute lease, renewed every 15 seconds while the job runs; a job whose
    worker died is claimable again once its lease lapses.
 2. Mints a fresh installation token. It lives in memory for this job only and
-   is never written anywhere.
+   is never written anywhere. GitHub's tokens expire after an hour, so the
+   first GitHub call made 50 minutes or more after minting mints a new one and
+   rebuilds the job's client over it; every token the job mints is redacted
+   from its logs, stored errors and traces.
 3. Checks the pull request on GitHub. If it is closed, the job is superseded
    and nothing is published. If its head has moved past the job's commit, the
    job is superseded, a job for the live head is queued unless one already
@@ -89,7 +92,8 @@ A job whose worker crashes is reclaimed once its lease lapses, and counts an
 attempt each time, so a job that crashes on every attempt stops at the limit
 (step 4) rather than being reclaimed forever. Every settle is fenced by the
 claimed attempt, so a stale worker publishes nothing. Errors are
-logged and stored with the model key and the installation token redacted.
+logged and stored with the model key and the installation tokens redacted,
+including an error that escapes the job and is logged as `worker.job_crashed`.
 
 ## Deploy
 

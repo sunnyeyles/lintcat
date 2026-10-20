@@ -25,13 +25,7 @@ import {
   type RetryPolicy,
   type ReviewJob,
 } from "@pr-review/db";
-import type {
-  CheckRunOutput,
-  GithubAppClient,
-  PullRequestReadClient,
-  RepositoryHistoryClient,
-  ReviewPublishClient,
-} from "@pr-review/github";
+import type { CheckRunOutput, GithubAppClient } from "@pr-review/github";
 import { errorMessage, redact, withFields, type StructuredLogger } from "@pr-review/logging";
 import {
   dashboardDelivery,
@@ -43,10 +37,9 @@ import {
 } from "@pr-review/reviewer";
 
 import { supersedeForLiveHead } from "#src/head-repair";
+import { createJobClient, type HostedClient } from "#src/job-client";
 import { createDatabaseReviewPublisher, type WriteDatabaseRunner } from "#src/record-review";
 import { redactingLogger } from "#src/redact";
-
-type HostedClient = PullRequestReadClient & RepositoryHistoryClient & ReviewPublishClient;
 
 export interface JobRunnerDeps {
   /** Single statements only: transactions go through `withWriteDatabase`. */
@@ -54,8 +47,10 @@ export interface JobRunnerDeps {
   /** Opens a transaction-capable database for dashboard ingest and head-repair enqueue. */
   withWriteDatabase: WriteDatabaseRunner;
   github: Pick<GithubAppClient, "createInstallationToken">;
-  /** Builds the job's GitHub client over its installation token. */
+  /** Builds the job's GitHub client over its installation token; rebuilt when the token is refreshed. */
   createClient: (token: string) => HostedClient;
+  /** The clock that ages the installation token; Date.now unless injected. */
+  now?: () => number;
   createLanguageModel: (config: LanguageModelConfig) => ReviewModel;
   /** The key that opens stored model keys. */
   encryptionKey: Uint8Array;
@@ -149,10 +144,22 @@ async function fixesAllowed(
   return false;
 }
 
-/** Runs one claimed job and settles its row; never throws for a review failure. */
+/** Runs one claimed job and settles its row; anything it throws has the job's secrets masked. */
 export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise<JobOutcome> {
-  const { database, lease, retry } = deps;
   const secrets: (string | undefined)[] = [];
+  try {
+    return await runJob(deps, job, secrets);
+  } catch (error: unknown) {
+    throw new Error(redact(errorMessage(error), secrets));
+  }
+}
+
+async function runJob(
+  deps: JobRunnerDeps,
+  job: ReviewJob,
+  secrets: (string | undefined)[],
+): Promise<JobOutcome> {
+  const { database, lease, retry } = deps;
   const traceFields: { traceId?: string } = {};
   const logger = withFields(redactingLogger(deps.logger, secrets), traceFields);
   const context = await findReviewJobContext(database, job.repoId);
@@ -214,9 +221,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
         );
     };
     try {
-      const token = await deps.github.createInstallationToken(installationId);
-      secrets.push(token);
-      client = deps.createClient(token);
+      client = await createJobClient({ ...deps, now: deps.now ?? Date.now }, installationId, secrets);
 
       const pullRequest = await client.getPullRequest(target);
       if (pullRequest.state !== "open") {
