@@ -31,6 +31,7 @@ export {
 } from "./memberships";
 export {
   findModelKeySummary,
+  ModelKeyUnreadableError,
   readModelKey,
   removeModelKey,
   saveModelKey,

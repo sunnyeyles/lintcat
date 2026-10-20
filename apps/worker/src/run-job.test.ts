@@ -20,6 +20,7 @@ import {
   enqueueReviewJob,
   findings,
   markUninstalled,
+  modelKeys,
   organizations,
   repos,
   reviewJobs,
@@ -1107,6 +1108,107 @@ describe("runReviewJob attempt limit", () => {
     const job = await claim();
 
     expect(await runReviewJob(deps({ retry }).deps, job)).toBe("no-key");
+
+    expect(checkRuns().map((run) => run.conclusion)).toEqual(["neutral"]);
+  });
+});
+
+describe("runReviewJob unreadable model key", () => {
+  const retry = { maxAttempts: 3, retryDelayMs: 0 };
+
+  function checkRuns() {
+    const calls = github.createCheckRun.mock.calls as unknown as [
+      { owner: string; repo: string; headSha: string; conclusion: string; output: { title: string; summary: string } },
+    ][];
+    return calls.map(([input]) => input);
+  }
+
+  async function expectFailedOnce(jobId: number) {
+    expect(await status(jobId)).toMatchObject({ status: "failed", attempts: 1, leaseExpiresAt: null });
+    await database.update(reviewJobs).set({ leaseExpiresAt: new Date(Date.now() - 1_000) });
+    expect(await claimReviewJob(database, { leaseMs: 60_000 })).toBeUndefined();
+  }
+
+  it("AC17: a key sealed under a rotated encryption key fails on the first attempt without retrying", async () => {
+    await withKey();
+    const job = await claim();
+    expect(job.attempts).toBe(1);
+    const { deps: d, createLanguageModel } = deps({ retry, encryptionKey: randomBytes(32) });
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    expect(github.createReview).not.toHaveBeenCalled();
+    await expectFailedOnce(job.id);
+    expect(log).not.toContainEqual(expect.objectContaining({ event: "review_job.retrying" }));
+    expectNoSecretsLogged();
+  });
+
+  it("AC17: logs review_job.model_key_unreadable", async () => {
+    await withKey();
+    const job = await claim();
+
+    await runReviewJob(deps({ retry, encryptionKey: randomBytes(32) }).deps, job);
+
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "review_job.model_key_unreadable", jobId: job.id }),
+    );
+  });
+
+  it("AC17: posts one neutral check run telling an owner to re-add the key, with the settings link", async () => {
+    await withKey();
+    const job = await claim();
+
+    expect(await runReviewJob(deps({ retry, encryptionKey: randomBytes(32) }).deps, job)).toBe("failed");
+
+    const runs = checkRuns();
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      owner: "octo-org",
+      repo: "example-service",
+      headSha,
+      conclusion: "neutral",
+    });
+    expect(runs[0]!.output.title).toMatch(/model key/i);
+    expect(runs[0]!.output.summary).toContain("Settings → Model key");
+    expect(runs[0]!.output.summary).toContain("https://octo-org.example.test/settings");
+    expect(runs[0]!.output.summary).not.toContain(API_KEY);
+  });
+
+  it("AC17: leaves the link out of the check run when settingsUrl returns undefined", async () => {
+    await withKey();
+    const job = await claim();
+    const { deps: d } = deps({ retry, encryptionKey: randomBytes(32), settingsUrl: () => undefined });
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+
+    const runs = checkRuns();
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.conclusion).toBe("neutral");
+    expect(runs[0]!.output.summary).toContain("Settings → Model key");
+    expect(runs[0]!.output.summary).not.toMatch(/https?:\/\//);
+    expect(runs[0]!.output.summary).not.toContain("undefined");
+  });
+
+  it("AC17: an unknown sealed format fails once the same way", async () => {
+    await withKey();
+    await database.update(modelKeys).set({ sealedKey: Buffer.from([9, 1, 2, 3]) });
+    const job = await claim();
+    const { deps: d, createLanguageModel } = deps({ retry });
+
+    expect(await runReviewJob(d, job)).toBe("failed");
+
+    expect(createLanguageModel).not.toHaveBeenCalled();
+    await expectFailedOnce(job.id);
+    expect(log).toContainEqual(expect.objectContaining({ event: "review_job.model_key_unreadable" }));
+    expect(checkRuns()).toMatchObject([{ conclusion: "neutral" }]);
+  });
+
+  it("AC16: the unreadable-key check run is neutral", async () => {
+    await withKey();
+    const job = await claim();
+
+    await runReviewJob(deps({ retry, encryptionKey: randomBytes(32) }).deps, job);
 
     expect(checkRuns().map((run) => run.conclusion)).toEqual(["neutral"]);
   });
