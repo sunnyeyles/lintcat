@@ -1,0 +1,65 @@
+{
+  "feature": "cost-of-last-run",
+  "lanes": 3,
+  "criteria": [
+    {
+      "id": "AC1",
+      "text": "Given `REPO_HISTORY_COLUMNS`, when it is read, then it is exactly `pullRequest, head, risk, findings, duration, cost, ran`, in that order.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC2",
+      "text": "Given `apps/web/app/o/[slug]/repos/[owner]/[name]/page.tsx`, when it renders Review history and its loading skeleton, then both take their columns from `REPO_HISTORY_COLUMNS` imported from `@/components/overview`, and the page defines no column list of its own.",
+      "verify": "manual"
+    },
+    {
+      "id": "AC3",
+      "text": "Given `ReviewsTable` rendered with `renderToStaticMarkup`, `columns={REPO_HISTORY_COLUMNS}`, `groupByPullRequest`, and two reviews of one pull request with `costUsd` 0.12 and 0.0042, when the markup is read, then the headers are \"Pull request, Head, Blast radius, Findings, Duration, Cost, When\" in that order, the \"Cost\" header has `text-right`, and `$0.12` and `$0.0042` each appear in a different row, with no total shown.",
+      "verify": "auto"
+    },
+    {
+      "id": "AC4",
+      "text": "Given a repository with reviews, when its page loads, then each Review history row's Cost matches the same review's Cost on the Reviews page.",
+      "verify": "manual"
+    }
+  ],
+  "tickets": [
+    {
+      "id": "01",
+      "title": "Show each run's cost in a repository's Review history",
+      "goal": "Export a shared REPO_HISTORY_COLUMNS list from the overview reviews table, adding the existing `cost` column between Duration and When, and have the repository page and its skeleton use it in place of the page-local HISTORY_COLUMNS. Delivers the Cost column end to end on /o/[slug]/repos/[owner]/[name], tested through ReviewsTable's rendered markup.",
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "blocked_by": [],
+      "owns": [
+        "apps/web/components/overview/reviews-table.tsx",
+        "apps/web/components/overview/reviews-table.test.tsx",
+        "apps/web/components/overview/index.ts",
+        "apps/web/app/o/[slug]/repos/[owner]/[name]/page.tsx"
+      ],
+      "tests": {
+        "paths": [
+          "apps/web/components/overview/reviews-table.test.tsx"
+        ],
+        "helpers": [],
+        "command": "pnpm vitest run apps/web/components/overview/reviews-table.test.tsx"
+      },
+      "difficulty": "normal",
+      "steps": [
+        "Add `export const REPO_HISTORY_COLUMNS: readonly ReviewColumn[]` = pullRequest, head, risk, findings, duration, cost, ran in reviews-table.tsx; reuse the existing `cost` entry in COLUMNS, no new column definition",
+        "Re-export REPO_HISTORY_COLUMNS from components/overview/index.ts",
+        "In the repo page, delete HISTORY_COLUMNS and import REPO_HISTORY_COLUMNS from `@/components/overview` for both ReviewsTable and TableCardSkeleton",
+        "Drop the now-unused `ReviewColumn` type import from the page if nothing else uses it",
+        "Tests use renderToStaticMarkup like components/review/review-summary.test.tsx; no jsdom or testing-library",
+        "AC3 no-total check: split the markup into <tr> rows; assert exactly two rows contain a `$` amount, one `$0.12` and the other `$0.0042`, and the grouped `PR #n` header row contains no `$`",
+        "Run pnpm typecheck, lint and dead-code"
+      ],
+      "human_steps": [],
+      "notes": "Leave RECENT_COLUMNS (overview page) and the Reviews page COLUMNS page-local. AC2 is checked in review, AC4 by loading a repo page. apps/web work follows the vercel-react-best-practices skill."
+    }
+  ]
+}
