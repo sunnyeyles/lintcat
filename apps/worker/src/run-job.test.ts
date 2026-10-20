@@ -31,9 +31,9 @@ import {
   type ReviewJob,
 } from "@pr-review/db";
 import { createTestDatabase } from "@pr-review/db/test-database";
-import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging";
+import { createCapturingLogger, redact, type CapturedLogEvent } from "@pr-review/logging";
 import { reviewRecordRiskSchema } from "@pr-review/schemas";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runReviewJob, type JobRunnerDeps } from "#src/run-job";
 
@@ -78,6 +78,11 @@ beforeEach(async () => {
     },
   ]);
   log = [];
+});
+
+// Each in-memory Postgres holds its WASM memory until closed.
+afterEach(async () => {
+  await (database as unknown as { $client: { close(): Promise<void> } }).$client.close();
 });
 
 function answering(findings = [makeFinding("naming", { line: 41 })]): ReviewModel {
@@ -1211,5 +1216,222 @@ describe("runReviewJob unreadable model key", () => {
     await runReviewJob(deps({ retry, encryptionKey: randomBytes(32) }).deps, job);
 
     expect(checkRuns().map((run) => run.conclusion)).toEqual(["neutral"]);
+  });
+});
+
+describe("runReviewJob installation token refresh", () => {
+  const TOKEN2 = "ghs_refreshed_token_5678";
+  const T0 = 1_700_000_000_000;
+  const MINUTE = 60_000;
+
+  interface GithubCall {
+    token: string;
+    method: string;
+    at: number;
+  }
+
+  // Each client records which token built it and the injected time of every call.
+  function tracking(clock: { now: number }) {
+    const calls: GithubCall[] = [];
+    const createClient = vi.fn((token: string) => {
+      return new Proxy(github, {
+        get(target, prop, receiver) {
+          const value = Reflect.get(target, prop, receiver) as unknown;
+          if (typeof value !== "function") return value;
+          return (...args: unknown[]) => {
+            calls.push({ token, method: String(prop), at: clock.now });
+            return (value as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        },
+      });
+    });
+    return { calls, createClient };
+  }
+
+  function twoTokens() {
+    return vi.fn<(installationId: number) => Promise<string>>()
+      .mockResolvedValueOnce(TOKEN)
+      .mockResolvedValueOnce(TOKEN2);
+  }
+
+  // Moves the clock as the model answers, so the publishing calls come after it.
+  function advancingModel(clock: { now: number }, minutes: number): ReviewModel {
+    const model = answering();
+    const generate = model.doGenerate.bind(model);
+    model.doGenerate = (async (options: Parameters<typeof generate>[0]) => {
+      clock.now = T0 + minutes * MINUTE;
+      return generate(options);
+    }) as typeof model.doGenerate;
+    return model;
+  }
+
+  it("AC18: makes no new token for a GitHub call 49 minutes after minting", async () => {
+    await withKey();
+    const job = await claim();
+    const clock = { now: T0 };
+    const { calls, createClient } = tracking(clock);
+    const createInstallationToken = twoTokens();
+    const { deps: d } = deps({
+      now: () => clock.now,
+      github: { createInstallationToken },
+      createClient,
+      createLanguageModel: () => advancingModel(clock, 49),
+    });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(createInstallationToken).toHaveBeenCalledOnce();
+    const late = calls.filter((call) => call.at === T0 + 49 * MINUTE);
+    expect(late.length).toBeGreaterThan(0);
+    expect(calls.every((call) => call.token === TOKEN)).toBe(true);
+    expect(github.createReview).toHaveBeenCalledOnce();
+  });
+
+  it("AC19: mints a second token for the next GitHub call 51 minutes after minting, and that call uses it", async () => {
+    await withKey();
+    const job = await claim();
+    const clock = { now: T0 };
+    const { calls, createClient } = tracking(clock);
+    const createInstallationToken = twoTokens();
+    const { deps: d } = deps({
+      now: () => clock.now,
+      github: { createInstallationToken },
+      createClient,
+      createLanguageModel: () => advancingModel(clock, 51),
+    });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(createInstallationToken).toHaveBeenCalledTimes(2);
+    expect(createInstallationToken).toHaveBeenNthCalledWith(2, INSTALLATION_ID);
+    const early = calls.filter((call) => call.at === T0);
+    const late = calls.filter((call) => call.at === T0 + 51 * MINUTE);
+    expect(early.length).toBeGreaterThan(0);
+    expect(early.every((call) => call.token === TOKEN)).toBe(true);
+    expect(late.length).toBeGreaterThan(0);
+    expect(late[0]!.token).toBe(TOKEN2);
+    expect(late.every((call) => call.token === TOKEN2)).toBe(true);
+    expect(calls).toContainEqual(expect.objectContaining({ method: "createReview", token: TOKEN2 }));
+    expect(github.createReview).toHaveBeenCalledOnce();
+  });
+
+  it("AC19: a job under 50 minutes mints exactly one token", async () => {
+    await withKey();
+    const job = await claim();
+    const clock = { now: T0 };
+    const createInstallationToken = twoTokens();
+    const { deps: d } = deps({ now: () => clock.now, github: { createInstallationToken } });
+
+    expect(await runReviewJob(d, job)).toBe("succeeded");
+
+    expect(createInstallationToken).toHaveBeenCalledOnce();
+  });
+
+  it("AC20: masks both tokens in logged errors and in the trace secrets", async () => {
+    await withKey();
+    const job = await claim();
+    const clock = { now: T0 };
+    const { calls, createClient } = tracking(clock);
+    const createInstallationToken = twoTokens();
+    let registered: readonly (string | undefined)[] = [];
+    const traceSecrets = vi.fn((secrets: readonly (string | undefined)[]) => {
+      registered = secrets;
+      return () => {};
+    });
+    // The review's first GitHub call refreshes the token, then the model fails naming both.
+    const leaky = makeModel([]).model;
+    leaky.doGenerate = async () => {
+      throw new Error(`bad credentials: ${TOKEN} then ${TOKEN2}`);
+    };
+    const { deps: d } = deps({
+      now: () => clock.now,
+      github: { createInstallationToken },
+      createClient,
+      traceSecrets,
+      createLanguageModel: () => {
+        clock.now = T0 + 51 * MINUTE;
+        return leaky;
+      },
+    });
+
+    expect(await runReviewJob(d, job)).toBe("retrying");
+
+    expect(createInstallationToken).toHaveBeenCalledTimes(2);
+    expect(calls).toContainEqual(expect.objectContaining({ token: TOKEN2 }));
+    const text = JSON.stringify(log);
+    expect(text).not.toContain(TOKEN);
+    expect(text).not.toContain(TOKEN2);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "review_job.retrying", error: expect.stringContaining("[redacted]") }),
+    );
+    const row = await status(job.id);
+    expect(row.lastError).not.toContain(TOKEN);
+    expect(row.lastError).not.toContain(TOKEN2);
+    expect(registered).toEqual(expect.arrayContaining([TOKEN, TOKEN2]));
+    const scrubbed = redact(`span saw ${TOKEN} and ${TOKEN2}`, registered);
+    expect(scrubbed).not.toContain(TOKEN);
+    expect(scrubbed).not.toContain(TOKEN2);
+  });
+});
+
+describe("runReviewJob crash redaction", () => {
+  // Every update throws once `broken` is set, so settling the row rejects.
+  function breakableDatabase(state: { broken?: Error }): Database {
+    return new Proxy(database, {
+      get(target, prop) {
+        if (prop === "update" && state.broken) {
+          const error = state.broken;
+          return () => {
+            throw error;
+          };
+        }
+        const value = Reflect.get(target, prop, target) as unknown;
+        return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      },
+    });
+  }
+
+  async function rejection(promise: Promise<unknown>): Promise<Error> {
+    const outcome = await promise.then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(Error);
+    return outcome as Error;
+  }
+
+  it("AC21: masks the token and model key when failReviewJob rejects with both", async () => {
+    await withKey();
+    const job = await claim();
+    const state: { broken?: Error } = {};
+    const failing = makeModel([]).model;
+    failing.doGenerate = async () => {
+      state.broken = new Error(`connection reset saving ${TOKEN} with ${API_KEY}`);
+      throw new Error("overloaded");
+    };
+    const { deps: d } = deps({ database: breakableDatabase(state), createLanguageModel: () => failing });
+
+    const error = await rejection(runReviewJob(d, job));
+
+    expect(error.message).toContain("[redacted]");
+    expect(error.message).not.toContain(TOKEN);
+    expect(error.message).not.toContain(API_KEY);
+    expectNoSecretsLogged();
+  });
+
+  it("AC21: masks the token when createCheckRun rejects with it and settling the job then rejects too", async () => {
+    const job = await claim();
+    const state: { broken?: Error } = {};
+    github.createCheckRun.mockImplementation(async () => {
+      state.broken = new Error(`GitHub rejected ${TOKEN}`);
+      throw state.broken;
+    });
+    const { deps: d } = deps({ database: breakableDatabase(state) });
+
+    const error = await rejection(runReviewJob(d, job));
+
+    expect(error.message).toContain("[redacted]");
+    expect(error.message).not.toContain(TOKEN);
+    expectNoSecretsLogged();
   });
 });
