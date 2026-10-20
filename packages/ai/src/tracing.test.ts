@@ -107,14 +107,14 @@ describe("startTracing", () => {
   it("stays off without keys", () => {
     const { logger, entries } = createCapturingLogger();
 
-    expect(startTracing({}, logger)).toBeUndefined();
+    expect(startTracing({}, logger, "cli")).toBeUndefined();
     expect(entries).toEqual([]);
   });
 
   it("stays off and says which key is missing when only one is set", () => {
     const { logger, entries } = createCapturingLogger();
 
-    expect(startTracing({ LANGFUSE_PUBLIC_KEY: "pk-lf-1" }, logger)).toBeUndefined();
+    expect(startTracing({ LANGFUSE_PUBLIC_KEY: "pk-lf-1" }, logger, "cli")).toBeUndefined();
     expect(entries).toEqual([
       {
         level: "error",

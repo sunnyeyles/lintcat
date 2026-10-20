@@ -11,6 +11,7 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { registerTelemetry, type Telemetry } from "ai";
 
+import { namingProcessor, type TraceSource } from "#src/name-spans";
 import { scrubbingProcessor, secretScrubber } from "#src/scrub-spans";
 
 const DEFAULT_BASE_URL = "https://cloud.langfuse.com";
@@ -33,6 +34,7 @@ export function createTelemetryIntegration(
 export function startTracing(
   env: Readonly<Record<string, string | undefined>>,
   logger: StructuredLogger,
+  source: TraceSource,
 ): Tracing | undefined {
   const publicKey = env.LANGFUSE_PUBLIC_KEY?.trim() ?? "";
   const secretKey = env.LANGFUSE_SECRET_KEY?.trim() ?? "";
@@ -52,7 +54,9 @@ export function startTracing(
     release: env.LANGFUSE_RELEASE?.trim() || undefined,
   });
   const scrubber = secretScrubber();
-  new NodeTracerProvider({ spanProcessors: [scrubbingProcessor(spanProcessor, scrubber.scrub)] }).register();
+  new NodeTracerProvider({
+    spanProcessors: [namingProcessor(scrubbingProcessor(spanProcessor, scrubber.scrub), source)],
+  }).register();
   // From v7 the SDK emits spans only to a registered integration.
   registerTelemetry(createTelemetryIntegration());
 

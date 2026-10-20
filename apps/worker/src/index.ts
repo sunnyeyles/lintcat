@@ -19,7 +19,7 @@ async function main(): Promise<void> {
   const envFile = findLocalEnvFile();
   if (envFile) process.loadEnvFile(envFile);
   const logger = createConsoleLogger();
-  const tracing = startTracing(process.env, logger);
+  const tracing = startTracing(process.env, logger, "worker");
   const database = db();
   const appDomain = process.env.APP_DOMAIN?.trim();
 

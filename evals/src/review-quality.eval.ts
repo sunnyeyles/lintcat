@@ -38,6 +38,7 @@ const deps = modelBackedDeps(access, logger, collector.onUsage);
 const tracing = startTracing(
   { ...process.env, LANGFUSE_ENVIRONMENT: process.env.LANGFUSE_ENVIRONMENT?.trim() || "eval" },
   logger,
+  "eval",
 );
 
 for (const evalCase of evalCases) {

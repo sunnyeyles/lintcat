@@ -280,7 +280,7 @@ export async function runReview(spec: ReviewRunSpec): Promise<FinishedReviewRun>
   let usage = emptyTokenUsage();
   const startedAt = Date.now();
   const outcome = await traceStage(
-    "review",
+    "review-changes",
     { ...reviewCorrelation(spec.target), incremental: spec.policy?.incremental ?? false },
     () =>
       review(spec, (spent) => {
@@ -289,7 +289,13 @@ export async function runReview(spec: ReviewRunSpec): Promise<FinishedReviewRun>
     {
       output: (reviewed) => ({
         candidateCount: reviewed.candidates.length,
-        findingCount: reviewed.findings.length,
+        findings: reviewed.findings.map(({ severity, category, file, line, title }) => ({
+          severity,
+          category,
+          file,
+          line,
+          title,
+        })),
         patches: reviewed.patches,
         suppressed: reviewed.suppressed,
       }),
@@ -330,7 +336,7 @@ async function review(
 
   cancelled.check("before start");
   const [pullRequest, changedFiles, diff] = await traceStage(
-    "load",
+    "load-changes",
     undefined,
     () =>
       Promise.all([
@@ -353,7 +359,7 @@ async function review(
   const tree: ReviewedTree = { baseSha: pullRequest.baseSha, changedFiles };
 
   const scope = await traceStage(
-    "scope",
+    "resolve-scope",
     { incremental },
     () => resolveReviewScope(target, { client, incremental, diff, changedFiles, logger }),
     {
@@ -392,7 +398,7 @@ async function review(
 
   // Built once, before the agent starts, and serialised onto the outcome.
   const { index: repositoryIndex, codeowners } = await traceStage(
-    "index",
+    "build-index",
     { baseSha: pullRequest.baseSha, enabled: index },
     () => buildReviewIndex({ client, target, baseSha: pullRequest.baseSha, enabled: index, logger }),
     { output: (built) => ({ built: built.index !== undefined }) },
@@ -449,7 +455,7 @@ async function review(
   // The AI boundary: only what passes validation reaches GitHub.
   const rejected: RejectedCandidate[] = [];
   const validated = await traceStage(
-    "validate",
+    "validate-findings",
     { candidates },
     () =>
       validateFindings(
@@ -518,7 +524,7 @@ async function review(
 
   cancelled.check("before publish");
   await traceStage(
-    "publish",
+    "publish-review",
     { findingCount: verified.findings.length, patchCount: verified.patchCount },
     async () =>
       deliverReview(

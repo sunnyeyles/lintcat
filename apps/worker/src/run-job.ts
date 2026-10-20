@@ -269,7 +269,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
 
   const untrace = deps.traceSecrets?.(secrets);
   try {
-    return await traceStage("review-job", { ...fields, prNumber: job.prNumber, headSha: job.headSha }, settle, {
+    return await traceStage("run-review-job", { ...fields, prNumber: job.prNumber, headSha: job.headSha }, settle, {
       output: (outcome) => ({ outcome, error: failure }),
       level: (outcome) => (outcome === "failed" ? "ERROR" : outcome === "retrying" ? "WARNING" : undefined),
       attributes: {
