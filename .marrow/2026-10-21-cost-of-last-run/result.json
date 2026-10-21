@@ -1,0 +1,41 @@
+{
+  "feature": "cost-of-last-run",
+  "status": "red",
+  "why": "finalize: blocked Blocked by pr-guard: commit da581262fdf8 ('Add acceptance tests for Show each run's cost in a repository's Review history') has AI attribution trailers in its message (Co-Authored-By: Claude Opus 5.5 and a Claude-Session line). I left the commits as they are. Someone has to reword that commit before the PR can go up.; The title and body pass the guard. I took the attribution footer out of pr.md because the hard rules forbid AI attribution.; Pushed marrow/cost-of-last-run at e1b2d99f02adb9aab9061b09d421462628ee9e4d with push -u, since there was no remote branch before. Rewording da581262fdf8 will mean a force-with-lease push against this SHA.; One human step I was given is out of date. It said to fix the test fixture's string id because typecheck was red. Fix round 1 (da8d27d) widened ReviewRow.id to string instead, and typecheck is now green. I dropped that step from Manual steps and put the type change under Risk so a person can decide which way to go.; Fix round 2 (e1b2d99) skips the apps/mcp apply_fix rollback test when running as root. I noted this under Risk and kept a manual step to make sure CI runs it.; base is the merge-base with origin/main: 3a26bf0 (short SHA).",
+  "branch": "marrow/cost-of-last-run",
+  "pushed": true,
+  "head": "e1b2d99f02adb9aab9061b09d421462628ee9e4d",
+  "base_branch": "main",
+  "checks_ok": true,
+  "open": 1,
+  "open_high": 0,
+  "fixed": 0,
+  "refuted": 0,
+  "tickets": [
+    {
+      "id": "01",
+      "status": "merged"
+    }
+  ],
+  "criteria": [
+    {
+      "id": "AC1",
+      "status": "pass"
+    },
+    {
+      "id": "AC2",
+      "status": "manual"
+    },
+    {
+      "id": "AC3",
+      "status": "pass"
+    },
+    {
+      "id": "AC4",
+      "status": "manual"
+    }
+  ],
+  "human_steps": 3,
+  "labels": [],
+  "run_id": "wf_2cd01cea-360"
+}
