@@ -5,11 +5,11 @@ import { REPO_HISTORY_COLUMNS, ReviewsTable } from "@/components/overview";
 
 import type { ReviewRow } from "./reviews-table";
 
-function review(id: string, costUsd: number, createdAt: Date): ReviewRow {
+function review(id: number, headSha: string, costUsd: number, createdAt: Date): ReviewRow {
   return {
     id,
     prNumber: 42,
-    headSha: `${id}abcdef0123456789`,
+    headSha,
     bySeverity: { low: 1, medium: 0, high: 0 },
     durationMs: 61_000,
     costUsd,
@@ -27,8 +27,8 @@ function render(): string {
       columns={REPO_HISTORY_COLUMNS}
       groupByPullRequest
       rows={[
-        review("bbbbbbb", 0.12, new Date("2026-10-20T12:00:00Z")),
-        review("aaaaaaa", 0.0042, new Date("2026-10-19T12:00:00Z")),
+        review(2, "bbbbbbbabcdef0123456789", 0.12, new Date("2026-10-20T12:00:00Z")),
+        review(1, "aaaaaaaabcdef0123456789", 0.0042, new Date("2026-10-19T12:00:00Z")),
       ]}
     />,
   );
