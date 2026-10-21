@@ -51,6 +51,16 @@ export type ReviewColumn =
   | "cost"
   | "ran";
 
+export const REPO_HISTORY_COLUMNS: readonly ReviewColumn[] = [
+  "pullRequest",
+  "head",
+  "risk",
+  "findings",
+  "duration",
+  "cost",
+  "ran",
+];
+
 // Set only when grouped: this row's place among its pull request's reviews.
 type Revision = { number: number; of: number };
 

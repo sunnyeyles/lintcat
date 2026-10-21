@@ -7,11 +7,11 @@ import { cache, Suspense } from "react";
 import {
   EmptyNotice,
   groupByPr,
+  REPO_HISTORY_COLUMNS,
   ReviewsTable,
   Section,
   Sparkline,
   toReviewRow,
-  type ReviewColumn,
 } from "@/components/overview";
 import { PageHeader } from "@/components/shell";
 import { InlineSkeleton, StatGridSkeleton, TableCardSkeleton } from "@/components/ui";
@@ -19,15 +19,6 @@ import { Stat, StatGrid } from "@/components/ui/stat";
 import { data } from "@/lib/data/server";
 import { formatDuration, formatNumber, formatRelative, formatUsd } from "@/lib/format";
 import { organizationPath } from "@/lib/paths";
-
-const HISTORY_COLUMNS: readonly ReviewColumn[] = [
-  "pullRequest",
-  "head",
-  "risk",
-  "findings",
-  "duration",
-  "ran",
-];
 
 // Shared by the header count and the history table, so both read one query.
 const repoReviews = cache(
@@ -78,7 +69,7 @@ async function ReviewHistory({
         <ReviewsTable
           slug={slug}
           rows={reviews.map(toReviewRow)}
-          columns={HISTORY_COLUMNS}
+          columns={REPO_HISTORY_COLUMNS}
           caption={`Every review of ${repo.owner}/${repo.name}, grouped by pull request, newest first.`}
           groupByPullRequest
         />
@@ -141,7 +132,7 @@ export default async function RepoDetailPage({
       </div>
 
       <Section title="Review history">
-        <Suspense fallback={<TableCardSkeleton rows={8} columns={HISTORY_COLUMNS.length} />}>
+        <Suspense fallback={<TableCardSkeleton rows={8} columns={REPO_HISTORY_COLUMNS.length} />}>
           <ReviewHistory slug={slug} repo={repo} />
         </Suspense>
       </Section>
