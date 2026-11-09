@@ -71,6 +71,13 @@ export {
 } from "./repository-graphs";
 export { findReviewMapInputs, type ReviewMapInputs } from "./review-map";
 export {
+  findRunTrace,
+  listRunTraces,
+  saveRunTraceFiles,
+  type RunTraceFileInput,
+  type RunTraceSummary,
+} from "./run-traces";
+export {
   deleteOrganizationRepoAccess,
   listCollaboratorOrganizationIds,
   listPrivateRepos,

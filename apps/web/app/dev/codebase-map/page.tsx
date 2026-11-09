@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { MapExplorer } from "@/app/dev/codebase-map/map-explorer";
 import { PageHeader } from "@/components/shell/page-header";
@@ -6,6 +7,7 @@ import { PageHeader } from "@/components/shell/page-header";
 export const metadata: Metadata = { title: "Codebase map" };
 
 export default function CodebaseMapDevPage() {
+  if (process.env.NODE_ENV === "production") notFound();
   return (
     <main className="mx-auto w-full max-w-[96rem] px-4 py-8">
       <PageHeader
