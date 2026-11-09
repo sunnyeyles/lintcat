@@ -301,6 +301,27 @@ export const findings = pgTable(
   (t) => [index("findings_review_severity_idx").on(t.reviewId, t.severity)],
 );
 
+// A local Claude Code run, pushed one transcript file at a time by its hooks.
+export const runTraces = pgTable("run_traces", {
+  runId: text("run_id").primaryKey(),
+  title: text("title"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const runTraceFiles = pgTable(
+  "run_trace_files",
+  {
+    runId: text("run_id")
+      .notNull()
+      .references(() => runTraces.runId, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    text: text("text").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.fileName] })],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Organization = typeof organizations.$inferSelect;

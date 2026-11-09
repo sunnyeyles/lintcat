@@ -118,6 +118,11 @@ export function toolTimes(node: AgentNode): { id: string; ms: number; label: str
   );
 }
 
+/** A tool call still waiting on its result: mid-call, if the run is live. */
+export function isRunning(node: AgentNode): boolean {
+  return node.steps.some((step) => step.kind === "tool" && step.call.result === undefined);
+}
+
 export function agentStats(node: AgentNode): AgentStats {
   return {
     durationMs: Math.max(0, toMs(node.endedAt) - toMs(node.startedAt)),

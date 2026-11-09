@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, cn } from "@pr-review/design";
+import { Badge, Button, Card, cn } from "@pr-review/design";
 import { ChevronDown, ChevronRight } from "@pr-review/design/icons";
 import { useMemo, useState } from "react";
 
@@ -11,6 +11,7 @@ import {
   formatDuration,
   formatTokens,
   fraction,
+  isRunning,
   roleColor,
   timeBounds,
   toolTimes,
@@ -31,12 +32,14 @@ export function AgentLanes({
   selectedId,
   onSelect,
   onToggle,
+  live = false,
 }: {
   root: AgentNode;
   collapsed: ReadonlySet<string>;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
+  live?: boolean;
 }) {
   const [zoom, setZoom] = useState<(typeof ZOOMS)[number]>(1);
   const rows = useMemo(() => visibleRows(root, collapsed), [root, collapsed]);
@@ -90,6 +93,7 @@ export function AgentLanes({
               bounds={bounds}
               ticks={ticks}
               selected={row.node.id === selectedId}
+              live={live}
               onSelect={onSelect}
               onToggle={onToggle}
             />
@@ -105,6 +109,7 @@ function LaneRowView({
   bounds,
   ticks,
   selected,
+  live,
   onSelect,
   onToggle,
 }: {
@@ -112,6 +117,7 @@ function LaneRowView({
   bounds: TimeBounds;
   ticks: number[];
   selected: boolean;
+  live: boolean;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
 }) {
@@ -154,6 +160,11 @@ function LaneRowView({
             <span className="shrink-0 font-medium">{node.role}</span>
             {node.description ? (
               <span className="text-muted-foreground truncate text-xs">{node.description}</span>
+            ) : null}
+            {live && isRunning(node) ? (
+              <Badge variant="secondary" className="ml-auto shrink-0">
+                running
+              </Badge>
             ) : null}
           </span>
           <span className="text-muted-foreground pl-3.5 text-xs tabular-nums">

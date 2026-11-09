@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { LiveRuns } from "@/app/dev/run-trace/live-runs";
 import { RunTraceExplorer } from "@/app/dev/run-trace/run-trace-explorer";
 import { PageHeader } from "@/components/shell/page-header";
 
@@ -13,7 +14,8 @@ export default function RunTraceDevPage() {
         title="Run trace"
         description="Drop a factory run's trace folder to see every agent it spawned: what each one thought, which tools it called, which files it read and edited, and how full its context window got."
       />
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
+        <LiveRuns />
         <RunTraceExplorer />
       </div>
     </main>

@@ -4,20 +4,17 @@ import { Alert, AlertDescription, AlertTitle, Button, cn } from "@pr-review/desi
 import { FolderGit2, Sparkles, TriangleAlert } from "@pr-review/design/icons";
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { AgentDetail } from "@/app/dev/run-trace/agent-detail";
-import { AgentLanes } from "@/app/dev/run-trace/agent-lanes";
 import { readDrop, readFileList, type TraceFile } from "@/app/dev/run-trace/read-trace-files";
 import { SAMPLE_TRACE } from "@/app/dev/run-trace/sample-trace";
-import { ancestorIds, findAgent, formatDuration, timeBounds, walk } from "@/app/dev/run-trace/trace-layout";
+import { formatDuration, timeBounds, walk } from "@/app/dev/run-trace/trace-layout";
+import { TraceView } from "@/app/dev/run-trace/trace-view";
 import { parseRun } from "@/lib/run-trace";
 import type { RunTrace } from "@/lib/run-trace/types";
 
-type Loaded = { trace: RunTrace; source: string };
+type Loaded = { trace: RunTrace; source: string; key: number };
 
 export function RunTraceExplorer() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -29,9 +26,7 @@ export function RunTraceExplorer() {
   }, []);
 
   const show = (trace: RunTrace, source: string) => {
-    setLoaded({ trace, source });
-    setSelectedId(trace.root.id);
-    setCollapsed(new Set());
+    setLoaded((previous) => ({ trace, source, key: (previous?.key ?? 0) + 1 }));
     setError(null);
   };
 
@@ -55,7 +50,6 @@ export function RunTraceExplorer() {
   };
 
   const trace = loaded?.trace;
-  const selected = trace && selectedId ? findAgent(trace.root, selectedId) : undefined;
 
   const summary = useMemo(() => {
     if (!trace) return null;
@@ -63,20 +57,6 @@ export function RunTraceExplorer() {
     const bounds = timeBounds(trace.root);
     return { agents: agents.length, duration: formatDuration(bounds.end - bounds.start) };
   }, [trace]);
-
-  const select = (id: string) => {
-    if (!trace) return;
-    setSelectedId(id);
-    const hidden = ancestorIds(trace.root, id).filter((a) => collapsed.has(a));
-    if (hidden.length > 0) setCollapsed(new Set([...collapsed].filter((c) => !hidden.includes(c))));
-  };
-
-  const toggle = (id: string) => {
-    const next = new Set(collapsed);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setCollapsed(next);
-  };
 
   return (
     <div className="space-y-4">
@@ -135,18 +115,7 @@ export function RunTraceExplorer() {
         </Alert>
       ) : null}
 
-      {trace ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_32rem]">
-          <AgentLanes
-            root={trace.root}
-            collapsed={collapsed}
-            selectedId={selectedId}
-            onSelect={select}
-            onToggle={toggle}
-          />
-          {selected ? <AgentDetail agent={selected} onSelect={select} /> : null}
-        </div>
-      ) : null}
+      {loaded ? <TraceView key={loaded.key} trace={loaded.trace} /> : null}
     </div>
   );
 }
