@@ -27,7 +27,7 @@ async function walk(dir: string): Promise<string[]> {
  * Reads a run from `<project>/<session>.jsonl` or its `<project>/<session>/` directory,
  * or any directory holding a main `.jsonl` beside `subagents/`.
  */
-export async function loadRunFiles(path: string): Promise<RunFile[]> {
+async function loadRunFiles(path: string): Promise<RunFile[]> {
   const info = await stat(path);
   let mainPath: string | undefined;
   let sessionDir: string;

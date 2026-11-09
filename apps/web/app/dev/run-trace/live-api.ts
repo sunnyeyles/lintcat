@@ -8,7 +8,7 @@ export type LiveRunFiles = { run: LiveRunSummary; files: { name: string; text: s
 const TOKEN_KEY = "run-trace-token";
 export const POLL_MS = 3000;
 // The hook pushes at least every few seconds while a run works, so a minute of silence means it ended.
-export const LIVE_WINDOW_MS = 60_000;
+const LIVE_WINDOW_MS = 60_000;
 
 const listeners = new Set<() => void>();
 

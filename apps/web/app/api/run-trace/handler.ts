@@ -13,7 +13,7 @@ import { parseRun } from "@/lib/run-trace";
 
 export type RunTraceDeps = { database: Database; token: string | undefined; now: () => Date };
 
-export const MAX_BODY_BYTES = 64 * 1024 * 1024;
+const MAX_BODY_BYTES = 64 * 1024 * 1024;
 const RUN_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const AGENT_FILE = /^agent-[A-Za-z0-9_-]{1,128}\.(jsonl|meta\.json)$/;
 

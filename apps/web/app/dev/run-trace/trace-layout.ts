@@ -62,7 +62,7 @@ export function visibleRows(root: AgentNode, collapsed: ReadonlySet<string>): La
   return rows;
 }
 
-export function sortByStart(nodes: AgentNode[]): AgentNode[] {
+function sortByStart(nodes: AgentNode[]): AgentNode[] {
   return [...nodes].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt));
 }
 
@@ -131,7 +131,7 @@ export function agentStats(node: AgentNode): AgentStats {
   };
 }
 
-export function peakOf(samples: ContextSample[]): number {
+function peakOf(samples: ContextSample[]): number {
   return samples.reduce((peak, sample) => Math.max(peak, sample.tokens), 0);
 }
 
