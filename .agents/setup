@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Amp orb setup: Node 24 (CI's version), pnpm from packageManager, workspace dependencies.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+step() {
+  local label="$1" start=$SECONDS
+  shift
+  echo "==> $label"
+  "$@"
+  echo "<== $label ($((SECONDS - start))s)"
+}
+
+node_major=24
+node_dir="$HOME/.local/share/node-v$node_major"
+export PATH="$node_dir/bin:$PATH"
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+
+install_node() {
+  if [[ "$("$node_dir/bin/node" --version 2>/dev/null)" == "v$node_major."* ]]; then
+    echo "Node $("$node_dir/bin/node" --version) already installed"
+    return
+  fi
+  local arch base file tmp
+  case "$(uname -m)" in
+    x86_64) arch=x64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *) echo "Unsupported architecture $(uname -m)" >&2; exit 1 ;;
+  esac
+  base="https://nodejs.org/dist/latest-v$node_major.x"
+  tmp="$(mktemp -d)"
+  curl -fsSL "$base/SHASUMS256.txt" -o "$tmp/SHASUMS256.txt"
+  file="$(awk -v a="linux-$arch.tar.gz" '$2 ~ a"$" { print $2 }' "$tmp/SHASUMS256.txt")"
+  curl -fsSL "$base/$file" -o "$tmp/$file"
+  (cd "$tmp" && grep " $file\$" SHASUMS256.txt | sha256sum -c -)
+  rm -rf "$node_dir"
+  mkdir -p "$node_dir"
+  tar -xzf "$tmp/$file" -C "$node_dir" --strip-components=1
+  rm -rf "$tmp"
+}
+
+persist_path() {
+  local marker="# lintcat: Node $node_major for Amp orbs"
+  if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+    cat >>"$HOME/.bash_profile" <<EOF
+
+$marker
+case ":\$PATH:" in
+  *":$node_dir/bin:"*) ;;
+  *) export PATH="$node_dir/bin:\$PATH" ;;
+esac
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+EOF
+  fi
+}
+
+install_pnpm() {
+  corepack enable pnpm
+  corepack install
+  pnpm --version
+}
+
+install_deps() {
+  pnpm install --frozen-lockfile --config.confirmModulesPurge=false --config.update-notifier=false
+}
+
+write_orb_guidance() {
+  local file="$HOME/.config/amp/AGENTS.md" marker="## lintcat in this orb"
+  mkdir -p "$(dirname "$file")"
+  if ! grep -Fqx "$marker" "$file" 2>/dev/null; then
+    cat >>"$file" <<EOF
+
+$marker
+
+- The PGlite-backed tests need about 2 GB per vitest worker, so the default \`pnpm test\` is
+  OOM-killed in this orb. Run \`pnpm test --maxWorkers=2\`, or one file as \`AGENTS.md\` shows.
+EOF
+  fi
+}
+
+step "Install Node $node_major" install_node
+step "Persist Node $node_major on PATH" persist_path
+step "Install pnpm from packageManager" install_pnpm
+step "Install workspace dependencies" install_deps
+step "Write orb agent guidance" write_orb_guidance
