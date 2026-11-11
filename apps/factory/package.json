@@ -15,9 +15,11 @@
     "build": "node ../../scripts/build-bundle.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@pr-review/agent-runtime": "workspace:*",
     "@pr-review/factory": "workspace:*",
-    "@pr-review/logging": "workspace:*"
+    "@pr-review/logging": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@pr-review/eslint-config": "workspace:*"

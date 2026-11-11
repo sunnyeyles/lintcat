@@ -137,6 +137,47 @@ export function createFactoryService(options: FactoryServiceOptions) {
       }
     },
 
+    /** A run row for a discovery still in progress; its placeholder spec can't be frozen until `propose` replaces it. */
+    async draft(input: { repoPath: string; outcome: string }): Promise<FactoryRun> {
+      const repo = await repoRoot(input.repoPath);
+      await ensureFactoryExcluded(repo);
+      const id = newRunId();
+      const title = input.outcome.trim().split("\n")[0]!.slice(0, 120) || "discovery";
+      const placeholder: Spec = {
+        title,
+        objective: input.outcome,
+        category: "quick",
+        requirements: [],
+        nonGoals: [],
+        constraints: [],
+        acceptanceCriteria: [],
+        plan: [],
+        architectureDecisions: [],
+        repositoryFindings: [],
+        assumptions: [],
+        estimatedFiles: 0,
+        risk: "low",
+        touchesSecurityOrData: false,
+      };
+      const contract: TaskContract = {
+        contractVersion: 1,
+        taskId: id,
+        repoPath: repo,
+        baseSha: await headSha(repo),
+        baseBranch: await currentBranch(repo),
+        profile: "quick",
+        routing: { reason: "discovery in progress", overridden: false },
+        spec: placeholder,
+        permittedOperations: { push: false, openPullRequest: false, networkDuringSetup: true },
+        budgets: loadProfile("quick").budgets,
+        approval: { state: "pending" },
+        implementationDecisions: [],
+      };
+      const run = await createRun(database, { id, repoPath: repo, title, contract, status: "draft" });
+      await appendEvent(database, { runId: id, kind: "discovery_started", data: {} });
+      return run;
+    },
+
     cancel: (runId: string) => requestCancel(database, runId),
     get: (runId: string) => getRun(database, runId),
     list: (filter: { limit?: number; repoPath?: string } = {}) => listRuns(database, { limit: filter.limit ?? 20, ...(filter.repoPath ? { repoPath: filter.repoPath } : {}) }),
