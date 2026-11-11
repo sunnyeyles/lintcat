@@ -153,6 +153,18 @@ export async function changedFiles(dir: string, baseSha: string): Promise<string
   return [...all].sort();
 }
 
+/** The committed change from `baseSha` to HEAD, leaving out `exclude` paths. */
+export async function committedDiff(
+  dir: string,
+  baseSha: string,
+  exclude: readonly string[] = [],
+): Promise<{ files: string[]; diff: string }> {
+  const scope = ["--", ".", ...exclude.map((path) => `:(exclude)${path}`)];
+  const names = await git(dir, ["diff", "--name-only", "-z", baseSha, "HEAD", ...scope]);
+  const diff = await git(dir, ["diff", baseSha, "HEAD", ...scope]);
+  return { files: names.split("\0").filter(Boolean).sort(), diff };
+}
+
 /** Uncommitted paths, with untracked directories collapsed to one entry. */
 export async function dirtyPaths(dir: string): Promise<string[]> {
   const out = await git(dir, ["status", "--porcelain", "-z", "--untracked-files=normal"]);

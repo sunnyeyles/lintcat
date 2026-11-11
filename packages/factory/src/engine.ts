@@ -1,4 +1,5 @@
 /** The deterministic orchestrator: agents reason, this code owns state, checks and delivery. */
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { collectRun, type AgentResult, type AgentRuntime, type AgentUsage } from "@pr-review/agent-runtime";
@@ -6,9 +7,12 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 import { z } from "zod";
 
 import { detectChecks, type CheckPlan } from "#src/checks";
-import { assertFrozen, recordDecision, type TaskContract } from "#src/contract";
+import { assertFrozen, recordDecision } from "#src/contract";
+import { assessEscalation } from "#src/escalation";
 import {
+  changedFiles,
   checkpointCommit,
+  committedDiff,
   createWorktree,
   dirtyPaths,
   headSha,
@@ -19,10 +23,13 @@ import {
   squashSince,
 } from "#src/git";
 import { locate } from "#src/locate";
-import { loadProfile, workflowVersion, type Stage } from "#src/profiles";
+import { loadProfile, workflowVersion, type Profile, type Stage } from "#src/profiles";
 import { loadPrompt } from "#src/prompts";
+import { analyseRepository, isTestPath, renderArchitecture, type ArchitectureBrief } from "#src/repository";
+import { renderReview, reviewOutputSchema, reviewPrompt, reviewRepairPrompt, validateReview, type ValidatedReview } from "#src/review";
 import { writeArtifact, writeRunFiles, type TaskView } from "#src/run-files";
 import { DEFAULT_LIMITS, SANDBOX_IMAGE, type ExecResult, type Sandbox, type SandboxProvider } from "#src/sandbox/index";
+import { implementPrompt, repairPrompt, reproducePrompt } from "#src/stage-prompts";
 import {
   findEffect,
   noteRecovery,
@@ -38,6 +45,8 @@ import {
 import { createRecorder } from "#src/telemetry";
 
 const MAX_RECOVERIES = 3;
+/** Escalating to a review needs at least this share of the wall-clock budget left. */
+const ESCALATION_BUDGET_SHARE = 0.25;
 
 interface PullRequestRequest {
   repoPath: string;
@@ -67,7 +76,17 @@ const implementerOutputSchema = z.object({
   acceptance: z.array(z.object({ id: z.string(), coverage: z.string() })),
   blockers: z.array(z.string()),
 });
-type ImplementerOutput = z.infer<typeof implementerOutputSchema>;
+
+const placedOutputSchema = implementerOutputSchema.extend({
+  placement: z.object({ location: z.string().min(1), reuse: z.array(z.string()), rationale: z.string().min(1) }),
+});
+
+const reproduceOutputSchema = z.object({
+  status: z.enum(["reproduced", "not_reproducible"]),
+  summary: z.string(),
+  reason: z.string(),
+  decisions: z.array(z.string()),
+});
 
 class RunStopped extends Error {
   constructor(
@@ -87,49 +106,23 @@ interface CheckOutcome {
   result: ExecResult;
 }
 
-const tail = (text: string, chars: number) => (text.length > chars ? `…${text.slice(-chars)}` : text);
+type CheckRecord = { name: string; command: string; exitCode: number; passed: boolean; outputHash: string };
 
-function implementPrompt(contract: TaskContract, located: unknown, plan: CheckPlan): string {
-  const { spec } = contract;
-  return [
-    `# Task: ${spec.title}`,
-    `Objective: ${spec.objective}`,
-    "## Approved specification (frozen)",
-    "```json",
-    JSON.stringify(
-      {
-        requirements: spec.requirements,
-        acceptanceCriteria: spec.acceptanceCriteria,
-        nonGoals: spec.nonGoals,
-        constraints: spec.constraints,
-        plan: spec.plan,
-        architectureDecisions: spec.architectureDecisions,
-        assumptions: spec.assumptions,
-      },
-      null,
-      2,
-    ),
-    "```",
-    "## Where to look first",
-    "```json",
-    JSON.stringify(located, null, 2),
-    "```",
-    "## Checks the factory runs afterwards (all must pass)",
-    ...plan.checks.map((c) => `- ${c.name}: \`${c.command}\``),
-    "",
-    "Implement the task now. Use `sandbox_exec` for targeted checks.",
-  ].join("\n");
+/** Everything a stage hands on, persisted in the checkpoint so recovery never redoes it. */
+interface RunData {
+  locate?: unknown;
+  architecture?: ArchitectureBrief;
+  repairs?: number;
+  summary?: string;
+  baseline?: CheckRecord[];
+  reproduce?: { status: "reproduced"; testFiles: string[]; failing: CheckRecord[] } | { status: "not_reproducible"; reason: string };
+  escalation?: { reason: string };
+  review?: ValidatedReview;
+  reviewRepair?: { sha: string };
+  turnsUsed?: number;
 }
 
-function repairPrompt(failures: CheckOutcome[], pass: number, max: number): string {
-  return [
-    `Repair pass ${pass} of ${max}. These mandatory checks failed after your change:`,
-    ...failures.map((f) =>
-      [`## ${f.name} (exit ${f.exitCode}${f.result.timedOut ? ", timed out" : ""})`, "```", tail(f.result.output, 6000), "```"].join("\n"),
-    ),
-    "Fix the cause, rerun the failing checks with `sandbox_exec`, then give your final answer.",
-  ].join("\n");
-}
+const record = (o: CheckOutcome): CheckRecord => ({ name: o.name, command: o.command, exitCode: o.exitCode, passed: o.passed, outputHash: o.result.outputHash });
 
 function errorCategory(result: ExecResult): string | null {
   if (result.timedOut) return "timeout";
@@ -138,11 +131,19 @@ function errorCategory(result: ExecResult): string | null {
   return result.exitCode === 0 ? null : "nonzero_exit";
 }
 
+/** The profile's stages, plus a review before delivery once a run has escalated. */
+function stagesOf(profile: Profile, data: RunData): Stage[] {
+  if (!data.escalation || profile.stages.includes("review")) return profile.stages;
+  const at = profile.stages.indexOf("deliver");
+  return [...profile.stages.slice(0, at), "review", ...profile.stages.slice(at)];
+}
+
 /** Runs one claimed run to a terminal state; never throws for run-level failures. */
 export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise<FactoryRun["status"]> {
   const { database, logger } = deps;
   const leaseMs = deps.leaseMs ?? 60_000;
   const heartbeatMs = deps.heartbeatMs ?? 5_000;
+  const startedAt = Date.now();
   let contract = claimed.contract;
   const profile = loadProfile(contract.profile);
   const recorder = createRecorder(
@@ -158,6 +159,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
   const deviations: string[] = [];
   const usage: AgentUsage[] = [];
   let checkpoint: Checkpoint | null = claimed.checkpoint ?? null;
+  const data: RunData = { ...((checkpoint?.data ?? {}) as RunData) };
   let sessionId = claimed.agentSessionId ?? undefined;
   let status: FactoryRun["status"] = "running";
   let currentStage: Stage | null = null;
@@ -191,7 +193,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       runId: claimed.id,
       status,
       stage: currentStage,
-      profile: profile.name,
+      profile: data.escalation ? `${profile.name} (escalated: + review)` : profile.name,
       contract,
       progress,
       verification,
@@ -199,6 +201,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       blockers,
       outcome,
       usage: summariseUsage(usage),
+      sections: evidenceSections(data, verification),
     };
     const { conflict } = await writeRunFiles(repo, claimed.id, {
       view,
@@ -207,58 +210,72 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     if (conflict) await recorder.event({ kind: "task_md_conflict", data: { preservedAs: "task.user-edit.md" } });
   };
 
-  const save = async (next: Checkpoint) => {
+  const save = async (stage: Stage, nextStage: Stage, sha?: string) => {
+    const next: Checkpoint = { stage, sha: sha ?? (await headSha(worktree)), nextStage, data: { ...data } as Record<string, unknown> };
     checkpoint = next;
-    await saveProgress(database, claimed.id, { checkpoint: next, stage: next.nextStage, ...(sessionId ? { agentSessionId: sessionId } : {}) });
+    await saveProgress(database, claimed.id, { checkpoint: next, stage: nextStage, contract, ...(sessionId ? { agentSessionId: sessionId } : {}) });
   };
 
-  // Implement and every repair pass draw on one turn budget.
-  let turnsUsed = Number(checkpoint?.data?.turnsUsed ?? 0);
-  const runAgent = async (stage: Stage, prompt: string, resume: boolean): Promise<{ result: AgentResult; output: ImplementerOutput | null }> => {
-    const turnsLeft = contract.budgets.maxAgentTurns - turnsUsed;
+  const decide = (stage: Stage, decision: string) => {
+    contract = recordDecision(contract, stage, decision, new Date());
+  };
+
+  const runAgent = async <S extends z.ZodType>(
+    stage: Stage,
+    prompt: string,
+    options: { role: "implementer" | "reviewer"; resume: boolean; schema: S },
+  ): Promise<{ result: AgentResult; output: z.infer<S> | null }> => {
+    const { role, resume, schema } = options;
+    const instructions = loadPrompt(role);
+    const implementer = role === "implementer";
+    // Implement and every repair pass draw on one turn budget; the reviewer gets its own.
+    const turnsLeft = implementer ? contract.budgets.maxAgentTurns - (data.turnsUsed ?? 0) : contract.budgets.maxAgentTurns;
     if (turnsLeft <= 0) throw new RunStopped("failed", `agent turn budget of ${contract.budgets.maxAgentTurns} spent`);
-    const instructions = loadPrompt("implementer");
     const result = await collectRun(
       deps.runtime.run({
-        role: "implementer",
+        role,
         promptVersion: instructions.version,
         systemPrompt: instructions.text,
         prompt,
         cwd: worktree,
-        readOnly: false,
+        readOnly: !implementer,
         maxTurns: turnsLeft,
-        outputSchema: z.toJSONSchema(implementerOutputSchema) as Record<string, unknown>,
+        outputSchema: z.toJSONSchema(schema) as Record<string, unknown>,
         signal: abort.signal,
-        tools: [
-          {
-            name: "sandbox_exec",
-            description:
-              "Run a shell command in the offline sandbox with the worktree at /workspace. Returns exit code and output.",
-            input: { command: z.string().min(1), cwd: z.string().optional() },
-            handler: async (args) => {
-              const result = await sandboxExec(stage, "agent", String(args.command), typeof args.cwd === "string" ? args.cwd : undefined);
-              return { text: `exit ${result.exitCode}${result.timedOut ? " (timed out)" : ""}\n${result.output}`, isError: result.exitCode !== 0 };
-            },
-          },
-        ],
-        ...(resume && sessionId ? { resumeSessionId: sessionId } : {}),
+        tools: implementer
+          ? [
+              {
+                name: "sandbox_exec",
+                description:
+                  "Run a shell command in the offline sandbox with the worktree at /workspace. Returns exit code and output.",
+                input: { command: z.string().min(1), cwd: z.string().optional() },
+                handler: async (args) => {
+                  const result = await sandboxExec(stage, "agent", String(args.command), typeof args.cwd === "string" ? args.cwd : undefined);
+                  return { text: `exit ${result.exitCode}${result.timedOut ? " (timed out)" : ""}\n${result.output}`, isError: result.exitCode !== 0 };
+                },
+              },
+            ]
+          : [],
+        ...(implementer && resume && sessionId ? { resumeSessionId: sessionId } : {}),
       }),
       async (event) => {
-        if (event.type === "session") sessionId = event.sessionId;
+        // The reviewer's session is disposable; only the implementer's is ever resumed.
+        if (event.type === "session" && implementer) sessionId = event.sessionId;
         if (event.type === "auth") {
-          await recorder.event({ kind: "agent_auth", stage, agentId: "implementer", promptVersion: instructions.version, data: { ...event } });
+          await recorder.event({ kind: "agent_auth", stage, agentId: role, promptVersion: instructions.version, data: { ...event } });
         }
       },
     );
     usage.push(result.usage);
-    turnsUsed += result.turns;
-    const parsed = implementerOutputSchema.safeParse(result.structured);
+    if (implementer) data.turnsUsed = (data.turnsUsed ?? 0) + result.turns;
+    const parsed = schema.safeParse(result.structured);
+    const outputStatus = parsed.success ? (parsed.data as { status?: unknown; verdict?: unknown }) : null;
     await recorder.event({
       kind: "agent_finished",
       stage,
-      agentId: "implementer",
+      agentId: role,
       promptVersion: instructions.version,
-      data: { ok: result.ok, reason: result.reason, turns: result.turns, durationMs: result.durationMs, usage: result.usage, status: parsed.success ? parsed.data.status : null },
+      data: { ok: result.ok, reason: result.reason, turns: result.turns, durationMs: result.durationMs, usage: result.usage, status: outputStatus?.status ?? outputStatus?.verdict ?? null },
     });
     return { result, output: parsed.success ? parsed.data : null };
   };
@@ -283,17 +300,30 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     return result;
   };
 
-  const runChecks = async (plan: CheckPlan, label: string): Promise<CheckOutcome[]> => {
+  const runChecks = async (plan: CheckPlan, stage: Stage, label: string): Promise<CheckOutcome[]> => {
     const outcomes: CheckOutcome[] = [];
     for (const check of plan.checks) {
       throwIfStopped();
-      const result = await sandboxExec("verify", check.name, check.command);
+      const result = await sandboxExec(stage, check.name, check.command);
       outcomes.push({ name: check.name, command: check.command, exitCode: result.exitCode, passed: result.exitCode === 0, durationMs: result.durationMs, result });
     }
-    verification.splice(0, verification.length, ...outcomes.map(({ result: _r, ...rest }) => rest));
-    await writeArtifact(repo, claimed.id, `verify-${label}.json`, JSON.stringify(verification, null, 2));
+    await writeArtifact(repo, claimed.id, `${label}.json`, JSON.stringify(outcomes.map(record), null, 2));
     return outcomes;
   };
+
+  /** Final verification evidence; a check that already failed at the refactor baseline is not blamed. */
+  const verifyChecks = async (plan: CheckPlan, stage: Stage, label: string) => {
+    const outcomes = await runChecks(plan, stage, label);
+    verification.splice(0, verification.length, ...outcomes.map(({ result: _r, ...rest }) => rest));
+    const preexisting = new Set((data.baseline ?? []).filter((b) => !b.passed).map((b) => b.name));
+    const blamed = outcomes.filter((o) => !o.passed && !preexisting.has(o.name));
+    const notBlamed = outcomes.filter((o) => !o.passed && preexisting.has(o.name)).map((o) => o.name);
+    await recorder.event({ kind: "checks_finished", stage, data: { label, notBlamed, results: outcomes.map((o) => ({ name: o.name, exitCode: o.exitCode, durationMs: o.durationMs })) } });
+    return { outcomes, blamed, notBlamed };
+  };
+
+  const withoutSetup = (files: string[]) =>
+    files.filter((f) => !setupPaths.some((p) => f === p || (p.endsWith("/") && f.startsWith(p))));
 
   const mark = (stage: string, state: TaskView["progress"][number]["status"], note?: string) => {
     const existing = progress.find((p) => p.stage === stage);
@@ -317,9 +347,10 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     if (plan.checks.length === 0) {
       throw new RunStopped("failed", "no checks detected: add .factory/checks so the change can be verified");
     }
-    const startIndex = checkpoint ? profile.stages.indexOf(checkpoint.nextStage as Stage) : 0;
+    let stages = stagesOf(profile, data);
+    const startIndex = checkpoint ? stages.indexOf(checkpoint.nextStage as Stage) : 0;
     if (startIndex < 0) throw new RunStopped("failed", `checkpoint names unknown stage ${checkpoint?.nextStage}`);
-    for (const stage of profile.stages.slice(0, startIndex)) mark(stage, "done", "before recovery");
+    for (const stage of stages.slice(0, startIndex)) mark(stage, "done", "before recovery");
 
     // Prepare always reruns: the sandbox is disposable and the worktree must match the checkpoint.
     currentStage = "prepare";
@@ -351,11 +382,12 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     });
     await sync();
 
-    let located: unknown = checkpoint?.data?.locate ?? null;
     let delivered: RunOutcome | undefined;
-    let repairs = Number(checkpoint?.data?.repairs ?? 0);
+    data.repairs ??= 0;
+    const needsPlacement = profile.name === "feature" || profile.name === "refactor";
 
-    for (const stage of profile.stages.slice(Math.max(startIndex, 1))) {
+    for (let i = Math.max(startIndex, 1); i < stages.length; i++) {
+      const stage = stages[i]!;
       throwIfStopped();
       currentStage = stage;
       mark(stage, "running");
@@ -365,56 +397,121 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
 
       await recorder.stage(stage, async () => {
         if (stage === "locate") {
-          located = await locate(worktree, contract.spec);
+          const located = await locate(worktree, contract.spec);
+          data.locate = located;
           await writeArtifact(repo, claimed.id, "locate.json", JSON.stringify(located, null, 2));
-          await save({ stage, sha: await headSha(worktree), nextStage: "implement", data: { locate: located } });
+          if (needsPlacement) {
+            data.architecture = await analyseRepository(worktree, located);
+            await writeArtifact(repo, claimed.id, "architecture.md", renderArchitecture(data.architecture));
+            await writeArtifact(repo, claimed.id, "architecture.json", JSON.stringify(data.architecture, null, 2));
+          }
+          await save(stage, stages[i + 1]!);
+          return;
+        }
+
+        if (stage === "baseline") {
+          const outcomes = await runChecks(plan, stage, "baseline");
+          data.baseline = outcomes.map(record);
+          await recorder.event({ kind: "baseline_recorded", stage, data: { results: data.baseline } });
+          if (!outcomes.some((o) => o.passed)) {
+            throw new RunStopped("failed", "no check passes at the base commit, so the refactor could not be shown to preserve behaviour");
+          }
+          await save(stage, stages[i + 1]!);
+          return;
+        }
+
+        if (stage === "reproduce") {
+          await reproduce(stage, plan, stages[i + 1]!);
           return;
         }
 
         if (stage === "implement") {
-          const { result, output } = await runAgent(stage, implementPrompt(contract, located, plan), false);
+          const reproduced = data.reproduce?.status === "reproduced" ? data.reproduce : undefined;
+          const prompt = implementPrompt(
+            contract,
+            {
+              located: data.locate ?? null,
+              architecture: data.architecture,
+              regression: reproduced ? { testFiles: reproduced.testFiles, failing: reproduced.failing.map((f) => f.name) } : undefined,
+              baselineFailing: data.baseline?.filter((b) => !b.passed).map((b) => b.name),
+              placement: needsPlacement,
+            },
+            plan,
+          );
+          const schema = needsPlacement ? placedOutputSchema : implementerOutputSchema;
+          const { result, output } = await runAgent(stage, prompt, { role: "implementer", resume: reproduced !== undefined, schema });
           throwIfStopped();
           if (!result.ok) throw new RunStopped("failed", `implementer ended with ${result.reason}`);
           if (output) {
-            for (const decision of output.decisions) contract = recordDecision(contract, stage, decision, new Date());
+            for (const decision of output.decisions) decide(stage, decision);
+            if ("placement" in output) {
+              const { location, reuse, rationale } = output.placement as z.infer<typeof placedOutputSchema>["placement"];
+              decide(stage, `placement: ${location} (${rationale})`);
+              decide(stage, `reuse: ${reuse.length ? reuse.join(", ") : "no existing module reused"}`);
+            }
             await saveProgress(database, claimed.id, { contract });
             if (output.status === "blocked") throw new RunStopped("failed", `implementer blocked: ${output.blockers.join("; ") || output.summary}`);
             if (output.status === "partial") deviations.push(`implementer reported partial: ${output.summary}`);
           } else {
-            deviations.push("implementer's final answer did not match its schema");
+            deviations.push(
+              needsPlacement
+                ? "implementer's final answer did not match its schema, so no placement or reuse justification was recorded"
+                : "implementer's final answer did not match its schema",
+            );
           }
           const sha = await checkpointCommit(worktree, `factory: implement ${contract.spec.title}`, undefined, setupPaths);
           if (!sha) throw new RunStopped("failed", "the implementer made no changes");
-          await save({ stage, sha, nextStage: "verify", data: { locate: located, repairs, turnsUsed, summary: output?.summary ?? "" } });
+          const missing = (reproduced?.testFiles ?? []).filter((f) => !existsSync(path.join(worktree, f)));
+          if (missing.length) throw new RunStopped("failed", `the fix deleted the regression test: ${missing.join(", ")}`);
+          data.summary = output?.summary ?? "";
+          await save(stage, "verify", sha);
           return;
         }
 
         if (stage === "verify") {
           let previousSignature: string | null = null;
           for (;;) {
-            const outcomes = await runChecks(plan, `${repairs}`);
-            const failures = outcomes.filter((o) => !o.passed);
-            await recorder.event({ kind: "checks_finished", stage, data: { repairs, results: outcomes.map((o) => ({ name: o.name, exitCode: o.exitCode, durationMs: o.durationMs })) } });
-            if (failures.length === 0) break;
+            const { blamed: failures, notBlamed } = await verifyChecks(plan, stage, `verify-${data.repairs}`);
+            if (failures.length === 0) {
+              for (const name of notBlamed) {
+                const note = `${name} fails at the base commit too; recorded, not blamed on this run`;
+                if (!deviations.includes(note)) deviations.push(note);
+              }
+              break;
+            }
             const signature = failures.map((f) => `${f.name}:${f.result.outputHash}`).sort().join("|");
+            const regressed = data.baseline ? " (passed at baseline: a regression)" : "";
             if (signature === previousSignature) {
               await recorder.event({ kind: "repeated_failure", stage, data: { signature } });
-              throw new RunStopped("failed", `the same checks failed identically after repair: ${failures.map((f) => f.name).join(", ")}`);
+              throw new RunStopped("failed", `the same checks failed identically after repair: ${failures.map((f) => f.name).join(", ")}${regressed}`);
             }
-            if (repairs >= contract.budgets.maxRepairPasses) {
-              throw new RunStopped("failed", `mandatory checks still failing after ${repairs} repair pass(es): ${failures.map((f) => f.name).join(", ")}`);
+            if (data.repairs! >= contract.budgets.maxRepairPasses) {
+              throw new RunStopped("failed", `mandatory checks still failing after ${data.repairs} repair pass(es): ${failures.map((f) => f.name).join(", ")}${regressed}`);
             }
             previousSignature = signature;
-            repairs++;
-            await recorder.event({ kind: "repair_started", stage, data: { pass: repairs, failing: failures.map((f) => f.name) } });
-            const { result } = await runAgent(stage, repairPrompt(failures, repairs, contract.budgets.maxRepairPasses), true);
+            data.repairs = data.repairs! + 1;
+            await recorder.event({ kind: "repair_started", stage, data: { pass: data.repairs, failing: failures.map((f) => f.name) } });
+            const failed = failures.map((f) => ({ name: f.name, exitCode: f.exitCode, timedOut: f.result.timedOut, output: f.result.output }));
+            const { result } = await runAgent(stage, repairPrompt(failed, data.repairs, contract.budgets.maxRepairPasses), {
+              role: "implementer",
+              resume: true,
+              schema: implementerOutputSchema,
+            });
             throwIfStopped();
             if (!result.ok) throw new RunStopped("failed", `repair agent ended with ${result.reason}`);
-            const sha = await checkpointCommit(worktree, `factory: repair pass ${repairs}`, undefined, setupPaths);
-            if (!sha) throw new RunStopped("failed", `repair pass ${repairs} changed nothing`);
-            await save({ stage, sha, nextStage: "verify", data: { locate: located, repairs, turnsUsed } });
+            const sha = await checkpointCommit(worktree, `factory: repair pass ${data.repairs}`, undefined, setupPaths);
+            if (!sha) throw new RunStopped("failed", `repair pass ${data.repairs} changed nothing`);
+            await save(stage, "verify", sha);
           }
-          await save({ stage, sha: await headSha(worktree), nextStage: "deliver", data: { locate: located, repairs, turnsUsed } });
+          if (!profile.independentReview && !data.escalation) await maybeEscalate(stage);
+          stages = stagesOf(profile, data);
+          await save(stage, stages[i + 1]!);
+          return;
+        }
+
+        if (stage === "review") {
+          await review(stage, plan);
+          await save(stage, "deliver");
           return;
         }
 
@@ -453,6 +550,98 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     await sandbox?.destroy().catch(() => {});
   }
 
+  /** A failing regression test, committed before any fix; or a recorded reason it can't exist. */
+  async function reproduce(stage: Stage, plan: CheckPlan, nextStage: Stage) {
+    const startSha = await headSha(worktree);
+    const { result, output } = await runAgent(stage, reproducePrompt(contract, data.locate ?? null, plan), {
+      role: "implementer",
+      resume: false,
+      schema: reproduceOutputSchema,
+    });
+    throwIfStopped();
+    if (!result.ok) throw new RunStopped("failed", `implementer ended with ${result.reason} while reproducing`);
+    if (!output) throw new RunStopped("failed", "the reproduce answer did not match its schema");
+    for (const decision of output.decisions) decide(stage, decision);
+    const touched = withoutSetup(await changedFiles(worktree, startSha));
+
+    if (output.status === "not_reproducible") {
+      if (!contract.spec.acceptanceCriteria.some((ac) => ac.verification === "manual")) {
+        throw new RunStopped("failed", `the bug could not be reproduced by a test (${output.reason}) and every acceptance criterion requires automated verification`);
+      }
+      if (touched.length) await resetTo(worktree, startSha);
+      decide(stage, `no regression test: ${output.reason}; continuing because the acceptance criteria allow manual verification`);
+      data.reproduce = { status: "not_reproducible", reason: output.reason };
+      await writeArtifact(repo, claimed.id, "reproduce.json", JSON.stringify(data.reproduce, null, 2));
+      await save(stage, nextStage, startSha);
+      return;
+    }
+
+    if (touched.length === 0) throw new RunStopped("failed", "the reproduce stage wrote no regression test");
+    const nonTest = touched.filter((f) => !isTestPath(f));
+    if (nonTest.length) {
+      await recorder.event({ kind: "reproduce_rejected", stage, data: { nonTest } });
+      throw new RunStopped("failed", `the reproduce stage may only add or change tests, but it changed ${nonTest.join(", ")}`);
+    }
+    const outcomes = await runChecks(plan, stage, "reproduce-checks");
+    const failing = outcomes.filter((o) => !o.passed);
+    if (failing.length === 0) {
+      throw new RunStopped("failed", `the regression test (${touched.join(", ")}) passes before any fix, so it does not reproduce the bug`);
+    }
+    const sha = await checkpointCommit(worktree, `factory: reproduce ${contract.spec.title}`, undefined, setupPaths);
+    if (!sha) throw new RunStopped("failed", "the regression test could not be committed");
+    data.reproduce = { status: "reproduced", testFiles: touched, failing: failing.map(record) };
+    await recorder.event({ kind: "bug_reproduced", stage, data: { testFiles: touched, failing: data.reproduce.failing } });
+    await writeArtifact(repo, claimed.id, "reproduce.json", JSON.stringify(data.reproduce, null, 2));
+    await save(stage, nextStage, sha);
+  }
+
+  /** Adds the review stage when a light run outgrew its estimate; stops when it outgrew its approval. */
+  async function maybeEscalate(stage: Stage) {
+    const { files } = await committedDiff(worktree, contract.baseSha, setupPaths);
+    const assessed = assessEscalation(worktree, files, contract.spec.estimatedFiles);
+    if (assessed.kind === "none") return;
+    if (assessed.kind === "blocked") throw new RunStopped("failed", `escalation exceeds the approved scope: ${assessed.reason}`);
+    const remainingMs = contract.budgets.wallClockMinutes * 60_000 - (Date.now() - startedAt);
+    if (remainingMs < contract.budgets.wallClockMinutes * 60_000 * ESCALATION_BUDGET_SHARE) {
+      throw new RunStopped("failed", `the run needs an independent review (${assessed.reason}) but too little of the wall-clock budget is left`);
+    }
+    data.escalation = { reason: assessed.reason };
+    decide(stage, `escalated ${profile.name} to add an independent review: ${assessed.reason}`);
+    await recorder.event({ kind: "profile_escalated", stage, data: { from: profile.name, added: ["review"], reason: assessed.reason, files: files.length } });
+  }
+
+  /** One review of the immutable diff; at most one repair pass and one recheck. */
+  async function review(stage: Stage, plan: CheckPlan) {
+    if (!data.review) {
+      const { files, diff } = await committedDiff(worktree, contract.baseSha, setupPaths);
+      const { result } = await runAgent(stage, reviewPrompt(contract, files, diff), { role: "reviewer", resume: false, schema: reviewOutputSchema });
+      throwIfStopped();
+      const validated = validateReview(result.structured, files, contract);
+      if (!result.ok || !validated) throw new RunStopped("failed", "the independent review returned no valid verdict");
+      data.review = validated;
+      await writeArtifact(repo, claimed.id, "review.json", JSON.stringify(validated, null, 2));
+      await recorder.event({ kind: "review_finished", stage, data: { verdict: validated.verdict, findings: validated.findings.length, blocking: validated.blocking.length, dropped: validated.dropped.length } });
+      await save(stage, "review");
+    }
+    const { blocking } = data.review;
+    if (blocking.length === 0) return;
+
+    if (!data.reviewRepair) {
+      await recorder.event({ kind: "review_repair_started", stage, data: { blocking: blocking.length } });
+      const { result } = await runAgent(stage, reviewRepairPrompt(blocking), { role: "implementer", resume: true, schema: implementerOutputSchema });
+      throwIfStopped();
+      if (!result.ok) throw new RunStopped("failed", `review repair ended with ${result.reason}`);
+      const sha = await checkpointCommit(worktree, "factory: review repair", undefined, setupPaths);
+      if (!sha) throw new RunStopped("failed", `the review's blocking findings were not addressed: ${blocking.map((f) => `${f.file}: ${f.problem}`).join("; ")}`);
+      data.reviewRepair = { sha };
+      await save(stage, "review", sha);
+    }
+    const { blamed } = await verifyChecks(plan, stage, "verify-review-repair");
+    if (blamed.length) {
+      throw new RunStopped("failed", `checks failing after the review repair: ${blamed.map((f) => `${f.name} (exit ${f.exitCode}, output ${f.result.outputHash.slice(0, 12)})`).join(", ")}`);
+    }
+  }
+
   async function deliver() {
     const body = [
       contract.spec.objective,
@@ -461,8 +650,12 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     ].join("\n");
     const sha = await squashSince(worktree, contract.baseSha, `${contract.spec.title}\n\n${body}`);
     await recordEffect(database, { key: `branch:${claimed.id}`, runId: claimed.id, kind: "branch", result: { branch, sha } });
+    const passed = verification.filter((v) => v.passed).length;
     const outcome: RunOutcome = {
-      summary: `Branch ${branch} at ${sha.slice(0, 12)}, all ${verification.length} checks passed.`,
+      summary:
+        passed === verification.length
+          ? `Branch ${branch} at ${sha.slice(0, 12)}, all ${verification.length} checks passed.`
+          : `Branch ${branch} at ${sha.slice(0, 12)}, ${passed} of ${verification.length} checks passed; the rest already failed at the base commit.`,
       branch,
       checks: verification.map((v) => ({ name: v.name, exitCode: v.exitCode, passed: v.passed })),
     };
@@ -483,9 +676,58 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     } else if (deps.delivery === "pr") {
       deviations.push("PR delivery skipped: the approved contract does not permit push and PR, or no GitHub client is configured");
     }
-    await saveProgress(database, claimed.id, { checkpoint: { stage: "deliver", sha, nextStage: "deliver" } });
+    await saveProgress(database, claimed.id, { checkpoint: { stage: "deliver", sha, nextStage: "deliver", data: { ...data } as Record<string, unknown> } });
     return outcome;
   }
+}
+
+/** The profile-specific evidence task.md shows: brief, baseline, reproduction, escalation, review. */
+function evidenceSections(data: RunData, verification: TaskView["verification"]): NonNullable<TaskView["sections"]> {
+  const sections: NonNullable<TaskView["sections"]> = [];
+  const passedNow = (name: string) => verification.find((v) => v.name === name)?.passed;
+  if (data.architecture) {
+    const brief = data.architecture;
+    sections.push({
+      heading: "Repository intelligence",
+      lines: [
+        `- Placement: ${brief.placement}`,
+        ...brief.candidates.slice(0, 5).map((c) => `- Candidate: \`${c.path}\` (${c.importers} importer(s)${c.test ? `, tested by \`${c.test}\`` : ""})`),
+        ...brief.risks.map((r) => `- Risk: ${r}`),
+        "- Full brief: `artifacts/architecture.md`",
+      ],
+    });
+  }
+  if (data.baseline) {
+    sections.push({
+      heading: "Baseline",
+      lines: data.baseline.map((b) => `- ${b.name}: ${b.passed ? "pass" : "FAIL (pre-existing, not blamed on this run)"} at the base commit, output \`${b.outputHash.slice(0, 12)}\``),
+    });
+  }
+  if (data.reproduce) {
+    const r = data.reproduce;
+    sections.push({
+      heading: "Reproduction",
+      lines:
+        r.status === "reproduced"
+          ? [
+              `- Regression test: ${r.testFiles.map((f) => `\`${f}\``).join(", ")}`,
+              ...r.failing.map((f) => {
+                const after = passedNow(f.name);
+                const now = after === undefined ? "" : after ? "; passes after the fix" : "; still failing";
+                return `- \`${f.command}\` failed before the fix (exit ${f.exitCode}, output \`${f.outputHash.slice(0, 12)}\`)${now}`;
+              }),
+            ]
+          : [`- Not reproduced by a test: ${r.reason}`],
+    });
+  }
+  if (data.escalation) sections.push({ heading: "Escalation", lines: [`- Added an independent review: ${data.escalation.reason}`] });
+  if (data.review) {
+    sections.push({
+      heading: "Independent review",
+      lines: [...renderReview(data.review), ...(data.reviewRepair ? [`- One repair pass made: \`${data.reviewRepair.sha.slice(0, 12)}\``] : [])],
+    });
+  }
+  return sections;
 }
 
 function usageTotals(usage: AgentUsage[]): Record<string, number | null> {

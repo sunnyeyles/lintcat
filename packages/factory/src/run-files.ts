@@ -18,6 +18,8 @@ export type TaskView = {
   blockers: string[];
   outcome: { summary: string; branch?: string; pullRequestUrl?: string } | null;
   usage?: { estimatedCostUsd: number | null; inputTokens: number; outputTokens: number; note: string };
+  /** Profile-specific evidence such as reproduction, baseline and review. */
+  sections?: { heading: string; lines: string[] }[];
 };
 
 export function runDir(repo: string, runId: string): string {
@@ -99,6 +101,7 @@ export function renderTaskMarkdown(view: TaskView): string {
       ),
     ]);
   }
+  for (const extra of view.sections ?? []) section(extra.heading, extra.lines);
   section("Blockers", bullets(view.blockers));
   if (view.outcome) {
     const { summary, branch, pullRequestUrl } = view.outcome;

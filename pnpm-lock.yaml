@@ -54,6 +54,9 @@ importers:
 
   apps/factory:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.4.3)
       '@pr-review/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
@@ -63,6 +66,9 @@ importers:
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@pr-review/eslint-config':
         specifier: workspace:*
@@ -375,6 +381,9 @@ importers:
       '@pr-review/agent-runtime':
         specifier: workspace:*
         version: link:../agent-runtime
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../logging

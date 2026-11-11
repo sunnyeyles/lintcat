@@ -16,7 +16,7 @@ export interface AgentPrompt {
 
 const frontmatterSchema = z.object({ role: z.string(), version: z.number().int() });
 
-export function loadPrompt(role: "discovery" | "implementer"): AgentPrompt {
+export function loadPrompt(role: "discovery" | "implementer" | "reviewer"): AgentPrompt {
   const raw = readFileSync(assetPath("agents", `${role}.md`), "utf8");
   const match = /^---\n([\s\S]*?)\n---\n/.exec(raw);
   if (!match?.[1]) throw new Error(`agents/${role}.md has no frontmatter`);

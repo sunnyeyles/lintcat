@@ -7,7 +7,9 @@
     "#src/*": "./src/*.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./fake-sandbox": "./src/sandbox/fake-sandbox.ts",
+    "./test-store": "./src/store/test-store.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -17,6 +19,7 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@pr-review/agent-runtime": "workspace:*",
+    "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.7",

@@ -1,6 +1,6 @@
 name: bugfix
 version: 1
-enabled: false
+enabled: true
 description: Reproducible defect. Diagnose, reproduce, regression test, fix, verify.
 weight: 1
 stages: [prepare, locate, reproduce, implement, verify, deliver]

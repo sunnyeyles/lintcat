@@ -48,9 +48,21 @@ describe("routeTask", () => {
     expect(routeTask(sampleSpec, profiles)).toMatchObject({ ok: true, profile: "quick", overridden: false });
   });
 
-  it("blocks profiles that are not enabled yet", () => {
-    expect(routeTask({ ...sampleSpec, category: "bugfix" }, profiles)).toMatchObject({ ok: false });
-    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, profiles)).toMatchObject({ ok: false, blocker: expect.stringMatching(/feature/) });
+  it("routes defects, structural work and larger features to their own profiles", () => {
+    expect(routeTask({ ...sampleSpec, category: "bugfix" }, profiles)).toMatchObject({ ok: true, profile: "bugfix" });
+    expect(routeTask({ ...sampleSpec, category: "refactor" }, profiles)).toMatchObject({ ok: true, profile: "refactor" });
+    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, profiles)).toMatchObject({ ok: true, profile: "feature" });
+    expect(routeTask({ ...sampleSpec, touchesSecurityOrData: true }, profiles)).toMatchObject({ ok: true, profile: "feature" });
+  });
+
+  it("blocks a profile that is disabled", () => {
+    const disabled = profiles.map((p) => (p.name === "feature" ? { ...p, enabled: false } : p));
+    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, disabled)).toMatchObject({ ok: false, blocker: expect.stringMatching(/feature/) });
+  });
+
+  it("allows a heavier override but never a lighter one for risky work", () => {
+    expect(routeTask(sampleSpec, profiles, "feature")).toMatchObject({ ok: true, profile: "feature", overridden: true });
+    expect(routeTask({ ...sampleSpec, category: "bugfix", risk: "high" }, profiles, "quick")).toMatchObject({ ok: false });
   });
 
   it("allows a lighter override only for low-risk work", () => {
@@ -61,7 +73,8 @@ describe("routeTask", () => {
 
 describe("loadPrompt", () => {
   it("versions each prompt by role, number and content", () => {
-    expect(loadPrompt("implementer").version).toMatch(/^implementer@1\+[0-9a-f]{8}$/);
+    expect(loadPrompt("implementer").version).toMatch(/^implementer@2\+[0-9a-f]{8}$/);
+    expect(loadPrompt("reviewer").version).toMatch(/^reviewer@1\+[0-9a-f]{8}$/);
     expect(loadPrompt("discovery").text).toContain("one consolidated");
   });
 });
