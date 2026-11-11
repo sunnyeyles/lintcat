@@ -4,7 +4,6 @@ on:
   # Branches only: main runs this through production.yml.
   push:
     branches-ignore: [main]
-  workflow_dispatch:
   workflow_call:
 
 permissions:
