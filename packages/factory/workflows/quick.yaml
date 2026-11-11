@@ -6,7 +6,7 @@ weight: 0
 stages: [prepare, locate, implement, verify, deliver]
 independentReview: false
 budgets:
-  maxAgentTurns: 60
-  maxRepairPasses: 2
-  wallClockMinutes: 45
-  commandTimeoutSeconds: 900
+  maxAgentTurns: 30
+  maxRepairPasses: 1
+  wallClockMinutes: 20
+  commandTimeoutSeconds: 300

@@ -6,7 +6,7 @@ weight: 2
 stages: [prepare, locate, baseline, implement, verify, review, deliver]
 independentReview: true
 budgets:
-  maxAgentTurns: 150
+  maxAgentTurns: 80
   maxRepairPasses: 1
-  wallClockMinutes: 120
-  commandTimeoutSeconds: 1200
+  wallClockMinutes: 45
+  commandTimeoutSeconds: 600

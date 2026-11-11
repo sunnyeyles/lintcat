@@ -125,6 +125,7 @@ describe("quick workflow", () => {
     expect((await service.runNext({ runId }))?.status).toBe("delivered");
     expect(runtime.specs[1]?.resumeSessionId).toBe("fake-session-1");
     expect(runtime.specs[1]?.prompt).toContain("expected hello");
+    expect(runtime.specs[1]?.maxTurns).toBe(runtime.specs[0]!.maxTurns - 1);
     const failed = (await listCommands(database, runId)).filter((c) => c.exitCode !== 0);
     expect(failed).toHaveLength(1);
   });
@@ -147,10 +148,9 @@ describe("quick workflow", () => {
     const { service, runId } = await approvedRun([
       writeGreet("export const greet = () => 'a';\n"),
       writeGreet("export const greet = () => 'b';\n"),
-      writeGreet("export const greet = () => 'c';\n"),
     ]);
     expect((await service.runNext({ runId }))?.status).toBe("failed");
-    expect((await service.get(runId))!.blocker).toMatch(/after 2 repair pass/);
+    expect((await service.get(runId))!.blocker).toMatch(/after 1 repair pass/);
     expect(readFileSync(path.join(repo, ".factory", "runs", runId, "task.md"), "utf8")).toMatch(/Blockers/);
   });
 

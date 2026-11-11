@@ -212,7 +212,11 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     await saveProgress(database, claimed.id, { checkpoint: next, stage: next.nextStage, ...(sessionId ? { agentSessionId: sessionId } : {}) });
   };
 
+  // Implement and every repair pass draw on one turn budget.
+  let turnsUsed = Number(checkpoint?.data?.turnsUsed ?? 0);
   const runAgent = async (stage: Stage, prompt: string, resume: boolean): Promise<{ result: AgentResult; output: ImplementerOutput | null }> => {
+    const turnsLeft = contract.budgets.maxAgentTurns - turnsUsed;
+    if (turnsLeft <= 0) throw new RunStopped("failed", `agent turn budget of ${contract.budgets.maxAgentTurns} spent`);
     const instructions = loadPrompt("implementer");
     const result = await collectRun(
       deps.runtime.run({
@@ -222,7 +226,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
         prompt,
         cwd: worktree,
         readOnly: false,
-        maxTurns: contract.budgets.maxAgentTurns,
+        maxTurns: turnsLeft,
         outputSchema: z.toJSONSchema(implementerOutputSchema) as Record<string, unknown>,
         signal: abort.signal,
         tools: [
@@ -247,6 +251,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       },
     );
     usage.push(result.usage);
+    turnsUsed += result.turns;
     const parsed = implementerOutputSchema.safeParse(result.structured);
     await recorder.event({
       kind: "agent_finished",
@@ -380,7 +385,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
           }
           const sha = await checkpointCommit(worktree, `factory: implement ${contract.spec.title}`, undefined, setupPaths);
           if (!sha) throw new RunStopped("failed", "the implementer made no changes");
-          await save({ stage, sha, nextStage: "verify", data: { locate: located, repairs, summary: output?.summary ?? "" } });
+          await save({ stage, sha, nextStage: "verify", data: { locate: located, repairs, turnsUsed, summary: output?.summary ?? "" } });
           return;
         }
 
@@ -407,9 +412,9 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
             if (!result.ok) throw new RunStopped("failed", `repair agent ended with ${result.reason}`);
             const sha = await checkpointCommit(worktree, `factory: repair pass ${repairs}`, undefined, setupPaths);
             if (!sha) throw new RunStopped("failed", `repair pass ${repairs} changed nothing`);
-            await save({ stage, sha, nextStage: "verify", data: { locate: located, repairs } });
+            await save({ stage, sha, nextStage: "verify", data: { locate: located, repairs, turnsUsed } });
           }
-          await save({ stage, sha: await headSha(worktree), nextStage: "deliver", data: { locate: located, repairs } });
+          await save({ stage, sha: await headSha(worktree), nextStage: "deliver", data: { locate: located, repairs, turnsUsed } });
           return;
         }
 
