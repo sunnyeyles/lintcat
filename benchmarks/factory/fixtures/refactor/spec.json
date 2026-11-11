@@ -1,0 +1,23 @@
+{
+  "title": "Extract the duplicated money formatting",
+  "objective": "One formatMoney(cents, currency) in src/money.mjs replaces the three copies of the formatting code",
+  "category": "refactor",
+  "requirements": [
+    "src/money.mjs exports formatMoney(cents, currency), returning e.g. '€3.50' or '-$0.05'",
+    "invoice.mjs and receipt.mjs import formatMoney from \"./money.mjs\" and no longer format amounts themselves",
+    "every existing output string stays byte-for-byte the same"
+  ],
+  "nonGoals": ["supporting more currencies", "changing any output"],
+  "constraints": ["no dependencies"],
+  "acceptanceCriteria": [
+    { "id": "AC1", "text": "Given the existing inputs, when invoiceLine, invoiceTotal and receipt run, then their outputs are unchanged", "verification": "automated" },
+    { "id": "AC2", "text": "Given formatMoney(-5, 'USD'), when called, then it returns '-$0.05'", "verification": "automated" }
+  ],
+  "plan": ["Record current outputs as a baseline", "Create src/money.mjs", "Use it in src/invoice.mjs and src/receipt.mjs", "Run the tests"],
+  "architectureDecisions": ["A new src/money.mjs module shared by invoice and receipt"],
+  "repositoryFindings": ["invoice.mjs formats money twice and receipt.mjs once, identically", "tests run with node --test"],
+  "assumptions": ["a negative amount puts the sign before the currency symbol, as today"],
+  "estimatedFiles": 4,
+  "risk": "low",
+  "touchesSecurityOrData": false
+}

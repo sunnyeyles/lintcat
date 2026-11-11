@@ -1,0 +1,5 @@
+{
+  "description": "Fix a median that sorts as strings, mutates its input and ignores even lengths; the visible test still passes",
+  "checks": "test: node --test \"test/*.test.mjs\"",
+  "baseSha": "ea2cabf309ed9938a497d96ecca85e88e89086f9"
+}

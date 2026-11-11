@@ -1,0 +1,5 @@
+{
+  "description": "Add an option to an existing function in a one-module repo",
+  "checks": "test: node --test \"test/*.test.mjs\"",
+  "baseSha": "97d755a78047d3207962293ff40ab9b67922a1a8"
+}

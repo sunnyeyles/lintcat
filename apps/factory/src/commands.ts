@@ -29,6 +29,8 @@ import {
   type FactoryConfig,
 } from "#src/config";
 import { createTerminalIO } from "#src/discovery-io";
+import { benchCompare, benchRun } from "#src/bench";
+import { serveMcp } from "#src/mcp";
 import { USAGE, type Command } from "#src/options";
 import {
   formatEvent,
@@ -39,6 +41,7 @@ import {
   renderSummary,
   TERMINAL_STATUSES,
 } from "#src/render";
+import { prune, report } from "#src/report";
 
 export interface CommandContext {
   env: Record<string, string | undefined>;
@@ -431,5 +434,15 @@ export function runCommand(ctx: CommandContext, command: Command): Promise<numbe
       return cancel(ctx, command.runId);
     case "result":
       return result(ctx, command.runId);
+    case "report":
+      return report(ctx, command, { openDatabase });
+    case "prune":
+      return prune(ctx, command, { openDatabase });
+    case "bench-run":
+      return benchRun(ctx, command, { openDatabase, agentRuntime, requireDocker });
+    case "bench-compare":
+      return Promise.resolve(benchCompare(ctx, command));
+    case "mcp":
+      return serveMcp(ctx, { openDatabase, makeService, agentRuntime, logRepo });
   }
 }

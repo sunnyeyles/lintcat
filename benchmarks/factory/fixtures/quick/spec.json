@@ -1,0 +1,23 @@
+{
+  "title": "Add an excited option to greet",
+  "objective": "greet(name, { excited: true }) ends the greeting with an exclamation mark",
+  "category": "quick",
+  "requirements": [
+    "greet accepts an optional second argument { excited?: boolean }",
+    "when excited is true the result is the usual greeting followed by a single '!'",
+    "without the option, or with excited false, the result is unchanged"
+  ],
+  "nonGoals": ["changing the greeting text"],
+  "constraints": ["keep greet a named export of src/greet.mjs"],
+  "acceptanceCriteria": [
+    { "id": "AC1", "text": "Given greet('Ada', { excited: true }), when called, then it returns 'Hello, Ada!'", "verification": "automated" },
+    { "id": "AC2", "text": "Given greet('Ada'), when called, then it still returns 'Hello, Ada'", "verification": "automated" }
+  ],
+  "plan": ["Add the options parameter to src/greet.mjs", "Cover it in test/greet.test.mjs"],
+  "architectureDecisions": ["Change src/greet.mjs in place"],
+  "repositoryFindings": ["src/greet.mjs defines greet", "tests run with node --test"],
+  "assumptions": [],
+  "estimatedFiles": 2,
+  "risk": "low",
+  "touchesSecurityOrData": false
+}

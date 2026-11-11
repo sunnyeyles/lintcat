@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  real,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -126,7 +127,35 @@ export const factoryEffects = pgTable("factory_effects", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const factoryLessonStatus = pgEnum("factory_lesson_status", ["proposed", "retired"]);
+
+export type LessonTarget = "prompt" | "tool" | "context" | "workflow" | "sandbox";
+
+// Learning memory: proposals for a human, never injected into an agent's context.
+export const factoryLessons = pgTable(
+  "factory_lessons",
+  {
+    key: text("key").primaryKey(),
+    scope: text("scope").notNull(),
+    target: text("target").$type<LessonTarget>().notNull(),
+    title: text("title").notNull(),
+    rootCause: text("root_cause").notNull(),
+    proposal: text("proposal").notNull(),
+    confidence: real("confidence").notNull(),
+    evidenceRunIds: jsonb("evidence_run_ids").$type<string[]>().notNull(),
+    occurrences: integer("occurrences").notNull(),
+    status: factoryLessonStatus("status").notNull().default("proposed"),
+    retiredReason: text("retired_reason"),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ...timestamps,
+  },
+  (table) => [index("factory_lessons_status_idx").on(table.status, table.expiresAt)],
+);
+
 export type FactoryRun = typeof factoryRuns.$inferSelect;
 export type FactoryEvent = typeof factoryEvents.$inferSelect;
 export type FactoryCommand = typeof factoryCommands.$inferSelect;
 export type FactoryEffect = typeof factoryEffects.$inferSelect;
+export type FactoryLesson = typeof factoryLessons.$inferSelect;

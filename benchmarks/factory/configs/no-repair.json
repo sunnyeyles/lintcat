@@ -1,0 +1,6 @@
+{
+  "name": "no-repair",
+  "description": "No repair passes: measures how much the repair loop is worth",
+  "budgets": { "maxRepairPasses": 0 },
+  "repeat": 1
+}

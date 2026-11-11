@@ -1,0 +1,25 @@
+{
+  "title": "Create a slugify module",
+  "objective": "A new src/slugify.mjs exports slugify(text), turning any text into a URL slug",
+  "category": "greenfield",
+  "requirements": [
+    "src/slugify.mjs exports a named function slugify(text)",
+    "the result is lowercase",
+    "every run of characters other than a-z and 0-9 becomes a single '-'",
+    "the result has no leading or trailing '-'",
+    "an empty string returns an empty string"
+  ],
+  "nonGoals": ["transliterating accented letters"],
+  "constraints": ["no dependencies", "ES module syntax"],
+  "acceptanceCriteria": [
+    { "id": "AC1", "text": "Given 'Hello, World!', when slugified, then the result is 'hello-world'", "verification": "automated" },
+    { "id": "AC2", "text": "Given '--edge--', when slugified, then the result is 'edge'", "verification": "automated" }
+  ],
+  "plan": ["Create src/slugify.mjs", "Add test/slugify.test.mjs"],
+  "architectureDecisions": ["A new module under src/, matching the README's purpose"],
+  "repositoryFindings": ["the repository has only a README and a smoke test", "tests run with node --test"],
+  "assumptions": [],
+  "estimatedFiles": 2,
+  "risk": "low",
+  "touchesSecurityOrData": false
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Fix median for unsorted and even-length input",
+  "objective": "median returns the true statistical median of a list of numbers",
+  "category": "bugfix",
+  "requirements": [
+    "median sorts numerically: median([10, 9, 2]) is 9, not 2",
+    "an even-length list returns the mean of its two middle values",
+    "median does not reorder the caller's array",
+    "median([]) throws a RangeError"
+  ],
+  "nonGoals": ["changing mean"],
+  "constraints": ["keep the named exports of src/stats.mjs"],
+  "acceptanceCriteria": [
+    { "id": "AC1", "text": "Given [10, 9, 2], when median is called, then it returns 9", "verification": "automated" },
+    { "id": "AC2", "text": "Given [1, 2, 3, 4], when median is called, then it returns 2.5", "verification": "automated" },
+    { "id": "AC3", "text": "Given an empty list, when median is called, then it throws a RangeError", "verification": "automated" }
+  ],
+  "plan": ["Write a failing regression test for median", "Fix median in src/stats.mjs", "Run the tests"],
+  "architectureDecisions": ["Fix src/stats.mjs in place"],
+  "repositoryFindings": ["median uses Array#sort without a comparator and sorts in place", "tests run with node --test"],
+  "assumptions": [],
+  "estimatedFiles": 2,
+  "risk": "low",
+  "touchesSecurityOrData": false
+}

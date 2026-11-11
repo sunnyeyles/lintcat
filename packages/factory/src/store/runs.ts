@@ -270,6 +270,23 @@ export async function recordEffect(
   return (await findEffect(database, effect.key))!;
 }
 
+/** Drops the event and command detail of runs that finished before the cutoff; the run rows stay. */
+export async function pruneRunHistory(
+  database: FactoryDatabase,
+  cutoff: Date,
+): Promise<{ runs: number; events: number; commands: number }> {
+  const old = database
+    .select({ id: factoryRuns.id })
+    .from(factoryRuns)
+    .where(and(inArray(factoryRuns.status, ["delivered", "failed", "cancelled"]), lt(factoryRuns.finishedAt, cutoff)));
+  return database.transaction(async (tx) => {
+    const events = await tx.delete(factoryEvents).where(inArray(factoryEvents.runId, old)).returning({ runId: factoryEvents.runId });
+    const commands = await tx.delete(factoryCommands).where(inArray(factoryCommands.runId, old)).returning({ runId: factoryCommands.runId });
+    const runs = new Set([...events, ...commands].map((row) => row.runId));
+    return { runs: runs.size, events: events.length, commands: commands.length };
+  });
+}
+
 export interface ProfileSummary {
   profile: string;
   runs: number;
