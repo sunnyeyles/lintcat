@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MAX_ASSISTANT_CHARS, MAX_MESSAGES } from "@/lib/docs-chat/limits";
 
@@ -8,7 +8,7 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export type ChatError =
   | { kind: "rate-limited"; retryAfterSeconds: number }
-  | { kind: "unavailable" | "interrupted" | "failed" };
+  | { kind: "unavailable" | "interrupted" | "failed" | "no-model-key" };
 
 export type DocsChat = {
   messages: ChatMessage[];
@@ -30,20 +30,42 @@ function errorFor(response: Response): ChatError {
     const seconds = Number(response.headers.get("retry-after"));
     return { kind: "rate-limited", retryAfterSeconds: Number.isFinite(seconds) && seconds > 0 ? seconds : 60 };
   }
+  if (response.status === 409) return { kind: "no-model-key" };
   return { kind: response.status === 503 ? "unavailable" : "failed" };
 }
 
+export type StreamingChatOptions = {
+  url: string;
+  maxMessages: number;
+  maxAssistantChars: number;
+  /** Extra fields sent with every question, read at send time. */
+  extraBody?: () => Record<string, unknown>;
+};
+
 export function useDocsChat(): DocsChat {
+  return useStreamingChat({
+    url: "/api/docs-chat",
+    maxMessages: MAX_MESSAGES,
+    maxAssistantChars: MAX_ASSISTANT_CHARS,
+  });
+}
+
+export function useStreamingChat(options: StreamingChatOptions): DocsChat {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<ChatError>();
   const controller = useRef<AbortController | null>(null);
+  const latest = useRef(options);
+  useEffect(() => {
+    latest.current = options;
+  });
 
   const ask = useCallback(async (history: ChatMessage[], question: string) => {
+    const { url, maxMessages, maxAssistantChars, extraBody } = latest.current;
     const conversation: ChatMessage[] = [...answered(history), { role: "user", content: question }];
     const outgoing = conversation
-      .slice(-(MAX_MESSAGES - 1))
-      .map((message) => ({ ...message, content: message.content.slice(0, MAX_ASSISTANT_CHARS) }));
+      .slice(-(maxMessages - 1))
+      .map((message) => ({ ...message, content: message.content.slice(0, maxAssistantChars) }));
     const abort = new AbortController();
     controller.current = abort;
     setMessages(conversation);
@@ -54,10 +76,10 @@ export function useDocsChat(): DocsChat {
     const show = () =>
       setMessages([...conversation, ...(answer ? [{ role: "assistant" as const, content: answer }] : [])]);
     try {
-      const response = await fetch("/api/docs-chat", {
+      const response = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: outgoing }),
+        body: JSON.stringify({ ...extraBody?.(), messages: outgoing }),
         signal: abort.signal,
       });
       if (!response.ok || !response.body) {

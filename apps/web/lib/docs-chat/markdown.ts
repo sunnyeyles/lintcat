@@ -13,6 +13,8 @@ export type Block =
 
 const PAGE_PATHS = new Set(DOCS_PAGES.map((page) => page.href));
 
+export type SafeHref = (href: string) => string | null;
+
 /** A same-site link to a docs page, optionally to one of its sections; anything else is null. */
 function safeDocsHref(href: string): string | null {
   const match = /^(\/[a-z0-9/-]*?)\/?(#[a-z0-9-]+)?$/.exec(href);
@@ -22,7 +24,7 @@ function safeDocsHref(href: string): string | null {
 
 const INLINE = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)\s]+)\)/g;
 
-function parseInline(text: string): Inline[] {
+function parseInline(text: string, safeHref: SafeHref): Inline[] {
   const inlines: Inline[] = [];
   let last = 0;
   for (const match of text.matchAll(INLINE)) {
@@ -31,7 +33,7 @@ function parseInline(text: string): Inline[] {
     if (code !== undefined) inlines.push({ kind: "code", text: code });
     else if (strong !== undefined) inlines.push({ kind: "strong", text: strong });
     else if (label !== undefined && href !== undefined) {
-      const safe = safeDocsHref(href);
+      const safe = safeHref(href);
       inlines.push(safe ? { kind: "link", text: label, href: safe } : { kind: "text", text: label });
     } else inlines.push({ kind: "text", text: whole });
     last = match.index + whole.length;
@@ -44,13 +46,13 @@ const BULLET = /^\s*[-*]\s+(.*)$/;
 const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
 
 // Tolerates a half-streamed answer: an unclosed fence is still code.
-export function parseAnswer(text: string): Block[] {
+export function parseAnswer(text: string, safeHref: SafeHref = safeDocsHref): Block[] {
   const blocks: Block[] = [];
   const lines = text.split("\n");
   let paragraph: string[] = [];
 
   const flush = () => {
-    if (paragraph.length > 0) blocks.push({ kind: "paragraph", inlines: parseInline(paragraph.join(" ")) });
+    if (paragraph.length > 0) blocks.push({ kind: "paragraph", inlines: parseInline(paragraph.join(" "), safeHref) });
     paragraph = [];
   };
 
@@ -68,7 +70,7 @@ export function parseAnswer(text: string): Block[] {
       flush();
       const ordered = !BULLET.test(line);
       const previous = blocks.at(-1);
-      const inlines = parseInline(item[1] ?? "");
+      const inlines = parseInline(item[1] ?? "", safeHref);
       if (previous?.kind === "list" && previous.ordered === ordered) previous.items.push(inlines);
       else blocks.push({ kind: "list", ordered, items: [inlines] });
       continue;

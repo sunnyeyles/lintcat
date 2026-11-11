@@ -11,6 +11,7 @@ import {
   SheetTrigger,
 } from "@pr-review/design";
 import {
+  Bot,
   ChartLine,
   FolderGit2,
   GitPullRequest,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/reviews", label: "Reviews", icon: GitPullRequest },
   { href: "/repos", label: "Repositories", icon: FolderGit2 },
   { href: "/insights", label: "Insights", icon: ChartLine },
+  { href: "/agent", label: "Agent", icon: Bot },
   { href: "/settings", label: "Settings", icon: Settings, ownerOnly: true },
 ];
 

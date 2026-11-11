@@ -19,13 +19,32 @@ import { Answer } from "@/components/docs-chat/answer";
 import type { ChatError, DocsChat } from "@/components/docs-chat/use-docs-chat";
 import { LogoMark } from "@/components/shell/logo-mark";
 import { MAX_USER_CHARS } from "@/lib/docs-chat/limits";
+import type { SafeHref } from "@/lib/docs-chat/markdown";
 
-const SUGGESTIONS = [
-  "How do I get LintCat reviewing my pull requests?",
-  "Which models can a repository use?",
-  "What can the GitHub App access?",
-  "How do I review changes before I push?",
-];
+export type ChatCopy = {
+  title: string;
+  description: string;
+  placeholder: string;
+  suggestions: readonly string[];
+  inputId: string;
+  maxUserChars: number;
+  /** Which answer links may render as links; docs pages when absent. */
+  safeHref?: SafeHref;
+};
+
+const DOCS_COPY: ChatCopy = {
+  title: "Ask about LintCat",
+  description: "Answers come from these docs, with links to the pages they used.",
+  placeholder: "Ask a question about LintCat",
+  suggestions: [
+    "How do I get LintCat reviewing my pull requests?",
+    "Which models can a repository use?",
+    "What can the GitHub App access?",
+    "How do I review changes before I push?",
+  ],
+  inputId: "docs-chat-question",
+  maxUserChars: MAX_USER_CHARS,
+};
 
 const WAITING_LINES = [
   "Chasing down the answer…",
@@ -65,6 +84,8 @@ function errorText(error: ChatError): string {
       return `That's the limit for now. Try again in ${waitFor(error.retryAfterSeconds)}.`;
     case "unavailable":
       return "Ask AI isn't available right now.";
+    case "no-model-key":
+      return "This organization has no model key yet. An owner can add one in Settings.";
     case "interrupted":
       return "The answer was cut off.";
     case "failed":
@@ -76,10 +97,12 @@ export function ChatPanel({
   chat,
   inputRef,
   onNavigate,
+  copy = DOCS_COPY,
 }: {
   chat: DocsChat;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   onNavigate: () => void;
+  copy?: ChatCopy;
 }) {
   const { messages, streaming, error, send, retry, stop, reset } = chat;
   const [draft, setDraft] = useState("");
@@ -111,14 +134,12 @@ export function ChatPanel({
         {messages.length === 0 ? (
           <Empty className="justify-start border-0 p-0 md:p-0">
             <EmptyHeader>
-              <EmptyTitle className="text-h3">Ask about LintCat</EmptyTitle>
-              <EmptyDescription>
-                Answers come from these docs, with links to the pages they used.
-              </EmptyDescription>
+              <EmptyTitle className="text-h3">{copy.title}</EmptyTitle>
+              <EmptyDescription>{copy.description}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
               <ul className="flex w-full flex-col gap-2">
-                {SUGGESTIONS.map((question) => (
+                {copy.suggestions.map((question) => (
                   <li key={question}>
                     <button
                       type="button"
@@ -146,7 +167,7 @@ export function ChatPanel({
               ) : (
                 <li key={i} aria-busy={streaming && i === messages.length - 1} className="text-foreground">
                   <span className="sr-only">Answer: </span>
-                  <Answer text={message.content} onNavigate={onNavigate} />
+                  <Answer text={message.content} onNavigate={onNavigate} safeHref={copy.safeHref} />
                 </li>
               ),
             )}
@@ -179,11 +200,11 @@ export function ChatPanel({
           submit(draft);
         }}
       >
-        <Label htmlFor="docs-chat-question" className="sr-only">
+        <Label htmlFor={copy.inputId} className="sr-only">
           Your question
         </Label>
         <Textarea
-          id="docs-chat-question"
+          id={copy.inputId}
           ref={inputRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -193,9 +214,9 @@ export function ChatPanel({
               submit(draft);
             }
           }}
-          maxLength={MAX_USER_CHARS}
+          maxLength={copy.maxUserChars}
           rows={2}
-          placeholder="Ask a question about LintCat"
+          placeholder={copy.placeholder}
           className="max-h-40 resize-none"
         />
         <div className="flex items-center gap-2">
@@ -205,9 +226,9 @@ export function ChatPanel({
               New chat
             </Button>
           ) : null}
-          {draft.length > MAX_USER_CHARS * 0.8 ? (
+          {draft.length > copy.maxUserChars * 0.8 ? (
             <span className="text-caption text-muted-foreground">
-              {draft.length}/{MAX_USER_CHARS}
+              {draft.length}/{copy.maxUserChars}
             </span>
           ) : null}
           {streaming ? (

@@ -1,7 +1,7 @@
 import { cn } from "@pr-review/design";
 import Link from "next/link";
 
-import { parseAnswer, type Inline } from "@/lib/docs-chat/markdown";
+import { parseAnswer, type Inline, type SafeHref } from "@/lib/docs-chat/markdown";
 
 function Inlines({ inlines, onNavigate }: { inlines: Inline[]; onNavigate: () => void }) {
   return inlines.map((inline, i) => {
@@ -35,10 +35,18 @@ function Inlines({ inlines, onNavigate }: { inlines: Inline[]; onNavigate: () =>
   });
 }
 
-export function Answer({ text, onNavigate }: { text: string; onNavigate: () => void }) {
+export function Answer({
+  text,
+  onNavigate,
+  safeHref,
+}: {
+  text: string;
+  onNavigate: () => void;
+  safeHref?: SafeHref;
+}) {
   return (
     <div className="flex flex-col gap-3">
-      {parseAnswer(text).map((block, i) => {
+      {parseAnswer(text, safeHref).map((block, i) => {
         if (block.kind === "code") {
           return (
             <pre
