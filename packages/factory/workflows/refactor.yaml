@@ -1,0 +1,12 @@
+name: refactor
+version: 1
+enabled: false
+description: Structural improvement. Map dependencies, baseline behaviour, refactor, regression verification, one review.
+weight: 2
+stages: [prepare, locate, baseline, implement, verify, review, deliver]
+independentReview: true
+budgets:
+  maxAgentTurns: 150
+  maxRepairPasses: 1
+  wallClockMinutes: 120
+  commandTimeoutSeconds: 1200

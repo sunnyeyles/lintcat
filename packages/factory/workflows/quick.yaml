@@ -1,0 +1,12 @@
+name: quick
+version: 1
+enabled: true
+description: Small feature, UI tweak or contained improvement. One agent, deterministic checks.
+weight: 0
+stages: [prepare, locate, implement, verify, deliver]
+independentReview: false
+budgets:
+  maxAgentTurns: 60
+  maxRepairPasses: 2
+  wallClockMinutes: 45
+  commandTimeoutSeconds: 900

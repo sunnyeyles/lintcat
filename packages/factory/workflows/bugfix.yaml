@@ -1,0 +1,12 @@
+name: bugfix
+version: 1
+enabled: false
+description: Reproducible defect. Diagnose, reproduce, regression test, fix, verify.
+weight: 1
+stages: [prepare, locate, reproduce, implement, verify, deliver]
+independentReview: false
+budgets:
+  maxAgentTurns: 80
+  maxRepairPasses: 2
+  wallClockMinutes: 60
+  commandTimeoutSeconds: 900

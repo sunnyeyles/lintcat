@@ -1,0 +1,12 @@
+name: feature
+version: 1
+enabled: false
+description: Substantial or multi-module work. Architecture and reuse plan, one independent final review.
+weight: 2
+stages: [prepare, locate, implement, verify, review, deliver]
+independentReview: true
+budgets:
+  maxAgentTurns: 150
+  maxRepairPasses: 1
+  wallClockMinutes: 120
+  commandTimeoutSeconds: 1200

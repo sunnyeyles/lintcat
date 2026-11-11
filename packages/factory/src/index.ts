@@ -1,0 +1,10 @@
+export { createFactoryService, type FactoryService } from "#src/service";
+export { runDiscovery, type DiscoveryIO, type DiscoveryTurn, type ReviewDecision } from "#src/discovery";
+export { PROFILE_NAMES, type ProfileName, type Spec, type TaskContract } from "#src/contract";
+export { openFactoryDatabase, migrateFactoryDatabase } from "#src/store/client";
+export type { FactoryRun, FactoryEvent, FactoryCommand } from "#src/store/schema";
+export { createDockerProvider, dockerAvailable, buildSandboxImage } from "#src/sandbox/docker-sandbox";
+export { detectChecks } from "#src/checks";
+export { ensureFactoryExcluded, repoRoot } from "#src/git";
+export { renderTaskMarkdown } from "#src/run-files";
+export { TOOL_VERSION } from "#src/telemetry";
