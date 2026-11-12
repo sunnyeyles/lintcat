@@ -1,6 +1,8 @@
+import type { AddressInfo } from "node:net";
+
 import { describe, expect, it } from "vitest";
 
-import { createDrainer, handleWorkerRequest } from "#src/server";
+import { createDrainer, createHttpServer, handleWorkerRequest, listen } from "#src/server";
 
 const SECRET = "ping-secret";
 
@@ -99,5 +101,39 @@ describe("createDrainer", () => {
     expect(await drain()).toBe(1);
     expect(await drain()).toBe(2);
     expect(calls).toBe(2);
+  });
+});
+
+describe("createHttpServer", () => {
+  it("logs the cause of a failed drain, which holds the database's own reason", async () => {
+    const logged: { event: string; fields?: Record<string, unknown> }[] = [];
+    const failure = new Error("Failed query: update review_jobs", {
+      cause: new Error('column "lease_expires_at" does not exist'),
+    });
+    const server = createHttpServer(
+      () => Promise.reject(failure),
+      { secret: SECRET },
+      { info() {}, error: (event, fields) => logged.push({ event, fields }) },
+    );
+    await listen(server, 0);
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${SECRET}` },
+      });
+      expect(response.status).toBe(500);
+    } finally {
+      server.close();
+    }
+    expect(logged).toEqual([
+      {
+        event: "worker_server.request_failed",
+        fields: {
+          error: "Failed query: update review_jobs",
+          cause: 'column "lease_expires_at" does not exist',
+        },
+      },
+    ]);
   });
 });
