@@ -6,15 +6,15 @@ import {
   baseName,
   clip,
   emptyNode,
+  eventLabel,
   iso,
   jsonDocument,
   jsonLines,
-  pushStep,
+  pushEvent,
   settleTimes,
-  stringify,
 } from "@/lib/run-trace/adapters/build";
 import { LIMITS, type RunFile, type TraceAdapter } from "@/lib/run-trace/adapters/types";
-import type { AgentNode, AgentStatus, RunTrace, TraceCost } from "@/lib/run-trace/types";
+import type { AgentNode, AgentStatus, RunTrace } from "@/lib/run-trace/types";
 
 export const FACTORY_RUN_FILE = "factory-run.json";
 
@@ -106,7 +106,7 @@ function read(files: readonly RunFile[]): { row?: Row; events: Event[]; commands
 const RUN_STATUS: Record<string, AgentStatus> = {
   delivered: "done",
   failed: "failed",
-  cancelled: "cancelled",
+  cancelled: "failed",
   queued: "running",
   running: "running",
   verifying: "running",
@@ -114,11 +114,7 @@ const RUN_STATUS: Record<string, AgentStatus> = {
 
 const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
 
-function usageCost(usage: unknown): TraceCost | undefined {
-  const u = asObject(usage);
-  if (!u) return undefined;
-  return { inputTokens: num(u.inputTokens), outputTokens: num(u.outputTokens), usd: num(u.estimatedCostUsd) ?? undefined };
-}
+const usageUsd = (usage: unknown) => num(asObject(usage)?.estimatedCostUsd);
 
 function brief(data: Record<string, unknown>): string | undefined {
   const parts = Object.entries(data)
@@ -168,9 +164,11 @@ function parseFactory(files: readonly RunFile[]): RunTrace {
       if (durationMs !== undefined && at) owner.startedAt = new Date(Date.parse(at) - durationMs).toISOString();
       owner.endedAt = at;
       owner.status = event.data.ok === false ? "failed" : "done";
-      if (event.data.ok === false) owner.error = clip(typeof event.data.reason === "string" ? event.data.reason : undefined);
-      const cost = usageCost(event.data.usage);
-      if (cost) addCost(owner, cost);
+      if (event.data.ok === false) {
+        const reason = typeof event.data.reason === "string" ? event.data.reason : "agent failed";
+        pushEvent(owner, { kind: "error", label: reason, timestamp: at, ok: false });
+      }
+      addCost(owner, usageUsd(event.data.usage));
       const usage = asObject(event.data.usage);
       const context = (num(usage?.inputTokens) ?? 0) + (num(usage?.cacheReadTokens) ?? 0) + (num(usage?.cacheWriteTokens) ?? 0);
       if (context > 0) owner.context.push({ timestamp: at, tokens: context, outputTokens: num(usage?.outputTokens) ?? 0 });
@@ -179,32 +177,22 @@ function parseFactory(files: readonly RunFile[]): RunTrace {
     if (event.kind === "agent_auth") continue;
     const results = Array.isArray(event.data.results) ? event.data.results.map(asObject) : [];
     const failedChecks = results.filter((r) => typeof r?.exitCode === "number" && r.exitCode !== 0).length;
-    pushStep(owner, {
-      kind: "event",
-      event: {
-        name: event.kind,
-        category: event.kind.startsWith("checks") || event.kind === "baseline_recorded" ? "check" : "log",
-        status: /fail|blocked|rejected/.test(event.kind) || failedChecks > 0 ? "error" : "ok",
-        text: results.length > 0 ? `${results.length - failedChecks}/${results.length} passed` : brief(event.data),
-        detail: stringify(event.data),
-        timestamp: at,
-      },
+    pushEvent(owner, {
+      kind: event.kind.startsWith("checks") || event.kind === "baseline_recorded" ? "check" : "log",
+      label: eventLabel(event.kind, results.length > 0 ? `${results.length - failedChecks}/${results.length} passed` : brief(event.data)),
+      timestamp: at,
+      ok: !/fail|blocked|rejected/.test(event.kind) && failedChecks === 0,
     });
   }
 
   for (const command of commands) {
     const owner = command.name === "agent" ? ([...agents.values()].find((a) => a.stage === command.stage) ?? stageNode(command.stage)) : stageNode(command.stage);
-    pushStep(owner, {
-      kind: "event",
-      event: {
-        name: command.name === "agent" ? "sandbox_exec" : command.name,
-        category: command.name === "agent" ? "command" : "check",
-        status: command.exitCode === 0 && !command.timedOut ? "ok" : "error",
-        text: clip(`$ ${command.command}${command.timedOut ? " (timed out)" : ` → exit ${command.exitCode}`}`),
-        detail: clip(command.output),
-        durationMs: command.durationMs,
-        timestamp: iso(command.startedAt),
-      },
+    const result = command.timedOut ? "timed out" : `exit ${command.exitCode}`;
+    pushEvent(owner, {
+      kind: command.name === "agent" ? "command" : "check",
+      label: eventLabel(command.name === "agent" ? "sandbox_exec" : command.name, `$ ${command.command} → ${result}`),
+      timestamp: iso(command.startedAt),
+      ok: command.exitCode === 0 && !command.timedOut,
     });
   }
 
@@ -212,9 +200,9 @@ function parseFactory(files: readonly RunFile[]): RunTrace {
   if (failedStage) failedStage.status = root.status;
   for (const node of agents.values()) if (node.status === "running" && root.status !== "running") node.status = undefined;
 
-  const total = usageCost(row?.outcome?.usage);
-  if (total) root.cost = total;
-  else for (const node of agents.values()) if (node.cost) addCost(root, node.cost);
+  const total = usageUsd(row?.outcome?.usage);
+  if (total !== undefined) root.costUsd = total;
+  else for (const node of agents.values()) addCost(root, node.costUsd);
 
   settleTimes(root);
   return {

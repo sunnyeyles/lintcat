@@ -5,9 +5,11 @@ import {
   addCost,
   clip,
   emptyNode,
+  eventLabel,
   isoFromNanos,
   jsonDocument,
   jsonValues,
+  pushEvent,
   pushStep,
   rootOf,
   settleTimes,
@@ -138,7 +140,9 @@ function parseOtel(files: readonly RunFile[]): RunTrace {
     node.startedAt = isoFromNanos(p.span.startTimeUnixNano);
     node.endedAt = isoFromNanos(p.span.endTimeUnixNano);
     node.status = !p.span.endTimeUnixNano ? "running" : failed(p.span) ? "failed" : "done";
-    if (failed(p.span)) node.error = clip(p.span.status?.message);
+    if (failed(p.span)) {
+      pushEvent(node, { kind: "error", label: p.span.status?.message || "span failed", timestamp: node.endedAt || node.startedAt, ok: false });
+    }
     return node;
   };
 
@@ -199,9 +203,7 @@ function addStep(owner: AgentNode, p: Parsed, nodes: Map<string, AgentNode>, spa
     const inputTokens = num(p.attrs["gen_ai.usage.input_tokens"]) ?? num(p.attrs["gen_ai.usage.prompt_tokens"]);
     const outputTokens = num(p.attrs["gen_ai.usage.output_tokens"]) ?? num(p.attrs["gen_ai.usage.completion_tokens"]);
     if (inputTokens !== undefined) owner.context.push({ timestamp: end, tokens: inputTokens, outputTokens: outputTokens ?? 0 });
-    if (inputTokens !== undefined || outputTokens !== undefined) {
-      addCost(owner, { inputTokens, outputTokens, usd: num(p.attrs["gen_ai.usage.cost"]) });
-    }
+    addCost(owner, num(p.attrs["gen_ai.usage.cost"]));
     return;
   }
 
@@ -225,18 +227,12 @@ function addStep(owner: AgentNode, p: Parsed, nodes: Map<string, AgentNode>, spa
     return;
   }
 
-  const startMs = Date.parse(at);
-  const endMs = Date.parse(end);
-  pushStep(owner, {
-    kind: "event",
-    event: {
-      name: p.span.name,
-      category: typeof p.attrs["process.command"] === "string" || typeof p.attrs["process.command_line"] === "string" ? "command" : "other",
-      status: !p.span.endTimeUnixNano ? "running" : failed(p.span) ? "error" : "ok",
-      text: asString(p.attrs["process.command_line"]) ?? asString(p.attrs["process.command"]) ?? clip(p.span.status?.message),
-      durationMs: Number.isFinite(endMs - startMs) ? endMs - startMs : undefined,
-      timestamp: at,
-    },
+  const command = asString(p.attrs["process.command_line"]) ?? asString(p.attrs["process.command"]);
+  pushEvent(owner, {
+    kind: command ? "command" : "other",
+    label: eventLabel(p.span.name, command ?? p.span.status?.message),
+    timestamp: at,
+    ok: !p.span.endTimeUnixNano ? undefined : !failed(p.span),
   });
 }
 

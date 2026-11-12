@@ -20,7 +20,6 @@ const STATUS_BADGE: Record<AgentStatus, "default" | "secondary" | "destructive" 
   running: "secondary",
   done: "outline",
   failed: "destructive",
-  cancelled: "outline",
 };
 
 export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (id: string) => void }) {
@@ -41,16 +40,12 @@ export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (
           {agent.status ? <Badge variant={STATUS_BADGE[agent.status]}>{agent.status}</Badge> : null}
         </CardTitle>
         <CardDescription>
-          {[agent.description, agent.model, formatDuration(stats.durationMs), activityLabel(stats), `peak ${formatTokens(stats.peakContext)}`, formatCost(agent.cost)]
+          {[agent.description, agent.model, formatDuration(stats.durationMs), activityLabel(stats), `peak ${formatTokens(stats.peakContext)}`, formatCost(agent.costUsd)]
             .filter(Boolean)
             .join(" · ")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {agent.error ? (
-          <p className="border-destructive text-destructive rounded-md border px-2.5 py-1.5 text-sm whitespace-pre-wrap">{agent.error}</p>
-        ) : null}
-
         <Section title="Context window">
           <ContextChart agent={agent} />
         </Section>
@@ -75,6 +70,18 @@ export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (
             ))}
           </ol>
         </Section>
+
+        {agent.events?.length ? (
+          <Section title={`Events (${agent.events.length})`}>
+            <ol className="max-h-[24rem] space-y-1.5 overflow-auto pr-1">
+              {agent.events.map((event, i) => (
+                <li key={i}>
+                  <EventView event={event} start={start} />
+                </li>
+              ))}
+            </ol>
+          </Section>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -127,7 +134,6 @@ function StepView({
   onSelect: (id: string) => void;
 }) {
   if (step.kind === "tool") return <ToolView call={step.call} start={start} child={child} onSelect={onSelect} />;
-  if (step.kind === "event") return <EventView event={step.event} start={start} />;
   if (step.kind === "thinking" && step.text.trim() === "") {
     return (
       <div className="flex items-baseline gap-2 px-2 py-1 text-sm">
@@ -212,34 +218,17 @@ function ToolView({
 }
 
 function EventView({ event, start }: { event: TraceEvent; start: number }) {
-  const failed = event.status === "error";
-  const header = (
-    <>
+  const failed = event.ok === false;
+  return (
+    <div className={cn("bg-surface-2 flex items-center gap-2 rounded-md border border-dashed px-2 py-1", failed && "border-destructive")}>
       <Stamp timestamp={event.timestamp} start={start} />
       <Badge variant={failed ? "destructive" : "outline"} className="font-mono">
-        {event.category === "other" ? event.name : `${event.category}: ${event.name}`}
+        {event.kind}
       </Badge>
-      {event.status === "running" ? <Badge variant="secondary">running</Badge> : null}
-      <span className="min-w-0 truncate font-mono text-xs" title={event.text}>
-        {event.text}
+      {event.ok === undefined ? <Badge variant="secondary">pending</Badge> : null}
+      <span className="min-w-0 truncate font-mono text-xs" title={event.label}>
+        {event.label}
       </span>
-      {event.durationMs !== undefined ? (
-        <span className="text-muted-foreground ml-auto shrink-0 text-xs tabular-nums">{formatDuration(event.durationMs)}</span>
-      ) : null}
-    </>
-  );
-  return (
-    <div className={cn("bg-surface-2 rounded-md border border-dashed px-2 py-1", failed && "border-destructive")}>
-      {event.detail ? (
-        <details>
-          <summary className="flex cursor-pointer list-none items-center gap-2">{header}</summary>
-          <pre className="bg-card mt-1 max-h-60 overflow-auto rounded-sm p-2 font-mono text-xs whitespace-pre-wrap">
-            {event.detail}
-          </pre>
-        </details>
-      ) : (
-        <div className="flex items-center gap-2">{header}</div>
-      )}
     </div>
   );
 }

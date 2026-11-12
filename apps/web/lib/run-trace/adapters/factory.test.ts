@@ -13,27 +13,28 @@ describe("factoryAdapter", () => {
     expect(factoryAdapter.detect(loadFixture("lintcat"))).toBe(0);
   });
 
-  it("puts stages under the run and agents under their stage, with commands and checks as steps", () => {
+  it("puts stages under the run and agents under their stage, with commands and checks as events", () => {
     const trace = factoryAdapter.parse(loadFixture("lintcat-factory"));
     expect(trace).toMatchObject({
       sessionId: "run_01JC8Z5Q3K",
       title: "Retry flaky webhook delivery",
       outcome: { status: "failed", blocker: "pnpm test still fails after 2 repair passes" },
     });
-    expect(trace.root).toMatchObject({ role: "factory", status: "failed", cost: { usd: 0.62 } });
+    expect(trace.root).toMatchObject({ role: "factory", status: "failed", costUsd: 0.62 });
     expect(trace.root.children.map((c) => c.role)).toEqual(["prepare", "reproduce", "implement", "verify"]);
 
     const verify = trace.root.children[3]!;
     expect(verify.status).toBe("failed");
     const implementer = verify.children[0]!;
-    expect(implementer).toMatchObject({ role: "implementer", stage: "verify", status: "failed", error: "max_turns" });
+    expect(implementer).toMatchObject({ role: "implementer", stage: "verify", status: "failed", costUsd: 0.08 });
     expect(implementer.startedAt).toBe("2026-11-10T09:05:10.000Z");
-    const commands = implementer.steps.filter((s) => s.kind === "event" && s.event.category === "command");
-    expect(commands).toHaveLength(1);
-    const checks = verify.steps.flatMap((s) =>
-      s.kind === "event" && s.event.category === "check" ? [`${s.event.name}:${s.event.status}`] : [],
-    );
-    expect(checks).toEqual(["lint:ok", "test:error", "checks_finished:error"]);
+    expect(implementer.events?.map((e) => [e.kind, e.ok])).toEqual([
+      ["command", false],
+      ["error", false],
+    ]);
+    expect(implementer.events?.[1]?.label).toBe("max_turns");
+    const checks = (verify.events ?? []).flatMap((e) => (e.kind === "check" ? [`${e.label.split(":")[0]}:${e.ok}`] : []));
+    expect(checks).toEqual(["lint:true", "test:false", "checks_finished:false"]);
   });
 
   it("reads an events.jsonl folder with its task.md title", () => {

@@ -21,12 +21,13 @@ describe("otelAdapter", () => {
     expect(spawn?.kind === "tool" && spawn.call.childAgentId).toBe(billing.id);
     expect(root.steps[0]).toMatchObject({ kind: "prompt", text: "Customer says the invoice total is wrong" });
 
-    const kinds = billing.steps.map((s) =>
-      s.kind === "tool" ? `tool:${s.call.name}:${s.call.isError}` : s.kind === "event" ? `event:${s.event.category}` : s.kind,
-    );
-    expect(kinds).toEqual(["prompt", "text", "event:command", "tool:post_credit:true", "text"]);
+    const kinds = billing.steps.map((s) => (s.kind === "tool" ? `tool:${s.call.name}:${s.call.isError}` : s.kind));
+    expect(kinds).toEqual(["prompt", "text", "tool:post_credit:true", "text"]);
+    expect(billing.events).toEqual([
+      { kind: "command", label: "recalc-job: python recalc.py --invoice INV-2041", timestamp: "2026-11-10T09:00:20.000Z", ok: true },
+    ]);
     expect(billing.context.map((c) => c.tokens)).toEqual([2400, 3100]);
-    expect(billing.cost).toEqual({ usd: undefined, inputTokens: 5500, outputTokens: 160 });
+    expect(billing.costUsd).toBeUndefined();
   });
 
   it("keeps an unfinished span running and skips junk spans", () => {

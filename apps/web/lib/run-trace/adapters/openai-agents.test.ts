@@ -16,10 +16,12 @@ describe("openAiAgentsAdapter", () => {
     const [planner, booker] = trace.root.children;
     expect(planner).toMatchObject({ role: "Planner", model: "gpt-4o", status: "done" });
     expect(booker?.role).toBe("Booker");
-    const steps = planner!.steps.map((s) =>
-      s.kind === "tool" ? `tool:${s.call.name}` : s.kind === "event" ? `${s.event.category}:${s.event.name}` : s.kind,
-    );
-    expect(steps).toEqual(["prompt", "text", "tool:search_flights", "check:budget_check", "handoff:handoff"]);
+    const steps = planner!.steps.map((s) => (s.kind === "tool" ? `tool:${s.call.name}` : s.kind));
+    expect(steps).toEqual(["prompt", "text", "tool:search_flights"]);
+    expect(planner!.events?.map((e) => [e.kind, e.label, e.ok])).toEqual([
+      ["check", "budget_check: passed", true],
+      ["handoff", "handoff: Planner → Booker", true],
+    ]);
     expect(booker!.context.map((c) => c.tokens)).toEqual([1500, 1900]);
   });
 

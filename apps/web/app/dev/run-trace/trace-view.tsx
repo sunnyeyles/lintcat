@@ -29,7 +29,7 @@ export function TraceView({ trace, live = false }: { trace: RunTrace; live?: boo
 
   return (
     <div className="space-y-4">
-      {trace.outcome ? <OutcomeBanner outcome={trace.outcome} cost={formatCost(trace.root.cost)} /> : null}
+      {trace.outcome ? <OutcomeBanner outcome={trace.outcome} cost={formatCost(trace.root.costUsd)} /> : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_32rem]">
       <AgentLanes
         root={trace.root}

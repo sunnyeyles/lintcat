@@ -5,11 +5,12 @@ import {
   addCost,
   clip,
   emptyNode,
+  eventLabel,
   jsonLines,
+  pushEvent,
   pushStep,
   rootOf,
   settleTimes,
-  stringify,
 } from "@/lib/run-trace/adapters/build";
 import { LIMITS, type RunFile, type TraceAdapter } from "@/lib/run-trace/adapters/types";
 import type { AgentNode, RunTrace, ToolCall } from "@/lib/run-trace/types";
@@ -91,30 +92,26 @@ function parseLintcat(files: readonly RunFile[]): RunTrace {
         break;
       }
       case "event":
-        pushStep(agentFor(event.agent, event.at), {
-          kind: "event",
-          event: {
-            name: event.name,
-            category: event.category ?? "other",
-            status: event.status,
-            text: clip(event.text),
-            detail: stringify(event.output),
-            durationMs: event.durationMs,
-            timestamp: event.at,
-          },
+        pushEvent(agentFor(event.agent, event.at), {
+          kind: event.category ?? "other",
+          label: eventLabel(event.name, event.text),
+          timestamp: event.at,
+          ok: event.status === undefined || event.status === "running" ? undefined : event.status === "ok",
         });
         break;
       case "usage": {
         const node = agentFor(event.agent, event.at);
         node.context.push({ timestamp: event.at, tokens: event.inputTokens, outputTokens: event.outputTokens ?? 0 });
-        addCost(node, { usd: event.costUsd, inputTokens: event.inputTokens, outputTokens: event.outputTokens });
+        addCost(node, event.costUsd);
         break;
       }
       case "agent_finished": {
         const node = agentFor(event.agent, event.at);
-        node.status = event.status;
+        node.status = event.status === "done" ? "done" : "failed";
         node.endedAt = event.at;
-        node.error = clip(event.error);
+        if (event.status === "cancelled" || event.error) {
+          pushEvent(node, { kind: event.status === "cancelled" ? "cancelled" : "error", label: event.error ?? "cancelled", timestamp: event.at, ok: false });
+        }
         break;
       }
       case "run_finished":
@@ -143,9 +140,7 @@ function parseLintcat(files: readonly RunFile[]): RunTrace {
 }
 
 function runStatus(status: string): AgentNode["status"] {
-  if (/fail|error|block/i.test(status)) return "failed";
-  if (/cancel/i.test(status)) return "cancelled";
-  return "done";
+  return /fail|error|block|cancel/i.test(status) ? "failed" : "done";
 }
 
 // Guards against a parent cycle (a → b → a), which would loop the tree.

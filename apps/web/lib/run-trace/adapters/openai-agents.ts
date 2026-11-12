@@ -2,12 +2,13 @@ import { z } from "zod";
 
 import { asObject, asString } from "@/lib/run-trace/json";
 import {
-  addCost,
   clip,
   emptyNode,
+  eventLabel,
   iso,
   jsonDocument,
   jsonValues,
+  pushEvent,
   pushStep,
   rootOf,
   settleTimes,
@@ -113,7 +114,7 @@ function parseOpenAiAgents(files: readonly RunFile[]): RunTrace {
     node.startedAt = iso(span.started_at);
     node.endedAt = iso(span.ended_at);
     node.status = !span.ended_at ? "running" : span.error ? "failed" : "done";
-    node.error = clip(span.error?.message);
+    if (span.error) pushEvent(node, { kind: "error", label: span.error.message ?? "agent failed", timestamp: node.endedAt, ok: false });
     const tools = span.span_data.tools;
     if (Array.isArray(tools) && tools.length > 0) node.description = `tools: ${tools.slice(0, 8).join(", ")}`;
     nodes.set(span.id, node);
@@ -164,7 +165,6 @@ function addStep(owner: AgentNode, span: Span, nodes: Map<string, AgentNode>, sp
     const inputTokens = num(usage?.input_tokens) ?? num(usage?.prompt_tokens);
     const outputTokens = num(usage?.output_tokens) ?? num(usage?.completion_tokens);
     if (inputTokens !== undefined) owner.context.push({ timestamp: end, tokens: inputTokens, outputTokens: outputTokens ?? 0 });
-    if (inputTokens !== undefined || outputTokens !== undefined) addCost(owner, { inputTokens, outputTokens });
     return;
   }
 
@@ -190,28 +190,19 @@ function addStep(owner: AgentNode, span: Span, nodes: Map<string, AgentNode>, sp
     return;
   }
 
-  const durationMs = Date.parse(end) - Date.parse(at);
-  const base = { timestamp: at, durationMs: Number.isFinite(durationMs) ? durationMs : undefined };
-  const status = !span.ended_at ? ("running" as const) : span.error ? ("error" as const) : ("ok" as const);
+  const ok = !span.ended_at ? undefined : !span.error;
   if (data.type === "handoff") {
-    pushStep(owner, {
-      kind: "event",
-      event: { ...base, name: "handoff", category: "handoff", status, text: `${asString(data.from_agent) ?? "?"} → ${asString(data.to_agent) ?? "?"}` },
-    });
+    const route = `${asString(data.from_agent) ?? "?"} → ${asString(data.to_agent) ?? "?"}`;
+    pushEvent(owner, { kind: "handoff", label: eventLabel("handoff", route), timestamp: at, ok });
     return;
   }
   if (data.type === "guardrail") {
     const triggered = data.triggered === true;
-    pushStep(owner, {
-      kind: "event",
-      event: { ...base, name: asString(data.name) ?? "guardrail", category: "check", status: triggered ? "error" : status, text: triggered ? "tripwire triggered" : "passed" },
-    });
+    const name = asString(data.name) ?? "guardrail";
+    pushEvent(owner, { kind: "check", label: eventLabel(name, triggered ? "tripwire triggered" : "passed"), timestamp: at, ok: triggered ? false : ok });
     return;
   }
-  pushStep(owner, {
-    kind: "event",
-    event: { ...base, name: asString(data.name) ?? data.type, category: "other", status, text: clip(span.error?.message), detail: stringify(data.data) },
-  });
+  pushEvent(owner, { kind: "other", label: eventLabel(asString(data.name) ?? data.type, span.error?.message), timestamp: at, ok });
 }
 
 export const openAiAgentsAdapter: TraceAdapter = {

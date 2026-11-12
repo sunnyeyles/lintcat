@@ -15,31 +15,16 @@ export type ToolCall = {
   childAgentId?: string;
 };
 
-type TraceEventCategory = "command" | "check" | "handoff" | "log" | "other";
-type TraceEventStatus = "ok" | "error" | "running";
-
-/** A non-LLM step: a shell command, a check, a handoff, a log line. */
-export type TraceEvent = {
-  name: string;
-  category: TraceEventCategory;
-  status?: TraceEventStatus;
-  text?: string;
-  /** Long output, shown on expand. */
-  detail?: string;
-  durationMs?: number;
-  timestamp: string;
-};
-
 export type AgentStep =
   | { kind: "prompt"; text: string; timestamp: string }
   | { kind: "thinking"; text: string; timestamp: string }
   | { kind: "text"; text: string; timestamp: string }
-  | { kind: "tool"; call: ToolCall }
-  | { kind: "event"; event: TraceEvent };
+  | { kind: "tool"; call: ToolCall };
 
-export type AgentStatus = "running" | "done" | "failed" | "cancelled";
+export type AgentStatus = "running" | "done" | "failed";
 
-export type TraceCost = { usd?: number; inputTokens?: number; outputTokens?: number };
+/** A non-LLM step: a shell command, a check, a handoff, a log line. `ok` is unset while unknown. */
+export type TraceEvent = { kind: string; label: string; timestamp: string; ok?: boolean };
 
 export type ContextSample = {
   timestamp: string;
@@ -63,8 +48,8 @@ export type AgentNode = {
   children: AgentNode[];
   status?: AgentStatus;
   stage?: string;
-  cost?: TraceCost;
-  error?: string;
+  costUsd?: number;
+  events?: TraceEvent[];
 };
 
 export type RunOutcomeSummary = { status?: string; summary?: string; blocker?: string; url?: string };

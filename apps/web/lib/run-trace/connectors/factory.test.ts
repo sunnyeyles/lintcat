@@ -52,8 +52,7 @@ describe("factoryConnector", () => {
     expect(adapter.id).toBe("lintcat-factory");
     expect(trace.title).toBe("Add retries");
     expect(trace.root.children.map((c) => c.role)).toEqual(["implement", "verify"]);
-    const check = trace.root.children[1]!.steps[0];
-    expect(check?.kind === "event" && check.event.detail?.length).toBeLessThan(9_000);
+    expect(trace.root.children[1]!.events?.[0]).toMatchObject({ kind: "check", label: "test: $ pnpm test → exit 1", ok: false });
   });
 
   it("answers undefined for an unknown run", async () => {

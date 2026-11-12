@@ -1,6 +1,6 @@
 import { truncate } from "@/lib/run-trace/json";
 import { LIMITS } from "@/lib/run-trace/adapters/types";
-import type { AgentNode, AgentStep, TraceCost } from "@/lib/run-trace/types";
+import type { AgentNode, AgentStep, TraceEvent } from "@/lib/run-trace/types";
 
 export function emptyNode(id: string, role: string): AgentNode {
   return { id, role, startedAt: "", endedAt: "", steps: [], filesRead: [], filesEdited: [], context: [], children: [] };
@@ -14,6 +14,16 @@ export function pushStep(node: AgentNode, step: AgentStep): void {
   if (node.steps.length < LIMITS.stepsPerAgent) node.steps.push(step);
 }
 
+export function pushEvent(node: AgentNode, event: TraceEvent): void {
+  node.events ??= [];
+  if (node.events.length < LIMITS.stepsPerAgent) node.events.push({ ...event, label: clip(event.label) ?? "" });
+}
+
+/** "name: detail", or just the name. */
+export function eventLabel(name: string, detail: string | undefined): string {
+  return detail ? `${name}: ${detail}` : name;
+}
+
 export function stringify(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value === "string") return clip(value);
@@ -25,9 +35,7 @@ export function stringify(value: unknown): string | undefined {
 }
 
 function stepTime(step: AgentStep): string {
-  if (step.kind === "tool") return step.call.timestamp;
-  if (step.kind === "event") return step.event.timestamp;
-  return step.timestamp;
+  return step.kind === "tool" ? step.call.timestamp : step.timestamp;
 }
 
 const validTime = (iso: string | undefined): iso is string => !!iso && !Number.isNaN(Date.parse(iso));
@@ -36,8 +44,10 @@ const validTime = (iso: string | undefined): iso is string => !!iso && !Number.i
 export function settleTimes(node: AgentNode): void {
   for (const child of node.children) settleTimes(child);
   node.steps.sort((a, b) => Date.parse(stepTime(a)) - Date.parse(stepTime(b)));
+  node.events?.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
   const times = [
     ...node.steps.map(stepTime),
+    ...(node.events ?? []).map((event) => event.timestamp),
     ...node.context.map((sample) => sample.timestamp),
     ...node.children.flatMap((child) => [child.startedAt, child.endedAt]),
   ].filter(validTime);
@@ -49,14 +59,8 @@ export function settleTimes(node: AgentNode): void {
   if (!validTime(node.endedAt) || (last && Date.parse(last) > Date.parse(node.endedAt))) node.endedAt = last ?? node.startedAt;
 }
 
-export function addCost(target: AgentNode, cost: TraceCost): void {
-  const current = target.cost ?? {};
-  const sum = (a?: number, b?: number) => (a === undefined && b === undefined ? undefined : (a ?? 0) + (b ?? 0));
-  target.cost = {
-    usd: sum(current.usd, cost.usd),
-    inputTokens: sum(current.inputTokens, cost.inputTokens),
-    outputTokens: sum(current.outputTokens, cost.outputTokens),
-  };
+export function addCost(target: AgentNode, usd: number | undefined): void {
+  if (usd !== undefined) target.costUsd = (target.costUsd ?? 0) + usd;
 }
 
 export function isoFromNanos(value: unknown): string {

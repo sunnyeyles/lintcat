@@ -30,12 +30,22 @@ describe("lintcatAdapter", () => {
       filesRead: ["src/api.ts"],
       filesEdited: ["docs/api.md"],
     });
-    expect(writer.cost?.inputTokens).toBe(14300);
-    expect(writer.cost?.usd).toBeCloseTo(0.061);
+    expect(writer.costUsd).toBeCloseTo(0.061);
     const spawn = lead.steps.find((s) => s.kind === "tool" && s.call.name === "spawn");
     expect(spawn?.kind === "tool" && spawn.call).toMatchObject({ childAgentId: "writer", result: "Drafted docs/api.md" });
-    const check = writer.steps.find((s) => s.kind === "event");
-    expect(check?.kind === "event" && check.event).toMatchObject({ category: "check", status: "error" });
+    expect(writer.events).toEqual([
+      { kind: "check", label: "markdownlint: 2 warnings", timestamp: "2026-11-10T09:00:35.000Z", ok: false },
+    ]);
+  });
+
+  it("maps cancelled to failed, with an event saying so", () => {
+    const { root } = lintcatAdapter.parse(
+      ndjson(
+        { type: "agent_started", at: AT, agent: "solo", role: "worker" },
+        { type: "agent_finished", at: AT, agent: "solo", status: "cancelled" },
+      ),
+    );
+    expect(root).toMatchObject({ status: "failed", events: [{ kind: "cancelled", label: "cancelled", ok: false }] });
   });
 
   it("drops invalid lines and breaks parent cycles", () => {

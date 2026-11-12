@@ -30,10 +30,10 @@ const HEADINGS: Heading[] = [
 
 const FORMATS = [
   ["claude-code", "Claude Code / Agent SDK", "A session's .jsonl transcript, with its subagents/ folder beside it."],
-  ["otel-genai", "OpenTelemetry GenAI spans", "An OTLP JSON export (resourceSpans), one document or one per line. invoke_agent spans become agents, chat and execute_tool spans become steps, parent span IDs build the tree."],
-  ["openai-agents", "OpenAI Agents SDK", "A traces/spans export: objects with \"object\": \"trace\" or \"trace.span\". Agent spans become agents; generation, function, handoff and guardrail spans become steps."],
+  ["otel-genai", "OpenTelemetry GenAI spans", "An OTLP JSON export (resourceSpans), one document or one per line. invoke_agent spans become agents, chat and execute_tool spans become steps, other spans become events, parent span IDs build the tree."],
+  ["openai-agents", "OpenAI Agents SDK", "A traces/spans export: objects with \"object\": \"trace\" or \"trace.span\". Agent spans become agents; generation and function spans become steps, handoffs and guardrails events."],
   ["lintcat", "lintcat run format", "The small NDJSON event stream below, for anything else."],
-  ["lintcat-factory", "lintcat factory", "A factory-run.json export, or a .factory/runs/<id>/ folder with events.jsonl. One agent per stage and agent, commands and checks as steps."],
+  ["lintcat-factory", "lintcat factory", "A factory-run.json export, or a .factory/runs/<id>/ folder with events.jsonl. One agent per stage and agent, commands and checks as events."],
 ] as const;
 
 const EVENTS = [
