@@ -1,4 +1,4 @@
-import type { AgentNode, ContextSample } from "@/lib/run-trace/types";
+import type { AgentNode, ContextSample, TraceCost } from "@/lib/run-trace/types";
 
 export type TimeBounds = { start: number; end: number };
 
@@ -12,6 +12,7 @@ export type LaneRow = {
 export type AgentStats = {
   durationMs: number;
   toolCount: number;
+  eventCount: number;
   peakContext: number;
 };
 
@@ -103,23 +104,36 @@ export function axisTicks(bounds: TimeBounds, target = 8): number[] {
   return ticks;
 }
 
+/** Tick marks on a lane: tool calls and non-LLM events. */
 export function toolTimes(node: AgentNode): { id: string; ms: number; label: string; error: boolean }[] {
-  return node.steps.flatMap((step) =>
-    step.kind === "tool"
-      ? [
-          {
-            id: step.call.id,
-            ms: toMs(step.call.timestamp),
-            label: `${step.call.name} ${step.call.summary}`.trim(),
-            error: step.call.isError === true,
-          },
-        ]
-      : [],
-  );
+  return node.steps.flatMap((step, index) => {
+    if (step.kind === "tool") {
+      return [
+        {
+          id: `${step.call.id}:${index}`,
+          ms: toMs(step.call.timestamp),
+          label: `${step.call.name} ${step.call.summary}`.trim(),
+          error: step.call.isError === true,
+        },
+      ];
+    }
+    if (step.kind === "event") {
+      return [
+        {
+          id: `event:${index}`,
+          ms: toMs(step.event.timestamp),
+          label: `${step.event.name} ${step.event.text ?? ""}`.trim(),
+          error: step.event.status === "error",
+        },
+      ];
+    }
+    return [];
+  });
 }
 
-/** A tool call still waiting on its result: mid-call, if the run is live. */
+/** An explicit running status, else a tool call still waiting on its result. */
 export function isRunning(node: AgentNode): boolean {
+  if (node.status !== undefined) return node.status === "running";
   return node.steps.some((step) => step.kind === "tool" && step.call.result === undefined);
 }
 
@@ -127,6 +141,7 @@ export function agentStats(node: AgentNode): AgentStats {
   return {
     durationMs: Math.max(0, toMs(node.endedAt) - toMs(node.startedAt)),
     toolCount: node.steps.filter((step) => step.kind === "tool").length,
+    eventCount: node.steps.filter((step) => step.kind === "event").length,
     peakContext: peakOf(node.context),
   };
 }
@@ -150,6 +165,18 @@ export function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+export function formatCost(cost: TraceCost | undefined): string | undefined {
+  if (!cost) return undefined;
+  if (cost.usd !== undefined) return `$${cost.usd < 0.01 ? cost.usd.toFixed(4) : cost.usd.toFixed(2)}`;
+  const tokens = (cost.inputTokens ?? 0) + (cost.outputTokens ?? 0);
+  return tokens > 0 ? `${formatTokens(tokens)} tokens` : undefined;
+}
+
+/** "3 tools", plus events when there are any. */
+export function activityLabel(stats: AgentStats): string {
+  return stats.eventCount > 0 ? `${stats.toolCount} tools · ${stats.eventCount} events` : `${stats.toolCount} tools`;
 }
 
 export function formatTokens(tokens: number): string {

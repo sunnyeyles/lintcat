@@ -305,6 +305,7 @@ export const findings = pgTable(
 export const runTraces = pgTable("run_traces", {
   runId: text("run_id").primaryKey(),
   title: text("title"),
+  format: text("format"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
 });

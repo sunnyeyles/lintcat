@@ -5,17 +5,24 @@ import { PageHeader } from "@/components/shell/page-header";
 
 export const metadata: Metadata = { title: "Run trace" };
 
-export default async function LiveRunTracePage({ params }: { params: Promise<{ runId: string }> }) {
+export default async function LiveRunTracePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ runId: string }>;
+  searchParams: Promise<{ source?: string | string[] }>;
+}) {
   const { runId } = await params;
+  const { source } = await searchParams;
   return (
     <main className="mx-auto w-full max-w-[110rem] px-4 py-8">
       <PageHeader
         eyebrow="Dev"
         title="Run trace"
-        description="A run pushed by the Claude Code hook. While it is live the page refreshes every few seconds."
+        description="A run pushed to the ingest API or read from a connected source. While it is live the page refreshes every few seconds."
       />
       <div className="mt-6">
-        <LiveRunTrace key={runId} runId={runId} />
+        <LiveRunTrace key={`${runId}:${source}`} runId={runId} source={typeof source === "string" ? source : undefined} />
       </div>
     </main>
   );

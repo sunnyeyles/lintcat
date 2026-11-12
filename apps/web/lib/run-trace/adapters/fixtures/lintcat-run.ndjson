@@ -1,0 +1,18 @@
+{"v":1,"at":"2026-11-10T09:00:00.000Z","type":"run_started","run":"nightly-docs-42","title":"Refresh API docs"}
+{"v":1,"at":"2026-11-10T09:00:00.000Z","type":"agent_started","agent":"lead","role":"lead","model":"claude-sonnet-4-5","prompt":"Regenerate API docs and open a PR"}
+{"v":1,"at":"2026-11-10T09:00:03.000Z","type":"step","agent":"lead","kind":"thinking","text":"Split into extract and write."}
+{"v":1,"at":"2026-11-10T09:00:05.000Z","type":"tool_call","agent":"lead","id":"writer","name":"spawn","summary":"writer: draft pages"}
+{"v":1,"at":"2026-11-10T09:00:05.000Z","type":"agent_started","agent":"writer","parent":"lead","role":"writer","description":"Draft pages","stage":"write"}
+{"v":1,"at":"2026-11-10T09:00:09.000Z","type":"tool_call","agent":"writer","id":"c1","name":"read_file","input":{"path":"src/api.ts"},"files":{"read":["src/api.ts"]}}
+{"v":1,"at":"2026-11-10T09:00:10.000Z","type":"tool_result","agent":"writer","id":"c1","output":"export function createUser() {}"}
+{"v":1,"at":"2026-11-10T09:00:12.000Z","type":"usage","agent":"writer","inputTokens":5200,"outputTokens":400,"costUsd":0.021}
+{"v":1,"at":"2026-11-10T09:00:30.000Z","type":"tool_call","agent":"writer","id":"c2","name":"write_file","input":{"path":"docs/api.md"},"files":{"edited":["docs/api.md"]},"output":"ok"}
+{"v":1,"at":"2026-11-10T09:00:32.000Z","type":"usage","agent":"writer","inputTokens":9100,"outputTokens":900,"costUsd":0.04}
+{"v":1,"at":"2026-11-10T09:00:35.000Z","type":"event","agent":"writer","name":"markdownlint","category":"check","status":"error","text":"2 warnings","durationMs":1800,"output":"docs/api.md:12 MD013 line length"}
+{"v":1,"at":"2026-11-10T09:00:40.000Z","type":"agent_finished","agent":"writer","status":"done"}
+{"v":1,"at":"2026-11-10T09:00:41.000Z","type":"tool_result","agent":"lead","id":"writer","output":"Drafted docs/api.md"}
+{"v":1,"at":"2026-11-10T09:00:44.000Z","type":"event","agent":"lead","name":"git push","category":"command","status":"ok","text":"$ git push origin docs/refresh","durationMs":2100}
+{"v":1,"at":"2026-11-10T09:00:46.000Z","type":"usage","agent":"lead","inputTokens":7000,"outputTokens":300}
+{"v":1,"at":"2026-11-10T09:00:48.000Z","type":"step","agent":"lead","kind":"text","text":"Opened the PR."}
+{"v":1,"at":"2026-11-10T09:00:48.000Z","type":"agent_finished","agent":"lead","status":"done"}
+{"v":1,"at":"2026-11-10T09:00:49.000Z","type":"run_finished","status":"delivered","summary":"Docs refreshed","url":"https://github.com/example/shop/pull/7"}

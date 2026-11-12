@@ -1,0 +1,188 @@
+{
+  "data": [
+    {
+      "object": "trace",
+      "id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "workflow_name": "Trip planner",
+      "group_id": null,
+      "metadata": {}
+    },
+    {
+      "object": "trace.span",
+      "id": "span_a1",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": null,
+      "started_at": "2026-11-10T09:00:00.000Z",
+      "ended_at": "2026-11-10T09:01:10.000Z",
+      "span_data": {
+        "type": "agent",
+        "name": "Planner",
+        "handoffs": [
+          "Booker"
+        ],
+        "tools": [
+          "search_flights"
+        ],
+        "output_type": "str"
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_g1",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": "span_a1",
+      "started_at": "2026-11-10T09:00:01.000Z",
+      "ended_at": "2026-11-10T09:00:05.000Z",
+      "span_data": {
+        "type": "generation",
+        "model": "gpt-4o",
+        "input": [
+          {
+            "role": "user",
+            "content": "Plan 3 days in Lisbon in March"
+          }
+        ],
+        "output": [
+          {
+            "role": "assistant",
+            "content": "Searching flights first."
+          }
+        ],
+        "usage": {
+          "input_tokens": 900,
+          "output_tokens": 40
+        }
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_f1",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": "span_a1",
+      "started_at": "2026-11-10T09:00:05.000Z",
+      "ended_at": "2026-11-10T09:00:09.000Z",
+      "span_data": {
+        "type": "function",
+        "name": "search_flights",
+        "input": "{\"to\":\"LIS\",\"month\":\"2027-03\"}",
+        "output": "3 options from €89"
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_gr",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": "span_a1",
+      "started_at": "2026-11-10T09:00:09.000Z",
+      "ended_at": "2026-11-10T09:00:10.000Z",
+      "span_data": {
+        "type": "guardrail",
+        "name": "budget_check",
+        "triggered": false
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_h1",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": "span_a1",
+      "started_at": "2026-11-10T09:00:12.000Z",
+      "ended_at": "2026-11-10T09:00:12.500Z",
+      "span_data": {
+        "type": "handoff",
+        "from_agent": "Planner",
+        "to_agent": "Booker"
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_a2",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": null,
+      "started_at": "2026-11-10T09:00:13.000Z",
+      "ended_at": "2026-11-10T09:01:10.000Z",
+      "span_data": {
+        "type": "agent",
+        "name": "Booker",
+        "handoffs": [],
+        "tools": [
+          "book_flight"
+        ],
+        "output_type": "str"
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_g2",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": "span_a2",
+      "started_at": "2026-11-10T09:00:14.000Z",
+      "ended_at": "2026-11-10T09:00:20.000Z",
+      "span_data": {
+        "type": "generation",
+        "model": "gpt-4o-mini",
+        "input": [
+          {
+            "role": "user",
+            "content": "Book the €89 option"
+          }
+        ],
+        "output": [
+          {
+            "role": "assistant",
+            "content": "Booking."
+          }
+        ],
+        "usage": {
+          "input_tokens": 1500,
+          "output_tokens": 30
+        }
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_f2",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": "span_a2",
+      "started_at": "2026-11-10T09:00:20.000Z",
+      "ended_at": "2026-11-10T09:01:00.000Z",
+      "span_data": {
+        "type": "function",
+        "name": "book_flight",
+        "input": "{\"option\":1}",
+        "output": "PNR X7KQ2"
+      },
+      "error": null
+    },
+    {
+      "object": "trace.span",
+      "id": "span_g3",
+      "trace_id": "trace_9a1f0c2e7b4d4e2f8a6b",
+      "parent_id": "span_a2",
+      "started_at": "2026-11-10T09:01:01.000Z",
+      "ended_at": "2026-11-10T09:01:09.000Z",
+      "span_data": {
+        "type": "generation",
+        "model": "gpt-4o-mini",
+        "output": [
+          {
+            "role": "assistant",
+            "content": "Booked: PNR X7KQ2."
+          }
+        ],
+        "usage": {
+          "input_tokens": 1900,
+          "output_tokens": 25
+        }
+      },
+      "error": null
+    }
+  ]
+}

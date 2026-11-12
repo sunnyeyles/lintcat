@@ -5,8 +5,23 @@ import { ArrowRight } from "@pr-review/design/icons";
 import type { ReactNode } from "react";
 
 import { ContextChart } from "@/app/dev/run-trace/context-chart";
-import { agentStats, formatDuration, formatTokens, roleColor, toMs } from "@/app/dev/run-trace/trace-layout";
-import type { AgentNode, AgentStep, ToolCall } from "@/lib/run-trace/types";
+import {
+  activityLabel,
+  agentStats,
+  formatCost,
+  formatDuration,
+  formatTokens,
+  roleColor,
+  toMs,
+} from "@/app/dev/run-trace/trace-layout";
+import type { AgentNode, AgentStatus, AgentStep, ToolCall, TraceEvent } from "@/lib/run-trace/types";
+
+const STATUS_BADGE: Record<AgentStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  running: "secondary",
+  done: "outline",
+  failed: "destructive",
+  cancelled: "outline",
+};
 
 export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (id: string) => void }) {
   const stats = agentStats(agent);
@@ -19,17 +34,23 @@ export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (
   return (
     <Card className="min-w-0 gap-4 self-start xl:sticky xl:top-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <span className="size-2.5 rounded-full" style={{ backgroundColor: roleColor(agent.role) }} />
           {agent.role}
+          {agent.stage && agent.stage !== agent.role ? <Badge variant="outline">{agent.stage}</Badge> : null}
+          {agent.status ? <Badge variant={STATUS_BADGE[agent.status]}>{agent.status}</Badge> : null}
         </CardTitle>
         <CardDescription>
-          {[agent.description, agent.model, formatDuration(stats.durationMs), `${stats.toolCount} tools`, `peak ${formatTokens(stats.peakContext)}`]
+          {[agent.description, agent.model, formatDuration(stats.durationMs), activityLabel(stats), `peak ${formatTokens(stats.peakContext)}`, formatCost(agent.cost)]
             .filter(Boolean)
             .join(" · ")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {agent.error ? (
+          <p className="border-destructive text-destructive rounded-md border px-2.5 py-1.5 text-sm whitespace-pre-wrap">{agent.error}</p>
+        ) : null}
+
         <Section title="Context window">
           <ContextChart agent={agent} />
         </Section>
@@ -72,7 +93,7 @@ function FileList({ title, files }: { title: string; files: string[] }) {
   return (
     <Section title={`${title} (${files.length})`}>
       {files.length === 0 ? (
-        <p className="text-muted-foreground text-xs">None recorded. Files touched through Bash are not tracked.</p>
+        <p className="text-muted-foreground text-xs">None recorded. Files touched through shell commands are not tracked.</p>
       ) : (
         <ul className="max-h-36 space-y-0.5 overflow-auto font-mono text-xs">
           {files.map((file) => (
@@ -106,6 +127,7 @@ function StepView({
   onSelect: (id: string) => void;
 }) {
   if (step.kind === "tool") return <ToolView call={step.call} start={start} child={child} onSelect={onSelect} />;
+  if (step.kind === "event") return <EventView event={step.event} start={start} />;
   if (step.kind === "thinking" && step.text.trim() === "") {
     return (
       <div className="flex items-baseline gap-2 px-2 py-1 text-sm">
@@ -185,6 +207,39 @@ function ToolView({
           <ArrowRight animate="none" />
         </Button>
       ) : null}
+    </div>
+  );
+}
+
+function EventView({ event, start }: { event: TraceEvent; start: number }) {
+  const failed = event.status === "error";
+  const header = (
+    <>
+      <Stamp timestamp={event.timestamp} start={start} />
+      <Badge variant={failed ? "destructive" : "outline"} className="font-mono">
+        {event.category === "other" ? event.name : `${event.category}: ${event.name}`}
+      </Badge>
+      {event.status === "running" ? <Badge variant="secondary">running</Badge> : null}
+      <span className="min-w-0 truncate font-mono text-xs" title={event.text}>
+        {event.text}
+      </span>
+      {event.durationMs !== undefined ? (
+        <span className="text-muted-foreground ml-auto shrink-0 text-xs tabular-nums">{formatDuration(event.durationMs)}</span>
+      ) : null}
+    </>
+  );
+  return (
+    <div className={cn("bg-surface-2 rounded-md border border-dashed px-2 py-1", failed && "border-destructive")}>
+      {event.detail ? (
+        <details>
+          <summary className="flex cursor-pointer list-none items-center gap-2">{header}</summary>
+          <pre className="bg-card mt-1 max-h-60 overflow-auto rounded-sm p-2 font-mono text-xs whitespace-pre-wrap">
+            {event.detail}
+          </pre>
+        </details>
+      ) : (
+        <div className="flex items-center gap-2">{header}</div>
+      )}
     </div>
   );
 }

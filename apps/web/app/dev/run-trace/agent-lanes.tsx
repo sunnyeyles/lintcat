@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from "@pr-review/design/icons";
 import { useMemo, useState } from "react";
 
 import {
+  activityLabel,
   agentStats,
   axisTicks,
   barSpan,
@@ -73,7 +74,7 @@ export function AgentLanes({
           className="grid"
         >
           <div className="bg-card text-muted-foreground sticky top-0 left-0 z-30 border-r border-b px-3 py-1.5 text-xs">
-            Agent · duration · tools · peak context
+            Agent · duration · activity · peak context
           </div>
           <div className="bg-card sticky top-0 z-20 h-7 border-b">
             {ticks.map((t) => (
@@ -165,10 +166,14 @@ function LaneRowView({
               <Badge variant="secondary" className="ml-auto shrink-0">
                 running
               </Badge>
+            ) : node.status === "failed" ? (
+              <Badge variant="destructive" className="ml-auto shrink-0">
+                failed
+              </Badge>
             ) : null}
           </span>
           <span className="text-muted-foreground pl-3.5 text-xs tabular-nums">
-            {formatDuration(stats.durationMs)} · {stats.toolCount} tools · {formatTokens(stats.peakContext)}
+            {formatDuration(stats.durationMs)} · {activityLabel(stats)} · {formatTokens(stats.peakContext)}
             {collapsed ? ` · +${node.children.length} hidden` : ""}
           </span>
         </button>

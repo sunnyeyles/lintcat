@@ -1,6 +1,5 @@
-// The shape a factory run (e.g. a marrow build) takes once its Claude Code
-// transcripts are parsed: one tree of agents, each with what it thought, what
-// it did, and how full its context window got. Parser and page share this.
+// The one shape every adapter produces and the page renders: a tree of agents.
+// Every field past the core is optional so sparse formats still render.
 
 export type ToolCall = {
   id: string;
@@ -16,11 +15,31 @@ export type ToolCall = {
   childAgentId?: string;
 };
 
+type TraceEventCategory = "command" | "check" | "handoff" | "log" | "other";
+type TraceEventStatus = "ok" | "error" | "running";
+
+/** A non-LLM step: a shell command, a check, a handoff, a log line. */
+export type TraceEvent = {
+  name: string;
+  category: TraceEventCategory;
+  status?: TraceEventStatus;
+  text?: string;
+  /** Long output, shown on expand. */
+  detail?: string;
+  durationMs?: number;
+  timestamp: string;
+};
+
 export type AgentStep =
   | { kind: "prompt"; text: string; timestamp: string }
   | { kind: "thinking"; text: string; timestamp: string }
   | { kind: "text"; text: string; timestamp: string }
-  | { kind: "tool"; call: ToolCall };
+  | { kind: "tool"; call: ToolCall }
+  | { kind: "event"; event: TraceEvent };
+
+export type AgentStatus = "running" | "done" | "failed" | "cancelled";
+
+export type TraceCost = { usd?: number; inputTokens?: number; outputTokens?: number };
 
 export type ContextSample = {
   timestamp: string;
@@ -42,10 +61,19 @@ export type AgentNode = {
   filesEdited: string[];
   context: ContextSample[];
   children: AgentNode[];
+  status?: AgentStatus;
+  stage?: string;
+  cost?: TraceCost;
+  error?: string;
 };
+
+export type RunOutcomeSummary = { status?: string; summary?: string; blocker?: string; url?: string };
 
 export type RunTrace = {
   sessionId: string;
   title?: string;
   root: AgentNode;
+  outcome?: RunOutcomeSummary;
+  /** The adapter id that produced this trace. */
+  format?: string;
 };

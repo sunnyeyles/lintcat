@@ -12,7 +12,7 @@ export default function RunTraceDevPage() {
       <PageHeader
         eyebrow="Dev"
         title="Run trace"
-        description="Drop a factory run's trace folder to see every agent it spawned: what each one thought, which tools it called, which files it read and edited, and how full its context window got."
+        description="Drop any agent factory's run (Claude Code, OpenTelemetry GenAI, OpenAI Agents SDK, lintcat run format or factory) to see every agent it spawned: what each one did, which tools and commands it ran, and how its run ended."
       />
       <div className="mt-6 space-y-6">
         <LiveRuns />

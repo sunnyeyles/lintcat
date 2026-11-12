@@ -1,11 +1,12 @@
 "use client";
 
+import { Badge, cn } from "@pr-review/design";
 import { useState } from "react";
 
 import { AgentDetail } from "@/app/dev/run-trace/agent-detail";
 import { AgentLanes } from "@/app/dev/run-trace/agent-lanes";
-import { ancestorIds, findAgent } from "@/app/dev/run-trace/trace-layout";
-import type { RunTrace } from "@/lib/run-trace/types";
+import { ancestorIds, findAgent, formatCost } from "@/app/dev/run-trace/trace-layout";
+import type { RunOutcomeSummary, RunTrace } from "@/lib/run-trace/types";
 
 // Selection and collapsed lanes survive a new `trace` for the same run; remount to reset.
 export function TraceView({ trace, live = false }: { trace: RunTrace; live?: boolean }) {
@@ -27,7 +28,9 @@ export function TraceView({ trace, live = false }: { trace: RunTrace; live?: boo
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_32rem]">
+    <div className="space-y-4">
+      {trace.outcome ? <OutcomeBanner outcome={trace.outcome} cost={formatCost(trace.root.cost)} /> : null}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_32rem]">
       <AgentLanes
         root={trace.root}
         collapsed={collapsed}
@@ -37,6 +40,26 @@ export function TraceView({ trace, live = false }: { trace: RunTrace; live?: boo
         live={live}
       />
       <AgentDetail agent={selected} onSelect={select} />
+      </div>
+    </div>
+  );
+}
+
+const FAILED = /fail|block|error|cancel/i;
+
+function OutcomeBanner({ outcome, cost }: { outcome: RunOutcomeSummary; cost?: string }) {
+  const failed = FAILED.test(outcome.status ?? "") || !!outcome.blocker;
+  return (
+    <div className={cn("bg-surface-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-4 py-2 text-sm", failed && "border-destructive")}>
+      {outcome.status ? <Badge variant={failed ? "destructive" : "secondary"}>{outcome.status}</Badge> : null}
+      {outcome.summary ? <span className="min-w-0">{outcome.summary}</span> : null}
+      {outcome.blocker ? <span className="text-destructive min-w-0">Blocker: {outcome.blocker}</span> : null}
+      {outcome.url && /^https?:\/\//.test(outcome.url) ? (
+        <a href={outcome.url} target="_blank" rel="noreferrer noopener" className="truncate underline">
+          {outcome.url}
+        </a>
+      ) : null}
+      {cost ? <span className="text-muted-foreground ml-auto tabular-nums">{cost}</span> : null}
     </div>
   );
 }
