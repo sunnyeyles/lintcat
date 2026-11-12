@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { LiveRuns } from "@/app/dev/run-trace/live-runs";
 import { RunTraceExplorer } from "@/app/dev/run-trace/run-trace-explorer";
+import { SparsePreview } from "@/app/dev/run-trace/sparse-preview";
 import { PageHeader } from "@/components/shell/page-header";
 
 export const metadata: Metadata = { title: "Run trace" };
@@ -17,6 +18,7 @@ export default function RunTraceDevPage() {
       <div className="mt-6 space-y-6">
         <LiveRuns />
         <RunTraceExplorer />
+        {process.env.NODE_ENV === "development" ? <SparsePreview /> : null}
       </div>
     </main>
   );

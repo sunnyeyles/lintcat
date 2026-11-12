@@ -135,7 +135,7 @@ function peakOf(samples: ContextSample[]): number {
   return samples.reduce((peak, sample) => Math.max(peak, sample.tokens), 0);
 }
 
-export function contextSeries(node: AgentNode): { seconds: number; tokens: number; output: number }[] {
+export function contextSeries(node: Pick<AgentNode, "startedAt" | "context">): { seconds: number; tokens: number; output: number }[] {
   const start = toMs(node.startedAt);
   return node.context.map((sample) => ({
     seconds: Math.max(0, Math.round((toMs(sample.timestamp) - start) / 1000)),

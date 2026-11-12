@@ -1,9 +1,11 @@
 "use client";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@pr-review/design";
 import { useState } from "react";
 
 import { AgentDetail } from "@/app/dev/run-trace/agent-detail";
 import { AgentLanes } from "@/app/dev/run-trace/agent-lanes";
+import { BotStage } from "@/app/dev/run-trace/bot-stage";
 import { ancestorIds, findAgent } from "@/app/dev/run-trace/trace-layout";
 import type { RunTrace } from "@/lib/run-trace/types";
 
@@ -27,16 +29,27 @@ export function TraceView({ trace, live = false }: { trace: RunTrace; live?: boo
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_32rem]">
-      <AgentLanes
-        root={trace.root}
-        collapsed={collapsed}
-        selectedId={selected.id}
-        onSelect={select}
-        onToggle={toggle}
-        live={live}
-      />
-      <AgentDetail agent={selected} onSelect={select} />
-    </div>
+    <Tabs defaultValue="bots">
+      <TabsList>
+        <TabsTrigger value="bots">Bots</TabsTrigger>
+        <TabsTrigger value="timeline">Timeline</TabsTrigger>
+      </TabsList>
+      <TabsContent value="bots" className="mt-2">
+        <BotStage root={trace.root} />
+      </TabsContent>
+      <TabsContent value="timeline" className="mt-2">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_32rem]">
+          <AgentLanes
+            root={trace.root}
+            collapsed={collapsed}
+            selectedId={selected.id}
+            onSelect={select}
+            onToggle={toggle}
+            live={live}
+          />
+          <AgentDetail agent={selected} onSelect={select} />
+        </div>
+      </TabsContent>
+    </Tabs>
   );
 }
