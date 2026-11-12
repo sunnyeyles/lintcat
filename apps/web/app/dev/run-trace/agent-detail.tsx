@@ -5,8 +5,22 @@ import { ArrowRight } from "@pr-review/design/icons";
 import type { ReactNode } from "react";
 
 import { ContextChart } from "@/app/dev/run-trace/context-chart";
-import { agentStats, formatDuration, formatTokens, roleColor, toMs } from "@/app/dev/run-trace/trace-layout";
-import type { AgentNode, AgentStep, ToolCall } from "@/lib/run-trace/types";
+import {
+  activityLabel,
+  agentStats,
+  formatCost,
+  formatDuration,
+  formatTokens,
+  roleColor,
+  toMs,
+} from "@/app/dev/run-trace/trace-layout";
+import type { AgentNode, AgentStatus, AgentStep, ToolCall, TraceEvent } from "@/lib/run-trace/types";
+
+const STATUS_BADGE: Record<AgentStatus, "default" | "secondary" | "destructive" | "outline"> = {
+  running: "secondary",
+  done: "outline",
+  failed: "destructive",
+};
 
 export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (id: string) => void }) {
   const stats = agentStats(agent);
@@ -19,12 +33,14 @@ export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (
   return (
     <Card className="min-w-0 gap-4 self-start xl:sticky xl:top-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex flex-wrap items-center gap-2">
           <span className="size-2.5 rounded-full" style={{ backgroundColor: roleColor(agent.role) }} />
           {agent.role}
+          {agent.stage && agent.stage !== agent.role ? <Badge variant="outline">{agent.stage}</Badge> : null}
+          {agent.status ? <Badge variant={STATUS_BADGE[agent.status]}>{agent.status}</Badge> : null}
         </CardTitle>
         <CardDescription>
-          {[agent.description, agent.model, formatDuration(stats.durationMs), `${stats.toolCount} tools`, `peak ${formatTokens(stats.peakContext)}`]
+          {[agent.description, agent.model, formatDuration(stats.durationMs), activityLabel(stats), `peak ${formatTokens(stats.peakContext)}`, formatCost(agent.costUsd)]
             .filter(Boolean)
             .join(" · ")}
         </CardDescription>
@@ -54,6 +70,18 @@ export function AgentDetail({ agent, onSelect }: { agent: AgentNode; onSelect: (
             ))}
           </ol>
         </Section>
+
+        {agent.events?.length ? (
+          <Section title={`Events (${agent.events.length})`}>
+            <ol className="max-h-[24rem] space-y-1.5 overflow-auto pr-1">
+              {agent.events.map((event, i) => (
+                <li key={i}>
+                  <EventView event={event} start={start} />
+                </li>
+              ))}
+            </ol>
+          </Section>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -72,7 +100,7 @@ function FileList({ title, files }: { title: string; files: string[] }) {
   return (
     <Section title={`${title} (${files.length})`}>
       {files.length === 0 ? (
-        <p className="text-muted-foreground text-xs">None recorded. Files touched through Bash are not tracked.</p>
+        <p className="text-muted-foreground text-xs">None recorded. Files touched through shell commands are not tracked.</p>
       ) : (
         <ul className="max-h-36 space-y-0.5 overflow-auto font-mono text-xs">
           {files.map((file) => (
@@ -185,6 +213,22 @@ function ToolView({
           <ArrowRight animate="none" />
         </Button>
       ) : null}
+    </div>
+  );
+}
+
+function EventView({ event, start }: { event: TraceEvent; start: number }) {
+  const failed = event.ok === false;
+  return (
+    <div className={cn("bg-surface-2 flex items-center gap-2 rounded-md border border-dashed px-2 py-1", failed && "border-destructive")}>
+      <Stamp timestamp={event.timestamp} start={start} />
+      <Badge variant={failed ? "destructive" : "outline"} className="font-mono">
+        {event.kind}
+      </Badge>
+      {event.ok === undefined ? <Badge variant="secondary">pending</Badge> : null}
+      <span className="min-w-0 truncate font-mono text-xs" title={event.label}>
+        {event.label}
+      </span>
     </div>
   );
 }

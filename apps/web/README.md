@@ -31,6 +31,7 @@ pnpm --filter @pr-review/web dev     # http://localhost:3000
 | `WORKER_PING_SECRET`        | Bearer token the worker checks; shared with `apps/worker`, required once `WORKER_URL` is set |
 | `ANTHROPIC_API_KEY`         | The platform's own key for the docs' Ask AI; unset, the route answers 503 |
 | `RUN_TRACE_TOKEN`           | Bearer token for pushing and reading live run traces (`/dev/run-trace`); unset, both 404 |
+| `FACTORY_DATABASE_URL`      | Optional: the factory's Postgres, read-only, so its runs show in `/dev/run-trace`; unset, the connector is off |
 
 Locally they go in the repo root `.env.local` (gitignored); `.env.example`
 lists them. Give the GitHub App the callback URL

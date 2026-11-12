@@ -81,7 +81,7 @@ describe("time scaling", () => {
 
 describe("agent stats", () => {
   it("counts tools, duration and peak context", () => {
-    expect(agentStats(tree)).toEqual({ durationMs: 100_000, toolCount: 1, peakContext: 30 });
+    expect(agentStats(tree)).toEqual({ durationMs: 100_000, toolCount: 1, eventCount: 0, peakContext: 30 });
   });
 
   it("finds the path to an agent", () => {

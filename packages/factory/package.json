@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./fake-sandbox": "./src/sandbox/fake-sandbox.ts",
+    "./store": "./src/store/index.ts",
     "./test-store": "./src/store/test-store.ts"
   },
   "scripts": {

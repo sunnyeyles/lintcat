@@ -116,6 +116,9 @@ importers:
       '@pr-review/design':
         specifier: workspace:*
         version: link:../../packages/design
+      '@pr-review/factory':
+        specifier: workspace:*
+        version: link:../../packages/factory
       '@pr-review/github':
         specifier: workspace:*
         version: link:../../packages/github

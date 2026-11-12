@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import Configuration from "@/app/(docs)/docs/configuration/page";
 import HowItWorks from "@/app/(docs)/docs/how-it-works/page";
 import McpServer from "@/app/(docs)/docs/mcp-server/page";
+import PlugInYourFactory from "@/app/(docs)/docs/plug-in-your-factory/page";
 import Introduction from "@/app/(docs)/docs/page";
 import Quickstart from "@/app/(docs)/docs/quickstart/page";
 import Security from "@/app/(docs)/docs/security/page";
@@ -18,6 +19,7 @@ const PAGES: Record<string, ComponentType> = {
   "/docs/how-it-works": HowItWorks,
   "/docs/security": Security,
   "/docs/mcp-server": McpServer,
+  "/docs/plug-in-your-factory": PlugInYourFactory,
 };
 
 function templateLiteral(text: string): string {

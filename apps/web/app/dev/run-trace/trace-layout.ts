@@ -12,6 +12,7 @@ export type LaneRow = {
 export type AgentStats = {
   durationMs: number;
   toolCount: number;
+  eventCount: number;
   peakContext: number;
 };
 
@@ -103,12 +104,13 @@ export function axisTicks(bounds: TimeBounds, target = 8): number[] {
   return ticks;
 }
 
+/** Tick marks on a lane: tool calls and non-LLM events. */
 export function toolTimes(node: AgentNode): { id: string; ms: number; label: string; error: boolean }[] {
-  return node.steps.flatMap((step) =>
+  const tools = node.steps.flatMap((step, index) =>
     step.kind === "tool"
       ? [
           {
-            id: step.call.id,
+            id: `${step.call.id}:${index}`,
             ms: toMs(step.call.timestamp),
             label: `${step.call.name} ${step.call.summary}`.trim(),
             error: step.call.isError === true,
@@ -116,10 +118,18 @@ export function toolTimes(node: AgentNode): { id: string; ms: number; label: str
         ]
       : [],
   );
+  const events = (node.events ?? []).map((event, index) => ({
+    id: `event:${index}`,
+    ms: toMs(event.timestamp),
+    label: event.label,
+    error: event.ok === false,
+  }));
+  return [...tools, ...events];
 }
 
-/** A tool call still waiting on its result: mid-call, if the run is live. */
+/** An explicit running status, else a tool call still waiting on its result. */
 export function isRunning(node: AgentNode): boolean {
+  if (node.status !== undefined) return node.status === "running";
   return node.steps.some((step) => step.kind === "tool" && step.call.result === undefined);
 }
 
@@ -127,6 +137,7 @@ export function agentStats(node: AgentNode): AgentStats {
   return {
     durationMs: Math.max(0, toMs(node.endedAt) - toMs(node.startedAt)),
     toolCount: node.steps.filter((step) => step.kind === "tool").length,
+    eventCount: node.events?.length ?? 0,
     peakContext: peakOf(node.context),
   };
 }
@@ -135,7 +146,7 @@ function peakOf(samples: ContextSample[]): number {
   return samples.reduce((peak, sample) => Math.max(peak, sample.tokens), 0);
 }
 
-export function contextSeries(node: AgentNode): { seconds: number; tokens: number; output: number }[] {
+export function contextSeries(node: Pick<AgentNode, "startedAt" | "context">): { seconds: number; tokens: number; output: number }[] {
   const start = toMs(node.startedAt);
   return node.context.map((sample) => ({
     seconds: Math.max(0, Math.round((toMs(sample.timestamp) - start) / 1000)),
@@ -150,6 +161,16 @@ export function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+export function formatCost(usd: number | undefined): string | undefined {
+  if (usd === undefined) return undefined;
+  return `$${usd < 0.01 ? usd.toFixed(4) : usd.toFixed(2)}`;
+}
+
+/** "3 tools", plus events when there are any. */
+export function activityLabel(stats: AgentStats): string {
+  return stats.eventCount > 0 ? `${stats.toolCount} tools · ${stats.eventCount} events` : `${stats.toolCount} tools`;
 }
 
 export function formatTokens(tokens: number): string {

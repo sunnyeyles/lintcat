@@ -44,6 +44,8 @@ By default every pull request is reviewed when it is opened, and again on every 
 
 [MCP server: The same review over a working tree, inside your coding agent.](/docs/mcp-server)
 
+[Plug in your factory: See any agent factory's runs in the run-trace dashboard: formats, push, pull.](/docs/plug-in-your-factory)
+
 ## Frequently asked questions {#faq}
 
 Which repositories does LintCat review?
@@ -280,5 +282,140 @@ Register it in any MCP client as a local stdio server named \`pr-review\`. It ne
 ## The same review as the App {#same-path}
 
 A local review is the same review the GitHub App runs, with the same checks on every finding and fix. It reads your local checkout instead of GitHub, and runs on your machine with your own key, not the account’s.`,
+  },
+  {
+    href: "/docs/plug-in-your-factory",
+    title: "Plug in your factory",
+    text: `Reference
+
+# Plug in your factory
+
+The run-trace dashboard at /dev/run-trace shows any agent factory's runs: every agent, what it did, and how its run ended. Hand it the files your factory already writes; no code changes.
+
+## Supported formats {#formats}
+
+Each format has an adapter. The dashboard reads what you give it, picks the adapter that fits best, shows which one it used, and lets you override it.
+| Format id | Name | What to hand over |
+| claude-code | Claude Code / Agent SDK | A session's .jsonl transcript, with its subagents/ folder beside it. |
+| otel-genai | OpenTelemetry GenAI spans | An OTLP JSON export (resourceSpans), one document or one per line. invoke_agent spans become agents, chat and execute_tool spans become steps, other spans become events, parent span IDs build the tree. |
+| openai-agents | OpenAI Agents SDK | A traces/spans export: objects with "object": "trace" or "trace.span". Agent spans become agents; generation and function spans become steps, handoffs and guardrails events. |
+| lintcat | lintcat run format | The small NDJSON event stream below, for anything else. |
+| lintcat-factory | lintcat factory | A factory-run.json export, or a .factory/runs/<id>/ folder with events.jsonl. One agent per stage and agent, commands and checks as events. |
+
+## The lintcat run format {#run-format}
+
+For any factory the other formats don’t cover. Write one JSON object per line. Every event has \`type\` and \`at\` (an ISO 8601 timestamp with a zone), and may carry \`"v": 1\`. Lines that don’t validate are skipped, not fatal, and events may arrive in any order. Validate against the [JSON Schema](/schemas/lintcat-run-format.schema.json); the Zod source is \`runEventSchema\` in \`@pr-review/schemas\`.
+| type | Fields | Meaning |
+| run_started | run, title? | Names the run. Optional: without it, top agents sit under a synthetic root. |
+| agent_started | agent, role, parent?, description?, model?, stage?, prompt? | Starts an agent; parent nests it under another. |
+| step | agent, kind (prompt | thinking | text), text | Something the agent was told, thought or said. |
+| tool_call | agent, id, name, input?, summary?, output?, error?, files? | A tool call; output may come here or later. |
+| tool_result | agent, id, output?, error? | The result of an earlier tool_call with the same id. |
+| event | agent, name, category?, status?, text?, output?, durationMs? | A non-LLM step: a shell command, a check, a handoff, a log line. |
+| usage | agent, inputTokens, outputTokens?, costUsd? | One model turn's usage; inputTokens draws the context chart. |
+| agent_finished | agent, status (done | failed | cancelled), error? | Ends an agent. Without it the agent shows as running. |
+| run_finished | status?, summary?, blocker?, url? | The run's outcome, shown above the timeline. |
+
+run.ndjson:
+
+\`\`\`
+{"v":1,"at":"2026-11-10T09:00:00Z","type":"run_started","run":"nightly-docs-42","title":"Refresh API docs"}
+{"v":1,"at":"2026-11-10T09:00:00Z","type":"agent_started","agent":"lead","role":"lead","model":"claude-sonnet-4-5","prompt":"Regenerate API docs and open a PR"}
+{"v":1,"at":"2026-11-10T09:00:05Z","type":"tool_call","agent":"lead","id":"writer","name":"spawn","summary":"writer: draft pages"}
+{"v":1,"at":"2026-11-10T09:00:05Z","type":"agent_started","agent":"writer","parent":"lead","role":"writer","stage":"write"}
+{"v":1,"at":"2026-11-10T09:00:09Z","type":"tool_call","agent":"writer","id":"c1","name":"read_file","input":{"path":"src/api.ts"},"files":{"read":["src/api.ts"]}}
+{"v":1,"at":"2026-11-10T09:00:10Z","type":"tool_result","agent":"writer","id":"c1","output":"export function createUser() {}"}
+{"v":1,"at":"2026-11-10T09:00:12Z","type":"usage","agent":"writer","inputTokens":5200,"outputTokens":400,"costUsd":0.021}
+{"v":1,"at":"2026-11-10T09:00:35Z","type":"event","agent":"writer","name":"markdownlint","category":"check","status":"error","text":"2 warnings","durationMs":1800}
+{"v":1,"at":"2026-11-10T09:00:40Z","type":"agent_finished","agent":"writer","status":"done"}
+{"v":1,"at":"2026-11-10T09:00:41Z","type":"tool_result","agent":"lead","id":"writer","output":"Drafted docs/api.md"}
+{"v":1,"at":"2026-11-10T09:00:48Z","type":"agent_finished","agent":"lead","status":"done"}
+{"v":1,"at":"2026-11-10T09:00:49Z","type":"run_finished","status":"delivered","summary":"Docs refreshed"}
+\`\`\`
+
+**Note: Linking a spawn** A tool_call whose id equals a child agent’s id gets an “Open” link to that agent, as the writer above does.
+
+## Drop a file {#drop}
+
+Open \`/dev/run-trace\` and drop a folder, one or more \`.json\`, \`.jsonl\` or \`.ndjson\` files, or a \`.zip\` of a folder. Or use Choose folder and Choose files. Everything is read in your browser; nothing is uploaded.
+
+## Push over HTTP {#push}
+
+Set \`RUN_TRACE_TOKEN\` on the web app, then POST \`{ format?, files: [{ name, text }] }\` to \`/api/run-trace/<runId>\` with that token as a bearer. Leave out \`format\` to auto-detect. Push again as the run grows: a file with the same name replaces the last copy, and the run page refreshes every few seconds while pushes keep arriving. A gzipped body with \`content-encoding: gzip\` also works.
+
+curl:
+
+\`\`\`
+curl -X POST "$RUN_TRACE_URL/api/run-trace/my-run-1" \\
+  -H "authorization: Bearer $RUN_TRACE_TOKEN" \\
+  -H "content-type: application/json" \\
+  -d "$(jq -n --rawfile text run.ndjson '{files: [{name: "run.ndjson", text: $text}]}')"
+\`\`\`
+
+Node:
+
+\`\`\`
+const events = [];
+async function emit(event) {
+  events.push(JSON.stringify({ v: 1, at: new Date().toISOString(), ...event }));
+  await fetch(\`\${process.env.RUN_TRACE_URL}/api/run-trace/my-run-1\`, {
+    method: "POST",
+    headers: { authorization: \`Bearer \${process.env.RUN_TRACE_TOKEN}\`, "content-type": "application/json" },
+    body: JSON.stringify({ format: "lintcat", files: [{ name: "run.ndjson", text: events.join("\\n") }] }),
+  });
+}
+
+await emit({ type: "agent_started", agent: "main", role: "planner" });
+await emit({ type: "agent_finished", agent: "main", status: "done" });
+\`\`\`
+
+Python:
+
+\`\`\`
+import json, os, urllib.request
+from datetime import datetime, timezone
+
+events = []
+def emit(**event):
+    events.append(json.dumps({"v": 1, "at": datetime.now(timezone.utc).isoformat(), **event}))
+    body = json.dumps({"format": "lintcat", "files": [{"name": "run.ndjson", "text": "\\n".join(events)}]})
+    urllib.request.urlopen(urllib.request.Request(
+        f"{os.environ['RUN_TRACE_URL']}/api/run-trace/my-run-1", data=body.encode(), method="POST",
+        headers={"authorization": f"Bearer {os.environ['RUN_TRACE_TOKEN']}", "content-type": "application/json"}))
+
+emit(type="agent_started", agent="main", role="worker")
+emit(type="agent_finished", agent="main", status="done")
+\`\`\`
+
+Responses:
+
+\`\`\`
+200 {"ok":true,"format":"lintcat","files":1}
+400 {"error":"unknown format \\"x\\"","supported":["claude-code","otel-genai","openai-agents","lintcat","lintcat-factory"]}
+404 a missing or wrong token, so the endpoint does not advertise itself
+413 a body over 64 MB
+\`\`\`
+
+Runnable versions are in \`scripts/run-trace-examples/\`. For Claude Code, \`scripts/run-trace-push.mjs\` pushes a session as a hook.
+
+## Pull from a database {#pull}
+
+A connector is a source the web app reads itself. The lintcat factory connector reads \`factory_runs\`, \`factory_events\` and \`factory_commands\` read-only. It is off until \`FACTORY_DATABASE_URL\` is set; then the factory’s runs appear beside pushed ones and update live.
+
+.env.local:
+
+\`\`\`
+# .env.local for apps/web: read runs straight from the factory's Postgres
+FACTORY_DATABASE_URL=postgres://user:password@localhost:5432/factory
+RUN_TRACE_TOKEN=any-long-random-string
+\`\`\`
+
+To add a source, implement \`RunTraceConnector\` (\`list\` and \`read\`, in \`apps/web/lib/run-trace/connectors/\`) and return files in any supported format.
+
+## Limits and safety {#limits}
+- Up to 500 files and 64 MB per push or drop; zips are capped by their expanded size.
+- Each format is validated with a schema; records that fail are skipped.
+- Nothing in a trace is ever run. Text is shown as text.
+- A file that matches no format gets a message naming what is supported, not an error page.`,
   },
 ];
