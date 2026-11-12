@@ -1,0 +1,5 @@
+{
+  "description": "Extract three copies of money formatting into one module without changing any output",
+  "checks": "test: node --test \"test/*.test.mjs\"",
+  "baseSha": "684c2c92bb2fa7f1141e244230d9f040ad92f9f0"
+}

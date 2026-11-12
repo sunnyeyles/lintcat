@@ -1,0 +1,5 @@
+{
+  "description": "Create a new module in an almost empty repo",
+  "checks": "test: node --test \"test/*.test.mjs\"",
+  "baseSha": "a540637f3d8e1d0d1f69c0375b12acf81e441029"
+}

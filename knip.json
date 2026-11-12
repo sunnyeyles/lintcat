@@ -2,23 +2,47 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     ".": {
-      "ignoreFiles": [".agents/**", "docs/**"]
+      "ignoreFiles": [
+        ".agents/**",
+        "docs/**"
+      ],
+      "ignore": [
+        "benchmarks/factory/fixtures/**"
+      ]
     },
     "apps/web": {
       "next": true,
-      "entry": ["components/shell/logo-mark.tsx"]
+      "entry": [
+        "components/shell/logo-mark.tsx"
+      ]
     },
     "apps/mcp": {
-      "entry": ["start.mjs"]
+      "entry": [
+        "start.mjs"
+      ]
+    },
+    "apps/factory": {
+      "entry": [
+        "src/index.ts",
+        "scripts/*.mjs"
+      ]
     },
     "packages/design": {
-      "entry": ["brand/cli/lintcat-spinner.js"]
+      "entry": [
+        "brand/cli/lintcat-spinner.js"
+      ]
     },
     "evals": {
       "vitest": {
-        "config": ["vitest.config.ts", "vitest.eval.config.ts"]
+        "config": [
+          "vitest.config.ts",
+          "vitest.eval.config.ts"
+        ]
       },
-      "project": ["**/*.ts", "!fixtures/**"]
+      "project": [
+        "**/*.ts",
+        "!fixtures/**"
+      ]
     }
   }
 }

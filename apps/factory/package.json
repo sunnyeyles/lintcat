@@ -1,0 +1,27 @@
+{
+  "name": "@pr-review/factory-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "factory": "./start.mjs"
+  },
+  "imports": {
+    "#src/*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "build": "node ../../scripts/build-bundle.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@pr-review/agent-runtime": "workspace:*",
+    "@pr-review/factory": "workspace:*",
+    "@pr-review/logging": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@pr-review/eslint-config": "workspace:*"
+  }
+}
