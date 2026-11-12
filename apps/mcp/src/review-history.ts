@@ -1,7 +1,6 @@
 import { authorize } from "@pr-review/db";
 import { createDbSource, type DataSource, type ReviewSummary } from "@pr-review/db/dashboard";
-
-import type { McpEnvironment } from "#src/environment";
+import type { LocalEnvironment } from "@pr-review/local";
 
 export interface Scoped {
   source: DataSource;
@@ -25,7 +24,7 @@ export function summariseReview(review: ReviewSummary) {
 
 /** The dashboard's own access rules, applied to the signed-in GitHub user. */
 export async function scopeToOrganization(
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   githubId: () => Promise<number>,
   org: string,
   repo: string | undefined,
@@ -53,7 +52,7 @@ export async function scopeToOrganization(
 
 /** One stored review with every finding, or a throw if it is not readable. */
 export async function readStoredReview(
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   githubId: () => Promise<number>,
   org: string,
   id: number,

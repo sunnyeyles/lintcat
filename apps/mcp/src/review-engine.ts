@@ -1,20 +1,13 @@
 /** Which way a review will be run: the key-backed tool loop, or one client-sampling call. */
+import { apiKeyEnvFor, MODEL_PROVIDERS, samplingEngine } from "@pr-review/ai";
 import {
-  apiKeyEnvFor,
-  MODEL_PROVIDERS,
-  samplingEngine,
-  toolLoopEngine,
-  type ReviewEngine,
-} from "@pr-review/ai";
+  hasModelApiKey,
+  modelReviewEngine,
+  type LocalEnvironment,
+  type SelectedEngine,
+} from "@pr-review/local";
 
 import type { ConnectedClient } from "#src/client-capabilities";
-import { hasModelApiKey, resolveModel, type McpEnvironment } from "#src/environment";
-
-export interface SelectedEngine {
-  engine: ReviewEngine;
-  /** One sampling request replaced the tool-calling agent; the result must say so. */
-  singleShot: boolean;
-}
 
 /** Said when the machine has neither a key nor a client willing to run the model. */
 function noModelAccessMessage(): string {
@@ -25,20 +18,12 @@ function noModelAccessMessage(): string {
   );
 }
 
-/** The key-backed engine: the tool-calling agent over the run's model. */
-export function modelReviewEngine(environment: McpEnvironment): SelectedEngine {
-  return {
-    engine: toolLoopEngine({ model: resolveModel(environment).model }),
-    singleShot: false,
-  };
-}
-
 /**
  * A provider key always wins: the tool-calling agent reads the repository,
  * and sampling is the fallback for a machine that has no key at all.
  */
 export function selectReviewEngine(
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   client: ConnectedClient,
 ): SelectedEngine {
   if (hasModelApiKey(environment)) {

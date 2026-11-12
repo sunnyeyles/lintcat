@@ -1,8 +1,7 @@
 import { ResourceTemplate, type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import { readWorkingTreeFile, type LocalEnvironment } from "@pr-review/local";
 
-import type { McpEnvironment } from "#src/environment";
-import { readWorkingTreeFile } from "#src/local-git-client";
 import { readStoredReview } from "#src/review-history";
 
 const REVIEW_RESOURCE_TEMPLATE = "pr-review://review/{org}/{id}";
@@ -35,7 +34,7 @@ function jsonResource(uri: URL, value: unknown): ReadResourceResult {
 
 export function registerContextResources(
   server: McpServer,
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   githubId: () => Promise<number>,
 ): void {
   server.registerResource(

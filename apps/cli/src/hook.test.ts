@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { createTestRepo, type TestRepo } from "@pr-review/mcp/test-repo";
+import { createTestRepo, type TestRepo } from "@pr-review/local/test-repo";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { BYPASS_ENV, hookScript, installPrePushHook } from "#src/hook";

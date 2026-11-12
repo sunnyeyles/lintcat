@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import { startTracing } from "@pr-review/ai";
 import { findLocalEnvFile } from "@pr-review/db";
+import { processEnvironment } from "@pr-review/local";
 import { createStderrLogger } from "@pr-review/logging";
-import { processEnvironment } from "@pr-review/mcp/local-review";
 
 import { runCli } from "#src/cli";
 import { cancelOnInterrupt } from "#src/interrupt";

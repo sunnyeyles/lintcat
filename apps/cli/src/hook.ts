@@ -2,7 +2,7 @@
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { git, repositoryRoot } from "@pr-review/mcp/local-review";
+import { git, repositoryRoot } from "@pr-review/local";
 
 import type { FailOn } from "#src/options";
 import { EXIT_CANCELLED } from "#src/review-command";

@@ -38,12 +38,12 @@ importers:
       '@pr-review/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@pr-review/local':
+        specifier: workspace:*
+        version: link:../../packages/local
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../../packages/logging
-      '@pr-review/mcp':
-        specifier: workspace:*
-        version: link:../mcp
       '@pr-review/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
@@ -91,6 +91,9 @@ importers:
       '@pr-review/index':
         specifier: workspace:*
         version: link:../../packages/index
+      '@pr-review/local':
+        specifier: workspace:*
+        version: link:../../packages/local
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -427,6 +430,31 @@ importers:
         version: link:../eslint-config
 
   packages/index:
+    devDependencies:
+      '@pr-review/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+
+  packages/local:
+    dependencies:
+      '@pr-review/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@pr-review/db':
+        specifier: workspace:*
+        version: link:../db
+      '@pr-review/github':
+        specifier: workspace:*
+        version: link:../github
+      '@pr-review/index':
+        specifier: workspace:*
+        version: link:../index
+      '@pr-review/logging':
+        specifier: workspace:*
+        version: link:../logging
+      '@pr-review/reviewer':
+        specifier: workspace:*
+        version: link:../reviewer
     devDependencies:
       '@pr-review/eslint-config':
         specifier: workspace:*

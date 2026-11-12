@@ -1,10 +1,14 @@
 import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import {
+  createLocalIndexCache,
+  resolveGithubToken,
+  type LocalEnvironment,
+  type LocalIndex,
+} from "@pr-review/local";
 
 import { connectedClient, type ConnectedClient } from "#src/client-capabilities";
 import { createClientLogger } from "#src/client-logger";
-import { resolveGithubToken, type McpEnvironment } from "#src/environment";
-import { createLocalIndexCache, type LocalIndex } from "#src/local-index";
 import { registerWorkflowPrompts } from "#src/prompts/workflow-prompts";
 import { registerContextResources } from "#src/resources/context-resources";
 import { registerFixTools } from "#src/tools/fix-tools";
@@ -38,7 +42,7 @@ export interface ServerOptions {
   readOnly?: boolean;
 }
 
-function readOnlyFromEnv(env: McpEnvironment["env"]): boolean {
+function readOnlyFromEnv(env: LocalEnvironment["env"]): boolean {
   return ["1", "true"].includes(env["PR_REVIEW_MCP_READ_ONLY"]?.trim().toLowerCase() ?? "");
 }
 
@@ -54,7 +58,7 @@ function hideWriteTools(server: McpServer): void {
 }
 
 /** The signed-in user's numeric GitHub id, read once per server. */
-function githubUserId(environment: McpEnvironment): () => Promise<number> {
+function githubUserId(environment: LocalEnvironment): () => Promise<number> {
   let id: Promise<number> | undefined;
   return () => {
     id ??= (async () => {
@@ -74,14 +78,14 @@ function githubUserId(environment: McpEnvironment): () => Promise<number> {
   };
 }
 
-export function createServer(base: McpEnvironment, options: ServerOptions = {}): McpServer {
+export function createServer(base: LocalEnvironment, options: ServerOptions = {}): McpServer {
   const server = new McpServer(
     { name: "pr-review-agents", version: "0.1.0" },
     { instructions: INSTRUCTIONS, capabilities: { logging: {} } },
   );
   if (options.readOnly ?? readOnlyFromEnv(base.env)) hideWriteTools(server);
   const client = options.client ?? connectedClient(server);
-  const environment: McpEnvironment = {
+  const environment: LocalEnvironment = {
     ...base,
     logger: createClientLogger(server, client, base.logger),
   };

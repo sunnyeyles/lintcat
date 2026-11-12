@@ -10,7 +10,7 @@ import {
   type ReviewTarget,
 } from "@pr-review/reviewer";
 
-import type { McpEnvironment } from "#src/environment";
+import type { LocalEnvironment } from "#src/environment";
 import type { SelectedEngine } from "#src/review-engine";
 
 export interface ReviewRequest {
@@ -51,7 +51,7 @@ function capturingSummary(
 }
 
 export async function runReview(
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   {
     client,
     target,

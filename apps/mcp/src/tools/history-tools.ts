@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { LocalEnvironment } from "@pr-review/local";
 import { z } from "zod";
 
-import type { McpEnvironment } from "#src/environment";
 import { reviewResourceUri } from "#src/resources/context-resources";
 import { readStoredReview, scopeToOrganization, summariseReview } from "#src/review-history";
 import { json } from "#src/tools/shared";
@@ -16,7 +16,7 @@ const rangeSchema = z.enum(["7d", "30d", "90d"]).optional().describe("Time windo
 
 export function registerHistoryTools(
   server: McpServer,
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   githubId: () => Promise<number>,
 ): void {
   server.registerTool(

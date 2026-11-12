@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { openLocalMemoryStore, repositoryRoot, type LocalEnvironment } from "@pr-review/local";
 import {
   addSuppression,
   readMemory,
@@ -10,14 +11,11 @@ import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
-import { repositoryRoot } from "#src/local-git-client";
-import { openLocalMemoryStore } from "#src/local-memory-store";
 import { repoPathSchema } from "#src/tools/shared";
 
 /** No base branch is resolved here: suppressing needs the checkout, not a diff. */
 async function checkoutRoot(
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   client: ConnectedClient,
   repoPath: string | undefined,
 ): Promise<string> {
@@ -27,7 +25,7 @@ async function checkoutRoot(
 
 export function registerMemoryTools(
   server: McpServer,
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   client: ConnectedClient,
 ): void {
   server.registerTool(

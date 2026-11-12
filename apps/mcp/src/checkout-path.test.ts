@@ -3,14 +3,14 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { LocalEnvironment } from "@pr-review/local";
+import { createTestRepo, type TestRepo } from "@pr-review/local/test-repo";
 import { createCapturingLogger } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import { staticClient } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
 import { createServer } from "#src/server";
-import { createTestRepo, type TestRepo } from "#src/test-repo";
 
 let repo: TestRepo;
 
@@ -23,7 +23,7 @@ beforeEach(() => {
 
 afterEach(() => repo.remove());
 
-function environment(cwd: string): McpEnvironment {
+function environment(cwd: string): LocalEnvironment {
   return {
     env: {},
     cwd,

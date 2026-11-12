@@ -29,12 +29,12 @@ import {
 import { createTestDatabase } from "@pr-review/db/test-database";
 import type { FileContentsRequest } from "@pr-review/github";
 import { MAX_REFERENCE_FILES, UNINDEXED_PATH_REASON } from "@pr-review/index";
+import type { LocalEnvironment } from "@pr-review/local";
+import { createTestRepo, type TestRepo } from "@pr-review/local/test-repo";
 import { createCapturingLogger } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { McpEnvironment } from "#src/environment";
 import { createServer, type ServerOptions } from "#src/server";
-import { createTestRepo, type TestRepo } from "#src/test-repo";
 
 let repo: TestRepo;
 
@@ -54,7 +54,7 @@ beforeEach(() => {
 
 afterEach(() => repo.remove());
 
-function environment(overrides: Partial<McpEnvironment> = {}): McpEnvironment {
+function environment(overrides: Partial<LocalEnvironment> = {}): LocalEnvironment {
   return {
     env: { OPENAI_API_KEY: "sk-test" },
     cwd: repo.root,
@@ -74,7 +74,7 @@ function environment(overrides: Partial<McpEnvironment> = {}): McpEnvironment {
 }
 
 async function connect(
-  env: McpEnvironment,
+  env: LocalEnvironment,
   githubId?: () => Promise<number>,
   extra: ServerOptions = {},
 ): Promise<Client> {
@@ -759,7 +759,7 @@ describe("the prompt list", () => {
 
 describe("a review through client sampling", () => {
   /** A client that answers sampling/createMessage with `reply`, recording what it was asked. */
-  async function samplingClient(env: McpEnvironment, reply: string) {
+  async function samplingClient(env: LocalEnvironment, reply: string) {
     const asked: CreateMessageRequest["params"][] = [];
     const server = createServer(env);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

@@ -9,12 +9,11 @@ import {
   unknownPath,
   type RepositoryIndex,
 } from "@pr-review/index";
+import type { LocalEnvironment, LocalIndex } from "@pr-review/local";
 import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
-import type { LocalIndex } from "#src/local-index";
 import { json, repoPathSchema } from "#src/tools/shared";
 
 const filePathSchema = z
@@ -28,7 +27,7 @@ function unknown(index: RepositoryIndex, file: string): CallToolResult {
 
 export function registerIndexTools(
   server: McpServer,
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   client: ConnectedClient,
   loadIndex: (repoPath: string) => Promise<LocalIndex>,
 ): void {

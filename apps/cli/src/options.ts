@@ -1,5 +1,5 @@
 /** The command line: what `pr-review` was asked to do, before anything is read. */
-import type { LocalScope } from "@pr-review/mcp/local-review";
+import type { LocalScope } from "@pr-review/local";
 
 /** The severity that makes a review fail; "off" never fails. */
 export type FailOn = "low" | "medium" | "high" | "off";

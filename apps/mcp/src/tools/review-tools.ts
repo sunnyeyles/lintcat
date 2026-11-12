@@ -1,14 +1,20 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import {
+  GitError,
+  openLocalMemoryStore,
+  openLocalRepository,
+  resolveGithubToken,
+  runReview,
+  type LocalEnvironment,
+  type LocalRepository,
+  type LocalScope,
+  type ReviewResult,
+} from "@pr-review/local";
 import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
-import { resolveGithubToken, type McpEnvironment } from "#src/environment";
-import { GitError } from "#src/git";
-import { openLocalRepository, type LocalRepository, type LocalScope } from "#src/local-git-client";
-import { openLocalMemoryStore } from "#src/local-memory-store";
-import { runReview, type ReviewResult } from "#src/review";
 import { selectReviewEngine } from "#src/review-engine";
 import { repoPathSchema } from "#src/tools/shared";
 
@@ -65,7 +71,7 @@ function chooseScope({ scope, range }: ScopeArgs): LocalScope {
 }
 
 async function openScoped(
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   connection: ConnectedClient,
   args: ScopeArgs,
 ): Promise<LocalRepository> {
@@ -101,7 +107,7 @@ function reviewResult(result: ReviewResult, heading: string): CallToolResult {
 
 export function registerReviewTools(
   server: McpServer,
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   connection: ConnectedClient,
 ): void {
   server.registerTool(

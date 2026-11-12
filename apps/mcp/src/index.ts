@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { startTracing } from "@pr-review/ai";
 import { findLocalEnvFile } from "@pr-review/db";
+import { processEnvironment } from "@pr-review/local";
 
-import { processEnvironment } from "#src/environment";
 import { createServer } from "#src/server";
 
 // This project's .env.local, found from the server's own files, never the client's cwd.

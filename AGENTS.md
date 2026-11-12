@@ -18,7 +18,8 @@ model key. One pipeline, four front ends:
   enqueues a row in `review_jobs`.
 - `apps/worker` (Cloud Run): claims jobs from that table, runs the pipeline with
   the org's decrypted key, publishes the check run and inline comments.
-- `apps/cli` and `apps/mcp`: the same pipeline over a local working tree.
+- `apps/cli` and `apps/mcp`: the same pipeline over a local working tree,
+  through `packages/local` (git client, memory store, model key resolution).
 
 The pipeline lives in `packages/reviewer` (`review-run.ts`). It builds a
 repository index at the base commit (`packages/index`), then runs **one**

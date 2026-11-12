@@ -5,6 +5,8 @@ import {
   LoggingMessageNotificationSchema,
   type LoggingMessageNotification,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { LocalEnvironment } from "@pr-review/local";
+import { createTestRepo, type TestRepo } from "@pr-review/local/test-repo";
 import {
   createCapturingLogger,
   createStderrLogger,
@@ -15,9 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { connectedClient, staticClient, type ConnectedClient } from "#src/client-capabilities";
 import { createClientLogger } from "#src/client-logger";
-import type { McpEnvironment } from "#src/environment";
 import { createServer } from "#src/server";
-import { createTestRepo, type TestRepo } from "#src/test-repo";
 
 let repo: TestRepo;
 
@@ -30,7 +30,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function environment(logger: McpEnvironment["logger"]): McpEnvironment {
+function environment(logger: LocalEnvironment["logger"]): LocalEnvironment {
   return {
     env: {},
     cwd: repo.root,

@@ -1,10 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { repositoryRoot, searchWorkingTree, type LocalEnvironment } from "@pr-review/local";
 import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
-import { repositoryRoot, searchWorkingTree } from "#src/local-git-client";
 import { json, repoPathSchema } from "#src/tools/shared";
 
 /** Lines, not files, so `SEARCH_LIMITS.maxMatches` is a cap on a different thing. */
@@ -12,7 +11,7 @@ const MAX_LINES = 200;
 
 export function registerSearchTools(
   server: McpServer,
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   client: ConnectedClient,
 ): void {
   server.registerTool(

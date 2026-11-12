@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { repositoryRoot, resolveInside, type LocalEnvironment } from "@pr-review/local";
 import {
   applyVerifiedPatches,
   MAX_PATCHED_FILES,
@@ -10,8 +11,6 @@ import { z } from "zod";
 
 import { resolveCheckoutPath } from "#src/checkout-path";
 import type { ConnectedClient } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
-import { repositoryRoot, resolveInside } from "#src/local-git-client";
 import { repoPathSchema } from "#src/tools/shared";
 
 type FindingPatch = Parameters<typeof applyVerifiedPatches>[1][number];
@@ -136,7 +135,7 @@ function writeAll(planned: readonly PlannedFile[]): void {
 
 export function registerFixTools(
   server: McpServer,
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   client: ConnectedClient,
 ): void {
   server.registerTool(

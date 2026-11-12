@@ -1,7 +1,8 @@
 import path from "node:path";
 
+import type { LocalEnvironment } from "@pr-review/local";
+
 import type { ConnectedClient } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
 
 function within(root: string, candidate: string): boolean {
   return candidate === root || candidate.startsWith(root + path.sep);
@@ -14,7 +15,7 @@ function defaultRoot(roots: readonly string[], cwd: string): string {
 
 /** Where a tool's `repoPath` points, gated by the client's roots; ungated when it serves none. */
 export async function resolveCheckoutPath(
-  environment: McpEnvironment,
+  environment: LocalEnvironment,
   client: ConnectedClient,
   repoPath: string | undefined,
 ): Promise<string> {

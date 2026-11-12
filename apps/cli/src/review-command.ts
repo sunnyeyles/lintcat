@@ -1,16 +1,16 @@
-/** One `pr-review review`: the MCP server's local review path, printed to a terminal. */
+/** One `pr-review review`: the shared local review path, printed to a terminal. */
 import path from "node:path";
 
 import { apiKeyEnvFor, MODEL_PROVIDERS } from "@pr-review/ai";
-import { createSilentLogger } from "@pr-review/logging";
 import {
   hasModelApiKey,
   modelReviewEngine,
   openLocalMemoryStore,
   openLocalRepository,
   runReview,
-  type McpEnvironment,
-} from "@pr-review/mcp/local-review";
+  type LocalEnvironment,
+} from "@pr-review/local";
+import { createSilentLogger } from "@pr-review/logging";
 
 import type { ReviewOptions } from "#src/options";
 import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
@@ -21,7 +21,7 @@ export const EXIT_ERROR = 2;
 export const EXIT_CANCELLED = 3;
 
 export interface CliDeps {
-  environment: McpEnvironment;
+  environment: LocalEnvironment;
   out: (text: string) => void;
   err: (text: string) => void;
   /** Aborting it cancels the review and its in-flight model calls. */

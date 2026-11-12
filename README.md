@@ -234,6 +234,8 @@ packages/
   ai/         Provider selection (model.ts), prompts, and agents/: the
               general agent, its runtime loop and read-only tools
   reviewer/   Review pipeline, validation chain, check-run rendering
+  local/      Local-checkout review shared by cli and mcp: git client,
+              memory store, index cache, model key resolution
   github/     GitHub client (installation-token auth) + Octokit calls
   schemas/    Zod schemas: ReviewFinding, the review trigger contract
   logging/    Structured single-line JSON logger
@@ -569,7 +571,7 @@ pnpm test
 
 Four adapters serve a repository through these interfaces: Octokit
 (`packages/github/src/app.ts`), the local checkout
-(`apps/mcp/src/local-git-client.ts`), the eval fixture
+(`packages/local/src/local-git-client.ts`), the eval fixture
 (`evals/src/fixture-client.ts`), and the agent test fake
 (`packages/ai/src/agent-test-support.ts`). One shared suite,
 `@pr-review/github/conformance`, runs against all four in `pnpm test`.

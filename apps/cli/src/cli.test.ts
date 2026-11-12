@@ -9,9 +9,9 @@ import {
   message,
   textBlock,
 } from "@pr-review/ai/agent-test-support";
+import type { LocalEnvironment } from "@pr-review/local";
+import { createTestRepo, type TestRepo } from "@pr-review/local/test-repo";
 import { createCapturingLogger } from "@pr-review/logging";
-import type { McpEnvironment } from "@pr-review/mcp/local-review";
-import { createTestRepo, type TestRepo } from "@pr-review/mcp/test-repo";
 import type { ReviewFinding } from "@pr-review/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,7 +38,7 @@ function scriptedModel(findings: readonly ReviewFinding[]) {
   return makeModel([message([textBlock(finalFindingsJson([...findings]))], "end_turn")]).model;
 }
 
-function environment(overrides: Partial<McpEnvironment> = {}): McpEnvironment {
+function environment(overrides: Partial<LocalEnvironment> = {}): LocalEnvironment {
   return {
     env: { OPENAI_API_KEY: "sk-test" },
     cwd: repo.root,
@@ -67,7 +67,7 @@ interface Run {
 
 async function run(
   argv: string[],
-  overrides: Partial<McpEnvironment> = {},
+  overrides: Partial<LocalEnvironment> = {},
   signal?: AbortSignal,
 ): Promise<Run> {
   const out: string[] = [];

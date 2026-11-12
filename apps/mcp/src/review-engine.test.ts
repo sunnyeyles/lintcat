@@ -1,12 +1,12 @@
 import { GENERAL_AGENT, type ReviewModel } from "@pr-review/ai";
+import type { LocalEnvironment } from "@pr-review/local";
 import { createCapturingLogger } from "@pr-review/logging";
 import { describe, expect, it } from "vitest";
 
 import { staticClient } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
 import { selectReviewEngine } from "#src/review-engine";
 
-function environment(env: Record<string, string | undefined>): McpEnvironment {
+function environment(env: Record<string, string | undefined>): LocalEnvironment {
   return {
     env,
     cwd: "/nowhere",

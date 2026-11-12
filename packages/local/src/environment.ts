@@ -22,10 +22,10 @@ import {
 } from "@pr-review/github";
 import { createStderrLogger, type StructuredLogger } from "@pr-review/logging";
 
-/** Everything the tools read from outside the process; tests pass fakes. */
-export interface McpEnvironment {
+/** Everything a local front end reads from outside the process; tests pass fakes. */
+export interface LocalEnvironment {
   env: Record<string, string | undefined>;
-  /** Where a tool without `repoPath` looks for a checkout. */
+  /** Where a review given no explicit path looks for a checkout. */
   cwd: string;
   logger: StructuredLogger;
   createLanguageModel: (config: LanguageModelConfig) => ReviewModel;
@@ -56,7 +56,7 @@ function runGh(args: readonly string[]): Promise<string> {
   });
 }
 
-export function processEnvironment(): McpEnvironment {
+export function processEnvironment(): LocalEnvironment {
   return {
     env: process.env,
     cwd: process.cwd(),
@@ -84,20 +84,20 @@ function selectProvider(env: Record<string, string | undefined>): ModelProvider 
 }
 
 /** Whether resolveModel would find a key; a named but unknown provider still throws. */
-export function hasModelApiKey(environment: McpEnvironment): boolean {
+export function hasModelApiKey(environment: LocalEnvironment): boolean {
   const { env } = environment;
   return (env[apiKeyEnvFor(selectProvider(env))]?.trim() ?? "") !== "";
 }
 
 /** Reads PR_REVIEW_MODEL_PROVIDER / PR_REVIEW_MODEL / PR_REVIEW_MODEL_BASE_URL and the provider's key. */
-export function resolveModel(environment: McpEnvironment): ModelSelection {
+export function resolveModel(environment: LocalEnvironment): ModelSelection {
   const { env } = environment;
   const provider = selectProvider(env);
   const keyEnv = apiKeyEnvFor(provider);
   const apiKey = env[keyEnv]?.trim() ?? "";
   if (apiKey === "") {
     const keys = MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ");
-    throw new Error(`No model API key is set. Set ${keys} in the MCP server's environment or .env.local.`);
+    throw new Error(`No model API key is set. Set ${keys} in the environment or .env.local.`);
   }
   const baseUrl = env["PR_REVIEW_MODEL_BASE_URL"]?.trim() ?? "";
   const modelId = env["PR_REVIEW_MODEL"]?.trim() || defaultModelFor(provider);
@@ -112,7 +112,7 @@ export function resolveModel(environment: McpEnvironment): ModelSelection {
 }
 
 /** GITHUB_TOKEN, then GH_TOKEN, then the `gh` CLI's own login. */
-export async function resolveGithubToken(environment: McpEnvironment): Promise<string> {
+export async function resolveGithubToken(environment: LocalEnvironment): Promise<string> {
   const fromEnv = (environment.env["GITHUB_TOKEN"] ?? environment.env["GH_TOKEN"])?.trim();
   return fromEnv || environment.gh(["auth", "token"]);
 }

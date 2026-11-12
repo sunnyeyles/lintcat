@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ListRootsRequestSchema, type ClientCapabilities } from "@modelcontextprotocol/sdk/types.js";
+import type { LocalEnvironment } from "@pr-review/local";
+import { createTestRepo, type TestRepo } from "@pr-review/local/test-repo";
 import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -13,9 +15,7 @@ import {
   staticClient,
   type ClientFeatures,
 } from "#src/client-capabilities";
-import type { McpEnvironment } from "#src/environment";
 import { createServer } from "#src/server";
-import { createTestRepo, type TestRepo } from "#src/test-repo";
 
 let repo: TestRepo;
 
@@ -25,7 +25,7 @@ beforeEach(() => {
 
 afterEach(() => repo.remove());
 
-function environment(logger: McpEnvironment["logger"]): McpEnvironment {
+function environment(logger: LocalEnvironment["logger"]): LocalEnvironment {
   return {
     env: {},
     cwd: repo.root,
