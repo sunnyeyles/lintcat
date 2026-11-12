@@ -15,7 +15,7 @@ type Moment =
   | { kind: "event"; at: number; event: BotEvent }
   | { kind: "said"; at: number; said: BotThought };
 
-export function timeline(bot: BotView): Moment[] {
+function timeline(bot: BotView): Moment[] {
   const moments: Moment[] = [
     ...bot.tools.map((tool) => ({
       kind: "tool" as const,

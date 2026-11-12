@@ -15,7 +15,7 @@ const LINE = {
   strokeLinejoin: "round",
 } as const;
 
-export function fuelColor(fraction: number): string {
+function fuelColor(fraction: number): string {
   if (fraction >= 0.85) return "var(--destructive)";
   if (fraction >= 0.6) return "var(--warning)";
   return "var(--success)";

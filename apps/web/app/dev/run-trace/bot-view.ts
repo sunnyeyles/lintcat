@@ -117,7 +117,7 @@ export function botStats(bot: BotView): string[] {
   return stats;
 }
 
-export function formatCost(usd: number): string {
+function formatCost(usd: number): string {
   return usd < 0.01 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`;
 }
 

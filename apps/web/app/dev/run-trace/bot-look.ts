@@ -38,7 +38,7 @@ const SPARE: Accessory[] = ["antenna", "propeller", "headphones", "bowtie", "flo
 
 const KNOWN_PREFIXES = ["marrow"];
 
-export function roleTokens(role: string): string[] {
+function roleTokens(role: string): string[] {
   return role
     .toLowerCase()
     .split(/[^a-z0-9]+/)

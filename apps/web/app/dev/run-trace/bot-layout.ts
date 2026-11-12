@@ -1,9 +1,9 @@
-import { walkBots, type BotView } from "@/app/dev/run-trace/bot-view";
+import { type BotView } from "@/app/dev/run-trace/bot-view";
 import { toMs } from "@/app/dev/run-trace/trace-layout";
 
 export type TreeBox = { bot: BotView; waves: TreeBox[][] };
 
-export type StageLane = { stage?: string; bots: BotView[] };
+type StageLane = { stage?: string; bots: BotView[] };
 
 export type Floor = { kind: "tree"; root: TreeBox } | { kind: "flat"; lanes: StageLane[] };
 
@@ -32,7 +32,7 @@ function box(bot: BotView): TreeBox {
 }
 
 /** Overlapping siblings share a wave, so parallel agents stand side by side. */
-export function waves(sorted: BotView[]): BotView[][] {
+function waves(sorted: BotView[]): BotView[][] {
   const result: BotView[][] = [];
   let waveEnd = -Infinity;
   for (const bot of sorted) {
@@ -62,9 +62,4 @@ function byStage(sorted: BotView[]): StageLane[] {
 
 function sortByStart(bots: BotView[]): BotView[] {
   return [...bots].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt));
-}
-
-export function findBot(root: BotView, id: string): BotView | undefined {
-  for (const bot of walkBots(root)) if (bot.id === id) return bot;
-  return undefined;
 }
