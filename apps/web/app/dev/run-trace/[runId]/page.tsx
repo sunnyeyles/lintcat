@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { LiveRunTrace } from "@/app/dev/run-trace/live-run-trace";
 import { PageHeader } from "@/components/shell/page-header";
+import { liveRunsEnabled } from "@/lib/run-trace-page";
 
 export const metadata: Metadata = { title: "Run trace" };
 
@@ -12,6 +14,7 @@ export default async function LiveRunTracePage({
   params: Promise<{ runId: string }>;
   searchParams: Promise<{ source?: string | string[] }>;
 }) {
+  if (!liveRunsEnabled()) notFound();
   const { runId } = await params;
   const { source } = await searchParams;
   return (
