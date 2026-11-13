@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-// In production the page exists only where RUN_TRACE_TOKEN is set; the token still guards the data.
+import { runTracePageEnabled } from "@/lib/run-trace-page";
+
 export default function RunTraceLayout({ children }: { children: ReactNode }) {
-  if (process.env.NODE_ENV === "production" && !process.env.RUN_TRACE_TOKEN) notFound();
+  if (!runTracePageEnabled()) notFound();
   return children;
 }

@@ -11,6 +11,7 @@ import {
   SheetTrigger,
 } from "@pr-review/design";
 import {
+  Bot,
   ChartLine,
   FolderGit2,
   GitPullRequest,
@@ -27,6 +28,7 @@ import { organizationPath, withinOrganization } from "@/lib/paths";
 
 // `href` is relative to the organization, e.g. "/repos" under `/o/<slug>`.
 type NavItem = { href: string; label: string; icon: IconComponent; ownerOnly?: boolean };
+
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -48,10 +50,12 @@ const LINK_CLASS =
 function NavLinks({
   slug,
   isOwner,
+  runTraceHref,
   onNavigate,
 }: {
   slug: string;
   isOwner: boolean;
+  runTraceHref?: string;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -78,6 +82,16 @@ function NavLinks({
           </Link>
         );
       })}
+      {runTraceHref ? (
+        <a
+          href={runTraceHref}
+          onClick={onNavigate}
+          className={cn(LINK_CLASS, "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}
+        >
+          <Bot className="size-4 shrink-0" />
+          <span className="truncate">Run trace</span>
+        </a>
+      ) : null}
     </nav>
   );
 }
@@ -86,10 +100,11 @@ export type SidebarProps = {
   slug: string;
   organizationName: string;
   isOwner?: boolean;
+  runTraceHref?: string;
   className?: string;
 };
 
-export function Sidebar({ slug, organizationName, isOwner = false, className }: SidebarProps) {
+export function Sidebar({ slug, organizationName, isOwner = false, runTraceHref, className }: SidebarProps) {
   return (
     <aside
       className={cn(
@@ -102,14 +117,22 @@ export function Sidebar({ slug, organizationName, isOwner = false, className }: 
           {organizationName}
         </p>
         <div className="pt-3">
-          <NavLinks slug={slug} isOwner={isOwner} />
+          <NavLinks slug={slug} isOwner={isOwner} runTraceHref={runTraceHref} />
         </div>
       </div>
     </aside>
   );
 }
 
-export function SidebarDrawer({ isOwner = false, className }: { isOwner?: boolean; className?: string }) {
+export function SidebarDrawer({
+  isOwner = false,
+  runTraceHref,
+  className,
+}: {
+  isOwner?: boolean;
+  runTraceHref?: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const { slug } = useParams<{ slug?: string }>();
   if (slug === undefined) return null;
@@ -131,7 +154,7 @@ export function SidebarDrawer({ isOwner = false, className }: { isOwner?: boolea
           <SheetDescription>LintCat dashboard</SheetDescription>
         </SheetHeader>
         <div className="px-3 py-4">
-          <NavLinks slug={slug} isOwner={isOwner} onNavigate={() => setOpen(false)} />
+          <NavLinks slug={slug} isOwner={isOwner} runTraceHref={runTraceHref} onNavigate={() => setOpen(false)} />
         </div>
       </SheetContent>
     </Sheet>

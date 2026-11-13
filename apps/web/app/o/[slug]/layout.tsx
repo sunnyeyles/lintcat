@@ -4,6 +4,10 @@ import { MainColumn } from "@/components/shell/main-column";
 import { Sidebar } from "@/components/shell/sidebar";
 import { SiteFooter } from "@/components/shell/site-footer";
 import { Topbar } from "@/components/shell/topbar";
+import { appDomain } from "@/lib/host";
+import { apexUrl } from "@/lib/paths";
+import { requestLocation } from "@/lib/request";
+import { RUN_TRACE_PATH, runTracePageEnabled } from "@/lib/run-trace-page";
 import { requireOrganization } from "@/lib/session";
 
 export default async function OrganizationLayout({
@@ -15,11 +19,13 @@ export default async function OrganizationLayout({
 }) {
   const { organization, role } = await requireOrganization((await params).slug);
   const isOwner = role === "owner";
+  const { host, protocol } = await requestLocation();
+  const runTrace = runTracePageEnabled() ? apexUrl(RUN_TRACE_PATH, host, protocol, appDomain()) : undefined;
   return (
     <div className="flex min-h-dvh flex-col">
       <Topbar isOwner={isOwner} />
       <div className="flex flex-1">
-        <Sidebar slug={organization.slug} organizationName={organization.name} isOwner={isOwner} />
+        <Sidebar slug={organization.slug} organizationName={organization.name} isOwner={isOwner} runTraceHref={runTrace} />
         <MainColumn>{children}</MainColumn>
       </div>
       <SiteFooter />
