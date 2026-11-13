@@ -8,7 +8,7 @@ import { DOCS_HOME } from "@/lib/docs";
 import { appDomain } from "@/lib/host";
 import { apexUrl, DASHBOARD_PATH, topbarSignInHref } from "@/lib/paths";
 import { requestLocation } from "@/lib/request";
-import { RUN_TRACE_PATH, runTracePageEnabled } from "@/lib/run-trace-page";
+import { RUN_TRACE_PATH } from "@/lib/run-trace-page";
 
 export async function Topbar({ isOwner = false, className }: { isOwner?: boolean; className?: string }) {
   const { host, protocol, path } = await requestLocation();
@@ -17,7 +17,7 @@ export async function Topbar({ isOwner = false, className }: { isOwner?: boolean
   const home = apexUrl("/", host, protocol, domain);
   const docs = apexUrl(DOCS_HOME, host, protocol, domain);
   const dashboard = apexUrl(DASHBOARD_PATH, host, protocol, domain);
-  const runTrace = runTracePageEnabled() ? apexUrl(RUN_TRACE_PATH, host, protocol, domain) : undefined;
+  const runTrace = apexUrl(RUN_TRACE_PATH, host, protocol, domain);
 
   return (
     <TopbarFrame

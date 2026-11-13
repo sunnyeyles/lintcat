@@ -7,7 +7,7 @@ import { Topbar } from "@/components/shell/topbar";
 import { appDomain } from "@/lib/host";
 import { apexUrl } from "@/lib/paths";
 import { requestLocation } from "@/lib/request";
-import { RUN_TRACE_PATH, runTracePageEnabled } from "@/lib/run-trace-page";
+import { RUN_TRACE_PATH } from "@/lib/run-trace-page";
 import { requireOrganization } from "@/lib/session";
 
 export default async function OrganizationLayout({
@@ -20,7 +20,7 @@ export default async function OrganizationLayout({
   const { organization, role } = await requireOrganization((await params).slug);
   const isOwner = role === "owner";
   const { host, protocol } = await requestLocation();
-  const runTrace = runTracePageEnabled() ? apexUrl(RUN_TRACE_PATH, host, protocol, appDomain()) : undefined;
+  const runTrace = apexUrl(RUN_TRACE_PATH, host, protocol, appDomain());
   return (
     <div className="flex min-h-dvh flex-col">
       <Topbar isOwner={isOwner} />
