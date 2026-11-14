@@ -6,6 +6,11 @@ export type FailOn = "low" | "medium" | "high" | "off";
 
 const FAIL_ON: readonly FailOn[] = ["low", "medium", "high", "off"];
 
+/** How a review is printed: for a person, or as one JSON object for a program. */
+export type OutputFormat = "text" | "json";
+
+const FORMATS: readonly OutputFormat[] = ["text", "json"];
+
 const SCOPES = ["working-tree", "staged", "range"] as const;
 
 export interface ReviewOptions {
@@ -16,6 +21,7 @@ export interface ReviewOptions {
   scope: LocalScope;
   index: boolean;
   failOn: FailOn;
+  format: OutputFormat;
   /** Let the review's own structured log through to stderr. */
   verbose: boolean;
   color: boolean | undefined;
@@ -110,6 +116,14 @@ function readFailOn(flags: Flags): FailOn {
   return value as FailOn;
 }
 
+function readFormat(flags: Flags): OutputFormat {
+  const value = flags.values.get("format") ?? "text";
+  if (!FORMATS.includes(value as OutputFormat)) {
+    throw new UsageError(`--format must be one of ${FORMATS.join(", ")}, not ${JSON.stringify(value)}`);
+  }
+  return value as OutputFormat;
+}
+
 function readColor(flags: Flags): boolean | undefined {
   if (flags.switches.has("no-color")) return false;
   if (flags.switches.has("color")) return true;
@@ -141,6 +155,7 @@ const REVIEW_FLAGS = [
   "scope",
   "range",
   "fail-on",
+  "format",
   "no-index",
   "verbose",
   "color",
@@ -156,6 +171,7 @@ function reviewOptions(flags: Flags): ReviewOptions {
     scope: readScope(flags),
     index: !flags.switches.has("no-index"),
     failOn: readFailOn(flags),
+    format: readFormat(flags),
     verbose: flags.switches.has("verbose"),
     color: readColor(flags),
   };

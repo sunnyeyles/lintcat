@@ -45,6 +45,12 @@ describe("the command line", () => {
     );
   });
 
+  it("reads the output format, text by default", () => {
+    expect(parseArguments([])).toMatchObject({ format: "text" });
+    expect(parseArguments(["--format", "json"])).toMatchObject({ format: "json" });
+    expect(() => parseArguments(["--format", "xml"])).toThrow(UsageError);
+  });
+
   it("turns the index off", () => {
     expect(parseArguments(["--no-index"])).toMatchObject({ index: false });
   });

@@ -30,6 +30,7 @@ Review options:
   --scope <kind>       working-tree (default), staged, or range
   --range <range>      Commits to review, e.g. HEAD~3..HEAD; implies --scope range
   --fail-on <level>    Exit non-zero at this severity or above: low, medium, high (default), off
+  --format <format>    text (default), or json: one JSON object on stdout and nothing else
   --no-index           Skip the repository import index
   --verbose            Let the review's structured log through to stderr
   --color / --no-color Force colour on or off (default: on for a terminal, off otherwise)

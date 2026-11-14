@@ -187,6 +187,51 @@ describe("reviewing a working tree", () => {
   });
 });
 
+describe("--format json", () => {
+  it("prints one JSON object and nothing else, with the --fail-on exit code", async () => {
+    const { code, out } = await run(["--base", "main", "--no-index", "--format", "json"], {
+      createLanguageModel: () => scriptedModel([admin]),
+    });
+
+    expect(out.split("\n")).toHaveLength(1);
+    expect(JSON.parse(out)).toEqual({
+      findings: [
+        {
+          file: "src/sessions.ts",
+          line: 3,
+          severity: "high",
+          category: admin.category,
+          message: "Admin is always on\n\nThe flag ships enabled.",
+        },
+      ],
+      summary: { total: 1, high: 1, medium: 0, low: 0, blocking: 1, failOn: "high", suppressed: 0 },
+      status: { exitCode: 1, blocked: true },
+    });
+    expect(code).toBe(1);
+  });
+
+  it("passes below the threshold exactly as text does", async () => {
+    const { code, out } = await run(
+      ["--base", "main", "--no-index", "--format=json", "--fail-on", "off"],
+      { createLanguageModel: () => scriptedModel([admin]) },
+    );
+
+    expect(JSON.parse(out).status).toEqual({ exitCode: 0, blocked: false });
+    expect(code).toBe(0);
+  });
+
+  it("keeps stdout to JSON when there is nothing to review", async () => {
+    repo.commit("admin");
+    repo.git("checkout", "-q", "main");
+
+    const { code, out, err } = await run(["--base", "main", "--format", "json"]);
+
+    expect(JSON.parse(out)).toMatchObject({ findings: [], status: { exitCode: 0 } });
+    expect(err).toContain("Nothing to review");
+    expect(code).toBe(0);
+  });
+});
+
 describe("cancelling a review", () => {
   it("aborts the in-flight model calls and prints no verdict", async () => {
     const { model, firstCall } = makeHangingModel();

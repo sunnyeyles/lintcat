@@ -13,7 +13,13 @@ import {
 } from "@pr-review/mcp/local-review";
 
 import type { ReviewOptions } from "#src/options";
-import { blockingFindings, orderFindings, renderFinding, renderSummary } from "#src/render";
+import {
+  blockingFindings,
+  orderFindings,
+  renderFinding,
+  renderJson,
+  renderSummary,
+} from "#src/render";
 
 export const EXIT_OK = 0;
 const EXIT_BLOCKED = 1;
@@ -66,8 +72,15 @@ async function review(
   );
   const changed = await local.client.listChangedFiles(local.target);
   const where = `${local.scope.headLabel} of ${local.root} against ${local.baseRef} (${local.baseSha.slice(0, 7)})`;
+  const json = options.format === "json";
   if (changed.length === 0) {
-    out(`Nothing to review: no changes in ${where}.`);
+    const nothing = `Nothing to review: no changes in ${where}.`;
+    if (!json) {
+      out(nothing);
+      return EXIT_OK;
+    }
+    err(nothing);
+    out(renderJson({ findings: [], blocking: [], failOn: options.failOn, suppressed: 0, exitCode: EXIT_OK }));
     return EXIT_OK;
   }
   err(`Reviewing ${changed.length} changed file(s): ${where}.`);
@@ -87,6 +100,11 @@ async function review(
   if (signal?.aborted === true) return EXIT_CANCELLED;
   const { findings, suppressed } = result.outcome;
   const blocking = blockingFindings(findings, options.failOn);
+  const exitCode = blocking.length > 0 ? EXIT_BLOCKED : EXIT_OK;
+  if (json) {
+    out(renderJson({ findings, blocking, failOn: options.failOn, suppressed, exitCode }));
+    return exitCode;
+  }
   const render = { color: options.color ?? false };
   for (const finding of orderFindings(findings)) {
     out("");
@@ -104,5 +122,5 @@ async function review(
       render,
     ),
   );
-  return blocking.length > 0 ? EXIT_BLOCKED : EXIT_OK;
+  return exitCode;
 }

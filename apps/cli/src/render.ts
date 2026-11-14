@@ -126,3 +126,31 @@ export function renderSummary(summary: ReportSummary, options: RenderOptions): s
   }
   return lines.join("\n");
 }
+
+export interface JsonReport extends ReportSummary {
+  exitCode: number;
+}
+
+/** The whole review as one JSON object, for `--format json`. */
+export function renderJson(report: JsonReport): string {
+  const { findings, blocking, failOn, suppressed, exitCode } = report;
+  return JSON.stringify({
+    findings: orderFindings(findings).map((finding) => ({
+      file: finding.file,
+      line: finding.line ?? null,
+      severity: finding.severity,
+      category: finding.category,
+      message: `${finding.title}\n\n${finding.explanation}`,
+    })),
+    summary: {
+      total: findings.length,
+      high: findings.filter((f) => f.severity === "high").length,
+      medium: findings.filter((f) => f.severity === "medium").length,
+      low: findings.filter((f) => f.severity === "low").length,
+      blocking: blocking.length,
+      failOn,
+      suppressed,
+    },
+    status: { exitCode, blocked: blocking.length > 0 },
+  });
+}
