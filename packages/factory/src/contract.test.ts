@@ -73,7 +73,7 @@ describe("routeTask", () => {
 
 describe("loadPrompt", () => {
   it("versions each prompt by role, number and content", () => {
-    expect(loadPrompt("implementer").version).toMatch(/^implementer@2\+[0-9a-f]{8}$/);
+    expect(loadPrompt("implementer").version).toMatch(/^implementer@3\+[0-9a-f]{8}$/);
     expect(loadPrompt("reviewer").version).toMatch(/^reviewer@1\+[0-9a-f]{8}$/);
     expect(loadPrompt("discovery").text).toContain("one consolidated");
   });

@@ -88,6 +88,7 @@ const run = {
     pullRequestUrl: "https://github.com/o/r/pull/1",
     checks: [{ name: "test", exitCode: 0, passed: true }],
     usage: { inputTokens: 10, estimatedCostUsd: null },
+    refactors: [{ title: "Extract parser", files: ["src/a.ts", "src/b.ts"], rationale: "duplicated" }],
   },
 } as unknown as FactoryRun;
 
@@ -102,6 +103,7 @@ describe("runs and results", () => {
     expect(text).toContain("PR:      https://github.com/o/r/pull/1");
     expect(text).toContain("  ✓ test (exit 0)");
     expect(text).toContain("Usage:   inputTokens=10");
+    expect(text).toContain("  - Extract parser (src/a.ts, src/b.ts)");
     expect(text).toContain("Task:    /repo/.factory/runs/r1/task.md");
   });
 });

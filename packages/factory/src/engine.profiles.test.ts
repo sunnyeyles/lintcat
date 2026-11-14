@@ -52,6 +52,7 @@ const baseSpec: Spec = {
 
 const done = { status: "done", summary: "changed greet", decisions: [], acceptance: [{ id: "AC1", coverage: "greet.test.js" }], blockers: [] };
 const placed = { ...done, placement: { location: "src/greet.js", reuse: ["src/greet.js"], rationale: "greet already owns the greeting" } };
+const suggestion = { title: "Extract the greeting", files: ["src/greet.js"], rationale: "the literal lives in two places" };
 const reproduced = { status: "reproduced", summary: "wrote a failing test", reason: "", decisions: ["the bug is the literal in greet.js"] };
 
 type Turn = Parameters<typeof createFakeRuntime>[0][number];
@@ -117,7 +118,7 @@ describe("workflow profiles", () => {
     it("commits a failing regression test, then a fix that makes it pass", async () => {
       const { repo, runtime, service, runId, profile, artifact, taskMd } = await start(baseSpec, [
         writes({ "src/greet.test.js": "expect(greet()).toBe('hello')\n" }, reproduced),
-        writes({ "src/greet.js": "export const greet = () => 'hello';\n" }, done),
+        writes({ "src/greet.js": "export const greet = () => 'hello';\n" }, { ...done, refactors: [suggestion, { ...suggestion, files: ["../x.js"] }] }),
       ]);
       expect(profile).toBe("bugfix");
       expect((await service.runNext({ runId }))?.status).toBe("delivered");
@@ -134,6 +135,11 @@ describe("workflow profiles", () => {
       expect(taskMd()).toMatch(/failed before the fix .*passes after the fix/);
       expect(taskMd()).toContain("the bug is the literal in greet.js");
       expect(await eventKinds(runId)).toContain("bug_reproduced");
+      expect(runtime.specs[1]?.prompt).toMatch(/describe up to 3 in `refactors`/);
+      expect(JSON.parse(artifact("artifacts/refactors.json")!)).toEqual([suggestion]);
+      expect(taskMd()).toMatch(/## Suggested refactors[\s\S]*\*\*Extract the greeting\*\* \(`src\/greet\.js`\)/);
+      expect(run.outcome?.refactors).toEqual([suggestion]);
+      expect(git(repo, "show", "--name-only", "--format=", run.branch!)).not.toMatch(/app\.js/);
       const stages = (await listCommands(database, runId)).map((c) => `${c.stage}:${c.exitCode}`);
       expect(stages).toEqual(["reproduce:1", "verify:0"]);
     });

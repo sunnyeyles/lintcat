@@ -103,6 +103,7 @@ export function renderResult(run: FactoryRun, taskPath: string): string {
     `Branch:  ${outcome?.branch ?? run.branch ?? "-"}`,
     `PR:      ${outcome?.pullRequestUrl ?? "-"}`,
     ...(outcome?.checks?.length ? ["Checks:", ...outcome.checks.map((c) => `  ${c.passed ? "✓" : "✗"} ${c.name} (exit ${c.exitCode})`)] : []),
+    ...(outcome?.refactors?.length ? ["Suggested refactors:", ...outcome.refactors.map((r) => `  - ${r.title} (${r.files.join(", ")})`)] : []),
     ...(usage ? [`Usage:   ${usage}`] : []),
     `Task:    ${taskPath}`,
   ].join("\n");

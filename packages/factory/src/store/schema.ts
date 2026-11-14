@@ -33,11 +33,18 @@ export interface Checkpoint {
   data?: Record<string, unknown>;
 }
 
+export interface RefactorSuggestion {
+  title: string;
+  files: string[];
+  rationale: string;
+}
+
 export interface RunOutcome {
   summary: string;
   branch?: string;
   pullRequestUrl?: string;
   checks?: { name: string; exitCode: number; passed: boolean }[];
+  refactors?: RefactorSuggestion[];
   usage?: Record<string, number | null>;
 }
 

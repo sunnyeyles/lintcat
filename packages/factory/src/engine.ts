@@ -25,6 +25,7 @@ import {
 import { locate } from "#src/locate";
 import { loadProfile, workflowVersion, type Profile, type Stage } from "#src/profiles";
 import { loadPrompt } from "#src/prompts";
+import { refactorOutcome, refactorSuggestionsSchema, renderRefactors, validateRefactors } from "#src/refactors";
 import { analyseRepository, isTestPath, renderArchitecture, type ArchitectureBrief } from "#src/repository";
 import { renderReview, reviewOutputSchema, reviewPrompt, reviewRepairPrompt, validateReview, type ValidatedReview } from "#src/review";
 import { writeArtifact, writeRunFiles, type TaskView } from "#src/run-files";
@@ -42,6 +43,7 @@ import {
   type FactoryRun,
   type RunOutcome,
 } from "#src/store/index";
+import type { RefactorSuggestion } from "#src/store/schema";
 import { createRecorder } from "#src/telemetry";
 
 const MAX_RECOVERIES = 3;
@@ -81,6 +83,8 @@ const placedOutputSchema = implementerOutputSchema.extend({
   placement: z.object({ location: z.string().min(1), reuse: z.array(z.string()), rationale: z.string().min(1) }),
 });
 
+const bugfixOutputSchema = implementerOutputSchema.extend({ refactors: refactorSuggestionsSchema });
+
 const reproduceOutputSchema = z.object({
   status: z.enum(["reproduced", "not_reproducible"]),
   summary: z.string(),
@@ -119,6 +123,7 @@ interface RunData {
   escalation?: { reason: string };
   review?: ValidatedReview;
   reviewRepair?: { sha: string };
+  refactors?: RefactorSuggestion[];
   turnsUsed?: number;
 }
 
@@ -385,6 +390,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     let delivered: RunOutcome | undefined;
     data.repairs ??= 0;
     const needsPlacement = profile.name === "feature" || profile.name === "refactor";
+    const suggestsRefactors = profile.name === "bugfix";
 
     for (let i = Math.max(startIndex, 1); i < stages.length; i++) {
       const stage = stages[i]!;
@@ -435,10 +441,11 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
               regression: reproduced ? { testFiles: reproduced.testFiles, failing: reproduced.failing.map((f) => f.name) } : undefined,
               baselineFailing: data.baseline?.filter((b) => !b.passed).map((b) => b.name),
               placement: needsPlacement,
+              suggestRefactors: suggestsRefactors,
             },
             plan,
           );
-          const schema = needsPlacement ? placedOutputSchema : implementerOutputSchema;
+          const schema = needsPlacement ? placedOutputSchema : suggestsRefactors ? bugfixOutputSchema : implementerOutputSchema;
           const { result, output } = await runAgent(stage, prompt, { role: "implementer", resume: reproduced !== undefined, schema });
           throwIfStopped();
           if (!result.ok) throw new RunStopped("failed", `implementer ended with ${result.reason}`);
@@ -448,6 +455,11 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
               const { location, reuse, rationale } = output.placement as z.infer<typeof placedOutputSchema>["placement"];
               decide(stage, `placement: ${location} (${rationale})`);
               decide(stage, `reuse: ${reuse.length ? reuse.join(", ") : "no existing module reused"}`);
+            }
+            if ("refactors" in output) {
+              data.refactors = validateRefactors(output.refactors as z.infer<typeof refactorSuggestionsSchema>);
+              await writeArtifact(repo, claimed.id, "refactors.json", JSON.stringify(data.refactors, null, 2));
+              await recorder.event({ kind: "refactors_suggested", stage, data: { count: data.refactors.length } });
             }
             await saveProgress(database, claimed.id, { contract });
             if (output.status === "blocked") throw new RunStopped("failed", `implementer blocked: ${output.blockers.join("; ") || output.summary}`);
@@ -648,6 +660,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       "",
       ...contract.spec.acceptanceCriteria.map((ac) => `- ${ac.id}: ${ac.text}`),
     ].join("\n");
+    const prBody = data.refactors?.length ? [body, "", "## Suggested refactors (not applied)", ...renderRefactors(data.refactors)].join("\n") : body;
     const sha = await squashSince(worktree, contract.baseSha, `${contract.spec.title}\n\n${body}`);
     await recordEffect(database, { key: `branch:${claimed.id}`, runId: claimed.id, kind: "branch", result: { branch, sha } });
     const passed = verification.filter((v) => v.passed).length;
@@ -658,6 +671,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
           : `Branch ${branch} at ${sha.slice(0, 12)}, ${passed} of ${verification.length} checks passed; the rest already failed at the base commit.`,
       branch,
       checks: verification.map((v) => ({ name: v.name, exitCode: v.exitCode, passed: v.passed })),
+      ...(data.refactors?.length ? { refactors: data.refactors } : {}),
     };
     const wantsPr = deps.delivery === "pr" && contract.permittedOperations.push && contract.permittedOperations.openPullRequest;
     if (wantsPr && deps.openPullRequest) {
@@ -670,7 +684,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       const existing = await findEffect(database, prKey);
       const url = existing
         ? String((existing.result as { url: string }).url)
-        : (await deps.openPullRequest({ repoPath: repo, branch, base: contract.baseBranch, title: contract.spec.title, body })).url;
+        : (await deps.openPullRequest({ repoPath: repo, branch, base: contract.baseBranch, title: contract.spec.title, body: prBody })).url;
       if (!existing) await recordEffect(database, { key: prKey, runId: claimed.id, kind: "pull_request", result: { url } });
       outcome.pullRequestUrl = url;
     } else if (deps.delivery === "pr") {
@@ -718,6 +732,15 @@ function evidenceSections(data: RunData, verification: TaskView["verification"])
               }),
             ]
           : [`- Not reproduced by a test: ${r.reason}`],
+    });
+  }
+  if (data.refactors?.length) {
+    sections.push({
+      heading: "Suggested refactors",
+      lines: [
+        "Not applied. Each can start its own run.",
+        ...data.refactors.flatMap((r) => [...renderRefactors([r]), `  - \`factory new "${refactorOutcome(r)}"\``]),
+      ],
     });
   }
   if (data.escalation) sections.push({ heading: "Escalation", lines: [`- Added an independent review: ${data.escalation.reason}`] });

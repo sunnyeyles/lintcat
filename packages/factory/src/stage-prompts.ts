@@ -64,6 +64,7 @@ export interface ImplementContext {
   regression?: { testFiles: string[]; failing: string[] } | undefined;
   baselineFailing?: string[] | undefined;
   placement: boolean;
+  suggestRefactors?: boolean;
 }
 
 export function implementPrompt(contract: TaskContract, context: ImplementContext, plan: CheckPlan): string {
@@ -78,6 +79,11 @@ export function implementPrompt(contract: TaskContract, context: ImplementContex
   }
   if (context.placement) {
     lines.push("Before writing code, compare extending a candidate module with adding a new one. Report the choice in `placement`.");
+  }
+  if (context.suggestRefactors) {
+    lines.push(
+      "Keep the fix minimal. If the code around the bug invites a refactor that would prevent this class of bug, describe up to 3 in `refactors`, but don't make them. Answer `[]` if none is worth it.",
+    );
   }
   lines.push("Implement the task now. Use `sandbox_exec` for targeted checks.");
   return lines.join("\n");
