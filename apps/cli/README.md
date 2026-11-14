@@ -29,6 +29,7 @@ and untracked files.
 | `--scope <kind>` | `working-tree` (default), `staged`, or `range` |
 | `--range <range>` | `HEAD~3..HEAD`, `main...feature` or a single commit; implies `--scope range` |
 | `--fail-on <level>` | The severity that fails the command: `low`, `medium`, `high` (default) or `off` |
+| `--format <format>` | `text` (default), or `json`: one JSON object on stdout (`findings`, `summary`, `status`) and nothing else |
 | `--no-index` | Skip the repository import index |
 | `--verbose` | Let the review's structured log through to stderr |
 | `--color` / `--no-color` | Force colour; otherwise it follows the terminal and `NO_COLOR` |
