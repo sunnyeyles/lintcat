@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "passThroughEnv": [
+        "FACTORY_DATABASE_URL",
+        "FACTORY_PACKAGE_DIR",
+        "FACTORY_AUTH",
+        "FACTORY_CLAUDE_PATH",
+        "FACTORY_DELIVERY"
+      ]
+    }
+  }
+}

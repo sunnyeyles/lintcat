@@ -16,7 +16,7 @@ import type { SandboxProvider } from "#src/engine/sandbox/sandbox";
 import type { FactoryDatabase } from "#src/engine/store/client";
 import { createTestFactoryDatabase } from "#src/engine/store/test-store";
 
-const BENCH = path.resolve(import.meta.dirname, "../../../../../benchmarks/factory");
+const BENCH = path.resolve(import.meta.dirname, "../../../benchmarks");
 const temp = (prefix: string) => mkdtempSync(path.join(tmpdir(), prefix));
 const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
 

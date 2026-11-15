@@ -18,11 +18,11 @@ export interface BenchDeps extends ReportDeps {
   requireDocker(): Promise<void>;
 }
 
-/** A config inside `benchmarks/factory/configs/` names its harness; FACTORY_BENCH_DIR overrides. */
+/** A config inside `apps/factory/benchmarks/configs/` names its harness; FACTORY_BENCH_DIR overrides. */
 function benchDirFor(ctx: CommandContext, configPath: string): string {
   const dir = ctx.env.FACTORY_BENCH_DIR ? path.resolve(ctx.cwd, ctx.env.FACTORY_BENCH_DIR) : path.dirname(path.dirname(configPath));
   if (!existsSync(path.join(dir, "fixtures"))) {
-    throw new EnvironmentError(`no fixtures/ in ${dir}: keep configs in benchmarks/factory/configs or set FACTORY_BENCH_DIR`);
+    throw new EnvironmentError(`no fixtures/ in ${dir}: keep configs in apps/factory/benchmarks/configs or set FACTORY_BENCH_DIR`);
   }
   return dir;
 }

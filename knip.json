@@ -5,9 +5,6 @@
       "ignoreFiles": [
         ".agents/**",
         "docs/**"
-      ],
-      "ignore": [
-        "benchmarks/factory/fixtures/**"
       ]
     },
     "apps/web": {
@@ -25,6 +22,9 @@
       "entry": [
         "src/index.ts",
         "scripts/*.mjs"
+      ],
+      "ignore": [
+        "benchmarks/fixtures/**"
       ]
     },
     "packages/design": {

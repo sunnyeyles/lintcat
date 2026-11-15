@@ -86,7 +86,7 @@ Every event carries `run_id`, `task_id`, `stage`, `agent_id`, `workflow_version`
 
 ## Evaluation
 
-`factory report` prints per-profile outcome metrics and a read-only learning report that clusters recurring failures into proposed lessons (`factory_lessons`); nothing it finds is applied or shown to an agent. `factory bench run --config benchmarks/factory/configs/baseline.json` runs four seeded fixtures through the real service and judges each delivery with hidden checks the agent never sees; `factory bench compare <a> <b>` compares two configurations. `factory prune` drops old event and command detail (`FACTORY_RETENTION_DAYS`, default 90). See [evaluation.md](evaluation.md).
+`factory report` prints per-profile outcome metrics and a read-only learning report that clusters recurring failures into proposed lessons (`factory_lessons`); nothing it finds is applied or shown to an agent. `factory bench run --config apps/factory/benchmarks/configs/baseline.json` runs four seeded fixtures through the real service and judges each delivery with hidden checks the agent never sees; `factory bench compare <a> <b>` compares two configurations. `factory prune` drops old event and command detail (`FACTORY_RETENTION_DAYS`, default 90). See [evaluation.md](evaluation.md).
 
 ## Assumptions and gaps
 

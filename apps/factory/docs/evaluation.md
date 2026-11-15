@@ -52,15 +52,15 @@ node apps/factory/start.mjs prune [--days <n>]   # default FACTORY_RETENTION_DAY
 ## Benchmark
 
 ```bash
-node apps/factory/start.mjs bench run --config benchmarks/factory/configs/baseline.json [--fixture quick,bugfix] [--keep]
-node apps/factory/start.mjs bench compare benchmarks/factory/configs/baseline.json benchmarks/factory/configs/no-repair.json
+node apps/factory/start.mjs bench run --config apps/factory/benchmarks/configs/baseline.json [--fixture quick,bugfix] [--keep]
+node apps/factory/start.mjs bench compare apps/factory/benchmarks/configs/baseline.json apps/factory/benchmarks/configs/no-repair.json
 ```
 
 `evaluate` is an alias for `bench`. A run uses the same auth, database and Docker sandbox image as `factory run`. Run `factory init` first, which builds the image and applies migrations.
 
 ### Fixtures
 
-`benchmarks/factory/fixtures/<name>/` contains:
+`apps/factory/benchmarks/fixtures/<name>/` contains:
 
 - `repo/`: the starting files. `buildFixture()` (`apps/factory/src/engine/bench/fixtures.ts`) commits them with a fixed author, committer and date (2026-01-01), with user and system git config disabled. It then refuses the repo unless HEAD equals `fixture.json`'s `baseSha`. Changing a fixture therefore means recording a new SHA.
 - `spec.json`: the approved spec, valid against `specSchema`, so a run needs no discovery.
@@ -77,13 +77,13 @@ node apps/factory/start.mjs bench compare benchmarks/factory/configs/baseline.js
 
 ### How the hidden checks stay independent
 
-- They live in `benchmarks/factory/fixtures/*/hidden`, outside the temporary fixture repo. The agent's file tools are confined to its worktree, and its commands run in a sandbox that mounts only that worktree. It can't see them.
+- They live in `apps/factory/benchmarks/fixtures/*/hidden`, outside the temporary fixture repo. The agent's file tools are confined to its worktree, and its commands run in a sandbox that mounts only that worktree. It can't see them.
 - After the run, the harness makes a fresh `git clone --no-local` of the delivered branch. It checks that the branch descends from the fixture's `baseSha`, copies the hidden tests in, and runs `node --test` in a new offline sandbox.
 - **verified** = the factory delivered *and* the hidden checks passed. The factory's own verdict is recorded as `claimedChecksPassed` and `factoryStatus`, and a delivery that fails the hidden checks counts as a *false claim*. The agent's self-reported status (`done` or `partial`) is never read.
 
 ### Configurations
 
-`benchmarks/factory/configs/*.json` is validated by `benchConfigSchema`:
+`apps/factory/benchmarks/configs/*.json` is validated by `benchConfigSchema`:
 
 | Field | Effect |
 | --- | --- |
@@ -97,6 +97,6 @@ The config hash is the sha256 of the parsed, key-sorted config, so formatting ch
 
 ### Results and comparison
 
-Each fixture run writes one JSON file under `benchmarks/factory/results/` (gitignored). It records the config name, hash and model, the fixture and its SHA, run id, profile, versions, factory status and blocker, the hidden check exit code and bounded output, `verified`, repairs, wall time and estimated cost. `bench compare <a> <b>` accepts config files or result directories. It prints a per-profile table of verified count and rate, first-pass rate, false claims, median wall time and estimated cost per verified success, each with a B − A delta, followed by per-fixture verified counts.
+Each fixture run writes one JSON file under `apps/factory/benchmarks/results/` (gitignored). It records the config name, hash and model, the fixture and its SHA, run id, profile, versions, factory status and blocker, the hidden check exit code and bounded output, `verified`, repairs, wall time and estimated cost. `bench compare <a> <b>` accepts config files or result directories. It prints a per-profile table of verified count and rate, first-pass rate, false claims, median wall time and estimated cost per verified success, each with a B − A delta, followed by per-fixture verified counts.
 
 Benchmark runs go to the same database as real runs, each from its own temporary repo. To see only one repository's runs, use `factory report --repo <path>`.
