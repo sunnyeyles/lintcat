@@ -5,6 +5,9 @@
       "ignoreFiles": [
         ".agents/**",
         "docs/**"
+      ],
+      "ignore": [
+        "scripts/run-trace-examples/**"
       ]
     },
     "apps/web": {

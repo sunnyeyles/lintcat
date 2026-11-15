@@ -40,6 +40,13 @@ describe("run traces", () => {
     expect((await findRunTrace(database, "s1"))?.run.title).toBe("Fix login");
   });
 
+  it("keeps the first format a run was stored with", async () => {
+    await saveRunTraceFiles(database, "s1", [], { format: "lintcat", now: at(0) });
+    await saveRunTraceFiles(database, "s1", [], { format: "otel-genai", now: at(1) });
+    await saveRunTraceFiles(database, "s1", [], { now: at(2) });
+    expect((await findRunTrace(database, "s1"))?.run.format).toBe("lintcat");
+  });
+
   it("lists the most recently active run first", async () => {
     await saveRunTraceFiles(database, "old", [], { now: at(0) });
     await saveRunTraceFiles(database, "new", [], { now: at(1) });

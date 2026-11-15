@@ -1,0 +1,1 @@
+ALTER TABLE "run_traces" ADD COLUMN "format" text;

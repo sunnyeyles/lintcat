@@ -1,0 +1,268 @@
+{
+  "run": {
+    "id": "run_01JC8Z5Q3K",
+    "title": "Retry flaky webhook delivery",
+    "status": "failed",
+    "stage": "verify",
+    "profile": "bugfix",
+    "blocker": "pnpm test still fails after 2 repair passes",
+    "outcome": {
+      "summary": "Blocked in verify",
+      "usage": {
+        "inputTokens": 21000,
+        "outputTokens": 3300,
+        "estimatedCostUsd": 0.62
+      }
+    },
+    "createdAt": "2026-11-10T09:00:00.000Z",
+    "finishedAt": "2026-11-10T09:06:40.000Z"
+  },
+  "events": [
+    {
+      "id": 1,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:00:00.000Z",
+      "kind": "run_started",
+      "stage": null,
+      "agentId": null,
+      "data": {
+        "attempt": 1,
+        "profile": "bugfix"
+      }
+    },
+    {
+      "id": 2,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:00:04.000Z",
+      "kind": "sandbox_ready",
+      "stage": "prepare",
+      "agentId": null,
+      "data": {
+        "sandbox": "docker",
+        "network": "none"
+      }
+    },
+    {
+      "id": 3,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:00:20.000Z",
+      "kind": "baseline_recorded",
+      "stage": "prepare",
+      "agentId": null,
+      "data": {
+        "results": [
+          {
+            "name": "test",
+            "exitCode": 0,
+            "durationMs": 9000
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:01:50.000Z",
+      "kind": "agent_finished",
+      "stage": "reproduce",
+      "agentId": "reproducer",
+      "data": {
+        "ok": true,
+        "turns": 9,
+        "durationMs": 85000,
+        "usage": {
+          "inputTokens": 6000,
+          "outputTokens": 900,
+          "cacheReadTokens": 24000,
+          "cacheWriteTokens": 500,
+          "estimatedCostUsd": 0.18
+        },
+        "status": "reproduced"
+      }
+    },
+    {
+      "id": 5,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:01:52.000Z",
+      "kind": "bug_reproduced",
+      "stage": "reproduce",
+      "agentId": null,
+      "data": {
+        "testFiles": [
+          "test/webhook.test.ts"
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:04:00.000Z",
+      "kind": "agent_finished",
+      "stage": "implement",
+      "agentId": "implementer",
+      "data": {
+        "ok": true,
+        "turns": 22,
+        "durationMs": 125000,
+        "usage": {
+          "inputTokens": 11000,
+          "outputTokens": 2100,
+          "cacheReadTokens": 44000,
+          "cacheWriteTokens": 500,
+          "estimatedCostUsd": 0.36
+        },
+        "status": "done"
+      }
+    },
+    {
+      "id": 7,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:05:00.000Z",
+      "kind": "checks_finished",
+      "stage": "verify",
+      "agentId": null,
+      "data": {
+        "label": "verify",
+        "results": [
+          {
+            "name": "lint",
+            "exitCode": 0,
+            "durationMs": 8000
+          },
+          {
+            "name": "test",
+            "exitCode": 1,
+            "durationMs": 31000
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:05:05.000Z",
+      "kind": "repair_started",
+      "stage": "verify",
+      "agentId": null,
+      "data": {
+        "pass": 1,
+        "failing": [
+          "test"
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:06:30.000Z",
+      "kind": "agent_finished",
+      "stage": "verify",
+      "agentId": "implementer",
+      "data": {
+        "ok": false,
+        "reason": "max_turns",
+        "turns": 12,
+        "durationMs": 80000,
+        "usage": {
+          "inputTokens": 4000,
+          "outputTokens": 300,
+          "cacheReadTokens": 16000,
+          "cacheWriteTokens": 500,
+          "estimatedCostUsd": 0.08
+        },
+        "status": null
+      }
+    },
+    {
+      "id": 10,
+      "runId": "run_01JC8Z5Q3K",
+      "at": "2026-11-10T09:06:39.000Z",
+      "kind": "blocked",
+      "stage": "verify",
+      "agentId": null,
+      "data": {
+        "reason": "repeated failure"
+      }
+    }
+  ],
+  "commands": [
+    {
+      "stage": "prepare",
+      "name": "test",
+      "command": "pnpm test",
+      "cwd": "/workspace",
+      "startedAt": "2026-11-10T09:00:08.000Z",
+      "durationMs": 9000,
+      "exitCode": 0,
+      "timedOut": false,
+      "errorCategory": null,
+      "outputHash": "h",
+      "output": "42 passed"
+    },
+    {
+      "stage": "reproduce",
+      "name": "agent",
+      "command": "pnpm vitest run test/webhook.test.ts",
+      "cwd": "/workspace",
+      "startedAt": "2026-11-10T09:01:00.000Z",
+      "durationMs": 6000,
+      "exitCode": 1,
+      "timedOut": false,
+      "errorCategory": "test",
+      "outputHash": "h",
+      "output": "1 failed: retries twice"
+    },
+    {
+      "stage": "implement",
+      "name": "agent",
+      "command": "pnpm vitest run test/webhook.test.ts",
+      "cwd": "/workspace",
+      "startedAt": "2026-11-10T09:03:00.000Z",
+      "durationMs": 7000,
+      "exitCode": 0,
+      "timedOut": false,
+      "errorCategory": null,
+      "outputHash": "h",
+      "output": "1 passed"
+    },
+    {
+      "stage": "verify",
+      "name": "lint",
+      "command": "pnpm lint",
+      "cwd": "/workspace",
+      "startedAt": "2026-11-10T09:04:15.000Z",
+      "durationMs": 8000,
+      "exitCode": 0,
+      "timedOut": false,
+      "errorCategory": null,
+      "outputHash": "h",
+      "output": ""
+    },
+    {
+      "stage": "verify",
+      "name": "test",
+      "command": "pnpm test",
+      "cwd": "/workspace",
+      "startedAt": "2026-11-10T09:04:23.000Z",
+      "durationMs": 31000,
+      "exitCode": 1,
+      "timedOut": false,
+      "errorCategory": "test",
+      "outputHash": "h",
+      "output": "FAIL test/queue.test.ts > drains in order"
+    },
+    {
+      "stage": "verify",
+      "name": "agent",
+      "command": "pnpm test test/queue.test.ts",
+      "cwd": "/workspace",
+      "startedAt": "2026-11-10T09:05:50.000Z",
+      "durationMs": 12000,
+      "exitCode": 1,
+      "timedOut": false,
+      "errorCategory": "test",
+      "outputHash": "h",
+      "output": "FAIL drains in order"
+    }
+  ]
+}

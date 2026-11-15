@@ -1,4 +1,4 @@
-# @pr-review/factory-cli
+# @pr-review/factory
 
 `factory` turns a described outcome into an approved spec, then implements it
 in a Docker sandbox and delivers a branch (or a pull request).

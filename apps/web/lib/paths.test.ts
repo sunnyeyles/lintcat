@@ -175,6 +175,7 @@ describe("isApexOnly", () => {
     expect(isApexOnly("/dashboard/setup")).toBe(true);
     expect(isApexOnly("/sign-in")).toBe(true);
     expect(isApexOnly("/sign-in/")).toBe(true);
+    expect(isApexOnly("/dev/run-trace")).toBe(true);
   });
 
   it("leaves an organization's own pages alone", () => {

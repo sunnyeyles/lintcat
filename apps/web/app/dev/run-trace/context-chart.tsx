@@ -20,7 +20,7 @@ const CONFIG = {
   tokens: { label: "Context", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
-export function ContextChart({ agent }: { agent: AgentNode }) {
+export function ContextChart({ agent }: { agent: Pick<AgentNode, "startedAt" | "context"> }) {
   const series = contextSeries(agent);
   if (series.length === 0) {
     return <p className="text-muted-foreground text-sm">No usage samples for this agent.</p>;

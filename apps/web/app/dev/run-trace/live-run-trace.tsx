@@ -5,21 +5,24 @@ import { TriangleAlert } from "@pr-review/design/icons";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { FormatPicker } from "@/app/dev/run-trace/format-picker";
 import {
   fetchRunTrace,
   isLive,
   POLL_MS,
+  runPath,
   useRunTraceToken,
   type LiveRunFiles,
 } from "@/app/dev/run-trace/live-api";
 import { TokenForm } from "@/app/dev/run-trace/live-runs";
 import { formatDuration, timeBounds, walk } from "@/app/dev/run-trace/trace-layout";
 import { TraceView } from "@/app/dev/run-trace/trace-view";
-import { parseRun } from "@/lib/run-trace";
+import { findAdapter, parseTrace } from "@/lib/run-trace";
 
-export function LiveRunTrace({ runId }: { runId: string }) {
+export function LiveRunTrace({ runId, source = "push" }: { runId: string; source?: string }) {
   const [token, setToken] = useRunTraceToken();
   const [data, setData] = useState<LiveRunFiles | null>(null);
+  const [format, setFormat] = useState<string | undefined>(undefined);
   const [missing, setMissing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +33,7 @@ export function LiveRunTrace({ runId }: { runId: string }) {
     let seen = "";
     const tick = async () => {
       try {
-        const body = await fetchRunTrace<LiveRunFiles>(`/api/run-trace/${runId}`, token);
+        const body = await fetchRunTrace<LiveRunFiles>(runPath("/api/run-trace", { runId, source }), token);
         if (stopped) return;
         if (!body) {
           setMissing(true);
@@ -53,16 +56,16 @@ export function LiveRunTrace({ runId }: { runId: string }) {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [runId, token]);
+  }, [runId, source, token]);
 
   const parsed = useMemo(() => {
     if (!data) return null;
     try {
-      return { trace: parseRun(data.files), error: null };
+      return { trace: parseTrace(data.files, format ?? data.run.format ?? undefined).trace, error: null };
     } catch (cause) {
       return { trace: null, error: cause instanceof Error ? cause.message : String(cause) };
     }
-  }, [data]);
+  }, [data, format]);
 
   if (!token) return <TokenForm onSave={setToken} />;
   if (missing) {
@@ -98,8 +101,12 @@ export function LiveRunTrace({ runId }: { runId: string }) {
             </span>
           ) : null}
         </span>
+        {trace?.format ? <Badge variant="secondary">{findAdapter(trace.format)?.label ?? trace.format}</Badge> : null}
+        {source !== "push" ? <Badge variant="outline">{source}</Badge> : null}
         {live ? <Badge>live</Badge> : <Badge variant="outline">finished</Badge>}
       </div>
+
+      <FormatPicker files={data.files} value={format} used={trace?.format ?? data.run.format ?? undefined} onChange={setFormat} />
 
       {error || parsed.error ? (
         <Alert variant="destructive">

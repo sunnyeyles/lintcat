@@ -1,0 +1,53 @@
+@media (prefers-reduced-motion: no-preference) {
+  .bob {
+    animation: bot-bob 1.6s ease-in-out infinite;
+  }
+  .blink {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: bot-blink 4s infinite;
+  }
+  .pop {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    animation: bot-pop 1.2s ease-in-out infinite;
+  }
+  .bot:hover .figure,
+  .bot:focus-visible .figure {
+    transform: rotate(-4deg) translateY(-2px);
+  }
+  .figure {
+    transition: transform 150ms ease-out;
+  }
+}
+
+@keyframes bot-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes bot-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes bot-pop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.08);
+  }
+}

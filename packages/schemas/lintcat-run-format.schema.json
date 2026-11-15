@@ -1,0 +1,438 @@
+{
+  "$id": "lintcat-run-format.schema.json",
+  "title": "lintcat run format event",
+  "description": "One line of a lintcat run format NDJSON stream.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "run_started"
+        },
+        "run": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "run"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "agent_started"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "stage": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "prompt": {
+          "type": "string",
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "agent",
+        "role"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "step"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "prompt",
+            "thinking",
+            "text"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "agent",
+        "kind",
+        "text"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "tool_call"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "input": {},
+        "summary": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "output": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "error": {
+          "type": "boolean"
+        },
+        "files": {
+          "type": "object",
+          "properties": {
+            "read": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 100000
+              }
+            },
+            "edited": {
+              "maxItems": 1000,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 100000
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "agent",
+        "id",
+        "name"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "tool_result"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "output": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "error": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "agent",
+        "id"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "event"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "command",
+            "check",
+            "handoff",
+            "log",
+            "other"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "error",
+            "running"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "output": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "agent",
+        "name"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "usage"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "inputTokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outputTokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "costUsd": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "agent",
+        "inputTokens"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "agent_finished"
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "done",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "error": {
+          "type": "string",
+          "maxLength": 100000
+        }
+      },
+      "required": [
+        "at",
+        "type",
+        "agent",
+        "status"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "type": {
+          "type": "string",
+          "const": "run_finished"
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "blocker": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2000,
+          "format": "uri"
+        }
+      },
+      "required": [
+        "at",
+        "type"
+      ]
+    }
+  ]
+}

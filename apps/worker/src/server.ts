@@ -67,7 +67,8 @@ export function createHttpServer(
     handleWorkerRequest(toWebRequest(req), drain, config)
       .then((response) => sendWebResponse(res, response))
       .catch((error: unknown) => {
-        logger.error("worker_server.request_failed", { error: errorMessage(error) });
+        const cause = error instanceof Error && error.cause !== undefined ? errorMessage(error.cause) : undefined;
+        logger.error("worker_server.request_failed", { error: errorMessage(error), cause });
         res.statusCode = 500;
         res.end();
       });

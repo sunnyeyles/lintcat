@@ -1,14 +1,26 @@
+import { LIMITS } from "@/lib/run-trace/adapters/types";
+import { TRACE_FILE, unzipTraceFiles } from "@/lib/run-trace/unzip";
+
 export type TraceFile = { name: string; text: string };
 
-const TRACE = /\.(jsonl|json)$/i;
+const ZIP = /\.zip$/i;
 
 function pathOf(file: File): string {
   return file.webkitRelativePath || file.name;
 }
 
+async function readOne(file: File, name: string): Promise<TraceFile[]> {
+  if (file.size > LIMITS.bytes) throw new Error(`${file.name} is larger than ${LIMITS.bytes / 1024 / 1024} MB.`);
+  if (ZIP.test(file.name)) {
+    const prefix = name.replace(ZIP, "");
+    return (await unzipTraceFiles(await file.arrayBuffer())).map((entry) => ({ ...entry, name: `${prefix}/${entry.name}` }));
+  }
+  return TRACE_FILE.test(file.name) ? [{ name, text: await file.text() }] : [];
+}
+
 export async function readFileList(files: Iterable<File>): Promise<TraceFile[]> {
-  const kept = [...files].filter((file) => TRACE.test(file.name));
-  return Promise.all(kept.map(async (file) => ({ name: pathOf(file), text: await file.text() })));
+  const read = await Promise.all([...files].map((file) => readOne(file, pathOf(file))));
+  return read.flat();
 }
 
 function entryFile(entry: FileSystemFileEntry): Promise<File> {
@@ -20,10 +32,11 @@ function readBatch(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]
 }
 
 async function collect(entry: FileSystemEntry, out: TraceFile[]): Promise<void> {
+  if (out.length > LIMITS.files) return;
   if (entry.isFile) {
-    if (!TRACE.test(entry.name)) return;
+    if (!TRACE_FILE.test(entry.name) && !ZIP.test(entry.name)) return;
     const file = await entryFile(entry as FileSystemFileEntry);
-    out.push({ name: entry.fullPath.replace(/^\//, ""), text: await file.text() });
+    out.push(...(await readOne(file, entry.fullPath.replace(/^\//, ""))));
     return;
   }
   const reader = (entry as FileSystemDirectoryEntry).createReader();
@@ -33,7 +46,7 @@ async function collect(entry: FileSystemEntry, out: TraceFile[]): Promise<void> 
   }
 }
 
-/** Reads dropped files and folders, recursing into directories. */
+/** Reads dropped files, folders and zips, recursing into directories. */
 export async function readDrop(transfer: DataTransfer): Promise<TraceFile[]> {
   const entries = [...transfer.items]
     .map((item) => item.webkitGetAsEntry?.())

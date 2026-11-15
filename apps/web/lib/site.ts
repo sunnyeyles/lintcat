@@ -24,6 +24,7 @@ export const PAGE_DATES: Record<string, PageDates> = {
   "/docs/how-it-works": { published: "2026-09-22", modified: "2026-09-29" },
   "/docs/security": { published: "2026-09-23", modified: "2026-10-18" },
   "/docs/mcp-server": { published: "2026-09-22", modified: "2026-09-25" },
+  "/docs/plug-in-your-factory": { published: "2026-11-12", modified: "2026-11-12" },
 };
 
 export const PUBLIC_PATHS: string[] = ["/", ...DOCS_PAGES.map((page) => page.href)];

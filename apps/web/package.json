@@ -14,6 +14,7 @@
     "@ai-sdk/anthropic": "^4.0.49",
     "@pr-review/db": "workspace:*",
     "@pr-review/design": "workspace:*",
+    "@pr-review/factory": "workspace:*",
     "@pr-review/github": "workspace:*",
     "@pr-review/index": "workspace:*",
     "@pr-review/logging": "workspace:*",

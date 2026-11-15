@@ -2,8 +2,22 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-export type LiveRunSummary = { runId: string; title: string | null; startedAt: string; lastSeenAt: string };
+export type LiveRunSummary = {
+  runId: string;
+  title: string | null;
+  format: string | null;
+  source: string;
+  startedAt: string;
+  lastSeenAt: string;
+};
 export type LiveRunFiles = { run: LiveRunSummary; files: { name: string; text: string }[] };
+export type LiveRunList = { runs: LiveRunSummary[]; errors?: { source: string; error: string }[] };
+
+/** The page and API path of a run; pushed runs keep their short URL. */
+export function runPath(base: string, run: { runId: string; source?: string }): string {
+  const source = run.source && run.source !== "push" ? `?source=${encodeURIComponent(run.source)}` : "";
+  return `${base}/${encodeURIComponent(run.runId)}${source}`;
+}
 
 const TOKEN_KEY = "run-trace-token";
 export const POLL_MS = 3000;

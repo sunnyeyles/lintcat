@@ -48,6 +48,11 @@ export const DOCS_NAV: DocsSection[] = [
         title: "MCP server",
         summary: "The same review over a working tree, inside your coding agent.",
       },
+      {
+        href: "/docs/plug-in-your-factory",
+        title: "Plug in your factory",
+        summary: "See any agent factory's runs in the run-trace dashboard: formats, push, pull.",
+      },
     ],
   },
 ];

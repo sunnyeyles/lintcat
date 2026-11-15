@@ -8,23 +8,28 @@ export type RunTraceFileInput = { name: string; text: string };
 export type RunTraceSummary = {
   runId: string;
   title: string | null;
+  format: string | null;
   startedAt: Date;
   lastSeenAt: Date;
 };
 
-/** Upserts the run and overwrites each file; a title, once known, is kept. */
+/** Upserts the run and overwrites each file; a title or format, once known, is kept. */
 export async function saveRunTraceFiles(
   database: Database,
   runId: string,
   files: readonly RunTraceFileInput[],
-  { title, now = new Date() }: { title?: string; now?: Date } = {},
+  { title, format, now = new Date() }: { title?: string; format?: string; now?: Date } = {},
 ): Promise<void> {
   await database
     .insert(runTraces)
-    .values({ runId, title: title ?? null, startedAt: now, lastSeenAt: now })
+    .values({ runId, title: title ?? null, format: format ?? null, startedAt: now, lastSeenAt: now })
     .onConflictDoUpdate({
       target: runTraces.runId,
-      set: { lastSeenAt: now, title: sql`coalesce(excluded.title, ${runTraces.title})` },
+      set: {
+        lastSeenAt: now,
+        title: sql`coalesce(excluded.title, ${runTraces.title})`,
+        format: sql`coalesce(${runTraces.format}, excluded.format)`,
+      },
     });
   if (files.length === 0) return;
   await database
@@ -41,6 +46,7 @@ export async function listRunTraces(database: Database, limit = 50): Promise<Run
     .select({
       runId: runTraces.runId,
       title: runTraces.title,
+      format: runTraces.format,
       startedAt: runTraces.startedAt,
       lastSeenAt: runTraces.lastSeenAt,
     })
@@ -57,6 +63,7 @@ export async function findRunTrace(
     .select({
       runId: runTraces.runId,
       title: runTraces.title,
+      format: runTraces.format,
       startedAt: runTraces.startedAt,
       lastSeenAt: runTraces.lastSeenAt,
     })

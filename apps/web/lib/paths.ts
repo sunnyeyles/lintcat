@@ -21,7 +21,7 @@ export function withinOrganization(pathname: string): string {
 
 export const SIGN_IN_PATH = "/sign-in";
 
-/** Docs, sign-in and the picker exist only on the apex; `/` on a subdomain is still that organization. */
+/** Docs, sign-in, dev tools and the picker exist only on the apex; `/` on a subdomain is still that organization. */
 export function isApexOnly(pathname: string): boolean {
   const page = pathname.replace(/\/$/, "") || "/";
   return (
@@ -29,7 +29,8 @@ export function isApexOnly(pathname: string): boolean {
     page.startsWith(`${DASHBOARD_PATH}/`) ||
     page === SIGN_IN_PATH ||
     page === "/docs" ||
-    page.startsWith("/docs/")
+    page.startsWith("/docs/") ||
+    page.startsWith("/dev/")
   );
 }
 
