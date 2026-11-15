@@ -6,11 +6,11 @@ The factory turns a conversation into a verified git branch. You describe an out
 
 | Path | Role |
 | --- | --- |
-| `apps/factory` | CLI (`factory init/new/run/worker/status/logs/cancel/resume/result`), `compose.yaml` for Postgres |
-| `packages/factory` | Core: contract, router, engine, store, sandbox, git, `task.md`, telemetry |
-| `packages/factory/agents/*.md` | Versioned agent instructions (`role@version+contenthash` on every event) |
-| `packages/factory/workflows/*.yaml` | Validated profile definitions |
-| `packages/agent-runtime` | `AgentRuntime` contract, Claude Agent SDK adapter, scripted fake |
+| `apps/factory/src` | CLI (`factory init/new/run/worker/status/logs/cancel/resume/result`), `compose.yaml` for Postgres |
+| `apps/factory/src/engine` | Core: contract, router, engine, store, sandbox, git, `task.md`, telemetry |
+| `apps/factory/agents/*.md` | Versioned agent instructions (`role@version+contenthash` on every event) |
+| `apps/factory/workflows/*.yaml` | Validated profile definitions |
+| `apps/factory/src/agent` | `AgentRuntime` contract, Claude Agent SDK adapter, scripted fake |
 
 ## Flow
 
@@ -74,7 +74,7 @@ node apps/factory/start.mjs new "add a --version flag" --repo /path/to/repo
 
 ## State and recovery
 
-- Postgres (`FACTORY_DATABASE_URL`) is authoritative: `factory_runs`, `factory_events`, `factory_commands`, `factory_effects`, `factory_lessons`. Migrations live in `packages/factory/drizzle`, separate from lintcat's.
+- Postgres (`FACTORY_DATABASE_URL`) is authoritative: `factory_runs`, `factory_events`, `factory_commands`, `factory_effects`, `factory_lessons`. Migrations live in `apps/factory/drizzle`, separate from lintcat's.
 - `.factory/runs/<id>/` holds `task.md` (a projection, rewritten on each transition), `state.json`, `events.jsonl` and `artifacts/`. Editing `task.md` by hand never changes the run: the edit is kept as `task.user-edit.md` and a `task_md_conflict` event is recorded.
 - After each stage the engine commits a checkpoint on the run branch and stores its SHA. A worker that claims an expired lease resets the worktree to the checkpoint and reruns the interrupted stage, at most 3 times.
 - Branch, push and PR are recorded in `factory_effects` before or after they happen, and the PR step also asks `gh` for an existing PR first, so a retry never opens a second.

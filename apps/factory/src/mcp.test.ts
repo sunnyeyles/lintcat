@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import type { FactoryRun } from "@pr-review/factory";
+import type { FactoryRun } from "#src/engine/store/schema";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { detachedLauncher } from "#src/mcp";

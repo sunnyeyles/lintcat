@@ -6,14 +6,16 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { createFakeRuntime, type FakeRuntime } from "@pr-review/agent-runtime";
-import { createFactoryService, type FactoryRun, type Spec } from "@pr-review/factory";
+import { createFakeRuntime, type FakeRuntime } from "#src/agent/fake-runtime";
+import { createFactoryService } from "#src/engine/service";
+import type { FactoryRun } from "#src/engine/store/schema";
+import type { Spec } from "#src/engine/contract";
 import { createSilentLogger } from "@pr-review/logging";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // The package exports no test helpers, so these come from its sources.
-import { createFakeSandboxProvider } from "@pr-review/factory/fake-sandbox";
-import { createTestFactoryDatabase } from "@pr-review/factory/test-store";
+import { createFakeSandboxProvider } from "#src/engine/sandbox/fake-sandbox";
+import { createTestFactoryDatabase } from "#src/engine/store/test-store";
 
 import { createFactoryMcpServer, type LaunchResult } from "#src/mcp-server";
 

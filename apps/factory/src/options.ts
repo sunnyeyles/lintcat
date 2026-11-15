@@ -1,5 +1,5 @@
 /** The command line: what `factory` was asked to do, before anything is read. */
-import { PROFILE_NAMES, type ProfileName } from "@pr-review/factory";
+import { PROFILE_NAMES, type ProfileName } from "#src/engine/contract";
 
 export type Command =
   | { kind: "init"; repoPath: string | undefined }

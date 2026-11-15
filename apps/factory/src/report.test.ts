@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import type { BenchResult, ProfileMetrics } from "@pr-review/factory";
+import type { BenchResult } from "#src/engine/bench/runner";
+import type { ProfileMetrics } from "#src/engine/metrics";
 import { describe, expect, it } from "vitest";
 
 import { benchCompare } from "#src/bench";

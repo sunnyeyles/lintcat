@@ -3,22 +3,16 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 
-import { createClaudeRuntime, type AgentRuntime } from "@pr-review/agent-runtime";
-import {
-  buildSandboxImage,
-  createDockerProvider,
-  createFactoryService,
-  detectChecks,
-  dockerAvailable,
-  ensureFactoryExcluded,
-  migrateFactoryDatabase,
-  openFactoryDatabase,
-  repoRoot,
-  runDiscovery,
-  TOOL_VERSION,
-  type FactoryRun,
-  type FactoryService,
-} from "@pr-review/factory";
+import { createClaudeRuntime } from "#src/agent/claude-agent-sdk";
+import type { AgentRuntime } from "#src/agent/runtime";
+import { buildSandboxImage, createDockerProvider, dockerAvailable } from "#src/engine/sandbox/docker-sandbox";
+import { createFactoryService, type FactoryService } from "#src/engine/service";
+import { detectChecks } from "#src/engine/checks";
+import { ensureFactoryExcluded, repoRoot } from "#src/engine/git";
+import { migrateFactoryDatabase, openFactoryDatabase } from "#src/engine/store/client";
+import { runDiscovery } from "#src/engine/discovery";
+import { TOOL_VERSION } from "#src/engine/telemetry";
+import type { FactoryRun } from "#src/engine/store/schema";
 
 import {
   claudeExecutable,

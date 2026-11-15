@@ -3,20 +3,14 @@ import path from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import type { AgentRuntime } from "@pr-review/agent-runtime";
-import {
-  continueDiscovery,
-  loadDiscoverySession,
-  PROFILE_NAMES,
-  renderTaskMarkdown,
-  repoRoot,
-  specSchema,
-  startDiscovery,
-  TOOL_VERSION,
-  type DiscoveryReply,
-  type FactoryRun,
-  type FactoryService,
-} from "@pr-review/factory";
+import type { AgentRuntime } from "#src/agent/runtime";
+import { continueDiscovery, loadDiscoverySession, startDiscovery, type DiscoveryReply } from "#src/engine/discovery";
+import { PROFILE_NAMES, specSchema } from "#src/engine/contract";
+import { renderTaskMarkdown } from "#src/engine/run-files";
+import { repoRoot } from "#src/engine/git";
+import { TOOL_VERSION } from "#src/engine/telemetry";
+import type { FactoryRun } from "#src/engine/store/schema";
+import type { FactoryService } from "#src/engine/service";
 import { z } from "zod";
 
 import { formatEvent, renderResult, renderRuns, renderSpec, renderStatus } from "#src/render";

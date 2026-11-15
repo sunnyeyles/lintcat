@@ -8,7 +8,7 @@ Stage 5 measures the factory three ways. Outcome metrics come from the run histo
 node apps/factory/start.mjs report [--json] [--repo <path>] [--since-days <n>]
 ```
 
-Metrics are per profile, over finished runs (`delivered`, `failed`, `cancelled`) that reached a profile. The code is in `packages/factory/src/metrics.ts`.
+Metrics are per profile, over finished runs (`delivered`, `failed`, `cancelled`) that reached a profile. The code is in `apps/factory/src/engine/metrics.ts`.
 
 | Metric | Definition |
 | --- | --- |
@@ -26,7 +26,7 @@ Metrics are per profile, over finished runs (`delivered`, `failed`, `cancelled`)
 
 ## Learning report
 
-`packages/factory/src/learning.ts`. It uses deterministic rules and calls no model.
+`apps/factory/src/engine/learning.ts`. It uses deterministic rules and calls no model.
 
 1. **Occurrences.** These are failed commands (outside `reproduce`), `repeated_failure` events and the blockers of failed runs.
 2. **Clusters.** Occurrences are grouped by source, `stage/command`, error category and a normalised signature. The signature is the first line of output that reads like an error, with ANSI codes, paths, hex ids, run ids, quoted values and numbers stripped. A cluster needs at least two distinct runs.
@@ -62,7 +62,7 @@ node apps/factory/start.mjs bench compare benchmarks/factory/configs/baseline.js
 
 `benchmarks/factory/fixtures/<name>/` contains:
 
-- `repo/`: the starting files. `buildFixture()` (`packages/factory/src/bench/fixtures.ts`) commits them with a fixed author, committer and date (2026-01-01), with user and system git config disabled. It then refuses the repo unless HEAD equals `fixture.json`'s `baseSha`. Changing a fixture therefore means recording a new SHA.
+- `repo/`: the starting files. `buildFixture()` (`apps/factory/src/engine/bench/fixtures.ts`) commits them with a fixed author, committer and date (2026-01-01), with user and system git config disabled. It then refuses the repo unless HEAD equals `fixture.json`'s `baseSha`. Changing a fixture therefore means recording a new SHA.
 - `spec.json`: the approved spec, valid against `specSchema`, so a run needs no discovery.
 - `fixture.json`: a description, the `.factory/checks` line and `baseSha`.
 - `hidden/`: the independent checks.

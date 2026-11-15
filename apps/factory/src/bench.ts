@@ -2,17 +2,12 @@
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 
-import type { AgentRuntime } from "@pr-review/agent-runtime";
-import {
-  createDockerProvider,
-  listFixtures,
-  loadBenchConfig,
-  loadResults,
-  renderComparison,
-  resultDirName,
-  runBenchmark,
-  type BenchResult,
-} from "@pr-review/factory";
+import type { AgentRuntime } from "#src/agent/runtime";
+import { createDockerProvider } from "#src/engine/sandbox/docker-sandbox";
+import { listFixtures } from "#src/engine/bench/fixtures";
+import { loadBenchConfig } from "#src/engine/bench/config";
+import { loadResults, resultDirName, runBenchmark, type BenchResult } from "#src/engine/bench/runner";
+import { renderComparison } from "#src/engine/bench/compare";
 
 import type { CommandContext } from "#src/commands";
 import { EnvironmentError, fileLogger, readConfig, type FactoryConfig } from "#src/config";
