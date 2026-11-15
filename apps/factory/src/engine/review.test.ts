@@ -1,11 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
 
 import type { TaskContract } from "#src/engine/contract";
-import { assessEscalation } from "#src/engine/escalation";
 import { validateReview } from "#src/engine/review";
 import { sampleSpec } from "#src/engine/test-fixtures";
 
@@ -46,30 +41,5 @@ describe("validateReview", () => {
       contract,
     )!;
     expect(review).toMatchObject({ verdict: "approve", blocking: [], findings: [] });
-  });
-});
-
-describe("assessEscalation", () => {
-  const repo = mkdtempSync(path.join(tmpdir(), "factory-escalation-"));
-  writeFileSync(path.join(repo, "package.json"), "{}");
-  for (const pkg of ["a", "b"]) {
-    mkdirSync(path.join(repo, "packages", pkg, "src"), { recursive: true });
-    writeFileSync(path.join(repo, "packages", pkg, "package.json"), "{}");
-  }
-
-  it("leaves a run within its estimate alone", () => {
-    expect(assessEscalation(repo, ["packages/a/src/x.ts", "packages/a/src/x.test.ts"], 2)).toEqual({ kind: "none" });
-  });
-
-  it("adds a review when the diff grows or crosses packages", () => {
-    expect(assessEscalation(repo, ["a", "b", "c", "d"], 1)).toMatchObject({ kind: "review", reason: expect.stringMatching(/4 files/) });
-    expect(assessEscalation(repo, ["packages/a/src/x.ts", "packages/b/src/y.ts"], 2)).toMatchObject({
-      kind: "review",
-      reason: expect.stringMatching(/crosses 2 packages \(packages\/a, packages\/b\)/),
-    });
-  });
-
-  it("blocks a diff far beyond the approved scope", () => {
-    expect(assessEscalation(repo, Array.from({ length: 11 }, (_, i) => `f${i}`), 1)).toMatchObject({ kind: "blocked" });
   });
 });

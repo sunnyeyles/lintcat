@@ -2,8 +2,8 @@
 import type { FactoryCommand, FactoryEvent, FactoryRun } from "#src/engine/store/schema";
 import type { FactoryService } from "#src/engine/service";
 import type { Spec } from "#src/engine/contract";
+import type { Route } from "#src/engine/profiles";
 
-export type Route = Awaited<ReturnType<FactoryService["propose"]>>["route"];
 type ProfileSummary = Awaited<ReturnType<FactoryService["summary"]>>[number];
 
 export const TERMINAL_STATUSES: readonly FactoryRun["status"][] = ["delivered", "failed", "cancelled"];
@@ -12,9 +12,7 @@ const list = (heading: string, items: readonly string[]): string[] =>
   items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `  - ${item}`)];
 
 export function renderSpec(spec: Spec, route: Route, runId: string): string {
-  const routing = route.ok
-    ? `Profile:   ${route.profile}${route.overridden ? " (overridden)" : ""}: ${route.reason}`
-    : `Blocked:   ${route.blocker}`;
+  const routing = `Profile:   ${route.profile}${route.overridden ? " (overridden)" : ""}: ${route.reason}`;
   return [
     `── ${spec.title} (${runId})`,
     `Objective: ${spec.objective}`,

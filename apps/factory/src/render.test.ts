@@ -23,19 +23,13 @@ const spec: Spec = {
 
 describe("rendering a spec", () => {
   it("shows the routed profile, the criteria and the numbered plan, and drops empty sections", () => {
-    const text = renderSpec(spec, { ok: true, profile: "feature", reason: "new behaviour", overridden: false }, "r1");
+    const text = renderSpec(spec, { profile: "feature", reason: "new behaviour", overridden: false }, "r1");
     expect(text).toContain("── Add a --json flag (r1)");
     expect(text).toContain("Profile:   feature: new behaviour");
     expect(text).toContain("  AC1 [automated] --json prints valid JSON");
     expect(text).toContain("  2. test it");
     expect(text).toContain("Non-goals:\n  - YAML");
     expect(text).not.toContain("Constraints:");
-  });
-
-  it("shows the blocker in place of a profile", () => {
-    const text = renderSpec(spec, { ok: false, blocker: "greenfield is out of scope" }, "r1");
-    expect(text).toContain("Blocked:   greenfield is out of scope");
-    expect(text).not.toContain("Profile:");
   });
 });
 

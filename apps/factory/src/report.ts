@@ -29,7 +29,7 @@ function table(rows: string[][]): string {
 export function renderMetrics(metrics: readonly ProfileMetrics[], auth: FactoryConfig["auth"]): string {
   if (metrics.length === 0) return "No finished runs yet.";
   const rows = [
-    ["PROFILE", "RUNS", "VERIFIED", "1ST PASS", "MEDIAN", "P95", "CMD FAIL", "REPEATED", "REPAIR OK", "REGRESS", "ESCALATED", "COST/VERIFIED"],
+    ["PROFILE", "RUNS", "VERIFIED", "1ST PASS", "MEDIAN", "P95", "CMD FAIL", "REPEATED", "REPAIR OK", "REGRESS", "COST/VERIFIED"],
     ...metrics.map((m) => [
       m.profile,
       String(m.runs),
@@ -41,7 +41,6 @@ export function renderMetrics(metrics: readonly ProfileMetrics[], auth: FactoryC
       pct(m.repeatedFailureRate),
       pct(m.repairSuccessRate),
       pct(m.testRegressionRate),
-      pct(m.escalationRate),
       `${usd(m.cost.perVerifiedSuccessUsd)}${m.cost.runsWithoutCost ? ` (${m.cost.runsWithoutCost} unknown)` : ""}`,
     ]),
   ];

@@ -37,6 +37,7 @@ export const budgetsSchema = z.object({
   wallClockMinutes: z.number().int().positive(),
   commandTimeoutSeconds: z.number().int().positive(),
 });
+export type Budgets = z.infer<typeof budgetsSchema>;
 
 const permittedOperationsSchema = z.object({
   push: z.boolean(),

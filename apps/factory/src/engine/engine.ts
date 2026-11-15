@@ -8,7 +8,6 @@ import { z } from "zod";
 
 import { detectChecks, type CheckPlan } from "#src/engine/checks";
 import { assertFrozen, recordDecision } from "#src/engine/contract";
-import { assessEscalation } from "#src/engine/escalation";
 import {
   changedFiles,
   checkpointCommit,
@@ -23,7 +22,7 @@ import {
   squashSince,
 } from "#src/engine/git";
 import { locate } from "#src/engine/locate";
-import { loadProfile, workflowVersion, type Profile, type Stage } from "#src/engine/profiles";
+import { PROFILES, workflowVersion, type Stage } from "#src/engine/profiles";
 import { loadPrompt } from "#src/engine/prompts";
 import { analyseRepository, isTestPath, renderArchitecture, type ArchitectureBrief } from "#src/engine/repository";
 import { renderReview, reviewOutputSchema, reviewPrompt, reviewRepairPrompt, validateReview, type ValidatedReview } from "#src/engine/review";
@@ -45,8 +44,6 @@ import {
 import { createRecorder } from "#src/engine/telemetry";
 
 const MAX_RECOVERIES = 3;
-/** Escalating to a review needs at least this share of the wall-clock budget left. */
-const ESCALATION_BUDGET_SHARE = 0.25;
 
 interface PullRequestRequest {
   repoPath: string;
@@ -115,7 +112,6 @@ interface RunData {
   summary?: string;
   baseline?: CheckRecord[];
   reproduce?: { status: "reproduced"; testFiles: string[]; failing: CheckRecord[] } | { status: "not_reproducible"; reason: string };
-  escalation?: { reason: string };
   review?: ValidatedReview;
   reviewRepair?: { sha: string };
   turnsUsed?: number;
@@ -130,21 +126,13 @@ function errorCategory(result: ExecResult): string | null {
   return result.exitCode === 0 ? null : "nonzero_exit";
 }
 
-/** The profile's stages, plus a review before delivery once a run has escalated. */
-function stagesOf(profile: Profile, data: RunData): Stage[] {
-  if (!data.escalation || profile.stages.includes("review")) return profile.stages;
-  const at = profile.stages.indexOf("deliver");
-  return [...profile.stages.slice(0, at), "review", ...profile.stages.slice(at)];
-}
-
 /** Runs one claimed run to a terminal state; never throws for run-level failures. */
 export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise<FactoryRun["status"]> {
   const { database, logger } = deps;
   const leaseMs = deps.leaseMs ?? 60_000;
   const heartbeatMs = deps.heartbeatMs ?? 5_000;
-  const startedAt = Date.now();
   let contract = claimed.contract;
-  const profile = loadProfile(contract.profile);
+  const profile = PROFILES[contract.profile];
   const recorder = createRecorder(
     database,
     { runId: claimed.id, taskId: contract.taskId, repoPath: claimed.repoPath, workflowVersion: workflowVersion(profile) },
@@ -192,7 +180,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       runId: claimed.id,
       status,
       stage: currentStage,
-      profile: data.escalation ? `${profile.name} (escalated: + review)` : profile.name,
+      profile: profile.name,
       contract,
       progress,
       verification,
@@ -332,7 +320,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
 
   try {
     assertFrozen(contract);
-    if (!profile.enabled) throw new RunStopped("failed", `profile ${profile.name} is not enabled`);
 
     const recovering = checkpoint !== null || claimed.attempts > 1;
     if (recovering) {
@@ -346,7 +333,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     if (plan.checks.length === 0) {
       throw new RunStopped("failed", "no checks detected: add .factory/checks so the change can be verified");
     }
-    let stages = stagesOf(profile, data);
+    const { stages } = profile;
     const startIndex = checkpoint ? stages.indexOf(checkpoint.nextStage as Stage) : 0;
     if (startIndex < 0) throw new RunStopped("failed", `checkpoint names unknown stage ${checkpoint?.nextStage}`);
     for (const stage of stages.slice(0, startIndex)) mark(stage, "done", "before recovery");
@@ -502,8 +489,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
             if (!sha) throw new RunStopped("failed", `repair pass ${data.repairs} changed nothing`);
             await save(stage, "verify", sha);
           }
-          if (!profile.independentReview && !data.escalation) await maybeEscalate(stage);
-          stages = stagesOf(profile, data);
           await save(stage, stages[i + 1]!);
           return;
         }
@@ -594,21 +579,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     await save(stage, nextStage, sha);
   }
 
-  /** Adds the review stage when a light run outgrew its estimate; stops when it outgrew its approval. */
-  async function maybeEscalate(stage: Stage) {
-    const { files } = await committedDiff(worktree, contract.baseSha, setupPaths);
-    const assessed = assessEscalation(worktree, files, contract.spec.estimatedFiles);
-    if (assessed.kind === "none") return;
-    if (assessed.kind === "blocked") throw new RunStopped("failed", `escalation exceeds the approved scope: ${assessed.reason}`);
-    const remainingMs = contract.budgets.wallClockMinutes * 60_000 - (Date.now() - startedAt);
-    if (remainingMs < contract.budgets.wallClockMinutes * 60_000 * ESCALATION_BUDGET_SHARE) {
-      throw new RunStopped("failed", `the run needs an independent review (${assessed.reason}) but too little of the wall-clock budget is left`);
-    }
-    data.escalation = { reason: assessed.reason };
-    decide(stage, `escalated ${profile.name} to add an independent review: ${assessed.reason}`);
-    await recorder.event({ kind: "profile_escalated", stage, data: { from: profile.name, added: ["review"], reason: assessed.reason, files: files.length } });
-  }
-
   /** One review of the immutable diff; at most one repair pass and one recheck. */
   async function review(stage: Stage, plan: CheckPlan) {
     if (!data.review) {
@@ -680,7 +650,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
   }
 }
 
-/** The profile-specific evidence task.md shows: brief, baseline, reproduction, escalation, review. */
+/** The profile-specific evidence task.md shows: brief, baseline, reproduction, review. */
 function evidenceSections(data: RunData, verification: TaskView["verification"]): NonNullable<TaskView["sections"]> {
   const sections: NonNullable<TaskView["sections"]> = [];
   const passedNow = (name: string) => verification.find((v) => v.name === name)?.passed;
@@ -719,7 +689,6 @@ function evidenceSections(data: RunData, verification: TaskView["verification"])
           : [`- Not reproduced by a test: ${r.reason}`],
     });
   }
-  if (data.escalation) sections.push({ heading: "Escalation", lines: [`- Added an independent review: ${data.escalation.reason}`] });
   if (data.review) {
     sections.push({
       heading: "Independent review",

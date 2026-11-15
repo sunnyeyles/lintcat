@@ -63,8 +63,7 @@ export function createTerminalIO(options: TerminalIOOptions): TerminalIO {
       });
       runId = run.id;
       out(`\n${renderSpec(spec, route, run.id)}\n`);
-      let blocked = !route.ok;
-      if (!route.ok) out(`This spec cannot be approved: ${route.blocker}`);
+      let blocked = false;
       for (;;) {
         const choice = await choose(blocked);
         if (choice === "q") return { decision: "abort" };

@@ -7,9 +7,8 @@ import type { StructuredLogger } from "@pr-review/logging";
 import { contractHash, freezeContract, type ProfileName, type Spec, type TaskContract } from "#src/engine/contract";
 import { executeRun, type EngineDeps } from "#src/engine/engine";
 import { currentBranch, ensureFactoryExcluded, headSha, repoRoot } from "#src/engine/git";
-import { loadProfile, loadProfiles, workflowVersion } from "#src/engine/profiles";
+import { PROFILES, routeTask, workflowVersion, type Route } from "#src/engine/profiles";
 import { readTaskMarkdown } from "#src/engine/run-files";
-import { routeTask, type Route } from "#src/engine/router";
 import type { SandboxProvider } from "#src/engine/sandbox/index";
 import {
   appendEvent,
@@ -70,9 +69,8 @@ export function createFactoryService(options: FactoryServiceOptions) {
     async propose(input: ProposalInput): Promise<ProposalResult> {
       const repo = await repoRoot(input.repoPath);
       await ensureFactoryExcluded(repo);
-      const route = routeTask(input.spec, loadProfiles(), input.profileOverride);
-      const profileName = route.ok ? route.profile : (input.profileOverride ?? "quick");
-      const profile = loadProfile(profileName);
+      const route = routeTask(input.spec, input.profileOverride);
+      const profileName = route.profile;
       const id = input.runId ?? newRunId();
       const contract: TaskContract = {
         contractVersion: 1,
@@ -81,14 +79,14 @@ export function createFactoryService(options: FactoryServiceOptions) {
         baseSha: await headSha(repo),
         baseBranch: await currentBranch(repo),
         profile: profileName,
-        routing: route.ok ? { reason: route.reason, overridden: route.overridden } : { reason: route.blocker, overridden: false },
+        routing: { reason: route.reason, overridden: route.overridden },
         spec: input.spec,
         permittedOperations: {
           push: input.allowPullRequest === true,
           openPullRequest: input.allowPullRequest === true,
           networkDuringSetup: true,
         },
-        budgets: profile.budgets,
+        budgets: PROFILES[profileName].budgets,
         approval: { state: "pending" },
         implementationDecisions: [],
       };
@@ -105,12 +103,10 @@ export function createFactoryService(options: FactoryServiceOptions) {
     async approve(runId: string): Promise<FactoryRun> {
       const run = await getRun(database, runId);
       if (!run) throw new Error(`no run ${runId}`);
-      const route = routeTask(run.contract.spec, loadProfiles(), run.contract.profile);
-      if (!route.ok) throw new Error(`cannot approve: ${route.blocker}`);
       const frozen = freezeContract(run.contract, new Date());
       const ok = await approveRun(database, runId, frozen, {
         profile: frozen.profile,
-        workflowVersion: workflowVersion(loadProfile(frozen.profile)),
+        workflowVersion: workflowVersion(PROFILES[frozen.profile]),
         contractHash: contractHash(frozen),
         baseSha: frozen.baseSha,
       });

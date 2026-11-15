@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { assertFrozen, ContractTamperedError, freezeContract, recordDecision, type TaskContract } from "#src/engine/contract";
-import { loadProfiles } from "#src/engine/profiles";
 import { loadPrompt } from "#src/engine/prompts";
-import { routeTask } from "#src/engine/router";
+import { routeTask } from "#src/engine/profiles";
 import { sampleSpec } from "#src/engine/test-fixtures";
 
 const draft: TaskContract = {
@@ -42,32 +41,19 @@ describe("task contract", () => {
 });
 
 describe("routeTask", () => {
-  const profiles = loadProfiles();
-
   it("routes small low-risk work to quick", () => {
-    expect(routeTask(sampleSpec, profiles)).toMatchObject({ ok: true, profile: "quick", overridden: false });
+    expect(routeTask(sampleSpec)).toMatchObject({ profile: "quick", overridden: false });
   });
 
   it("routes defects, structural work and larger features to their own profiles", () => {
-    expect(routeTask({ ...sampleSpec, category: "bugfix" }, profiles)).toMatchObject({ ok: true, profile: "bugfix" });
-    expect(routeTask({ ...sampleSpec, category: "refactor" }, profiles)).toMatchObject({ ok: true, profile: "refactor" });
-    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, profiles)).toMatchObject({ ok: true, profile: "feature" });
-    expect(routeTask({ ...sampleSpec, touchesSecurityOrData: true }, profiles)).toMatchObject({ ok: true, profile: "feature" });
+    expect(routeTask({ ...sampleSpec, category: "bugfix" })).toMatchObject({ profile: "bugfix" });
+    expect(routeTask({ ...sampleSpec, category: "refactor" })).toMatchObject({ profile: "refactor" });
+    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 })).toMatchObject({ profile: "feature" });
+    expect(routeTask({ ...sampleSpec, touchesSecurityOrData: true })).toMatchObject({ profile: "feature" });
   });
 
-  it("blocks a profile that is disabled", () => {
-    const disabled = profiles.map((p) => (p.name === "feature" ? { ...p, enabled: false } : p));
-    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, disabled)).toMatchObject({ ok: false, blocker: expect.stringMatching(/feature/) });
-  });
-
-  it("allows a heavier override but never a lighter one for risky work", () => {
-    expect(routeTask(sampleSpec, profiles, "feature")).toMatchObject({ ok: true, profile: "feature", overridden: true });
-    expect(routeTask({ ...sampleSpec, category: "bugfix", risk: "high" }, profiles, "quick")).toMatchObject({ ok: false });
-  });
-
-  it("allows a lighter override only for low-risk work", () => {
-    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, profiles, "quick")).toMatchObject({ ok: true, profile: "quick", overridden: true });
-    expect(routeTask({ ...sampleSpec, touchesSecurityOrData: true }, profiles, "quick")).toMatchObject({ ok: false });
+  it("honours an override", () => {
+    expect(routeTask(sampleSpec, "feature")).toMatchObject({ profile: "feature", overridden: true });
   });
 });
 

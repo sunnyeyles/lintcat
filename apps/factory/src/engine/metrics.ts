@@ -105,7 +105,6 @@ export interface ProfileMetrics {
   repeatedFailureRate: number | null;
   repairSuccessRate: number | null;
   testRegressionRate: number | null;
-  escalationRate: number | null;
   agentRunsPerRun: number | null;
   cost: { estimatedUsd: number | null; perVerifiedSuccessUsd: number | null; runsWithoutCost: number };
   otherEventKinds: Record<string, number>;
@@ -132,7 +131,6 @@ const KNOWN_KINDS = new Set([
   "baseline_recorded",
   "bug_reproduced",
   "reproduce_rejected",
-  "profile_escalated",
   "review_finished",
   "review_repair_started",
 ]);
@@ -227,7 +225,6 @@ function computeProfileMetrics(history: RunHistory): ProfileMetrics[] {
         repeatedFailureRate: ratio(repeated.length, failingChecks.length),
         repairSuccessRate: ratio(repairedRuns.filter((r) => r.status === "delivered").length, repairedRuns.length),
         testRegressionRate: ratio(regressions.filter(Boolean).length, regressions.length),
-        escalationRate: ratio(runs.filter((r) => eventsOf(r).some((e) => e.kind === "profile_escalated")).length, runs.length),
         agentRunsPerRun: ratio(agentRuns.reduce((sum, n) => sum + n, 0), runs.length),
         cost: {
           estimatedUsd: totalCost,
