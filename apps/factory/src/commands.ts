@@ -24,7 +24,6 @@ import {
 } from "#src/config";
 import { createTerminalIO } from "#src/discovery-io";
 import { benchCompare, benchRun } from "#src/bench";
-import { serveMcp } from "#src/mcp";
 import { USAGE, type Command } from "#src/options";
 import {
   formatEvent,
@@ -135,7 +134,7 @@ async function explainUnclaimable(ctx: CommandContext, service: FactoryService, 
   const run = await service.get(runId);
   if (!run) ctx.err(`no run ${runId}`);
   else if (TERMINAL_STATUSES.includes(run.status)) ctx.err(`${runId} already finished as ${run.status}; see factory result ${runId}`);
-  else if (run.status === "draft" || run.status === "awaiting_approval") ctx.err(`${runId} is not approved yet`);
+  else if (run.status === "awaiting_approval") ctx.err(`${runId} is not approved yet`);
   else if (run.leaseExpiresAt && run.leaseExpiresAt > new Date()) {
     ctx.err(`${runId} is still running elsewhere (lease until ${run.leaseExpiresAt.toISOString()}); follow it with factory logs -f ${runId}`);
   } else ctx.err(`${runId} cannot be claimed right now (${run.status}); try again shortly`);
@@ -436,7 +435,5 @@ export function runCommand(ctx: CommandContext, command: Command): Promise<numbe
       return benchRun(ctx, command, { openDatabase, agentRuntime, requireDocker });
     case "bench-compare":
       return Promise.resolve(benchCompare(ctx, command));
-    case "mcp":
-      return serveMcp(ctx, { openDatabase, makeService, agentRuntime, logRepo });
   }
 }

@@ -15,7 +15,6 @@ export type Command =
   | { kind: "worker"; pollMs: number }
   | { kind: "status"; runId: string | undefined }
   | { kind: "logs"; runId: string; follow: boolean }
-  | { kind: "mcp" }
   | { kind: "report"; json: boolean; repoPath: string | undefined; sinceDays: number | undefined }
   | { kind: "prune"; days: number | undefined }
   | { kind: "bench-run"; configPath: string; fixtures: string[] | undefined; keep: boolean }
@@ -43,7 +42,6 @@ Commands:
   logs <id> [-f]                       A run's events; -f follows until it finishes
   cancel <id>                          Cancel a run
   result <id>                          Branch, PR, checks, usage and task.md
-  mcp                                  Serve the factory as MCP tools over stdio (apps/factory/docs/mcp.md)
   report [--json] [--repo <path>]      Per-profile metrics and the learning report
       [--since-days <n>]
   prune [--days <n>]                   Drop old runs' events and commands (FACTORY_RETENTION_DAYS)
@@ -196,10 +194,6 @@ export function parseArguments(argv: readonly string[]): Command {
       }
       throw new UsageError(`${command} needs run or compare`);
     }
-    case "mcp":
-      allow(parsed, []);
-      positionals(parsed, command, 0, "");
-      return { kind: "mcp" };
     case "logs": {
       allow(parsed, ["f", "follow"]);
       const [runId] = positionals(parsed, command, 1, "a run id");

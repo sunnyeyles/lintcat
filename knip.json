@@ -23,8 +23,7 @@
     },
     "apps/factory": {
       "entry": [
-        "src/index.ts",
-        "scripts/*.mjs"
+        "src/index.ts"
       ],
       "ignore": [
         "benchmarks/fixtures/**"

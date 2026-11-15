@@ -57,9 +57,6 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.3.322
         version: 0.3.322(@anthropic-ai/sdk@1.8.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.30.0
-        version: 1.30.0(zod@4.4.3)
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.1
