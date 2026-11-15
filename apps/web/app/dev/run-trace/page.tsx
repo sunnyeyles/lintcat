@@ -7,14 +7,14 @@ import { SparsePreview } from "@/app/dev/run-trace/sparse-preview";
 import { PageHeader } from "@/components/shell/page-header";
 import { liveRunsEnabled } from "@/lib/run-trace-page";
 
-export const metadata: Metadata = { title: "Run trace" };
+export const metadata: Metadata = { title: "Factory trace" };
 
 export default function RunTraceDevPage() {
   return (
     <main className="mx-auto w-full max-w-[110rem] px-4 py-8">
       <PageHeader
         eyebrow="Dev"
-        title="Run trace"
+        title="Factory trace"
         description="Drop any agent factory's run (Claude Code, OpenTelemetry GenAI, OpenAI Agents SDK, lintcat run format or factory) to see every agent it spawned: what each one did, which tools and commands it ran, and how its run ended."
       />
       <div className="mt-6 space-y-6">
