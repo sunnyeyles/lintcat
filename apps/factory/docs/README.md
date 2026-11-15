@@ -47,6 +47,23 @@ All four profiles run on the one engine; `workflows/*.yaml` lists each one's sta
 - **Review.** One read-only reviewer (`agents/reviewer.md`, fresh session, Read/Glob/Grep only) sees the spec, acceptance criteria and the committed diff against the base. Its JSON is validated: findings on files outside the diff, and over 20, are dropped, and unknown acceptance ids are stripped. The verdict is `changes` only if a blocking finding survives. Then the implementer session gets one targeted repair, the checks run once more, and any failure ends the run. There is never a second review, and recovery from a review checkpoint reuses the stored verdict. The result goes to `artifacts/review.json` and `task.md`.
 - **Escalation.** After verify, a `quick` or `bugfix` run whose committed diff touches more than max(3, 2 × `estimatedFiles`) files, or files under more than one package manifest, gains a review stage. A `profile_escalated` event and a decision record it; the escalation lives in checkpoint data, so the frozen contract hash still verifies. Past max(10, 5 × `estimatedFiles`) files, or with under 25% of the wall-clock budget left, the run stops with a blocker instead.
 
+## Cast
+
+One character per job, drawn by `scripts/characters.mjs` into `assets/characters/`. Regenerate with `node apps/factory/scripts/characters.mjs`; the output is byte-identical on every run.
+
+![The factory cast](../assets/characters/cast.png)
+
+| Character | Job | Carries |
+| --- | --- | --- |
+| `discovery.png` | discovery agent: outcome to spec | clipboard, pencil |
+| `locate.png` | locate | radar dish, flashlight, map pin |
+| `architect.png` | architecture brief | blueprint, compass |
+| `reproduce.png` | reproduce | bug net, bug in a jar |
+| `implementer.png` | implement | wrench, welding torch |
+| `verify.png` | verify and baseline | checklist, stamp |
+| `reviewer.png` | independent review | monocle, red pen |
+| `deliver.png` | deliver | forklift, crate |
+
 ## Auth
 
 The agent runs the official Claude Code binary through the Agent SDK. The factory never reads or proxies credentials.
