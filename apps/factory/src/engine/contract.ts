@@ -31,12 +31,13 @@ export const specSchema = z.object({
 });
 export type Spec = z.infer<typeof specSchema>;
 
-export const budgetsSchema = z.object({
+const budgetsSchema = z.object({
   maxAgentTurns: z.number().int().positive(),
   maxRepairPasses: z.number().int().min(0).max(3),
   wallClockMinutes: z.number().int().positive(),
   commandTimeoutSeconds: z.number().int().positive(),
 });
+export type Budgets = z.infer<typeof budgetsSchema>;
 
 const permittedOperationsSchema = z.object({
   push: z.boolean(),
@@ -91,16 +92,9 @@ export function freezeContract(contract: TaskContract, now: Date): TaskContract 
   return { ...parsed, approval: { state: "approved", approvedAt: now.toISOString(), hash: contractHash(parsed) } };
 }
 
-export class ContractTamperedError extends Error {
-  constructor(taskId: string) {
-    super(`task ${taskId}: the approved contract changed after approval`);
-    this.name = "ContractTamperedError";
-  }
-}
-
 export function assertFrozen(contract: TaskContract): void {
   if (contract.approval.state !== "approved" || contract.approval.hash !== contractHash(contract)) {
-    throw new ContractTamperedError(contract.taskId);
+    throw new Error(`task ${contract.taskId}: the approved contract changed after approval`);
   }
 }
 

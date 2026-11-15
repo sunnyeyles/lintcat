@@ -8,7 +8,6 @@ import { z } from "zod";
 
 import { detectChecks, type CheckPlan } from "#src/engine/checks";
 import { assertFrozen, recordDecision } from "#src/engine/contract";
-import { assessEscalation } from "#src/engine/escalation";
 import {
   changedFiles,
   checkpointCommit,
@@ -23,12 +22,12 @@ import {
   squashSince,
 } from "#src/engine/git";
 import { locate } from "#src/engine/locate";
-import { loadProfile, workflowVersion, type Profile, type Stage } from "#src/engine/profiles";
+import { PROFILES, workflowVersion, type Stage } from "#src/engine/profiles";
 import { loadPrompt } from "#src/engine/prompts";
-import { analyseRepository, isTestPath, renderArchitecture, type ArchitectureBrief } from "#src/engine/repository";
+import { isTestPath } from "#src/engine/repository";
 import { renderReview, reviewOutputSchema, reviewPrompt, reviewRepairPrompt, validateReview, type ValidatedReview } from "#src/engine/review";
 import { writeArtifact, writeRunFiles, type TaskView } from "#src/engine/run-files";
-import { DEFAULT_LIMITS, SANDBOX_IMAGE, type ExecResult, type Sandbox, type SandboxProvider } from "#src/engine/sandbox/index";
+import { DEFAULT_LIMITS, SANDBOX_IMAGE, type ExecResult, type Sandbox, type SandboxProvider } from "#src/engine/sandbox/sandbox";
 import { implementPrompt, repairPrompt, reproducePrompt } from "#src/engine/stage-prompts";
 import {
   findEffect,
@@ -45,8 +44,6 @@ import {
 import { createRecorder } from "#src/engine/telemetry";
 
 const MAX_RECOVERIES = 3;
-/** Escalating to a review needs at least this share of the wall-clock budget left. */
-const ESCALATION_BUDGET_SHARE = 0.25;
 
 interface PullRequestRequest {
   repoPath: string;
@@ -66,7 +63,6 @@ export interface EngineDeps {
   heartbeatMs?: number;
   /** Finds an open PR for the branch first, so a retry never opens a second. */
   openPullRequest?: (request: PullRequestRequest) => Promise<{ url: string }>;
-  sandboxImage?: string;
 }
 
 const implementerOutputSchema = z.object({
@@ -111,12 +107,10 @@ type CheckRecord = { name: string; command: string; exitCode: number; passed: bo
 /** Everything a stage hands on, persisted in the checkpoint so recovery never redoes it. */
 interface RunData {
   locate?: unknown;
-  architecture?: ArchitectureBrief;
   repairs?: number;
   summary?: string;
   baseline?: CheckRecord[];
   reproduce?: { status: "reproduced"; testFiles: string[]; failing: CheckRecord[] } | { status: "not_reproducible"; reason: string };
-  escalation?: { reason: string };
   review?: ValidatedReview;
   reviewRepair?: { sha: string };
   turnsUsed?: number;
@@ -131,21 +125,13 @@ function errorCategory(result: ExecResult): string | null {
   return result.exitCode === 0 ? null : "nonzero_exit";
 }
 
-/** The profile's stages, plus a review before delivery once a run has escalated. */
-function stagesOf(profile: Profile, data: RunData): Stage[] {
-  if (!data.escalation || profile.stages.includes("review")) return profile.stages;
-  const at = profile.stages.indexOf("deliver");
-  return [...profile.stages.slice(0, at), "review", ...profile.stages.slice(at)];
-}
-
 /** Runs one claimed run to a terminal state; never throws for run-level failures. */
 export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise<FactoryRun["status"]> {
   const { database, logger } = deps;
   const leaseMs = deps.leaseMs ?? 60_000;
   const heartbeatMs = deps.heartbeatMs ?? 5_000;
-  const startedAt = Date.now();
   let contract = claimed.contract;
-  const profile = loadProfile(contract.profile);
+  const profile = PROFILES[contract.profile];
   const recorder = createRecorder(
     database,
     { runId: claimed.id, taskId: contract.taskId, repoPath: claimed.repoPath, workflowVersion: workflowVersion(profile) },
@@ -193,7 +179,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       runId: claimed.id,
       status,
       stage: currentStage,
-      profile: data.escalation ? `${profile.name} (escalated: + review)` : profile.name,
+      profile: profile.name,
       contract,
       progress,
       verification,
@@ -203,11 +189,10 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       usage: summariseUsage(usage),
       sections: evidenceSections(data, verification),
     };
-    const { conflict } = await writeRunFiles(repo, claimed.id, {
+    await writeRunFiles(repo, claimed.id, {
       view,
       state: { runId: claimed.id, status, stage: currentStage, branch, worktree, checkpoint, sessionId },
     });
-    if (conflict) await recorder.event({ kind: "task_md_conflict", data: { preservedAs: "task.user-edit.md" } });
   };
 
   const save = async (stage: Stage, nextStage: Stage, sha?: string) => {
@@ -333,7 +318,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
 
   try {
     assertFrozen(contract);
-    if (!profile.enabled) throw new RunStopped("failed", `profile ${profile.name} is not enabled`);
 
     const recovering = checkpoint !== null || claimed.attempts > 1;
     if (recovering) {
@@ -347,7 +331,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     if (plan.checks.length === 0) {
       throw new RunStopped("failed", "no checks detected: add .factory/checks so the change can be verified");
     }
-    let stages = stagesOf(profile, data);
+    const { stages } = profile;
     const startIndex = checkpoint ? stages.indexOf(checkpoint.nextStage as Stage) : 0;
     if (startIndex < 0) throw new RunStopped("failed", `checkpoint names unknown stage ${checkpoint?.nextStage}`);
     for (const stage of stages.slice(0, startIndex)) mark(stage, "done", "before recovery");
@@ -363,7 +347,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
         await resetTo(worktree, target);
         await recorder.event({ kind: "worktree_reconciled", stage: "prepare", repositorySha: target });
       }
-      sandbox = await deps.sandboxes.create({ runId: claimed.id, worktreePath: worktree, image: deps.sandboxImage ?? SANDBOX_IMAGE, limits: DEFAULT_LIMITS });
+      sandbox = await deps.sandboxes.create({ runId: claimed.id, worktreePath: worktree, image: SANDBOX_IMAGE, limits: DEFAULT_LIMITS });
       if (plan.install) {
         const startedAt = new Date();
         const result = await sandbox.setup({ command: plan.install, timeoutMs: contract.budgets.commandTimeoutSeconds * 1000 });
@@ -377,7 +361,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
         deviations.push(`left out of the delivery, written by dependency install: ${setupPaths.join(", ")}`);
         await recorder.event({ kind: "setup_paths_excluded", stage: "prepare", data: { paths: setupPaths } });
       }
-      await recorder.event({ kind: "sandbox_ready", stage: "prepare", data: { sandbox: deps.sandboxes.name, image: deps.sandboxImage ?? SANDBOX_IMAGE, limits: DEFAULT_LIMITS, network: "none" } });
+      await recorder.event({ kind: "sandbox_ready", stage: "prepare", data: { sandbox: deps.sandboxes.name, image: SANDBOX_IMAGE, limits: DEFAULT_LIMITS, network: "none" } });
       mark("prepare", "done");
     });
     await sync();
@@ -400,11 +384,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
           const located = await locate(worktree, contract.spec);
           data.locate = located;
           await writeArtifact(repo, claimed.id, "locate.json", JSON.stringify(located, null, 2));
-          if (needsPlacement) {
-            data.architecture = await analyseRepository(worktree, located);
-            await writeArtifact(repo, claimed.id, "architecture.md", renderArchitecture(data.architecture));
-            await writeArtifact(repo, claimed.id, "architecture.json", JSON.stringify(data.architecture, null, 2));
-          }
           await save(stage, stages[i + 1]!);
           return;
         }
@@ -431,7 +410,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
             contract,
             {
               located: data.locate ?? null,
-              architecture: data.architecture,
               regression: reproduced ? { testFiles: reproduced.testFiles, failing: reproduced.failing.map((f) => f.name) } : undefined,
               baselineFailing: data.baseline?.filter((b) => !b.passed).map((b) => b.name),
               placement: needsPlacement,
@@ -459,7 +437,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
                 : "implementer's final answer did not match its schema",
             );
           }
-          const sha = await checkpointCommit(worktree, `factory: implement ${contract.spec.title}`, undefined, setupPaths);
+          const sha = await checkpointCommit(worktree, `factory: implement ${contract.spec.title}`, setupPaths);
           if (!sha) throw new RunStopped("failed", "the implementer made no changes");
           const missing = (reproduced?.testFiles ?? []).filter((f) => !existsSync(path.join(worktree, f)));
           if (missing.length) throw new RunStopped("failed", `the fix deleted the regression test: ${missing.join(", ")}`);
@@ -499,12 +477,10 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
             });
             throwIfStopped();
             if (!result.ok) throw new RunStopped("failed", `repair agent ended with ${result.reason}`);
-            const sha = await checkpointCommit(worktree, `factory: repair pass ${data.repairs}`, undefined, setupPaths);
+            const sha = await checkpointCommit(worktree, `factory: repair pass ${data.repairs}`, setupPaths);
             if (!sha) throw new RunStopped("failed", `repair pass ${data.repairs} changed nothing`);
             await save(stage, "verify", sha);
           }
-          if (!profile.independentReview && !data.escalation) await maybeEscalate(stage);
-          stages = stagesOf(profile, data);
           await save(stage, stages[i + 1]!);
           return;
         }
@@ -587,27 +563,12 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     if (failing.length === 0) {
       throw new RunStopped("failed", `the regression test (${touched.join(", ")}) passes before any fix, so it does not reproduce the bug`);
     }
-    const sha = await checkpointCommit(worktree, `factory: reproduce ${contract.spec.title}`, undefined, setupPaths);
+    const sha = await checkpointCommit(worktree, `factory: reproduce ${contract.spec.title}`, setupPaths);
     if (!sha) throw new RunStopped("failed", "the regression test could not be committed");
     data.reproduce = { status: "reproduced", testFiles: touched, failing: failing.map(record) };
     await recorder.event({ kind: "bug_reproduced", stage, data: { testFiles: touched, failing: data.reproduce.failing } });
     await writeArtifact(repo, claimed.id, "reproduce.json", JSON.stringify(data.reproduce, null, 2));
     await save(stage, nextStage, sha);
-  }
-
-  /** Adds the review stage when a light run outgrew its estimate; stops when it outgrew its approval. */
-  async function maybeEscalate(stage: Stage) {
-    const { files } = await committedDiff(worktree, contract.baseSha, setupPaths);
-    const assessed = assessEscalation(worktree, files, contract.spec.estimatedFiles);
-    if (assessed.kind === "none") return;
-    if (assessed.kind === "blocked") throw new RunStopped("failed", `escalation exceeds the approved scope: ${assessed.reason}`);
-    const remainingMs = contract.budgets.wallClockMinutes * 60_000 - (Date.now() - startedAt);
-    if (remainingMs < contract.budgets.wallClockMinutes * 60_000 * ESCALATION_BUDGET_SHARE) {
-      throw new RunStopped("failed", `the run needs an independent review (${assessed.reason}) but too little of the wall-clock budget is left`);
-    }
-    data.escalation = { reason: assessed.reason };
-    decide(stage, `escalated ${profile.name} to add an independent review: ${assessed.reason}`);
-    await recorder.event({ kind: "profile_escalated", stage, data: { from: profile.name, added: ["review"], reason: assessed.reason, files: files.length } });
   }
 
   /** One review of the immutable diff; at most one repair pass and one recheck. */
@@ -631,7 +592,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       const { result } = await runAgent(stage, reviewRepairPrompt(blocking), { role: "implementer", resume: true, schema: implementerOutputSchema });
       throwIfStopped();
       if (!result.ok) throw new RunStopped("failed", `review repair ended with ${result.reason}`);
-      const sha = await checkpointCommit(worktree, "factory: review repair", undefined, setupPaths);
+      const sha = await checkpointCommit(worktree, "factory: review repair", setupPaths);
       if (!sha) throw new RunStopped("failed", `the review's blocking findings were not addressed: ${blocking.map((f) => `${f.file}: ${f.problem}`).join("; ")}`);
       data.reviewRepair = { sha };
       await save(stage, "review", sha);
@@ -681,22 +642,10 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
   }
 }
 
-/** The profile-specific evidence task.md shows: brief, baseline, reproduction, escalation, review. */
+/** The profile-specific evidence task.md shows: baseline, reproduction, review. */
 function evidenceSections(data: RunData, verification: TaskView["verification"]): NonNullable<TaskView["sections"]> {
   const sections: NonNullable<TaskView["sections"]> = [];
   const passedNow = (name: string) => verification.find((v) => v.name === name)?.passed;
-  if (data.architecture) {
-    const brief = data.architecture;
-    sections.push({
-      heading: "Repository intelligence",
-      lines: [
-        `- Placement: ${brief.placement}`,
-        ...brief.candidates.slice(0, 5).map((c) => `- Candidate: \`${c.path}\` (${c.importers} importer(s)${c.test ? `, tested by \`${c.test}\`` : ""})`),
-        ...brief.risks.map((r) => `- Risk: ${r}`),
-        "- Full brief: `artifacts/architecture.md`",
-      ],
-    });
-  }
   if (data.baseline) {
     sections.push({
       heading: "Baseline",
@@ -720,7 +669,6 @@ function evidenceSections(data: RunData, verification: TaskView["verification"])
           : [`- Not reproduced by a test: ${r.reason}`],
     });
   }
-  if (data.escalation) sections.push({ heading: "Escalation", lines: [`- Added an independent review: ${data.escalation.reason}`] });
   if (data.review) {
     sections.push({
       heading: "Independent review",

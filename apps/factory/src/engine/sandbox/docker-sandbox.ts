@@ -28,7 +28,6 @@ interface RunResult {
 export type CommandRunner = (command: string, args: string[], options?: RunOptions) => Promise<RunResult>;
 
 export interface DockerProviderOptions {
-  docker?: string;
   secrets?: string[];
   runner?: CommandRunner;
 }
@@ -116,7 +115,7 @@ function hostUser(): string {
 }
 
 export function createDockerProvider(options: DockerProviderOptions = {}): SandboxProvider {
-  const docker = options.docker ?? "docker";
+  const docker = "docker";
   const secrets = options.secrets ?? [];
   const run = options.runner ?? runCommand;
 

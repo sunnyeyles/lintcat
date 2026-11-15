@@ -1,7 +1,4 @@
 /** The Claude Agent SDK behind the AgentRuntime contract. */
-import { accessSync, constants } from "node:fs";
-import path from "node:path";
-
 import {
   createSdkMcpServer,
   query,
@@ -32,9 +29,8 @@ const NEVER_PASSED = ["DATABASE_URL", "FACTORY_DATABASE_URL", "GITHUB_TOKEN", "G
 
 export interface ClaudeRuntimeOptions {
   auth: AuthMode;
-  /** The installed `claude` binary; found on PATH when omitted. */
-  executable?: string;
-  env?: NodeJS.ProcessEnv;
+  /** The installed `claude` binary. */
+  executable: string;
 }
 
 export function agentEnvironment(auth: AuthMode, source: NodeJS.ProcessEnv): Record<string, string> {
@@ -68,20 +64,6 @@ export function authMismatch(
     return "no Claude subscription login found: run `claude` and /login, or set CLAUDE_CODE_OAUTH_TOKEN";
   }
   return null;
-}
-
-function findOnPath(binary: string, pathVariable = process.env.PATH ?? ""): string | undefined {
-  for (const dir of pathVariable.split(path.delimiter)) {
-    if (!dir) continue;
-    const candidate = path.join(dir, binary);
-    try {
-      accessSync(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      continue;
-    }
-  }
-  return undefined;
 }
 
 function usageOf(message: Extract<SDKMessage, { type: "result" }>): AgentUsage {
@@ -154,8 +136,7 @@ function guardHook(root: string): HookCallback {
 }
 
 export function createClaudeRuntime(options: ClaudeRuntimeOptions): AgentRuntime {
-  const source = options.env ?? process.env;
-  const executable = options.executable ?? findOnPath("claude", source.PATH);
+  const { executable } = options;
 
   return {
     name: "claude-agent-sdk",
@@ -169,7 +150,7 @@ export function createClaudeRuntime(options: ClaudeRuntimeOptions): AgentRuntime
       const sdkOptions: Options = {
         abortController,
         cwd: spec.cwd,
-        env: agentEnvironment(options.auth, source),
+        env: agentEnvironment(options.auth, process.env),
         // The target repo's own hooks and MCP servers would run on the host, outside the sandbox.
         settingSources: [],
         strictMcpConfig: true,
@@ -189,7 +170,7 @@ export function createClaudeRuntime(options: ClaudeRuntimeOptions): AgentRuntime
         hooks: { PreToolUse: [{ hooks: [guardHook(spec.cwd)] }] },
         systemPrompt: spec.systemPrompt,
         maxTurns: spec.maxTurns,
-        ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
+        pathToClaudeCodeExecutable: executable,
         ...(spec.model ? { model: spec.model } : {}),
         ...(spec.resumeSessionId ? { resume: spec.resumeSessionId } : {}),
         ...(spec.outputSchema ? { outputFormat: { type: "json_schema", schema: withoutDialect(spec.outputSchema) } } : {}),

@@ -1,14 +1,9 @@
 /** The conversational entry point: questions one at a time, then one spec for one approval. */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { collectRun, type AgentRuntime, type AgentUsage } from "#src/agent/runtime";
 import { z } from "zod";
 
-import { specSchema, type ProfileName, type Spec } from "#src/engine/contract";
+import { specSchema, type Spec } from "#src/engine/contract";
 import { loadPrompt } from "#src/engine/prompts";
-import { runDir } from "#src/engine/run-files";
-import type { FactoryService, ProposalResult } from "#src/engine/service";
 
 // Flat rather than a union: structured output schemas handle one object shape most reliably.
 const turnSchema = z.object({
@@ -27,7 +22,7 @@ export type ReviewDecision = { decision: "approve" } | { decision: "revise"; fee
 
 export interface DiscoveryIO {
   ask(turn: Extract<DiscoveryTurn, { kind: "question" }>): Promise<string>;
-  review(spec: Spec): Promise<ReviewDecision>;
+  review(spec: Spec, promptVersion: string): Promise<ReviewDecision>;
   progress?(message: string): void;
 }
 
@@ -164,121 +159,11 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       continue;
     }
 
-    const decision = await io.review(turn.spec);
+    const decision = await io.review(turn.spec, step.promptVersion);
     if (decision.decision === "approve") {
       return { status: "approved", spec: turn.spec, promptVersion: step.promptVersion, usage };
     }
     if (decision.decision === "abort" || ++revisions > maxRevisions) return { status: "aborted", usage };
     message = discoveryMessages.revise(decision.feedback);
   }
-}
-
-/** Discovery spread over separate calls (MCP), kept in `.factory/runs/<id>/discovery.json`. */
-export interface DiscoverySession extends DiscoveryState {
-  runId: string;
-  repoPath: string;
-  outcome: string;
-  revisions: number;
-  pending: "outcome" | "question" | "proposal";
-  question?: Extract<DiscoveryTurn, { kind: "question" }>;
-  profileOverride?: ProfileName;
-  allowPullRequest?: boolean;
-}
-
-const sessionFile = (repoPath: string, runId: string) => join(runDir(repoPath, runId), "discovery.json");
-
-async function saveDiscoverySession(session: DiscoverySession): Promise<void> {
-  await mkdir(runDir(session.repoPath, session.runId), { recursive: true });
-  await writeFile(sessionFile(session.repoPath, session.runId), `${JSON.stringify(session, null, 2)}\n`);
-}
-
-export async function loadDiscoverySession(repoPath: string, runId: string): Promise<DiscoverySession | null> {
-  try {
-    return JSON.parse(await readFile(sessionFile(repoPath, runId), "utf8")) as DiscoverySession;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
-}
-
-export type DiscoveryReply =
-  | { kind: "question"; runId: string; question: Extract<DiscoveryTurn, { kind: "question" }>; questionsAsked: number }
-  | ({ kind: "proposal"; runId: string; spec: Spec } & ProposalResult);
-
-export interface TurnOptions {
-  service: Pick<FactoryService, "draft" | "propose" | "get">;
-  runtime: AgentRuntime;
-  maxQuestions?: number;
-  maxRevisions?: number;
-  signal?: AbortSignal;
-}
-
-async function advance(options: TurnOptions, session: DiscoverySession, message: string): Promise<DiscoveryReply> {
-  const step = await discoveryStep({
-    runtime: options.runtime,
-    repoPath: session.repoPath,
-    message,
-    state: session,
-    ...(options.maxQuestions === undefined ? {} : { maxQuestions: options.maxQuestions }),
-    ...(options.signal ? { signal: options.signal } : {}),
-  });
-  const next: DiscoverySession = { ...session, ...step.state };
-  if (step.turn.kind === "question") {
-    await saveDiscoverySession({ ...next, pending: "question", question: step.turn });
-    return { kind: "question", runId: session.runId, question: step.turn, questionsAsked: next.questions };
-  }
-  const proposal = await options.service.propose({
-    repoPath: session.repoPath,
-    spec: step.turn.spec,
-    promptVersion: step.promptVersion,
-    runId: session.runId,
-    ...(session.profileOverride ? { profileOverride: session.profileOverride } : {}),
-    ...(session.allowPullRequest ? { allowPullRequest: true } : {}),
-  });
-  const { question: _answered, ...rest } = next;
-  await saveDiscoverySession({ ...rest, pending: "proposal" });
-  return { kind: "proposal", runId: session.runId, spec: step.turn.spec, ...proposal };
-}
-
-/** Records a draft run and runs the first discovery turn. */
-export async function startDiscovery(
-  options: TurnOptions & { repoPath: string; outcome: string; profileOverride?: ProfileName; allowPullRequest?: boolean },
-): Promise<DiscoveryReply> {
-  const run = await options.service.draft({ repoPath: options.repoPath, outcome: options.outcome });
-  const session: DiscoverySession = {
-    runId: run.id,
-    repoPath: run.repoPath,
-    outcome: options.outcome,
-    questions: 0,
-    revisions: 0,
-    pending: "outcome",
-    ...(options.profileOverride ? { profileOverride: options.profileOverride } : {}),
-    ...(options.allowPullRequest ? { allowPullRequest: true } : {}),
-  };
-  await saveDiscoverySession(session);
-  try {
-    return await advance(options, session, discoveryMessages.outcome(options.outcome));
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`${reason} (run ${run.id} is kept as a draft: retry with factory_answer, or cancel it)`, { cause: error });
-  }
-}
-
-/** Answers the pending question, or revises the pending proposal with feedback. */
-export async function continueDiscovery(options: TurnOptions & { runId: string; answer: string }): Promise<DiscoveryReply> {
-  const run = await options.service.get(options.runId);
-  if (!run) throw new Error(`no run ${options.runId}`);
-  if (run.status !== "draft" && run.status !== "awaiting_approval") {
-    throw new Error(`run ${run.id} is ${run.status}; its discovery is over`);
-  }
-  const session = await loadDiscoverySession(run.repoPath, run.id);
-  if (!session) throw new Error(`run ${run.id} was not started by discovery; propose a revised spec with factory_start instead`);
-  const answer = options.answer.trim() || "(no answer: use your best judgement and record it as an assumption)";
-  if (session.pending === "outcome") {
-    return advance(options, session, `${discoveryMessages.outcome(session.outcome)}\n\nMore context: ${answer}`);
-  }
-  if (session.pending === "question") return advance(options, session, discoveryMessages.answer(answer));
-  const maxRevisions = options.maxRevisions ?? 3;
-  if (session.revisions >= maxRevisions) throw new Error(`run ${run.id} hit its ${maxRevisions}-revision limit: approve or cancel it`);
-  return advance(options, { ...session, revisions: session.revisions + 1 }, discoveryMessages.revise(answer));
 }

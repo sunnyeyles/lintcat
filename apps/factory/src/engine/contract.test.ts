@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { assertFrozen, ContractTamperedError, freezeContract, recordDecision, type TaskContract } from "#src/engine/contract";
-import { loadProfiles } from "#src/engine/profiles";
+import { assertFrozen, freezeContract, recordDecision, type TaskContract } from "#src/engine/contract";
 import { loadPrompt } from "#src/engine/prompts";
-import { routeTask } from "#src/engine/router";
+import { routeTask } from "#src/engine/profiles";
 import { sampleSpec } from "#src/engine/test-fixtures";
 
 const draft: TaskContract = {
@@ -27,7 +26,7 @@ describe("task contract", () => {
     expect(() => assertFrozen(frozen)).not.toThrow();
     expect(() => freezeContract(frozen, new Date())).toThrow(/already approved/);
     const edited = { ...frozen, spec: { ...frozen.spec, acceptanceCriteria: [] } };
-    expect(() => assertFrozen(edited)).toThrow(ContractTamperedError);
+    expect(() => assertFrozen(edited)).toThrow(/changed after approval/);
   });
 
   it("lets implementation decisions be appended without breaking the freeze", () => {
@@ -37,43 +36,30 @@ describe("task contract", () => {
   });
 
   it("refuses to approve an unrouted pending contract", () => {
-    expect(() => assertFrozen(draft)).toThrow(ContractTamperedError);
+    expect(() => assertFrozen(draft)).toThrow(/changed after approval/);
   });
 });
 
 describe("routeTask", () => {
-  const profiles = loadProfiles();
-
   it("routes small low-risk work to quick", () => {
-    expect(routeTask(sampleSpec, profiles)).toMatchObject({ ok: true, profile: "quick", overridden: false });
+    expect(routeTask(sampleSpec)).toMatchObject({ profile: "quick", overridden: false });
   });
 
   it("routes defects, structural work and larger features to their own profiles", () => {
-    expect(routeTask({ ...sampleSpec, category: "bugfix" }, profiles)).toMatchObject({ ok: true, profile: "bugfix" });
-    expect(routeTask({ ...sampleSpec, category: "refactor" }, profiles)).toMatchObject({ ok: true, profile: "refactor" });
-    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, profiles)).toMatchObject({ ok: true, profile: "feature" });
-    expect(routeTask({ ...sampleSpec, touchesSecurityOrData: true }, profiles)).toMatchObject({ ok: true, profile: "feature" });
+    expect(routeTask({ ...sampleSpec, category: "bugfix" })).toMatchObject({ profile: "bugfix" });
+    expect(routeTask({ ...sampleSpec, category: "refactor" })).toMatchObject({ profile: "refactor" });
+    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 })).toMatchObject({ profile: "feature" });
+    expect(routeTask({ ...sampleSpec, touchesSecurityOrData: true })).toMatchObject({ profile: "feature" });
   });
 
-  it("blocks a profile that is disabled", () => {
-    const disabled = profiles.map((p) => (p.name === "feature" ? { ...p, enabled: false } : p));
-    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, disabled)).toMatchObject({ ok: false, blocker: expect.stringMatching(/feature/) });
-  });
-
-  it("allows a heavier override but never a lighter one for risky work", () => {
-    expect(routeTask(sampleSpec, profiles, "feature")).toMatchObject({ ok: true, profile: "feature", overridden: true });
-    expect(routeTask({ ...sampleSpec, category: "bugfix", risk: "high" }, profiles, "quick")).toMatchObject({ ok: false });
-  });
-
-  it("allows a lighter override only for low-risk work", () => {
-    expect(routeTask({ ...sampleSpec, estimatedFiles: 12 }, profiles, "quick")).toMatchObject({ ok: true, profile: "quick", overridden: true });
-    expect(routeTask({ ...sampleSpec, touchesSecurityOrData: true }, profiles, "quick")).toMatchObject({ ok: false });
+  it("honours an override", () => {
+    expect(routeTask(sampleSpec, "feature")).toMatchObject({ profile: "feature", overridden: true });
   });
 });
 
 describe("loadPrompt", () => {
   it("versions each prompt by role, number and content", () => {
-    expect(loadPrompt("implementer").version).toMatch(/^implementer@2\+[0-9a-f]{8}$/);
+    expect(loadPrompt("implementer").version).toMatch(/^implementer@3\+[0-9a-f]{8}$/);
     expect(loadPrompt("reviewer").version).toMatch(/^reviewer@1\+[0-9a-f]{8}$/);
     expect(loadPrompt("discovery").text).toContain("one consolidated");
   });

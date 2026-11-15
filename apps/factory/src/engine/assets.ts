@@ -1,4 +1,4 @@
-/** Finds the package's Markdown, YAML and migrations both from source and from a bundled app. */
+/** Finds the package's prompts, sandbox and migrations both from source and from a bundled app. */
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +12,7 @@ function factoryPackageDir(): string {
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (;;) {
     for (const candidate of [dir, path.join(dir, "apps", "factory")]) {
-      if (existsSync(path.join(candidate, "agents")) && existsSync(path.join(candidate, "workflows"))) {
+      if (existsSync(path.join(candidate, "agents")) && existsSync(path.join(candidate, "drizzle"))) {
         return (cached = candidate);
       }
     }

@@ -8,7 +8,7 @@ import { createSilentLogger } from "@pr-review/logging";
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { assertFrozen, type Spec } from "#src/engine/contract";
+import type { Spec } from "#src/engine/contract";
 import { createWorktree, headSha } from "#src/engine/git";
 import { createFakeSandboxProvider, type FakeHandler } from "#src/engine/sandbox/fake-sandbox";
 import { createFactoryService } from "#src/engine/service";
@@ -187,7 +187,7 @@ describe("workflow profiles", () => {
     });
 
     it("records a check failing at baseline without blaming the run, then reviews once", async () => {
-      const { service, runId, runtime, artifact, taskMd } = await start(
+      const { service, runId, runtime, taskMd } = await start(
         refactorSpec,
         [
           writes({ "src/greet.js": "const message = 'hi';\nexport const greet = () => message;\n" }, placed),
@@ -201,8 +201,6 @@ describe("workflow profiles", () => {
       expect(taskMd()).toMatch(/legacy: FAIL \(pre-existing, not blamed on this run\)/);
       expect(taskMd()).toMatch(/legacy fails at the base commit too/);
       expect(taskMd()).toMatch(/placement: src\/greet\.js \(greet already owns the greeting\)/);
-      expect(artifact("artifacts/architecture.md")).toMatch(/Recommended placement/);
-      expect(runtime.specs[0]?.prompt).toMatch(/Architecture brief/);
       expect(runtime.specs[0]?.prompt).toMatch(/already fail at the base commit .*legacy/);
       expect((await listCommands(database, runId)).map((c) => c.stage)).toEqual(["baseline", "baseline", "verify", "verify"]);
     });
@@ -317,41 +315,4 @@ describe("workflow profiles", () => {
     });
   });
 
-  describe("quick escalation", () => {
-    const quickSpec: Spec = { ...baseSpec, title: "Say hello", category: "quick" };
-    const many = (count: number) =>
-      Object.fromEntries([["src/greet.js", "export const greet = () => 'hello';\n"], ...Array.from({ length: count - 1 }, (_, i) => [`src/extra${i}.js`, `export const x${i} = ${i};\n`])]);
-
-    it("adds one review when the diff outgrows the estimate, without touching the frozen contract", async () => {
-      const { service, runId, runtime, profile, taskMd } = await start(quickSpec, [
-        writes(many(4), done),
-        answers({ verdict: "approve", summary: "fine", findings: [] }),
-      ]);
-      expect(profile).toBe("quick");
-      expect((await service.runNext({ runId }))?.status).toBe("delivered");
-      expect(runtime.specs.map((s) => s.role)).toEqual(["implementer", "reviewer"]);
-      const events = await listEvents(database, runId);
-      expect(events.find((e) => e.kind === "profile_escalated")?.data).toMatchObject({ from: "quick", added: ["review"] });
-      const run = (await service.get(runId))!;
-      expect(() => assertFrozen(run.contract)).not.toThrow();
-      expect(run.contract.profile).toBe("quick");
-      expect(run.contract.implementationDecisions.map((d) => d.decision)).toEqual([expect.stringMatching(/^escalated quick to add an independent review: 4 files/)]);
-      expect(taskMd()).toMatch(/## Escalation/);
-      expect(taskMd()).toMatch(/\[x\] review/);
-    });
-
-    it("stops with a blocker when the diff far exceeds the approved scope", async () => {
-      const { service, runId, runtime } = await start(quickSpec, [writes(many(11), done)]);
-      expect((await service.runNext({ runId }))?.status).toBe("failed");
-      expect((await service.get(runId))!.blocker).toMatch(/escalation exceeds the approved scope: the change touches 11 files/);
-      expect(runtime.specs).toHaveLength(1);
-    });
-
-    it("leaves a contained quick run alone", async () => {
-      const { service, runId, runtime } = await start(quickSpec, [writes(many(1), done)]);
-      expect((await service.runNext({ runId }))?.status).toBe("delivered");
-      expect(runtime.specs).toHaveLength(1);
-      expect(await eventKinds(runId)).not.toContain("profile_escalated");
-    });
-  });
 });

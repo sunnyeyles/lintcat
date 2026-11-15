@@ -1,7 +1,6 @@
 /** The prompts the engine hands the implementer at each stage. */
 import type { CheckPlan } from "#src/engine/checks";
 import type { TaskContract } from "#src/engine/contract";
-import { renderArchitecture, type ArchitectureBrief } from "#src/engine/repository";
 
 const tail = (text: string, chars: number) => (text.length > chars ? `…${text.slice(-chars)}` : text);
 
@@ -36,11 +35,7 @@ function specBlock(contract: TaskContract): string[] {
   ];
 }
 
-function contextBlock(located: unknown, architecture: ArchitectureBrief | undefined): string[] {
-  const lines = ["## Where to look first", "```json", JSON.stringify(located, null, 2), "```"];
-  if (architecture) lines.push("## Architecture brief (repository intelligence)", renderArchitecture(architecture));
-  return lines;
-}
+const contextBlock = (located: unknown) => ["## Where to look first", "```json", JSON.stringify(located, null, 2), "```"];
 
 const checksBlock = (plan: CheckPlan) => [
   "## Checks the factory runs afterwards",
@@ -51,7 +46,7 @@ const checksBlock = (plan: CheckPlan) => [
 export function reproducePrompt(contract: TaskContract, located: unknown, plan: CheckPlan): string {
   return [
     ...specBlock(contract),
-    ...contextBlock(located, undefined),
+    ...contextBlock(located),
     ...checksBlock(plan),
     "Reproduce the bug now: diagnose it, then write a regression test that fails because of it.",
     "Change test files only and don't fix the bug yet. If no test can reproduce it, change nothing and answer `not_reproducible` with the reason.",
@@ -60,14 +55,13 @@ export function reproducePrompt(contract: TaskContract, located: unknown, plan: 
 
 export interface ImplementContext {
   located: unknown;
-  architecture?: ArchitectureBrief | undefined;
   regression?: { testFiles: string[]; failing: string[] } | undefined;
   baselineFailing?: string[] | undefined;
   placement: boolean;
 }
 
 export function implementPrompt(contract: TaskContract, context: ImplementContext, plan: CheckPlan): string {
-  const lines = [...specBlock(contract), ...contextBlock(context.located, context.architecture), ...checksBlock(plan)];
+  const lines = [...specBlock(contract), ...contextBlock(context.located), ...checksBlock(plan)];
   if (context.regression) {
     lines.push(
       `Your regression test (${context.regression.testFiles.join(", ")}) fails in ${context.regression.failing.join(", ")}. Fix the bug so it passes; never weaken or delete it.`,

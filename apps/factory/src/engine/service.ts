@@ -1,4 +1,4 @@
-/** The factory's one API: the CLI now and the MCP server later are thin clients of it. */
+/** The factory's one API; the CLI is a thin client of it. */
 import { randomBytes } from "node:crypto";
 
 import type { AgentRuntime } from "#src/agent/runtime";
@@ -7,10 +7,9 @@ import type { StructuredLogger } from "@pr-review/logging";
 import { contractHash, freezeContract, type ProfileName, type Spec, type TaskContract } from "#src/engine/contract";
 import { executeRun, type EngineDeps } from "#src/engine/engine";
 import { currentBranch, ensureFactoryExcluded, headSha, repoRoot } from "#src/engine/git";
-import { loadProfile, loadProfiles, workflowVersion } from "#src/engine/profiles";
+import { PROFILES, routeTask, workflowVersion, type Route } from "#src/engine/profiles";
 import { readTaskMarkdown } from "#src/engine/run-files";
-import { routeTask, type Route } from "#src/engine/router";
-import type { SandboxProvider } from "#src/engine/sandbox/index";
+import type { SandboxProvider } from "#src/engine/sandbox/sandbox";
 import {
   appendEvent,
   approveRun,
@@ -36,7 +35,6 @@ export interface FactoryServiceOptions {
   openPullRequest?: EngineDeps["openPullRequest"];
   leaseMs?: number;
   heartbeatMs?: number;
-  sandboxImage?: string;
 }
 
 export interface ProposalInput {
@@ -64,7 +62,6 @@ export function createFactoryService(options: FactoryServiceOptions) {
     ...(options.openPullRequest ? { openPullRequest: options.openPullRequest } : {}),
     ...(options.leaseMs ? { leaseMs: options.leaseMs } : {}),
     ...(options.heartbeatMs ? { heartbeatMs: options.heartbeatMs } : {}),
-    ...(options.sandboxImage ? { sandboxImage: options.sandboxImage } : {}),
   };
 
   return {
@@ -72,9 +69,8 @@ export function createFactoryService(options: FactoryServiceOptions) {
     async propose(input: ProposalInput): Promise<ProposalResult> {
       const repo = await repoRoot(input.repoPath);
       await ensureFactoryExcluded(repo);
-      const route = routeTask(input.spec, loadProfiles(), input.profileOverride);
-      const profileName = route.ok ? route.profile : (input.profileOverride ?? "quick");
-      const profile = loadProfile(profileName);
+      const route = routeTask(input.spec, input.profileOverride);
+      const profileName = route.profile;
       const id = input.runId ?? newRunId();
       const contract: TaskContract = {
         contractVersion: 1,
@@ -83,14 +79,14 @@ export function createFactoryService(options: FactoryServiceOptions) {
         baseSha: await headSha(repo),
         baseBranch: await currentBranch(repo),
         profile: profileName,
-        routing: route.ok ? { reason: route.reason, overridden: route.overridden } : { reason: route.blocker, overridden: false },
+        routing: { reason: route.reason, overridden: route.overridden },
         spec: input.spec,
         permittedOperations: {
           push: input.allowPullRequest === true,
           openPullRequest: input.allowPullRequest === true,
           networkDuringSetup: true,
         },
-        budgets: profile.budgets,
+        budgets: PROFILES[profileName].budgets,
         approval: { state: "pending" },
         implementationDecisions: [],
       };
@@ -107,12 +103,10 @@ export function createFactoryService(options: FactoryServiceOptions) {
     async approve(runId: string): Promise<FactoryRun> {
       const run = await getRun(database, runId);
       if (!run) throw new Error(`no run ${runId}`);
-      const route = routeTask(run.contract.spec, loadProfiles(), run.contract.profile);
-      if (!route.ok) throw new Error(`cannot approve: ${route.blocker}`);
       const frozen = freezeContract(run.contract, new Date());
       const ok = await approveRun(database, runId, frozen, {
         profile: frozen.profile,
-        workflowVersion: workflowVersion(loadProfile(frozen.profile)),
+        workflowVersion: workflowVersion(PROFILES[frozen.profile]),
         contractHash: contractHash(frozen),
         baseSha: frozen.baseSha,
       });
@@ -135,47 +129,6 @@ export function createFactoryService(options: FactoryServiceOptions) {
         if (done) onRun?.(done);
         else await new Promise((resolve) => setTimeout(resolve, pollMs).unref());
       }
-    },
-
-    /** A run row for a discovery still in progress; its placeholder spec can't be frozen until `propose` replaces it. */
-    async draft(input: { repoPath: string; outcome: string }): Promise<FactoryRun> {
-      const repo = await repoRoot(input.repoPath);
-      await ensureFactoryExcluded(repo);
-      const id = newRunId();
-      const title = input.outcome.trim().split("\n")[0]!.slice(0, 120) || "discovery";
-      const placeholder: Spec = {
-        title,
-        objective: input.outcome,
-        category: "quick",
-        requirements: [],
-        nonGoals: [],
-        constraints: [],
-        acceptanceCriteria: [],
-        plan: [],
-        architectureDecisions: [],
-        repositoryFindings: [],
-        assumptions: [],
-        estimatedFiles: 0,
-        risk: "low",
-        touchesSecurityOrData: false,
-      };
-      const contract: TaskContract = {
-        contractVersion: 1,
-        taskId: id,
-        repoPath: repo,
-        baseSha: await headSha(repo),
-        baseBranch: await currentBranch(repo),
-        profile: "quick",
-        routing: { reason: "discovery in progress", overridden: false },
-        spec: placeholder,
-        permittedOperations: { push: false, openPullRequest: false, networkDuringSetup: true },
-        budgets: loadProfile("quick").budgets,
-        approval: { state: "pending" },
-        implementationDecisions: [],
-      };
-      const run = await createRun(database, { id, repoPath: repo, title, contract, status: "draft" });
-      await appendEvent(database, { runId: id, kind: "discovery_started", data: {} });
-      return run;
     },
 
     cancel: (runId: string) => requestCancel(database, runId),

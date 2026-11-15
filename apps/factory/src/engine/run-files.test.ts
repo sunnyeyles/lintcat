@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -112,27 +112,15 @@ describe("run files", () => {
   });
   afterEach(() => rmSync(repo, { recursive: true, force: true }));
 
-  it("writes task.md and state.json atomically and detects hand edits", async () => {
+  it("writes task.md and state.json atomically", async () => {
     expect(await readTaskMarkdown(repo, "run-1")).toBeNull();
-    expect(await writeRunFiles(repo, "run-1", { view: view(), state: { status: "running" } })).toEqual({
-      conflict: false,
-    });
+    await writeRunFiles(repo, "run-1", { view: view(), state: { status: "running" } });
     const dir = runDir(repo, "run-1");
     expect(readdirSync(dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
     expect(existsSync(join(dir, "artifacts"))).toBe(true);
     const state = JSON.parse(readFileSync(join(dir, "state.json"), "utf8"));
-    expect(state).toMatchObject({ status: "running", taskMdHash: expect.stringMatching(/^[0-9a-f]{64}$/) });
-
-    expect(await writeRunFiles(repo, "run-1", { view: view({ stage: "verify" }), state: {} })).toEqual({
-      conflict: false,
-    });
-
-    const edited = `${await readTaskMarkdown(repo, "run-1")}\nMy note\n`;
-    writeFileSync(join(dir, "task.md"), edited);
-    expect(await writeRunFiles(repo, "run-1", { view: view(), state: {} })).toEqual({ conflict: true });
-    expect(readFileSync(join(dir, "task.user-edit.md"), "utf8")).toBe(edited);
+    expect(state).toEqual({ status: "running" });
     expect(await readTaskMarkdown(repo, "run-1")).toBe(renderTaskMarkdown(view()));
-    expect(await writeRunFiles(repo, "run-1", { view: view(), state: {} })).toEqual({ conflict: false });
   });
 
   it("appends events as JSON lines", async () => {
