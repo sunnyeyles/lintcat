@@ -6,6 +6,7 @@ import {
   ArrowUp as IsxArrowUp,
   ArrowUp2 as IsxArrowUp2,
   Book1 as IsxBook1,
+  Building3 as IsxBuilding3,
   Category as IsxCategory,
   Chart as IsxChart,
   Clock as IsxClock,
@@ -109,6 +110,7 @@ export const ChartLine = icon("ChartLine", IsxChart, "float");
 export const Check = icon("Check", CheckGlyph, "float");
 export const Circle = icon("Circle", DotGlyph, "float");
 export const Coins = icon("Coins", IsxCoin1, "float");
+export const Factory = icon("Factory", IsxBuilding3, "float");
 export const FolderGit2 = icon("FolderGit2", IsxFolder2, "float");
 export const GitPullRequest = icon("GitPullRequest", GitPullRequestGlyph, "float");
 export const KeyRound = icon("KeyRound", IsxKey, "float");

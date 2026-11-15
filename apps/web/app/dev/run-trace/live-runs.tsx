@@ -28,7 +28,7 @@ export function TokenForm({ onSave, invalid }: { onSave: (token: string) => void
         value={value}
         onChange={(event) => setValue(event.currentTarget.value)}
         placeholder="RUN_TRACE_TOKEN"
-        aria-label="Run trace token"
+        aria-label="Factory trace token"
         aria-invalid={invalid || undefined}
         className="max-w-xs"
       />

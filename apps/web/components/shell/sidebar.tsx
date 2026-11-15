@@ -11,8 +11,8 @@ import {
   SheetTrigger,
 } from "@pr-review/design";
 import {
-  Bot,
   ChartLine,
+  Factory,
   FolderGit2,
   GitPullRequest,
   type IconComponent,
@@ -88,8 +88,8 @@ function NavLinks({
           onClick={onNavigate}
           className={cn(LINK_CLASS, "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}
         >
-          <Bot className="size-4 shrink-0" />
-          <span className="truncate">Run trace</span>
+          <Factory className="size-4 shrink-0" />
+          <span className="truncate">Factory trace</span>
         </a>
       ) : null}
     </nav>
