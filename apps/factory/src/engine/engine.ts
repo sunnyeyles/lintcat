@@ -24,7 +24,7 @@ import {
 import { locate } from "#src/engine/locate";
 import { PROFILES, workflowVersion, type Stage } from "#src/engine/profiles";
 import { loadPrompt } from "#src/engine/prompts";
-import { analyseRepository, isTestPath, renderArchitecture, type ArchitectureBrief } from "#src/engine/repository";
+import { isTestPath } from "#src/engine/repository";
 import { renderReview, reviewOutputSchema, reviewPrompt, reviewRepairPrompt, validateReview, type ValidatedReview } from "#src/engine/review";
 import { writeArtifact, writeRunFiles, type TaskView } from "#src/engine/run-files";
 import { DEFAULT_LIMITS, SANDBOX_IMAGE, type ExecResult, type Sandbox, type SandboxProvider } from "#src/engine/sandbox/index";
@@ -107,7 +107,6 @@ type CheckRecord = { name: string; command: string; exitCode: number; passed: bo
 /** Everything a stage hands on, persisted in the checkpoint so recovery never redoes it. */
 interface RunData {
   locate?: unknown;
-  architecture?: ArchitectureBrief;
   repairs?: number;
   summary?: string;
   baseline?: CheckRecord[];
@@ -386,11 +385,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
           const located = await locate(worktree, contract.spec);
           data.locate = located;
           await writeArtifact(repo, claimed.id, "locate.json", JSON.stringify(located, null, 2));
-          if (needsPlacement) {
-            data.architecture = await analyseRepository(worktree, located);
-            await writeArtifact(repo, claimed.id, "architecture.md", renderArchitecture(data.architecture));
-            await writeArtifact(repo, claimed.id, "architecture.json", JSON.stringify(data.architecture, null, 2));
-          }
           await save(stage, stages[i + 1]!);
           return;
         }
@@ -417,7 +411,6 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
             contract,
             {
               located: data.locate ?? null,
-              architecture: data.architecture,
               regression: reproduced ? { testFiles: reproduced.testFiles, failing: reproduced.failing.map((f) => f.name) } : undefined,
               baselineFailing: data.baseline?.filter((b) => !b.passed).map((b) => b.name),
               placement: needsPlacement,
@@ -650,22 +643,10 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
   }
 }
 
-/** The profile-specific evidence task.md shows: brief, baseline, reproduction, review. */
+/** The profile-specific evidence task.md shows: baseline, reproduction, review. */
 function evidenceSections(data: RunData, verification: TaskView["verification"]): NonNullable<TaskView["sections"]> {
   const sections: NonNullable<TaskView["sections"]> = [];
   const passedNow = (name: string) => verification.find((v) => v.name === name)?.passed;
-  if (data.architecture) {
-    const brief = data.architecture;
-    sections.push({
-      heading: "Repository intelligence",
-      lines: [
-        `- Placement: ${brief.placement}`,
-        ...brief.candidates.slice(0, 5).map((c) => `- Candidate: \`${c.path}\` (${c.importers} importer(s)${c.test ? `, tested by \`${c.test}\`` : ""})`),
-        ...brief.risks.map((r) => `- Risk: ${r}`),
-        "- Full brief: `artifacts/architecture.md`",
-      ],
-    });
-  }
   if (data.baseline) {
     sections.push({
       heading: "Baseline",

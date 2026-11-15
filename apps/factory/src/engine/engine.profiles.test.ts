@@ -187,7 +187,7 @@ describe("workflow profiles", () => {
     });
 
     it("records a check failing at baseline without blaming the run, then reviews once", async () => {
-      const { service, runId, runtime, artifact, taskMd } = await start(
+      const { service, runId, runtime, taskMd } = await start(
         refactorSpec,
         [
           writes({ "src/greet.js": "const message = 'hi';\nexport const greet = () => message;\n" }, placed),
@@ -201,8 +201,6 @@ describe("workflow profiles", () => {
       expect(taskMd()).toMatch(/legacy: FAIL \(pre-existing, not blamed on this run\)/);
       expect(taskMd()).toMatch(/legacy fails at the base commit too/);
       expect(taskMd()).toMatch(/placement: src\/greet\.js \(greet already owns the greeting\)/);
-      expect(artifact("artifacts/architecture.md")).toMatch(/Recommended placement/);
-      expect(runtime.specs[0]?.prompt).toMatch(/Architecture brief/);
       expect(runtime.specs[0]?.prompt).toMatch(/already fail at the base commit .*legacy/);
       expect((await listCommands(database, runId)).map((c) => c.stage)).toEqual(["baseline", "baseline", "verify", "verify"]);
     });
