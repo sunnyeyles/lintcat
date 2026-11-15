@@ -1,5 +1,7 @@
 /** Discovery in the terminal: one question at a time, then propose, render and decide. */
-import type { DiscoveryIO, FactoryService, ProfileName, ReviewDecision, Spec } from "@pr-review/factory";
+import type { DiscoveryIO, ReviewDecision } from "#src/engine/discovery";
+import type { FactoryService } from "#src/engine/service";
+import type { ProfileName, Spec } from "#src/engine/contract";
 
 import { renderSpec } from "#src/render";
 

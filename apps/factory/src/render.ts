@@ -1,5 +1,7 @@
 /** Pure text for the terminal: everything here takes data and returns lines. */
-import type { FactoryCommand, FactoryEvent, FactoryRun, FactoryService, Spec } from "@pr-review/factory";
+import type { FactoryCommand, FactoryEvent, FactoryRun } from "#src/engine/store/schema";
+import type { FactoryService } from "#src/engine/service";
+import type { Spec } from "#src/engine/contract";
 
 export type Route = Awaited<ReturnType<FactoryService["propose"]>>["route"];
 type ProfileSummary = Awaited<ReturnType<FactoryService["summary"]>>[number];

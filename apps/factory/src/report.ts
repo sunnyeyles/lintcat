@@ -1,16 +1,11 @@
 /** `factory report` and `factory prune`: outcome metrics, the learning report and retention. */
 import path from "node:path";
 
-import {
-  learningReport,
-  listLessons,
-  profileMetrics,
-  pruneRunHistory,
-  repoRoot,
-  type FactoryLesson,
-  type LearningReport,
-  type ProfileMetrics,
-} from "@pr-review/factory";
+import { learningReport, type LearningReport } from "#src/engine/learning";
+import { listLessons, pruneRunHistory } from "#src/engine/store/index";
+import { profileMetrics, type ProfileMetrics } from "#src/engine/metrics";
+import { repoRoot } from "#src/engine/git";
+import type { FactoryLesson } from "#src/engine/store/schema";
 
 import type { CommandContext } from "#src/commands";
 import { EnvironmentError, readConfig, type FactoryConfig } from "#src/config";

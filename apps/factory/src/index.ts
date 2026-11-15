@@ -2,7 +2,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { AgentAuthError } from "@pr-review/agent-runtime";
+import { AgentAuthError } from "#src/agent/runtime";
 
 import { runCommand } from "#src/commands";
 import { EnvironmentError, findLocalEnvFile } from "#src/config";

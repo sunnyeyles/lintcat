@@ -7,7 +7,6 @@
         "docs/**"
       ],
       "ignore": [
-        "benchmarks/factory/fixtures/**",
         "scripts/run-trace-examples/**"
       ]
     },
@@ -26,6 +25,9 @@
       "entry": [
         "src/index.ts",
         "scripts/*.mjs"
+      ],
+      "ignore": [
+        "benchmarks/fixtures/**"
       ]
     },
     "packages/design": {

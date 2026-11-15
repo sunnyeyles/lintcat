@@ -1,4 +1,5 @@
-import type { FactoryCommand, FactoryRun, Spec } from "@pr-review/factory";
+import type { FactoryCommand, FactoryRun } from "#src/engine/store/schema";
+import type { Spec } from "#src/engine/contract";
 import { describe, expect, it } from "vitest";
 
 import { formatData, formatEvent, renderFailedCommand, renderResult, renderRuns, renderSpec } from "#src/render";

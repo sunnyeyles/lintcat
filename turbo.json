@@ -19,12 +19,7 @@
     "LANGFUSE_BASE_URL",
     "LANGFUSE_ENVIRONMENT",
     "LANGFUSE_RELEASE",
-    "PATH",
-    "FACTORY_DATABASE_URL",
-    "FACTORY_PACKAGE_DIR",
-    "FACTORY_AUTH",
-    "FACTORY_CLAUDE_PATH",
-    "FACTORY_DELIVERY"
+    "PATH"
   ],
   "tasks": {
     "transit": { "dependsOn": ["^transit"] },

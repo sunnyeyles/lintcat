@@ -1,5 +1,5 @@
 /** The command line: what `factory` was asked to do, before anything is read. */
-import { PROFILE_NAMES, type ProfileName } from "@pr-review/factory";
+import { PROFILE_NAMES, type ProfileName } from "#src/engine/contract";
 
 export type Command =
   | { kind: "init"; repoPath: string | undefined }
@@ -43,7 +43,7 @@ Commands:
   logs <id> [-f]                       A run's events; -f follows until it finishes
   cancel <id>                          Cancel a run
   result <id>                          Branch, PR, checks, usage and task.md
-  mcp                                  Serve the factory as MCP tools over stdio (docs/factory/mcp.md)
+  mcp                                  Serve the factory as MCP tools over stdio (apps/factory/docs/mcp.md)
   report [--json] [--repo <path>]      Per-profile metrics and the learning report
       [--since-days <n>]
   prune [--days <n>]                   Drop old runs' events and commands (FACTORY_RETENTION_DAYS)

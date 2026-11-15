@@ -54,25 +54,43 @@ importers:
 
   apps/factory:
     dependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: ^0.3.322
+        version: 0.3.322(@anthropic-ai/sdk@1.8.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.4.3)
-      '@pr-review/agent-runtime':
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
+      '@pr-review/index':
         specifier: workspace:*
-        version: link:../../packages/agent-runtime
-      '@pr-review/factory':
-        specifier: workspace:*
-        version: link:../../packages/factory
+        version: link:../../packages/index
       '@pr-review/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.9
+      yaml:
+        specifier: ^2.8.1
+        version: 2.9.1
       zod:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.5.8
+        version: 0.5.8
       '@pr-review/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
 
   apps/mcp:
     dependencies:
@@ -118,7 +136,7 @@ importers:
         version: link:../../packages/design
       '@pr-review/factory':
         specifier: workspace:*
-        version: link:../../packages/factory
+        version: link:../factory
       '@pr-review/github':
         specifier: workspace:*
         version: link:../../packages/github
@@ -230,19 +248,6 @@ importers:
       '@pr-review/eslint-config':
         specifier: workspace:*
         version: link:../packages/eslint-config
-
-  packages/agent-runtime:
-    dependencies:
-      '@anthropic-ai/claude-agent-sdk':
-        specifier: ^0.3.322
-        version: 0.3.322(@anthropic-ai/sdk@1.8.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(zod@4.4.3)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@pr-review/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
 
   packages/ai:
     dependencies:
@@ -375,43 +380,6 @@ importers:
       typescript-eslint:
         specifier: ^8.70.1
         version: 8.70.1(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
-
-  packages/factory:
-    dependencies:
-      '@opentelemetry/api':
-        specifier: ^1.9.0
-        version: 1.9.1
-      '@pr-review/agent-runtime':
-        specifier: workspace:*
-        version: link:../agent-runtime
-      '@pr-review/index':
-        specifier: workspace:*
-        version: link:../index
-      '@pr-review/logging':
-        specifier: workspace:*
-        version: link:../logging
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@electric-sql/pglite@0.5.8)(@neondatabase/serverless@1.1.0)(@opentelemetry/api@1.9.1)(postgres@3.4.9)
-      postgres:
-        specifier: ^3.4.7
-        version: 3.4.9
-      yaml:
-        specifier: ^2.8.1
-        version: 2.9.1
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@electric-sql/pglite':
-        specifier: ^0.5.8
-        version: 0.5.8
-      '@pr-review/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
-      drizzle-kit:
-        specifier: ^0.31.10
-        version: 0.31.10
 
   packages/github:
     dependencies:

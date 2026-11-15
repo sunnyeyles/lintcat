@@ -4,8 +4,10 @@ import { closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { AgentRuntime } from "@pr-review/agent-runtime";
-import { dockerAvailable, type FactoryRun, type FactoryService } from "@pr-review/factory";
+import type { AgentRuntime } from "#src/agent/runtime";
+import { dockerAvailable } from "#src/engine/sandbox/docker-sandbox";
+import type { FactoryRun } from "#src/engine/store/schema";
+import type { FactoryService } from "#src/engine/service";
 
 import type { CommandContext } from "#src/commands";
 import { claudeExecutable, EnvironmentError, readConfig, type FactoryConfig } from "#src/config";
