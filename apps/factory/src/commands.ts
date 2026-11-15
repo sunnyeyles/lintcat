@@ -23,7 +23,6 @@ import {
   type FactoryConfig,
 } from "#src/config";
 import { createTerminalIO } from "#src/discovery-io";
-import { benchCompare, benchRun } from "#src/bench";
 import { USAGE, type Command } from "#src/options";
 import {
   formatEvent,
@@ -431,9 +430,5 @@ export function runCommand(ctx: CommandContext, command: Command): Promise<numbe
       return report(ctx, command, { openDatabase });
     case "prune":
       return prune(ctx, command, { openDatabase });
-    case "bench-run":
-      return benchRun(ctx, command, { openDatabase, agentRuntime, requireDocker });
-    case "bench-compare":
-      return Promise.resolve(benchCompare(ctx, command));
   }
 }

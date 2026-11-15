@@ -66,7 +66,6 @@ export interface EngineDeps {
   heartbeatMs?: number;
   /** Finds an open PR for the branch first, so a retry never opens a second. */
   openPullRequest?: (request: PullRequestRequest) => Promise<{ url: string }>;
-  sandboxImage?: string;
 }
 
 const implementerOutputSchema = z.object({
@@ -363,7 +362,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
         await resetTo(worktree, target);
         await recorder.event({ kind: "worktree_reconciled", stage: "prepare", repositorySha: target });
       }
-      sandbox = await deps.sandboxes.create({ runId: claimed.id, worktreePath: worktree, image: deps.sandboxImage ?? SANDBOX_IMAGE, limits: DEFAULT_LIMITS });
+      sandbox = await deps.sandboxes.create({ runId: claimed.id, worktreePath: worktree, image: SANDBOX_IMAGE, limits: DEFAULT_LIMITS });
       if (plan.install) {
         const startedAt = new Date();
         const result = await sandbox.setup({ command: plan.install, timeoutMs: contract.budgets.commandTimeoutSeconds * 1000 });
@@ -377,7 +376,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
         deviations.push(`left out of the delivery, written by dependency install: ${setupPaths.join(", ")}`);
         await recorder.event({ kind: "setup_paths_excluded", stage: "prepare", data: { paths: setupPaths } });
       }
-      await recorder.event({ kind: "sandbox_ready", stage: "prepare", data: { sandbox: deps.sandboxes.name, image: deps.sandboxImage ?? SANDBOX_IMAGE, limits: DEFAULT_LIMITS, network: "none" } });
+      await recorder.event({ kind: "sandbox_ready", stage: "prepare", data: { sandbox: deps.sandboxes.name, image: SANDBOX_IMAGE, limits: DEFAULT_LIMITS, network: "none" } });
       mark("prepare", "done");
     });
     await sync();

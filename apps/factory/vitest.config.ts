@@ -1,5 +1,3 @@
-import { configDefaults, defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config";
 
-export default defineConfig({
-  test: { exclude: [...configDefaults.exclude, "benchmarks/**"] },
-});
+export default defineConfig({});

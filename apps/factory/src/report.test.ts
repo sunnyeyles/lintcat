@@ -1,29 +1,13 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
-import type { BenchResult } from "#src/engine/bench/runner";
 import type { ProfileMetrics } from "#src/engine/metrics";
 import { describe, expect, it } from "vitest";
 
-import { benchCompare } from "#src/bench";
-import type { CommandContext } from "#src/commands";
 import { parseArguments, UsageError } from "#src/options";
 import { renderMetrics, retentionDays } from "#src/report";
 
-describe("report and bench arguments", () => {
-  it("parses report, prune and bench commands", () => {
+describe("report arguments", () => {
+  it("parses report and prune", () => {
     expect(parseArguments(["report", "--json", "--repo", "x", "--since-days", "7"])).toEqual({ kind: "report", json: true, repoPath: "x", sinceDays: 7 });
     expect(parseArguments(["prune"])).toEqual({ kind: "prune", days: undefined });
-    expect(parseArguments(["bench", "run", "--config", "c.json", "--fixture", "quick,bugfix", "--keep"])).toEqual({
-      kind: "bench-run",
-      configPath: "c.json",
-      fixtures: ["quick", "bugfix"],
-      keep: true,
-    });
-    expect(parseArguments(["evaluate", "compare", "a.json", "b"])).toEqual({ kind: "bench-compare", a: "a.json", b: "b" });
-    expect(() => parseArguments(["bench", "run"])).toThrow(UsageError);
-    expect(() => parseArguments(["bench", "compare", "a"])).toThrow(UsageError);
     expect(() => parseArguments(["prune", "--days", "0"])).toThrow(UsageError);
   });
 
@@ -62,36 +46,5 @@ describe("report rendering", () => {
     expect(text).toContain("notional");
     expect(text).toContain("quick:new_kind×2");
     expect(renderMetrics([metrics], "api-key")).not.toContain("notional");
-  });
-});
-
-describe("bench compare", () => {
-  it("compares two result directories", () => {
-    const root = mkdtempSync(path.join(tmpdir(), "bench-cli-"));
-    const write = (dir: string, verified: boolean) => {
-      mkdirSync(path.join(root, dir));
-      const result = {
-        schemaVersion: 1,
-        config: { name: dir, hash: "f".repeat(64), model: null },
-        fixture: { name: "quick", baseSha: "0".repeat(40) },
-        repetition: 1,
-        profile: "quick",
-        factoryStatus: "delivered",
-        hidden: { ran: true, passed: verified, exitCode: 0, output: "" },
-        verified,
-        repairs: 0,
-        wallTimeMs: 1000,
-        estimatedCostUsd: null,
-        promptVersions: [],
-        startedAt: "2026-06-01T00:00:00.000Z",
-      } as unknown as BenchResult;
-      writeFileSync(path.join(root, dir, "r.json"), JSON.stringify(result));
-    };
-    write("a", false);
-    write("b", true);
-    const out: string[] = [];
-    const ctx = { cwd: root, env: {}, out: (t: string) => out.push(t) } as unknown as CommandContext;
-    expect(benchCompare(ctx, { a: "a", b: "b" })).toBe(0);
-    expect(out.join("\n")).toMatch(/quick\s+verified \(hidden checks\)\s+0\/1 0%\s+1\/1 100%\s+\+100%/);
   });
 });

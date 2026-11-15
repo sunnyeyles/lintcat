@@ -17,8 +17,6 @@ export type Command =
   | { kind: "logs"; runId: string; follow: boolean }
   | { kind: "report"; json: boolean; repoPath: string | undefined; sinceDays: number | undefined }
   | { kind: "prune"; days: number | undefined }
-  | { kind: "bench-run"; configPath: string; fixtures: string[] | undefined; keep: boolean }
-  | { kind: "bench-compare"; a: string; b: string }
   | { kind: "help" }
   | { kind: "version" };
 
@@ -45,14 +43,11 @@ Commands:
   report [--json] [--repo <path>]      Per-profile metrics and the learning report
       [--since-days <n>]
   prune [--days <n>]                   Drop old runs' events and commands (FACTORY_RETENTION_DAYS)
-  bench run --config <file>            Run benchmark fixtures, judged by hidden checks
-      [--fixture a,b] [--keep]           (evaluate is an alias of bench)
-  bench compare <a> <b>                Compare two configs' results (config files or result dirs)
   help | version
 
 Exit codes: 0 ok, 1 run failed or cancelled, 2 usage error, 3 environment problem.`;
 
-const SWITCHES = new Set(["pr", "no-run", "f", "follow", "help", "h", "version", "json", "keep"]);
+const SWITCHES = new Set(["pr", "no-run", "f", "follow", "help", "h", "version", "json"]);
 
 function readDays(value: string | undefined, flag: string): number | undefined {
   if (value === undefined) return undefined;
@@ -176,24 +171,6 @@ export function parseArguments(argv: readonly string[]): Command {
       allow(parsed, ["days"]);
       positionals(parsed, command, 0, "");
       return { kind: "prune", days: readDays(parsed.values.get("days"), "days") };
-    case "bench":
-    case "evaluate": {
-      const [action, ...rest] = parsed.positional;
-      if (action === "run") {
-        allow(parsed, ["config", "fixture", "keep"]);
-        if (rest.length) throw new UsageError(`unexpected argument ${JSON.stringify(rest[0])}`);
-        const configPath = parsed.values.get("config");
-        if (!configPath) throw new UsageError(`${command} run needs --config <file>`);
-        const fixtures = parsed.values.get("fixture")?.split(",").map((f) => f.trim()).filter(Boolean);
-        return { kind: "bench-run", configPath, fixtures, keep: parsed.switches.has("keep") };
-      }
-      if (action === "compare") {
-        allow(parsed, []);
-        if (rest.length !== 2) throw new UsageError(`${command} compare needs two configs or result directories`);
-        return { kind: "bench-compare", a: rest[0]!, b: rest[1]! };
-      }
-      throw new UsageError(`${command} needs run or compare`);
-    }
     case "logs": {
       allow(parsed, ["f", "follow"]);
       const [runId] = positionals(parsed, command, 1, "a run id");

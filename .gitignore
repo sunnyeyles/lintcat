@@ -13,4 +13,3 @@ next-env.d.ts
 docs/anidoodle/.engine/
 .amp/portals/*
 .DS_Store
-apps/factory/benchmarks/results/

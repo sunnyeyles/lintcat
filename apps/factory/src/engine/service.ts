@@ -36,7 +36,6 @@ export interface FactoryServiceOptions {
   openPullRequest?: EngineDeps["openPullRequest"];
   leaseMs?: number;
   heartbeatMs?: number;
-  sandboxImage?: string;
 }
 
 export interface ProposalInput {
@@ -64,7 +63,6 @@ export function createFactoryService(options: FactoryServiceOptions) {
     ...(options.openPullRequest ? { openPullRequest: options.openPullRequest } : {}),
     ...(options.leaseMs ? { leaseMs: options.leaseMs } : {}),
     ...(options.heartbeatMs ? { heartbeatMs: options.heartbeatMs } : {}),
-    ...(options.sandboxImage ? { sandboxImage: options.sandboxImage } : {}),
   };
 
   return {

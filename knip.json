@@ -24,9 +24,6 @@
     "apps/factory": {
       "entry": [
         "src/index.ts"
-      ],
-      "ignore": [
-        "benchmarks/fixtures/**"
       ]
     },
     "packages/design": {
