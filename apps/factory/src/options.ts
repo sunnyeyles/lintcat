@@ -40,7 +40,7 @@ Commands:
   logs <id> [-f]                       A run's events; -f follows until it finishes
   cancel <id>                          Cancel a run
   result <id>                          Branch, PR, checks, usage and task.md
-  report [--json] [--repo <path>]      Per-profile metrics and the learning report
+  report [--json] [--repo <path>]      Per-profile outcome metrics
       [--since-days <n>]
   prune [--days <n>]                   Drop old runs' events and commands (FACTORY_RETENTION_DAYS)
   help | version

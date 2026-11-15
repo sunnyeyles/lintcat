@@ -1,11 +1,9 @@
-/** `factory report` and `factory prune`: outcome metrics, the learning report and retention. */
+/** `factory report` and `factory prune`: outcome metrics and retention. */
 import path from "node:path";
 
-import { learningReport, type LearningReport } from "#src/engine/learning";
-import { listLessons, pruneRunHistory } from "#src/engine/store/index";
+import { pruneRunHistory } from "#src/engine/store/index";
 import { profileMetrics, type ProfileMetrics } from "#src/engine/metrics";
 import { repoRoot } from "#src/engine/git";
-import type { FactoryLesson } from "#src/engine/store/schema";
 
 import type { CommandContext } from "#src/commands";
 import { EnvironmentError, readConfig, type FactoryConfig } from "#src/config";
@@ -56,24 +54,6 @@ export function renderMetrics(metrics: readonly ProfileMetrics[], auth: FactoryC
   ].join("\n");
 }
 
-function renderLearning(report: LearningReport & { expired: number }, lessons: readonly FactoryLesson[]): string {
-  if (report.clusters.length === 0) return `No recurring failures across ${report.runsAnalysed} finished run(s).`;
-  const lines = [`Recurring failures across ${report.runsAnalysed} finished run(s); proposals only, nothing was changed:`];
-  for (const cluster of report.clusters) {
-    lines.push(
-      "",
-      `● ${cluster.label} — ${cluster.signature}`,
-      `  ${cluster.runIds.length} run(s), ${cluster.occurrences} occurrence(s), profiles ${cluster.profiles.join(", ")}; ${cluster.firstSeenAt.toISOString().slice(0, 10)} to ${cluster.lastSeenAt.toISOString().slice(0, 10)}`,
-      `  Likely cause: ${cluster.rootCause}`,
-      ...cluster.candidates.map((c) => `  → [${c.target}] ${c.change} (confidence ${c.confidence.toFixed(2)})`),
-      `  Evidence: ${cluster.runIds.join(", ")}`,
-    );
-  }
-  const proposed = lessons.filter((l) => l.status === "proposed").length;
-  lines.push("", `Lessons: ${proposed} proposed, ${lessons.length - proposed} retired${report.expired ? ` (${report.expired} expired now)` : ""}. They are never given to an agent.`);
-  return lines.join("\n");
-}
-
 async function withDatabase<T>(ctx: CommandContext, deps: ReportDeps, work: (db: FactoryDatabaseHandle, config: FactoryConfig) => Promise<T>): Promise<T> {
   const config = readConfig(ctx.env);
   const db = await deps.openDatabase(config);
@@ -100,13 +80,10 @@ export async function report(
   };
   return withDatabase(ctx, deps, async ({ database }, config) => {
     const metrics = await profileMetrics(database, filter);
-    const learning = await learningReport(database, filter);
-    const lessons = await listLessons(database);
     if (command.json) {
-      ctx.out(JSON.stringify({ filter, costBasis: config.auth === "subscription" ? "notional" : "estimated", metrics, learning, lessons }, null, 2));
+      ctx.out(JSON.stringify({ filter, costBasis: config.auth === "subscription" ? "notional" : "estimated", metrics }, null, 2));
     } else {
       ctx.out(renderMetrics(metrics, config.auth));
-      ctx.out(`\n${renderLearning(learning, lessons)}`);
     }
     return 0;
   });
@@ -125,7 +102,7 @@ export async function prune(ctx: CommandContext, command: { days: number | undef
   const days = retentionDays(ctx.env, command.days);
   return withDatabase(ctx, deps, async ({ database }) => {
     const pruned = await pruneRunHistory(database, new Date(Date.now() - days * DAY_MS));
-    ctx.out(`Pruned ${pruned.events} event(s) and ${pruned.commands} command(s) from ${pruned.runs} run(s) finished over ${days} day(s) ago; run rows and lessons are kept.`);
+    ctx.out(`Pruned ${pruned.events} event(s) and ${pruned.commands} command(s) from ${pruned.runs} run(s) finished over ${days} day(s) ago; run rows are kept.`);
     return 0;
   });
 }
