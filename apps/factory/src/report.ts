@@ -7,6 +7,7 @@ import { repoRoot } from "#src/engine/git";
 
 import type { CommandContext } from "#src/commands";
 import { EnvironmentError, readConfig, type FactoryConfig } from "#src/config";
+import { table } from "#src/render";
 
 type FactoryDatabaseHandle = { database: Parameters<typeof profileMetrics>[0]; close(): Promise<void> };
 
@@ -20,11 +21,6 @@ const DAY_MS = 86_400_000;
 const pct = (v: number | null) => (v === null ? "-" : `${Math.round(v * 100)}%`);
 const secs = (v: number | null) => (v === null ? "-" : v >= 120_000 ? `${(v / 60_000).toFixed(1)}m` : `${(v / 1000).toFixed(1)}s`);
 const usd = (v: number | null) => (v === null ? "-" : `$${v.toFixed(2)}`);
-
-function table(rows: string[][]): string {
-  const widths = rows[0]!.map((_, c) => Math.max(...rows.map((row) => row[c]!.length)));
-  return rows.map((row) => row.map((cell, c) => cell.padEnd(widths[c]!)).join("  ").trimEnd()).join("\n");
-}
 
 export function renderMetrics(metrics: readonly ProfileMetrics[], auth: FactoryConfig["auth"]): string {
   if (metrics.length === 0) return "No finished runs yet.";
@@ -58,10 +54,6 @@ async function withDatabase<T>(ctx: CommandContext, deps: ReportDeps, work: (db:
   const db = await deps.openDatabase(config);
   try {
     return await work(db, config);
-  } catch (error) {
-    const cause = (error as { cause?: { code?: unknown } }).cause;
-    if (cause?.code === "42P01") throw new EnvironmentError("the factory database is not migrated: run `factory init`");
-    throw error;
   } finally {
     await db.close();
   }

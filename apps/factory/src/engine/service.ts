@@ -9,7 +9,7 @@ import { executeRun, type EngineDeps } from "#src/engine/engine";
 import { currentBranch, ensureFactoryExcluded, headSha, repoRoot } from "#src/engine/git";
 import { PROFILES, routeTask, workflowVersion, type Route } from "#src/engine/profiles";
 import { readTaskMarkdown } from "#src/engine/run-files";
-import type { SandboxProvider } from "#src/engine/sandbox/index";
+import type { SandboxProvider } from "#src/engine/sandbox/sandbox";
 import {
   appendEvent,
   approveRun,

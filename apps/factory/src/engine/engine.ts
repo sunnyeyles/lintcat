@@ -27,7 +27,7 @@ import { loadPrompt } from "#src/engine/prompts";
 import { isTestPath } from "#src/engine/repository";
 import { renderReview, reviewOutputSchema, reviewPrompt, reviewRepairPrompt, validateReview, type ValidatedReview } from "#src/engine/review";
 import { writeArtifact, writeRunFiles, type TaskView } from "#src/engine/run-files";
-import { DEFAULT_LIMITS, SANDBOX_IMAGE, type ExecResult, type Sandbox, type SandboxProvider } from "#src/engine/sandbox/index";
+import { DEFAULT_LIMITS, SANDBOX_IMAGE, type ExecResult, type Sandbox, type SandboxProvider } from "#src/engine/sandbox/sandbox";
 import { implementPrompt, repairPrompt, reproducePrompt } from "#src/engine/stage-prompts";
 import {
   findEffect,
@@ -189,11 +189,10 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       usage: summariseUsage(usage),
       sections: evidenceSections(data, verification),
     };
-    const { conflict } = await writeRunFiles(repo, claimed.id, {
+    await writeRunFiles(repo, claimed.id, {
       view,
       state: { runId: claimed.id, status, stage: currentStage, branch, worktree, checkpoint, sessionId },
     });
-    if (conflict) await recorder.event({ kind: "task_md_conflict", data: { preservedAs: "task.user-edit.md" } });
   };
 
   const save = async (stage: Stage, nextStage: Stage, sha?: string) => {
@@ -438,7 +437,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
                 : "implementer's final answer did not match its schema",
             );
           }
-          const sha = await checkpointCommit(worktree, `factory: implement ${contract.spec.title}`, undefined, setupPaths);
+          const sha = await checkpointCommit(worktree, `factory: implement ${contract.spec.title}`, setupPaths);
           if (!sha) throw new RunStopped("failed", "the implementer made no changes");
           const missing = (reproduced?.testFiles ?? []).filter((f) => !existsSync(path.join(worktree, f)));
           if (missing.length) throw new RunStopped("failed", `the fix deleted the regression test: ${missing.join(", ")}`);
@@ -478,7 +477,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
             });
             throwIfStopped();
             if (!result.ok) throw new RunStopped("failed", `repair agent ended with ${result.reason}`);
-            const sha = await checkpointCommit(worktree, `factory: repair pass ${data.repairs}`, undefined, setupPaths);
+            const sha = await checkpointCommit(worktree, `factory: repair pass ${data.repairs}`, setupPaths);
             if (!sha) throw new RunStopped("failed", `repair pass ${data.repairs} changed nothing`);
             await save(stage, "verify", sha);
           }
@@ -564,7 +563,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     if (failing.length === 0) {
       throw new RunStopped("failed", `the regression test (${touched.join(", ")}) passes before any fix, so it does not reproduce the bug`);
     }
-    const sha = await checkpointCommit(worktree, `factory: reproduce ${contract.spec.title}`, undefined, setupPaths);
+    const sha = await checkpointCommit(worktree, `factory: reproduce ${contract.spec.title}`, setupPaths);
     if (!sha) throw new RunStopped("failed", "the regression test could not be committed");
     data.reproduce = { status: "reproduced", testFiles: touched, failing: failing.map(record) };
     await recorder.event({ kind: "bug_reproduced", stage, data: { testFiles: touched, failing: data.reproduce.failing } });
@@ -593,7 +592,7 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
       const { result } = await runAgent(stage, reviewRepairPrompt(blocking), { role: "implementer", resume: true, schema: implementerOutputSchema });
       throwIfStopped();
       if (!result.ok) throw new RunStopped("failed", `review repair ended with ${result.reason}`);
-      const sha = await checkpointCommit(worktree, "factory: review repair", undefined, setupPaths);
+      const sha = await checkpointCommit(worktree, "factory: review repair", setupPaths);
       if (!sha) throw new RunStopped("failed", `the review's blocking findings were not addressed: ${blocking.map((f) => `${f.file}: ${f.problem}`).join("; ")}`);
       data.reviewRepair = { sha };
       await save(stage, "review", sha);

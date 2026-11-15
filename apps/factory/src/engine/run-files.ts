@@ -1,10 +1,10 @@
-import { createHash, randomBytes } from "node:crypto";
-import { appendFile, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { TaskContract } from "#src/engine/contract";
 
-type ProgressStatus = "done" | "running" | "failed" | "skipped";
+type ProgressStatus = "done" | "running" | "failed";
 
 export type TaskView = {
   runId: string;
@@ -26,7 +26,7 @@ export function runDir(repo: string, runId: string): string {
   return join(repo, ".factory", "runs", runId);
 }
 
-const PROGRESS_MARK: Record<ProgressStatus, string> = { done: "x", running: " ", failed: " ", skipped: "-" };
+const PROGRESS_MARK: Record<ProgressStatus, string> = { done: "x", running: " ", failed: " " };
 
 function bullets(items: readonly string[]): string[] {
   return items.map((item) => `- ${item}`);
@@ -115,9 +115,6 @@ export function renderTaskMarkdown(view: TaskView): string {
   return `${sections.map((lines) => lines.join("\n")).join("\n\n")}\n`;
 }
 
-function sha256(text: string): string {
-  return createHash("sha256").update(text).digest("hex");
-}
 
 async function atomicWrite(path: string, content: string): Promise<void> {
   const tmp = `${path}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
@@ -134,27 +131,17 @@ async function readOrNull(path: string): Promise<string | null> {
   }
 }
 
-/** A hand-edited task.md is copied to `task.user-edit.md` before being overwritten. */
 export async function writeRunFiles(
   repo: string,
   runId: string,
   files: { view: TaskView; state: Record<string, unknown> },
-): Promise<{ conflict: boolean }> {
+): Promise<void> {
   const dir = runDir(repo, runId);
   await mkdir(join(dir, "artifacts"), { recursive: true });
   const taskPath = join(dir, "task.md");
   const statePath = join(dir, "state.json");
-
-  const existing = await readOrNull(taskPath);
-  const previousState = await readOrNull(statePath);
-  const storedHash = previousState ? (JSON.parse(previousState) as { taskMdHash?: unknown }).taskMdHash : undefined;
-  const conflict = existing !== null && sha256(existing) !== storedHash;
-  if (conflict) await copyFile(taskPath, join(dir, "task.user-edit.md"));
-
-  const markdown = renderTaskMarkdown(files.view);
-  await atomicWrite(taskPath, markdown);
-  await atomicWrite(statePath, `${JSON.stringify({ ...files.state, taskMdHash: sha256(markdown) }, null, 2)}\n`);
-  return { conflict };
+  await atomicWrite(taskPath, renderTaskMarkdown(files.view));
+  await atomicWrite(statePath, `${JSON.stringify(files.state, null, 2)}\n`);
 }
 
 export async function appendEventLine(repo: string, runId: string, event: object): Promise<void> {

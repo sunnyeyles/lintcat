@@ -10,6 +10,8 @@ import { createFactoryService, type FactoryService } from "#src/engine/service";
 import { detectChecks } from "#src/engine/checks";
 import { ensureFactoryExcluded, repoRoot } from "#src/engine/git";
 import { migrateFactoryDatabase, openFactoryDatabase } from "#src/engine/store/client";
+import { listRuns } from "#src/engine/store/runs";
+import { errorMessage } from "@pr-review/logging";
 import { runDiscovery } from "#src/engine/discovery";
 import { TOOL_VERSION } from "#src/engine/telemetry";
 import type { FactoryRun } from "#src/engine/store/schema";
@@ -50,7 +52,11 @@ export interface CommandContext {
 type Database = ReturnType<typeof openFactoryDatabase>;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const SECRET_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
+
+// Redacted from sandbox output before it is stored or shown to an agent.
+const hostSecrets = (env: CommandContext["env"]) => SECRET_ENV.map((key) => env[key]).filter((v): v is string => !!v && v.length >= 8);
 
 const readOnlyRuntime: AgentRuntime = {
   name: "none",
@@ -73,7 +79,7 @@ async function logRepo(cwd: string): Promise<string> {
 
 function describeDbError(error: unknown, config: FactoryConfig): EnvironmentError {
   const cause = (error as { cause?: unknown }).cause;
-  const reason = cause === undefined ? message(error) : message(cause) || String((cause as { code?: unknown }).code ?? "");
+  const reason = cause === undefined ? errorMessage(error) : errorMessage(cause) || String((cause as { code?: unknown }).code ?? "");
   if (/does not exist|42P01/.test(reason)) return new EnvironmentError("the factory database is not migrated: run `factory init`");
   const where = config.databaseUrl.replace(/\/\/[^@]*@/, "//");
   return new EnvironmentError(
@@ -84,8 +90,7 @@ function describeDbError(error: unknown, config: FactoryConfig): EnvironmentErro
 async function openDatabase(config: FactoryConfig): Promise<Database> {
   const db = openFactoryDatabase(config.databaseUrl);
   try {
-    const probe = createFactoryService({ database: db.database, runtime: readOnlyRuntime, sandboxes: createDockerProvider(), logger: { info() {}, error() {} } });
-    await probe.list({ limit: 1 });
+    await listRuns(db.database, { limit: 1 });
     return db;
   } catch (error) {
     await db.close().catch(() => {});
@@ -99,17 +104,18 @@ async function requireDocker(): Promise<void> {
 
 interface ServiceOptions {
   db: Database;
+  env: CommandContext["env"];
   config: FactoryConfig;
   logRepo: string;
   delivery?: "branch" | "pr";
   runtime?: AgentRuntime;
 }
 
-function makeService({ db, config, logRepo: repo, delivery, runtime }: ServiceOptions): FactoryService {
+function makeService({ db, env, config, logRepo: repo, delivery, runtime }: ServiceOptions): FactoryService {
   return createFactoryService({
     database: db.database,
     runtime: runtime ?? readOnlyRuntime,
-    sandboxes: createDockerProvider(),
+    sandboxes: createDockerProvider({ secrets: hostSecrets(env) }),
     logger: fileLogger(path.join(repo, ".factory", "factory.log")),
     delivery: delivery ?? config.delivery,
     openPullRequest,
@@ -120,12 +126,12 @@ function agentRuntime(ctx: CommandContext, config: FactoryConfig): AgentRuntime 
   return createClaudeRuntime({ auth: config.auth, executable: claudeExecutable(config, ctx.env) });
 }
 
-async function lastEventId(service: FactoryService, runId: string): Promise<number | undefined> {
-  let afterId: number | undefined;
+async function allEvents(service: FactoryService, runId: string) {
+  const all = [];
   for (;;) {
-    const events = await service.events(runId, afterId);
-    if (events.length === 0) return afterId;
-    afterId = events.at(-1)!.id;
+    const page = await service.events(runId, all.at(-1)?.id);
+    if (page.length === 0) return all;
+    all.push(...page);
   }
 }
 
@@ -141,7 +147,7 @@ async function explainUnclaimable(ctx: CommandContext, service: FactoryService, 
 }
 
 async function foreground(ctx: CommandContext, service: FactoryService, runId: string): Promise<number> {
-  let afterId = await lastEventId(service, runId);
+  let afterId = (await allEvents(service, runId)).at(-1)?.id;
   const pump = async () => {
     for (const event of await service.events(runId, afterId)) {
       ctx.out(formatEvent(event));
@@ -186,7 +192,7 @@ async function init(ctx: CommandContext, repoPath: string | undefined): Promise<
   try {
     await buildSandboxImage();
   } catch (error) {
-    throw new EnvironmentError(message(error));
+    throw new EnvironmentError(errorMessage(error));
   }
   ctx.out("✓ sandbox image built");
   await ensureFactoryExcluded(repo);
@@ -203,7 +209,7 @@ async function init(ctx: CommandContext, repoPath: string | undefined): Promise<
     claudeExecutable(config, ctx.env);
     ctx.out(`✓ claude found (auth: ${config.auth})`);
   } catch (error) {
-    ctx.out(`! ${message(error)}`);
+    ctx.out(`! ${errorMessage(error)}`);
   }
   const db = openFactoryDatabase(config.databaseUrl);
   try {
@@ -224,15 +230,7 @@ async function discover(ctx: CommandContext, command: Extract<Command, { kind: "
   const runtime = agentRuntime(ctx, config);
   if (command.run) await requireDocker();
   const db = await openDatabase(config);
-  let promptVersion = "unknown";
-  const tapped: AgentRuntime = {
-    name: runtime.name,
-    run(spec) {
-      promptVersion = spec.promptVersion;
-      return runtime.run(spec);
-    },
-  };
-  const service = makeService({ db, config, logRepo: repo, delivery, runtime: tapped });
+  const service = makeService({ db, env: ctx.env, config, logRepo: repo, delivery, runtime });
   const rl = createInterface({ input: ctx.stdin, output: ctx.stdout });
   rl.on("SIGINT", ctx.interrupt);
   const io = createTerminalIO({
@@ -243,7 +241,6 @@ async function discover(ctx: CommandContext, command: Extract<Command, { kind: "
     ask: (prompt) => rl.question(prompt, { signal: ctx.signal }),
     out: ctx.out,
     progress: (text) => ctx.err(`  … ${text}`),
-    promptVersion: () => promptVersion,
   });
   const discard = async () => {
     const runId = io.runId();
@@ -252,7 +249,7 @@ async function discover(ctx: CommandContext, command: Extract<Command, { kind: "
   try {
     let result: Awaited<ReturnType<typeof runDiscovery>>;
     try {
-      result = await runDiscovery({ runtime: tapped, repoPath: repo, outcome: command.outcome, io, signal: ctx.signal });
+      result = await runDiscovery({ runtime, repoPath: repo, outcome: command.outcome, io, signal: ctx.signal });
     } catch (error) {
       await discard();
       if (ctx.signal.aborted) {
@@ -284,7 +281,7 @@ async function runOne(ctx: CommandContext, runId: string): Promise<number> {
   const config = readConfig(ctx.env);
   const db = await openDatabase(config);
   try {
-    const run = await makeService({ db, config, logRepo: await logRepo(ctx.cwd) }).get(runId);
+    const run = await makeService({ db, env: ctx.env, config, logRepo: await logRepo(ctx.cwd) }).get(runId);
     if (!run) {
       ctx.err(`no run ${runId}`);
       return 1;
@@ -292,7 +289,7 @@ async function runOne(ctx: CommandContext, runId: string): Promise<number> {
     const runtime = agentRuntime(ctx, config);
     await requireDocker();
     const delivery = run.contract.permittedOperations.openPullRequest ? "pr" : config.delivery;
-    return await foreground(ctx, makeService({ db, config, logRepo: run.repoPath, delivery, runtime }), runId);
+    return await foreground(ctx, makeService({ db, env: ctx.env, config, logRepo: run.repoPath, delivery, runtime }), runId);
   } finally {
     await db.close();
   }
@@ -304,7 +301,7 @@ async function worker(ctx: CommandContext, pollMs: number): Promise<number> {
   await requireDocker();
   const db = await openDatabase(config);
   try {
-    const service = makeService({ db, config, logRepo: await logRepo(ctx.cwd), runtime });
+    const service = makeService({ db, env: ctx.env, config, logRepo: await logRepo(ctx.cwd), runtime });
     ctx.out(`factory worker polling every ${pollMs}ms (delivery: ${config.delivery}); Ctrl-C stops after the current run`);
     await service.worker({ signal: ctx.signal, pollMs, onRun: (r) => ctx.out(`${new Date().toISOString()} ${r.runId} ${r.status}`) });
     return 0;
@@ -317,7 +314,7 @@ async function withService<T>(ctx: CommandContext, work: (service: FactoryServic
   const config = readConfig(ctx.env);
   const db = await openDatabase(config);
   try {
-    return await work(makeService({ db, config, logRepo: await logRepo(ctx.cwd) }));
+    return await work(makeService({ db, env: ctx.env, config, logRepo: await logRepo(ctx.cwd) }));
   } finally {
     await db.close();
   }
@@ -327,15 +324,6 @@ async function getOrReport(ctx: CommandContext, service: FactoryService, runId: 
   const run = await service.get(runId);
   if (!run) ctx.err(`no run ${runId}`);
   return run;
-}
-
-async function allEvents(service: FactoryService, runId: string) {
-  const all = [];
-  for (;;) {
-    const page = await service.events(runId, all.at(-1)?.id);
-    if (page.length === 0) return all;
-    all.push(...page);
-  }
 }
 
 async function status(ctx: CommandContext, runId: string | undefined): Promise<number> {
@@ -414,7 +402,6 @@ export function runCommand(ctx: CommandContext, command: Command): Promise<numbe
     case "new":
       return discover(ctx, command);
     case "run":
-    case "resume":
       return runOne(ctx, command.runId);
     case "worker":
       return worker(ctx, command.pollMs);

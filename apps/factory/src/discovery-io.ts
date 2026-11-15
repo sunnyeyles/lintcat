@@ -13,7 +13,6 @@ export interface TerminalIOOptions {
   ask: (prompt: string) => Promise<string>;
   out: (text: string) => void;
   progress: (text: string) => void;
-  promptVersion: () => string;
 }
 
 export interface TerminalIO extends DiscoveryIO {
@@ -52,11 +51,11 @@ export function createTerminalIO(options: TerminalIOOptions): TerminalIO {
       return answer || "(no answer: use your best judgement and record it as an assumption)";
     },
 
-    async review(spec: Spec): Promise<ReviewDecision> {
+    async review(spec: Spec, promptVersion: string): Promise<ReviewDecision> {
       const { run, route } = await service.propose({
         repoPath: options.repoPath,
         spec,
-        promptVersion: options.promptVersion(),
+        promptVersion,
         allowPullRequest: options.allowPullRequest,
         ...(options.profile ? { profileOverride: options.profile } : {}),
         ...(runId ? { runId } : {}),

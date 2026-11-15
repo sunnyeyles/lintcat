@@ -22,7 +22,7 @@ export type ReviewDecision = { decision: "approve" } | { decision: "revise"; fee
 
 export interface DiscoveryIO {
   ask(turn: Extract<DiscoveryTurn, { kind: "question" }>): Promise<string>;
-  review(spec: Spec): Promise<ReviewDecision>;
+  review(spec: Spec, promptVersion: string): Promise<ReviewDecision>;
   progress?(message: string): void;
 }
 
@@ -159,7 +159,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       continue;
     }
 
-    const decision = await io.review(turn.spec);
+    const decision = await io.review(turn.spec, step.promptVersion);
     if (decision.decision === "approve") {
       return { status: "approved", spec: turn.spec, promptVersion: step.promptVersion, usage };
     }

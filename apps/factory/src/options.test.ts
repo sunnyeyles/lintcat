@@ -42,7 +42,7 @@ describe("the factory command line", () => {
   });
 
   it("takes a run id for the run commands", () => {
-    for (const kind of ["run", "resume", "cancel", "result"] as const) {
+    for (const kind of ["run", "cancel", "result"] as const) {
       expect(parseArguments([kind, "r1"])).toEqual({ kind, runId: "r1" });
       expect(() => parseArguments([kind])).toThrow(/needs a run id/);
     }

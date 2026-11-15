@@ -35,7 +35,7 @@ type HistoryRun = Pick<
   "id" | "repoPath" | "status" | "profile" | "workflowVersion" | "createdAt" | "finishedAt" | "blocker" | "outcome"
 >;
 
-export interface RunHistory {
+interface RunHistory {
   runs: HistoryRun[];
   eventsByRun: Map<string, HistoryEvent[]>;
   commandsByRun: Map<string, HistoryCommand[]>;
@@ -48,7 +48,7 @@ function group<T extends { runId: string }>(rows: T[]): Map<string, T[]> {
 }
 
 /** Terminal runs that reached a profile, with their events and commands. */
-export async function loadRunHistory(database: FactoryDatabase, filter: HistoryFilter = {}): Promise<RunHistory> {
+async function loadRunHistory(database: FactoryDatabase, filter: HistoryFilter = {}): Promise<RunHistory> {
   const conditions: SQL[] = [inArray(factoryRuns.status, [...TERMINAL]), isNotNull(factoryRuns.profile)];
   if (filter.repoPath) conditions.push(eq(factoryRuns.repoPath, filter.repoPath));
   if (filter.since) conditions.push(gte(factoryRuns.createdAt, filter.since));
@@ -127,7 +127,6 @@ const KNOWN_KINDS = new Set([
   "run_delivered",
   "run_failed",
   "run_cancelled",
-  "task_md_conflict",
   "baseline_recorded",
   "bug_reproduced",
   "reproduce_rejected",
@@ -136,7 +135,7 @@ const KNOWN_KINDS = new Set([
 ]);
 
 // A failing check while reproducing a bug is the point of that stage, not a failure.
-export const EXPECTED_FAILURE_STAGES = new Set(["reproduce"]);
+const EXPECTED_FAILURE_STAGES = new Set(["reproduce"]);
 
 const ratio = (part: number, whole: number) => (whole === 0 ? null : part / whole);
 

@@ -11,7 +11,7 @@ export type Command =
       pr: boolean;
       run: boolean;
     }
-  | { kind: "run" | "resume" | "cancel" | "result"; runId: string }
+  | { kind: "run" | "cancel" | "result"; runId: string }
   | { kind: "worker"; pollMs: number }
   | { kind: "status"; runId: string | undefined }
   | { kind: "logs"; runId: string; follow: boolean }
@@ -33,8 +33,7 @@ Commands:
   init [--repo <path>]                 Check Docker and the database, build the sandbox image
   new "<outcome>" [--repo <path>]      Discover, approve and run a task
       [--profile quick|bugfix|feature|refactor] [--pr] [--no-run]
-  run <id>                             Run a queued run in the foreground
-  resume <id>                          Recover a run whose worker died
+  run <id>                             Run a queued run, or recover one whose worker died
   worker [--poll-ms <n>]               Run queued tasks until interrupted
   status [<id>]                        One run, or the recent runs and per-profile summary
   logs <id> [-f]                       A run's events; -f follows until it finishes
@@ -102,7 +101,7 @@ function positionals(parsed: Parsed, command: string, count: number, label: stri
   return parsed.positional;
 }
 
-function runIdCommand(kind: "run" | "resume" | "cancel" | "result", parsed: Parsed): Command {
+function runIdCommand(kind: "run" | "cancel" | "result", parsed: Parsed): Command {
   allow(parsed, []);
   const [runId] = positionals(parsed, kind, 1, "a run id");
   return { kind, runId: runId! };
@@ -150,7 +149,6 @@ export function parseArguments(argv: readonly string[]): Command {
       };
     }
     case "run":
-    case "resume":
     case "cancel":
     case "result":
       return runIdCommand(command, parsed);

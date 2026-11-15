@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assertFrozen, ContractTamperedError, freezeContract, recordDecision, type TaskContract } from "#src/engine/contract";
+import { assertFrozen, freezeContract, recordDecision, type TaskContract } from "#src/engine/contract";
 import { loadPrompt } from "#src/engine/prompts";
 import { routeTask } from "#src/engine/profiles";
 import { sampleSpec } from "#src/engine/test-fixtures";
@@ -26,7 +26,7 @@ describe("task contract", () => {
     expect(() => assertFrozen(frozen)).not.toThrow();
     expect(() => freezeContract(frozen, new Date())).toThrow(/already approved/);
     const edited = { ...frozen, spec: { ...frozen.spec, acceptanceCriteria: [] } };
-    expect(() => assertFrozen(edited)).toThrow(ContractTamperedError);
+    expect(() => assertFrozen(edited)).toThrow(/changed after approval/);
   });
 
   it("lets implementation decisions be appended without breaking the freeze", () => {
@@ -36,7 +36,7 @@ describe("task contract", () => {
   });
 
   it("refuses to approve an unrouted pending contract", () => {
-    expect(() => assertFrozen(draft)).toThrow(ContractTamperedError);
+    expect(() => assertFrozen(draft)).toThrow(/changed after approval/);
   });
 });
 
