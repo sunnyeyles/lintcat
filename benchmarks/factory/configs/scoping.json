@@ -1,0 +1,5 @@
+{
+  "name": "scoping",
+  "description": "The scoper on the scoping fixtures, three times each since single runs vary",
+  "repeat": 3
+}

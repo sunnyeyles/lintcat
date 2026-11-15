@@ -36,6 +36,25 @@ describe("rendering a spec", () => {
     expect(text).toContain("Blocked:   greenfield is out of scope");
     expect(text).not.toContain("Profile:");
   });
+
+  it("shows the scoper's pushback, whether discovery applied it, and its follow-ups", () => {
+    const scoping = {
+      verdict: "change" as const,
+      from: "bugfix" as const,
+      proposed: "refactor" as const,
+      reason: "the null check is missing at 4 call sites",
+      evidence: ["src/a.mjs:3"],
+      followUps: ["Drop the legacy helper"],
+      applied: true,
+      promptVersion: "scoper@1+abcd1234",
+    };
+    const route = { ok: true as const, profile: "refactor" as const, reason: "structural change", overridden: false };
+    const text = renderSpec({ ...spec, category: "refactor", scoping }, route, "r1");
+    expect(text).toContain("Scoping:   proposed refactor instead of bugfix (applied): the null check is missing at 4 call sites\n  - src/a.mjs:3");
+    expect(text).toContain("Follow-ups:\n  - Drop the legacy helper");
+    expect(renderSpec({ ...spec, scoping: { ...scoping, applied: false } }, route, "r1")).toContain("(rebutted)");
+    expect(renderSpec(spec, route, "r1")).not.toContain("Scoping:");
+  });
 });
 
 describe("formatting an event", () => {

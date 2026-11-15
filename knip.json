@@ -8,6 +8,7 @@
       ],
       "ignore": [
         "benchmarks/factory/fixtures/**",
+        "benchmarks/factory/scoping/**",
         "scripts/run-trace-examples/**"
       ]
     },

@@ -1,0 +1,33 @@
+{
+  "title": "Fix the crash on the profile page for a deleted user",
+  "objective": "Opening the profile of a deleted user shows 'Unknown user' instead of crashing.",
+  "category": "bugfix",
+  "requirements": [
+    "displayName returns 'Unknown user' when the user does not exist"
+  ],
+  "nonGoals": [],
+  "constraints": [
+    "keep the named exports of src/profile.mjs"
+  ],
+  "acceptanceCriteria": [
+    {
+      "id": "AC1",
+      "text": "Given no user u9, when displayName('u9') is called, then it returns 'Unknown user'",
+      "verification": "automated"
+    }
+  ],
+  "plan": [
+    "Write a failing test for displayName with an unknown id",
+    "Add a missing-user check in src/profile.mjs"
+  ],
+  "architectureDecisions": [
+    "Fix src/profile.mjs in place"
+  ],
+  "repositoryFindings": [
+    "displayName dereferences findUser(id) without checking it"
+  ],
+  "assumptions": [],
+  "estimatedFiles": 2,
+  "risk": "low",
+  "touchesSecurityOrData": false
+}

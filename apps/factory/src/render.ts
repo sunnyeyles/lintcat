@@ -9,6 +9,18 @@ export const TERMINAL_STATUSES: readonly FactoryRun["status"][] = ["delivered", 
 const list = (heading: string, items: readonly string[]): string[] =>
   items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `  - ${item}`)];
 
+function scopingLines(scoping: Spec["scoping"]): string[] {
+  if (!scoping) return [];
+  const verdict =
+    scoping.verdict === "change"
+      ? [
+          `Scoping:   proposed ${scoping.proposed} instead of ${scoping.from} (${scoping.applied ? "applied" : "rebutted"}): ${scoping.reason}`,
+          ...scoping.evidence.map((e) => `  - ${e}`),
+        ]
+      : [];
+  return [...verdict, ...list("Follow-ups", scoping.followUps)];
+}
+
 export function renderSpec(spec: Spec, route: Route, runId: string): string {
   const routing = route.ok
     ? `Profile:   ${route.profile}${route.overridden ? " (overridden)" : ""}: ${route.reason}`
@@ -17,6 +29,7 @@ export function renderSpec(spec: Spec, route: Route, runId: string): string {
     `── ${spec.title} (${runId})`,
     `Objective: ${spec.objective}`,
     `Category:  ${spec.category}   Risk: ${spec.risk}${spec.touchesSecurityOrData ? " (touches security or data)" : ""}   ~${spec.estimatedFiles} files`,
+    ...scopingLines(spec.scoping),
     routing,
     ...list("Requirements", spec.requirements),
     "Acceptance criteria:",

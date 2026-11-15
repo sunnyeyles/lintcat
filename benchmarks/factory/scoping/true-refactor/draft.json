@@ -1,0 +1,36 @@
+{
+  "title": "Remove the duplicate formatPriceRounded",
+  "objective": "One price formatter instead of two copies of the same code.",
+  "category": "refactor",
+  "requirements": [
+    "formatPriceRounded is deleted and its callers use formatPrice",
+    "every price renders exactly as before"
+  ],
+  "nonGoals": [
+    "changing currency handling"
+  ],
+  "constraints": [],
+  "acceptanceCriteria": [
+    {
+      "id": "AC1",
+      "text": "Given the existing tests, when they run after the change, then they all pass unchanged",
+      "verification": "automated"
+    }
+  ],
+  "plan": [
+    "Point src/invoice.mjs at formatPrice",
+    "Delete formatPriceRounded from src/prices.mjs"
+  ],
+  "architectureDecisions": [
+    "Keep formatPrice in src/prices.mjs"
+  ],
+  "repositoryFindings": [
+    "src/prices.mjs exports formatPrice and formatPriceRounded"
+  ],
+  "assumptions": [
+    "the two formatters are duplicates"
+  ],
+  "estimatedFiles": 2,
+  "risk": "low",
+  "touchesSecurityOrData": false
+}

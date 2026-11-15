@@ -25,3 +25,4 @@ export { loadBenchConfig } from "#src/bench/config";
 export { listFixtures } from "#src/bench/fixtures";
 export { loadResults, resultDirName, runBenchmark, type BenchResult } from "#src/bench/runner";
 export { renderComparison } from "#src/bench/compare";
+export { listScopingFixtures, runScopingBenchmark, summarizeScoping, type ScopingResult } from "#src/bench/scoping";

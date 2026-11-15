@@ -1,0 +1,10 @@
+{
+  "categories": [
+    "refactor"
+  ],
+  "mustCite": [
+    "src/users.mjs",
+    "src/email.mjs",
+    "src/billing.mjs"
+  ]
+}

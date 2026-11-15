@@ -1,0 +1,4 @@
+{
+  "description": "A missing-user crash reported on one page; the same unchecked lookup sits at four call sites",
+  "baseSha": "8f6bae3fd006761c01a4951197ee2622a50abfef"
+}

@@ -1,0 +1,4 @@
+{
+  "description": "A 'remove the duplicate' refactor whose two formatters round differently",
+  "baseSha": "41ca44f2bff693c085d0ef9205b6893a2314c6f4"
+}

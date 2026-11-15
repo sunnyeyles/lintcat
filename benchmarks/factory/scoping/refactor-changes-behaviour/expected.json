@@ -1,0 +1,10 @@
+{
+  "categories": [
+    "bugfix",
+    "feature"
+  ],
+  "mustCite": [
+    "src/prices.mjs",
+    "src/invoice.mjs"
+  ]
+}

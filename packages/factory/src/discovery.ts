@@ -5,9 +5,10 @@ import { join } from "node:path";
 import { collectRun, type AgentRuntime, type AgentUsage } from "@pr-review/agent-runtime";
 import { z } from "zod";
 
-import { specSchema, type ProfileName, type Spec } from "#src/contract";
-import { loadPrompt } from "#src/prompts";
+import { specSchema, type ProfileName, type Scoping, type Spec } from "#src/contract";
+import { loadPrompt, renderMessage } from "#src/prompts";
 import { runDir } from "#src/run-files";
+import { runScoper } from "#src/scoping";
 import type { FactoryService, ProposalResult } from "#src/service";
 
 // Flat rather than a union: structured output schemas handle one object shape most reliably.
@@ -16,7 +17,7 @@ const turnSchema = z.object({
   question: z.string().optional(),
   facts: z.array(z.string()).optional(),
   assumptions: z.array(z.string()).optional(),
-  spec: specSchema.optional(),
+  spec: specSchema.omit({ scoping: true }).optional(),
 });
 
 export type DiscoveryTurn =
@@ -49,6 +50,9 @@ export type DiscoveryResult =
 interface DiscoveryState {
   sessionId?: string;
   questions: number;
+  /** The scoper runs once per discovery, on its first proposal. */
+  scoped?: boolean;
+  scoping?: Omit<Scoping, "applied">;
 }
 
 interface DiscoveryStepOptions {
@@ -69,10 +73,29 @@ interface DiscoveryStep {
 }
 
 const discoveryMessages = {
-  outcome: (outcome: string) => `Desired outcome:\n\n${outcome}`,
-  answer: (answer: string) => `Answer: ${answer}`,
-  revise: (feedback: string) => `Revise the spec with this feedback, then propose it again:\n\n${feedback}`,
+  outcome: (outcome: string) => renderMessage("discovery", "outcome", { outcome }),
+  answer: (answer: string) => renderMessage("discovery", "answer", { answer }),
+  revise: (feedback: string) => renderMessage("discovery", "revise", { feedback }),
 };
+
+const bullets = (items: readonly string[]) => items.map((item) => `- ${item}`).join("\n");
+
+function scopingMessage(scoping: Omit<Scoping, "applied">): string {
+  return renderMessage("discovery", "scoping", {
+    proposed: scoping.proposed,
+    from: scoping.from,
+    reason: scoping.reason,
+    evidence: bullets(scoping.evidence),
+    followUps: scoping.followUps.length ? `\nIt also suggests splitting out:\n${bullets(scoping.followUps)}\n` : "",
+  });
+}
+
+/** Code, not either agent, puts the scoper's record on the spec the person approves. */
+function withScoping(spec: Spec, scoping: Omit<Scoping, "applied"> | undefined): Spec {
+  const { scoping: _modelWritten, ...rest } = spec;
+  if (!scoping || (scoping.verdict === "accept" && !scoping.followUps.length)) return rest;
+  return { ...rest, scoping: { ...scoping, applied: rest.category === scoping.proposed } };
+}
 
 function parseTurn(structured: unknown): DiscoveryTurn {
   const turn = turnSchema.parse(structured);
@@ -91,7 +114,7 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
   const prompt = loadPrompt("discovery");
   const outputSchema = z.toJSONSchema(turnSchema) as Record<string, unknown>;
   const usage: AgentUsage[] = [];
-  let { sessionId, questions } = options.state;
+  let { sessionId, questions, scoped, scoping } = options.state;
   let message = options.message;
   let repairs = 0;
 
@@ -124,16 +147,29 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
       repairs = 0;
     } catch (error) {
       if (++repairs > 2) throw error;
-      message = `Your last answer did not match the schema (${String(error)}). Answer again.`;
+      message = renderMessage("discovery", "schema-retry", { error: String(error) });
       continue;
     }
 
     if (turn.kind === "question" && questions >= maxQuestions) {
-      message = "No more questions: propose the spec now, recording every open point as an assumption.";
+      message = renderMessage("discovery", "no-more-questions");
       continue;
     }
+    if (turn.kind === "proposal" && !scoped) {
+      scoped = true;
+      options.progress?.("scoping…");
+      const review = await runScoper({ runtime, repoPath, spec: turn.spec, ...(options.signal ? { signal: options.signal } : {}) });
+      usage.push(review.usage);
+      scoping = review.scoping;
+      if (scoping.verdict === "change") {
+        message = scopingMessage(scoping);
+        continue;
+      }
+    }
     if (turn.kind === "question") questions++;
-    return { turn, state: { ...(sessionId ? { sessionId } : {}), questions }, promptVersion: prompt.version, usage };
+    if (turn.kind === "proposal") turn = { kind: "proposal", spec: withScoping(turn.spec, scoping) };
+    const state: DiscoveryState = { ...(sessionId ? { sessionId } : {}), questions, ...(scoped ? { scoped } : {}), ...(scoping ? { scoping } : {}) };
+    return { turn, state, promptVersion: prompt.version, usage };
   }
 }
 
@@ -273,9 +309,9 @@ export async function continueDiscovery(options: TurnOptions & { runId: string; 
   }
   const session = await loadDiscoverySession(run.repoPath, run.id);
   if (!session) throw new Error(`run ${run.id} was not started by discovery; propose a revised spec with factory_start instead`);
-  const answer = options.answer.trim() || "(no answer: use your best judgement and record it as an assumption)";
+  const answer = options.answer.trim() || renderMessage("discovery", "no-answer");
   if (session.pending === "outcome") {
-    return advance(options, session, `${discoveryMessages.outcome(session.outcome)}\n\nMore context: ${answer}`);
+    return advance(options, session, renderMessage("discovery", "more-context", { outcome: session.outcome, answer }));
   }
   if (session.pending === "question") return advance(options, session, discoveryMessages.answer(answer));
   const maxRevisions = options.maxRevisions ?? 3;

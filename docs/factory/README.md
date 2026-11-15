@@ -16,7 +16,8 @@ The factory turns a conversation into a verified git branch. You describe an out
 
 ```
 factory new "<outcome>"
-  discovery agent (read-only tools) ── one question at a time ──▶ spec
+  discovery agent (read-only tools) ── one question at a time ──▶ draft spec
+  scoper agent (read-only, once) checks the category against the code; discovery applies or rebuts ──▶ spec
   router picks a profile ──▶ awaiting_approval ──▶ ✋ one approval (contract frozen by sha256)
   queued ──▶ claimed with a lease (SKIP LOCKED) ──▶ running
     prepare   worktree .factory/worktrees/<id> on factory/<slug>-<id>; container; install with network; network cut

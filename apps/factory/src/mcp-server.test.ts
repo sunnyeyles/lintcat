@@ -144,6 +144,7 @@ describe("factory MCP server", () => {
     turns.push(
       () => ({ structured: { kind: "question", question: "Which flag name?", facts: ["CLI in cli.js"] } }),
       () => ({ structured: { kind: "proposal", spec } }),
+      () => ({ structured: { verdict: "accept", reason: "", evidence: [], followUps: [] } }),
       () => ({ structured: { kind: "proposal", spec: { ...spec, title: "Add --version and -v" } } }),
     );
     const start = await call("factory_start", { repoPath: repo, outcome: "add a version flag" });
@@ -165,7 +166,9 @@ describe("factory MCP server", () => {
 
     const revised = await call("factory_answer", { runId, answer: "also -v" });
     expect(revised.data.spec.title).toBe("Add --version and -v");
-    expect(runtime.specs[2]?.prompt).toMatch(/Revise the spec[\s\S]*also -v/);
+    expect(runtime.specs[2]?.role).toBe("scoper");
+    expect(runtime.specs[3]?.prompt).toMatch(/Revise the spec[\s\S]*also -v/);
+    expect(runtime.specs.filter((s) => s.role === "scoper")).toHaveLength(1);
     expect((await call("factory_status", { runId })).data.run).toMatchObject({ status: "awaiting_approval", title: "Add --version and -v" });
 
     const approve = await call("factory_approve", { runId });
@@ -174,7 +177,11 @@ describe("factory MCP server", () => {
   });
 
   it("keeps a draft whose first turn failed so factory_answer can retry it", async () => {
-    turns.push(() => ({ ok: false }), () => ({ structured: { kind: "proposal", spec } }));
+    turns.push(
+      () => ({ ok: false }),
+      () => ({ structured: { kind: "proposal", spec } }),
+      () => ({ structured: { verdict: "accept", reason: "", evidence: [], followUps: [] } }),
+    );
     const start = await call("factory_start", { repoPath: repo, outcome: "add a version flag" });
     expect(start.result.isError).toBe(true);
     const runId = /run (r\w+) is kept as a draft/.exec(start.text)?.[1];

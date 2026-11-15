@@ -12,11 +12,28 @@ const acceptanceCriterionSchema = z.object({
   verification: z.enum(["automated", "manual"]),
 });
 
+export const categorySchema = z.enum(["quick", "bugfix", "feature", "refactor", "greenfield"]);
+export type Category = z.infer<typeof categorySchema>;
+
+/** What the scoper said about the draft; written by code, never by discovery. */
+const scopingSchema = z.object({
+  verdict: z.enum(["accept", "change"]),
+  from: categorySchema,
+  proposed: categorySchema,
+  reason: z.string(),
+  evidence: z.array(z.string()),
+  followUps: z.array(z.string()),
+  applied: z.boolean(),
+  promptVersion: z.string(),
+});
+export type Scoping = z.infer<typeof scopingSchema>;
+
 /** What discovery proposes and the user approves. */
 export const specSchema = z.object({
   title: z.string().min(1).max(120),
   objective: z.string().min(1),
-  category: z.enum(["quick", "bugfix", "feature", "refactor", "greenfield"]),
+  category: categorySchema,
+  scoping: scopingSchema.optional(),
   requirements: z.array(z.string().min(1)).min(1),
   nonGoals: z.array(z.string()),
   constraints: z.array(z.string()),

@@ -1,0 +1,4 @@
+{
+  "description": "The same report and draft, but every other call site already handles a missing user",
+  "baseSha": "c97813237f1f6c9f2b6e142153ff31739d26769a"
+}

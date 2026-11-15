@@ -29,7 +29,7 @@ import {
   type FactoryConfig,
 } from "#src/config";
 import { createTerminalIO } from "#src/discovery-io";
-import { benchCompare, benchRun } from "#src/bench";
+import { benchCompare, benchRun, benchScoping } from "#src/bench";
 import { serveMcp } from "#src/mcp";
 import { USAGE, type Command } from "#src/options";
 import {
@@ -236,7 +236,7 @@ async function discover(ctx: CommandContext, command: Extract<Command, { kind: "
   const tapped: AgentRuntime = {
     name: runtime.name,
     run(spec) {
-      promptVersion = spec.promptVersion;
+      if (spec.role === "discovery") promptVersion = spec.promptVersion;
       return runtime.run(spec);
     },
   };
@@ -440,6 +440,8 @@ export function runCommand(ctx: CommandContext, command: Command): Promise<numbe
       return prune(ctx, command, { openDatabase });
     case "bench-run":
       return benchRun(ctx, command, { openDatabase, agentRuntime, requireDocker });
+    case "bench-scoping":
+      return benchScoping(ctx, command, { agentRuntime });
     case "bench-compare":
       return Promise.resolve(benchCompare(ctx, command));
     case "mcp":

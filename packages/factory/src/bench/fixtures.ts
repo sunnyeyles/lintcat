@@ -73,6 +73,17 @@ function filesUnder(root: string, prefix = ""): string[] {
 
 /** Builds the fixture repo in `target` and refuses it unless its HEAD is the recorded SHA. */
 export async function buildFixture(fixture: Fixture, target: string): Promise<{ repoPath: string; sha: string }> {
+  const built = await buildRepo(fixture, target);
+  await mkdir(path.join(target, ".factory"), { recursive: true });
+  await writeFile(path.join(target, ".factory", "checks"), `${fixture.checks}\n`);
+  return built;
+}
+
+/** Commits `<dir>/repo` into `target` with a fixed identity and date, so the SHA is reproducible. */
+export async function buildRepo(
+  fixture: { name: string; dir: string; baseSha: string },
+  target: string,
+): Promise<{ repoPath: string; sha: string }> {
   const source = path.join(fixture.dir, "repo");
   await mkdir(target, { recursive: true });
   await git(target, "init", "-q", "-b", "main");
@@ -89,7 +100,5 @@ export async function buildFixture(fixture: Fixture, target: string): Promise<{ 
   await git(target, "config", "user.name", GIT_ENV.GIT_AUTHOR_NAME);
   await git(target, "config", "user.email", GIT_ENV.GIT_AUTHOR_EMAIL);
   await git(target, "config", "commit.gpgsign", "false");
-  await mkdir(path.join(target, ".factory"), { recursive: true });
-  await writeFile(path.join(target, ".factory", "checks"), `${fixture.checks}\n`);
   return { repoPath: target, sha };
 }

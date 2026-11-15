@@ -19,6 +19,7 @@ export type Command =
   | { kind: "report"; json: boolean; repoPath: string | undefined; sinceDays: number | undefined }
   | { kind: "prune"; days: number | undefined }
   | { kind: "bench-run"; configPath: string; fixtures: string[] | undefined; keep: boolean }
+  | { kind: "bench-scoping"; configPath: string; fixtures: string[] | undefined }
   | { kind: "bench-compare"; a: string; b: string }
   | { kind: "help" }
   | { kind: "version" };
@@ -49,6 +50,8 @@ Commands:
   prune [--days <n>]                   Drop old runs' events and commands (FACTORY_RETENTION_DAYS)
   bench run --config <file>            Run benchmark fixtures, judged by hidden checks
       [--fixture a,b] [--keep]           (evaluate is an alias of bench)
+  bench scoping --config <file>        Grade the scoper on the scoping fixtures (no Docker)
+      [--fixture a,b]
   bench compare <a> <b>                Compare two configs' results (config files or result dirs)
   help | version
 
@@ -189,12 +192,20 @@ export function parseArguments(argv: readonly string[]): Command {
         const fixtures = parsed.values.get("fixture")?.split(",").map((f) => f.trim()).filter(Boolean);
         return { kind: "bench-run", configPath, fixtures, keep: parsed.switches.has("keep") };
       }
+      if (action === "scoping") {
+        allow(parsed, ["config", "fixture"]);
+        if (rest.length) throw new UsageError(`unexpected argument ${JSON.stringify(rest[0])}`);
+        const configPath = parsed.values.get("config");
+        if (!configPath) throw new UsageError(`${command} scoping needs --config <file>`);
+        const fixtures = parsed.values.get("fixture")?.split(",").map((f) => f.trim()).filter(Boolean);
+        return { kind: "bench-scoping", configPath, fixtures };
+      }
       if (action === "compare") {
         allow(parsed, []);
         if (rest.length !== 2) throw new UsageError(`${command} compare needs two configs or result directories`);
         return { kind: "bench-compare", a: rest[0]!, b: rest[1]! };
       }
-      throw new UsageError(`${command} needs run or compare`);
+      throw new UsageError(`${command} needs run, scoping or compare`);
     }
     case "mcp":
       allow(parsed, []);

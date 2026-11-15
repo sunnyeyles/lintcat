@@ -92,8 +92,30 @@ node apps/factory/start.mjs bench compare benchmarks/factory/configs/baseline.js
 | `budgets` | overrides any of the contract's budgets before approval |
 | `profileOverride` | routes through the router's normal override rules |
 | `fixtures`, `repeat` | which fixtures to run, and how many times each |
+| `prompts` | a prompt set folder, relative to the bench dir, used in place of `packages/factory/agents/` |
 
-The config hash is the sha256 of the parsed, key-sorted config, so formatting changes don't split one configuration in two. Every result also records the run's `workflowVersion`, the `promptVersions` seen in its events and the `toolVersion`. A prompt or workflow edit is visible in the comparison even under the same config. To compare prompt sets, run the same config before and after the edit, and the header shows both prompt versions.
+The config hash is the sha256 of the parsed, key-sorted config, so formatting changes don't split one configuration in two. Every result also records the run's `workflowVersion`, the `promptVersions` seen in its events and the `toolVersion`. A prompt or workflow edit is visible in the comparison even under the same config. To compare prompt sets, copy `packages/factory/agents/` somewhere, edit it, and point a second config's `prompts` at the copy; or run the same config before and after an edit. The header shows both prompt versions.
+
+### Prompts
+
+Every agent's wording lives in `packages/factory/agents/<role>/`: `system.md` (with `role` and `version` frontmatter) and one template per message the factory sends, with `{{name}}` slots. The recorded prompt version hashes the whole folder, so editing any message changes it. A set must be complete, and a template rendered with a missing or extra value throws. `FACTORY_PROMPTS_DIR` points the factory at another set. It is an operator setting only: prompts are never read from the repository being worked on.
+
+### Scoping fixtures
+
+```bash
+node apps/factory/start.mjs bench scoping --config benchmarks/factory/configs/scoping.json [--fixture a,b]
+```
+
+These grade only the scoper, the read-only agent that checks discovery's category against the code before the person sees the spec. No Docker or database is needed. `benchmarks/factory/scoping/<name>/` holds `repo/` (built by `buildRepo()` to `fixture.json`'s `baseSha`), `draft.json` (the spec as discovery hands it over) and `expected.json` (the accepted categories and the files a pushback must cite), which stays outside the repo the scoper reads.
+
+| Fixture | Draft | Expected |
+| --- | --- | --- |
+| `bandaid-null-check` | bugfix: guard one page against a missing user | refactor: four callers dereference the same unchecked lookup |
+| `oneoff-null-check` | the same draft | bugfix: every other caller already handles it |
+| `refactor-changes-behaviour` | refactor: delete a "duplicate" price formatter | bugfix or feature: the two round differently |
+| `true-refactor` | the same draft | refactor: they really are copies |
+
+Each pair shares one draft, so only the code tells them apart. Grading is deterministic: the proposed category must be one expected, and a pushback must name every `mustCite` file. The summary counts right pushbacks on mislabelled drafts and false pushbacks on correct ones separately. Results go to `results/scoping/<name>-<hash8>/`.
 
 ### Results and comparison
 

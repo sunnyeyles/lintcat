@@ -13,6 +13,8 @@ const benchConfigSchema = z
     model: z.string().min(1).optional(),
     budgets: budgetsSchema.partial().optional(),
     profileOverride: z.enum(PROFILE_NAMES).optional(),
+    /** A prompt set folder, relative to the bench dir, in place of packages/factory/agents. */
+    prompts: z.string().min(1).optional(),
     fixtures: z.array(z.string().min(1)).optional(),
     repeat: z.number().int().min(1).max(10).default(1),
   })
