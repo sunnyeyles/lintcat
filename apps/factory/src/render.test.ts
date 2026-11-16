@@ -48,7 +48,7 @@ describe("rendering a scoping record", () => {
 
   it("shows an applied change after the category, with its evidence", () => {
     const text = renderSpec({ ...spec, category: "refactor", scoping }, route, "r1");
-    expect(text).toMatch(/Category:.*\nScoping:   proposed refactor instead of bugfix \(applied\): three call sites\n  - src\/a.ts:10 parses by hand/);
+    expect(text).toMatch(/Category:.*\nScoping: {3}proposed refactor instead of bugfix \(applied\): three call sites\n {2}- src\/a.ts:10 parses by hand/);
   });
 
   it("shows a rebuttal", () => {
