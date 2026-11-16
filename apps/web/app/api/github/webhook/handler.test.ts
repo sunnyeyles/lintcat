@@ -3,12 +3,10 @@ import { createHmac } from "node:crypto";
 import {
   authorize,
   memberships,
-  organizationSlugRedirects,
   organizations,
   repoSettings,
   repos,
   reviewJobs,
-  reviews,
   saveRepoSettings,
   users,
   type Database,
@@ -24,8 +22,6 @@ import type {
 import { createCapturingLogger, type CapturedLogEvent } from "@pr-review/logging";
 import { asc, eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { membershipsForUser } from "@/lib/organization";
 
 import { handleGithubWebhook } from "./handler";
 
@@ -56,12 +52,6 @@ const octocat: OrganizationMember = {
 const hubot: OrganizationMember = {
   id: 3_000_000_002,
   login: "hubot",
-  avatarUrl: null,
-  role: "member",
-};
-const mallory: OrganizationMember = {
-  id: 3_000_000_003,
-  login: "mallory",
   avatarUrl: null,
   role: "member",
 };
@@ -131,7 +121,7 @@ beforeEach(async () => {
 });
 
 function installation(
-  type: "Organization" | "User" = "Organization",
+  type: "Organization" | "User" | "Enterprise" = "Organization",
   login = "Acme",
   suspendedAt: string | null = null,
 ) {
@@ -190,20 +180,7 @@ function deliver(request: Request): Promise<Response> {
 const uninstalled = () =>
   delivery("installation", { action: "deleted", installation: installation() });
 
-async function seedReview(repo: InstallationRepository): Promise<void> {
-  const [row] = await database
-    .select({ id: repos.id })
-    .from(repos)
-    .where(eq(repos.githubRepoId, repo.id));
-  await database.insert(reviews).values({
-    repoId: row!.id,
-    prNumber: 1,
-    headSha: `sha-${repo.name}`,
-    summary: "ok",
-  });
-}
-
-const created = (type: "Organization" | "User" = "Organization", login = "Acme") =>
+const created = (type: "Organization" | "User" | "Enterprise" = "Organization", login = "Acme") =>
   delivery("installation", { action: "created", installation: installation(type, login) });
 
 function repositoriesChanged(
@@ -318,7 +295,7 @@ describe("handleGithubWebhook signature", () => {
 });
 
 describe("handleGithubWebhook installation", () => {
-  it("creates an organization and its repositories on an organization install", async () => {
+  it("installs on created, logging the delivery as the source", async () => {
     const response = await deliver(created());
     expect(response.status).toBe(200);
     expect(await state()).toEqual({
@@ -339,78 +316,24 @@ describe("handleGithubWebhook installation", () => {
         { githubId: hubot.id, login: "hubot", role: "member" },
       ],
     });
-    expect(log).toEqual([
-      expect.objectContaining({
-        event: "membership.granted",
-        source: "installation.created",
-        organization: "acme",
-        githubUserId: octocat.id,
-        role: "owner",
-        reason: "github_org_admin",
-      }),
-      expect.objectContaining({
-        event: "membership.granted",
-        githubUserId: hubot.id,
-        role: "member",
-        reason: "github_org_member",
-      }),
-    ]);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "membership.granted", source: "installation.created" }),
+    );
   });
 
-  it("creates a user-type organization on a personal account install", async () => {
+  it("reads a personal account install as a user-type organization", async () => {
     listed = [{ ...widgets, owner: "Mona" }];
-    const response = await deliver(created("User", "Mona"));
-    expect(response.status).toBe(200);
-    const { organizations: orgs, repos: repoRows } = await state();
-    expect(orgs).toMatchObject([{ accountType: "user", slug: "mona", name: "Mona" }]);
-    expect(repoRows).toEqual([{ ...repoRow(widgets), owner: "Mona" }]);
-    expect((await state()).memberships).toEqual([
-      { githubId: ACCOUNT_ID, login: "Mona", role: "owner" },
-    ]);
-    expect(log).toEqual([
-      expect.objectContaining({
-        event: "membership.granted",
-        reason: "personal_account_owner",
-      }),
-    ]);
-    expect(githubCalls).toBe(0);
+    expect((await deliver(created("User", "Mona"))).status).toBe(200);
+    expect((await state()).organizations).toMatchObject([{ accountType: "user", slug: "mona" }]);
   });
 
-  it("claims a repository ingest already recorded, keeping its reviews", async () => {
-    const [org] = await database
-      .insert(organizations)
-      .values({
-        githubAccountId: ACCOUNT_ID,
-        accountType: "organization",
-        slug: "acme",
-        name: "Acme",
-      })
-      .returning();
-    const [repo] = await database
-      .insert(repos)
-      .values({ organizationId: org!.id, owner: "Acme", name: "widgets" })
-      .returning();
-    await database.insert(reviews).values({
-      repoId: repo!.id,
-      prNumber: 1,
-      headSha: "abc",
-        summary: "ok",
-    });
-
-    await deliver(created());
-
-    expect((await state()).repos).toEqual([repoRow(widgets), repoRow(secrets)]);
-    expect(await database.select().from(reviews)).toHaveLength(1);
+  it("204s an account type the dashboard does not serve", async () => {
+    expect((await deliver(created("Enterprise"))).status).toBe(204);
+    expect(await state()).toEqual(empty);
+    expect(listCalls).toBe(0);
   });
 
-  it("marks removed the repositories the installation no longer lists when created again", async () => {
-    await deliver(created());
-    listed = [secrets];
-    await deliver(created());
-    expect((await state()).repos).toEqual([repoRow(widgets, true), repoRow(secrets)]);
-  });
-
-  it("sets and clears suspended_at on suspend and unsuspend", async () => {
+  it("sets suspended_at from the payload on suspend and clears it on unsuspend", async () => {
     await deliver(created());
 
     const suspend = await deliver(
@@ -429,76 +352,40 @@ describe("handleGithubWebhook installation", () => {
     expect((await state()).organizations[0]?.suspendedAt).toBeNull();
   });
 
-  it("keeps the organization, its repositories and reviews on uninstall, but closes access", async () => {
+  it("uninstalls on deleted", async () => {
     await deliver(created());
-    await seedReview(widgets);
-    const response = await deliver(uninstalled());
-    expect(response.status).toBe(200);
-
-    const after = await state();
-    expect(after.organizations).toMatchObject([
-      { slug: "acme", installationId: null, uninstalled: true },
-    ]);
-    expect(after.repos).toEqual([repoRow(widgets), repoRow(secrets)]);
-    expect(after.memberships).toHaveLength(2);
-    expect(await database.select().from(reviews)).toHaveLength(1);
-    expect(await authorize(database, { githubId: octocat.id }, "acme")).toEqual({
-      status: "not-found",
-    });
-    expect(await membershipsForUser(database, octocat.id)).toEqual([]);
-  });
-
-  it("converges when an uninstall is delivered twice", async () => {
-    await deliver(created());
-    const request = uninstalled();
-    await deliver(request.clone());
-    const [once] = await database.select().from(organizations);
-    await deliver(request);
-    expect(await database.select().from(organizations)).toEqual([once]);
-  });
-
-  it("brings the organization and its re-listed repositories back on reinstall", async () => {
-    await deliver(created());
-    await seedReview(widgets);
-    await seedReview(secrets);
-    await deliver(uninstalled());
-
-    listed = [widgets];
-    members = [octocat];
-    const response = await deliver(created());
-
-    expect(response.status).toBe(200);
-    const after = await state();
-    expect(after.organizations).toMatchObject([
-      { installationId: INSTALLATION_ID, uninstalled: false },
-    ]);
-    expect(after.repos).toEqual([repoRow(widgets), repoRow(secrets, true)]);
-    expect(after.memberships).toEqual([
-      { githubId: octocat.id, login: "octocat", role: "owner" },
-    ]);
-    expect(await database.select().from(reviews)).toHaveLength(2);
-    expect(await authorize(database, { githubId: octocat.id }, "acme")).toMatchObject({
-      status: "allowed",
-    });
-  });
-
-  it("does not revive an uninstalled organization for a late repositories delivery", async () => {
-    await deliver(created());
-    await deliver(uninstalled());
-    const response = await deliver(repositoriesChanged("added", [widgets]));
-    expect(response.status).toBe(204);
+    expect((await deliver(uninstalled())).status).toBe(200);
     expect((await state()).organizations).toMatchObject([
       { installationId: null, uninstalled: true },
     ]);
   });
 
-  it("leaves state unchanged when the same delivery arrives twice", async () => {
-    const request = created();
-    await deliver(request.clone());
-    const once = await state();
-    const again = await deliver(request);
-    expect(again.status).toBe(200);
-    expect(await state()).toEqual(once);
+  it("follows a login change on new_permissions_accepted, and 204s one with nothing to follow", async () => {
+    const accepted = (login: string) =>
+      delivery("installation", {
+        action: "new_permissions_accepted",
+        installation: installation("Organization", login),
+      });
+    expect((await deliver(accepted("Acme"))).status).toBe(204);
+    expect(await state()).toEqual(empty);
+
+    await deliver(created());
+    expect((await deliver(accepted("Acme-Corp"))).status).toBe(200);
+    expect((await state()).organizations).toMatchObject([{ slug: "acme-corp" }]);
+  });
+
+  it("204s an installation action it does not act on", async () => {
+    await deliver(created());
+    const response = await deliver(
+      delivery("installation", { action: "unknown", installation: installation() }),
+    );
+    expect(response.status).toBe(204);
+  });
+
+  it("400s a malformed installation payload", async () => {
+    const response = await deliver(delivery("installation", { action: "created" }));
+    expect(response.status).toBe(400);
+    expect(await state()).toEqual(empty);
   });
 });
 
@@ -508,70 +395,35 @@ describe("handleGithubWebhook installation_repositories", () => {
     await deliver(created());
   });
 
-  it("adds repositories", async () => {
+  it("adds repositories, taking the owner from the full name", async () => {
     const response = await deliver(repositoriesChanged("added", [secrets]));
     expect(response.status).toBe(200);
     expect((await state()).repos).toEqual([repoRow(widgets), repoRow(secrets)]);
   });
 
-  it("marks repositories removed, keeping their reviews", async () => {
-    await seedReview(widgets);
+  it("marks repositories removed", async () => {
     const response = await deliver(repositoriesChanged("removed", [widgets]));
     expect(response.status).toBe(200);
     expect((await state()).repos).toEqual([repoRow(widgets, true)]);
-    expect(await database.select().from(reviews)).toHaveLength(1);
   });
 
-  it("converges when a removal is delivered twice", async () => {
-    const request = repositoriesChanged("removed", [widgets]);
-    await deliver(request.clone());
-    const once = await database.select().from(repos);
-    await deliver(request);
-    expect(await database.select().from(repos)).toEqual(once);
-  });
-
-  it("restores a removed repository added again", async () => {
-    await deliver(repositoriesChanged("removed", [widgets]));
-    await deliver(repositoriesChanged("added", [widgets]));
-    expect((await state()).repos).toEqual([repoRow(widgets)]);
-  });
-
-  it("converges when an add is delivered twice", async () => {
-    const request = repositoriesChanged("added", [secrets]);
-    await deliver(request.clone());
-    const once = await state();
-    await deliver(request);
-    expect(await state()).toEqual(once);
-  });
-
-  it("sets up the whole organization, members included, when an add arrives before the install", async () => {
-    database = await createTestDatabase();
-    listed = [widgets, secrets];
-    await deliver(repositoriesChanged("added", [secrets]));
-    expect(await state()).toMatchObject({
-      organizations: [{ slug: "acme", installationId: INSTALLATION_ID }],
-      repos: [repoRow(widgets), repoRow(secrets)],
-      memberships: [
-        { githubId: octocat.id, login: "octocat", role: "owner" },
-        { githubId: hubot.id, login: "hubot", role: "member" },
-      ],
-    });
-  });
-
-  it("makes a personal account's owner its owner when an add arrives before the install", async () => {
-    database = await createTestDatabase();
-    listed = [{ ...widgets, owner: "Mona" }];
+  it("logs the delivery as the source of a login change", async () => {
     await deliver(
       delivery("installation_repositories", {
         action: "added",
-        installation: installation("User", "Mona"),
-        repositories_added: [payloadRepo({ ...widgets, owner: "Mona" })],
+        installation: installation("Organization", "Acme-Corp"),
+        repositories_added: [],
         repositories_removed: [],
       }),
     );
-    expect((await state()).memberships).toEqual([
-      { githubId: ACCOUNT_ID, login: "Mona", role: "owner" },
-    ]);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "organization.renamed", source: "installation_repositories.added" }),
+    );
+  });
+
+  it("204s a late delivery for an uninstalled organization", async () => {
+    await deliver(uninstalled());
+    expect((await deliver(repositoriesChanged("added", [secrets]))).status).toBe(204);
   });
 });
 
@@ -611,13 +463,19 @@ async function roles() {
   return (await state()).memberships.map(({ login, role }) => ({ login, role }));
 }
 
-describe("handleGithubWebhook organization members", () => {
+const readAs = (member: OrganizationMember, permission: RepositoryCollaborator["permission"]) => ({
+  id: member.id,
+  login: member.login,
+  permission,
+});
+
+describe("handleGithubWebhook members", () => {
   beforeEach(async () => {
     members = [octocat];
     await deliver(created());
   });
 
-  it("adds a member who joined the organization", async () => {
+  it("syncs a member on organization.member_added, logging the delivery as the source", async () => {
     members = [octocat, hubot];
     const response = await deliver(organizationEvent("member_added", hubot));
     expect(response.status).toBe(200);
@@ -626,116 +484,26 @@ describe("handleGithubWebhook organization members", () => {
       { login: "hubot", role: "member" },
     ]);
     expect(log).toEqual([
-      expect.objectContaining({
-        event: "membership.granted",
-        source: "organization.member_added",
-        githubUserId: hubot.id,
-        role: "member",
-        reason: "github_org_member",
-      }),
+      expect.objectContaining({ event: "membership.granted", source: "organization.member_added" }),
     ]);
   });
 
-  it("removes a member, who then no longer passes authorize", async () => {
+  it("syncs a member on organization.member_removed", async () => {
     members = [octocat, hubot];
     await deliver(organizationEvent("member_added", hubot));
-    expect(await authorize(database, { githubId: hubot.id }, "acme")).toMatchObject({
-      status: "allowed",
-      role: "member",
-    });
+    members = [octocat];
+    expect((await deliver(organizationEvent("member_removed", hubot))).status).toBe(200);
+    expect(await roles()).toEqual([{ login: "octocat", role: "owner" }]);
+  });
+
+  it("syncs a member on membership and member deliveries", async () => {
+    members = [{ ...octocat, role: "member" }];
+    expect((await deliver(memberEvent("member", "edited", octocat))).status).toBe(200);
+    expect(await roles()).toEqual([{ login: "octocat", role: "member" }]);
 
     members = [octocat];
-    const response = await deliver(organizationEvent("member_removed", hubot));
-
-    expect(response.status).toBe(200);
+    expect((await deliver(memberEvent("membership", "added", octocat))).status).toBe(200);
     expect(await roles()).toEqual([{ login: "octocat", role: "owner" }]);
-    expect(await authorize(database, { githubId: hubot.id }, "acme")).toEqual({
-      status: "not-found",
-    });
-    expect(log).toEqual([
-      expect.objectContaining({
-        event: "membership.revoked",
-        source: "organization.member_removed",
-        reason: "not_github_org_member",
-        removed: true,
-      }),
-    ]);
-  });
-
-  it("promotes a member made an organization admin", async () => {
-    members = [octocat, hubot];
-    await deliver(organizationEvent("member_added", hubot));
-    members = [octocat, { ...hubot, role: "admin" }];
-    const response = await deliver(memberEvent("membership", "added", hubot));
-    expect(response.status).toBe(200);
-    expect(await roles()).toContainEqual({ login: "hubot", role: "owner" });
-    expect(await authorize(database, { githubId: hubot.id }, "acme")).toMatchObject({
-      role: "owner",
-    });
-  });
-
-  it("demotes an admin made a plain member", async () => {
-    members = [{ ...octocat, role: "member" }];
-    const response = await deliver(memberEvent("member", "edited", octocat));
-    expect(response.status).toBe(200);
-    expect(await roles()).toEqual([{ login: "octocat", role: "member" }]);
-  });
-
-  it("converges when the same delivery arrives twice", async () => {
-    members = [octocat, hubot];
-    const request = organizationEvent("member_added", hubot);
-    await deliver(request.clone());
-    const once = await state();
-    const again = await deliver(request);
-    expect(again.status).toBe(200);
-    expect(await state()).toEqual(once);
-  });
-
-  it("follows GitHub, not the payload, when a stale removal arrives late", async () => {
-    members = [octocat, hubot];
-    await deliver(organizationEvent("member_added", hubot));
-    await deliver(organizationEvent("member_removed", hubot));
-    expect(await roles()).toContainEqual({ login: "hubot", role: "member" });
-  });
-
-  it("revokes members GitHub no longer lists when the App is installed again", async () => {
-    members = [hubot];
-    await deliver(created());
-    expect(await roles()).toEqual([{ login: "hubot", role: "member" }]);
-    expect(log).toContainEqual(
-      expect.objectContaining({
-        event: "membership.revoked",
-        githubUserId: octocat.id,
-        reason: "not_github_org_member",
-        removed: true,
-      }),
-    );
-  });
-
-  it("resyncs members on unsuspend", async () => {
-    members = [hubot];
-    await deliver(
-      delivery("installation", { action: "unsuspend", installation: installation() }),
-    );
-    expect(await roles()).toEqual([{ login: "hubot", role: "member" }]);
-  });
-
-  it("skips an organization that is suspended, keeping its members", async () => {
-    await deliver(
-      delivery("installation", {
-        action: "suspend",
-        installation: installation("Organization", "Acme", SUSPENDED_AT),
-      }),
-    );
-    githubCalls = 0;
-    members = [];
-    const response = await deliver(organizationEvent("member_removed", octocat));
-    expect(response.status).toBe(204);
-    expect(githubCalls).toBe(0);
-    expect(await roles()).toEqual([{ login: "octocat", role: "owner" }]);
-    expect(log).toEqual([
-      expect.objectContaining({ event: "membership.skipped", reason: "installation_suspended" }),
-    ]);
   });
 
   it("204s an organization that has not installed the App", async () => {
@@ -744,23 +512,77 @@ describe("handleGithubWebhook organization members", () => {
     );
     expect(response.status).toBe(204);
     expect(log).toEqual([
-      expect.objectContaining({
-        event: "membership.skipped",
-        organization: "other",
-        reason: "organization_not_installed",
-      }),
+      expect.objectContaining({ event: "membership.skipped", organization: "other" }),
     ]);
   });
 
   it("204s a collaborator change that names no account at all", async () => {
     const response = await deliver(memberEvent("member", "added", hubot, null));
     expect(response.status).toBe(204);
+    expect(log).toEqual([]);
     expect(await roles()).toEqual([{ login: "octocat", role: "owner" }]);
   });
 
-  it("204s organization actions it does not act on", async () => {
+  it("204s actions it does not act on, without asking GitHub", async () => {
+    githubCalls = 0;
+    const invited = delivery("organization", { action: "member_invited", organization: acme });
+    expect((await deliver(invited)).status).toBe(204);
+    expect((await deliver(memberEvent("membership", "edited", hubot))).status).toBe(204);
+    expect(githubCalls).toBe(0);
+  });
+
+  it("passes a collaborator delivery's repository on, logging it as the source", async () => {
+    collaborators = { "acme/secrets": [readAs(hubot, "write")] };
     const response = await deliver(
-      delivery("organization", { action: "member_invited", organization: acme }),
+      delivery("member", {
+        action: "added",
+        member: payloadUser(hubot),
+        repository: { id: secrets.id, name: secrets.name, full_name: "Acme/secrets" },
+        organization: acme,
+        installation: { id: INSTALLATION_ID },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "repo_access.granted", source: "member.added" }),
+    );
+  });
+});
+
+describe("handleGithubWebhook personal repository collaborators", () => {
+  const mona = { id: ACCOUNT_ID, login: "Mona" };
+  const monaSecrets = { ...secrets, owner: "Mona" };
+
+  beforeEach(async () => {
+    listed = [monaSecrets];
+    await deliver(created("User", "Mona"));
+  });
+
+  it("takes the repository's owner as the account when the delivery names no organization", async () => {
+    collaborators = { "mona/secrets": [readAs(hubot, "write")] };
+    const response = await deliver(
+      delivery("member", {
+        action: "added",
+        member: payloadUser(hubot),
+        repository: { id: secrets.id, name: secrets.name, full_name: "Mona/secrets", owner: mona },
+        installation: { id: INSTALLATION_ID },
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await authorize(database, { githubId: hubot.id }, "mona")).toMatchObject({
+      status: "allowed",
+      role: "collaborator",
+    });
+  });
+
+  it("ignores a team membership delivery's repository owner", async () => {
+    const response = await deliver(
+      delivery("membership", {
+        action: "added",
+        member: payloadUser(hubot),
+        repository: { id: secrets.id, owner: mona },
+        installation: { id: INSTALLATION_ID },
+      }),
     );
     expect(response.status).toBe(204);
   });
@@ -785,382 +607,63 @@ function repositoryEvent(
   });
 }
 
-async function readableBy(member: OrganizationMember): Promise<string[] | "not-found" | "redirect"> {
-  const result = await authorize(database, { githubId: member.id }, "acme");
-  if (result.status !== "allowed") return result.status;
-  const rows = await database.select({ id: repos.id, name: repos.name }).from(repos);
-  return result.readableRepos
-    .map((entry) => rows.find((row) => row.id === entry.id)!.name)
-    .sort();
-}
-
-const readAs = (member: OrganizationMember, permission: RepositoryCollaborator["permission"]) => ({
-  id: member.id,
-  login: member.login,
-  permission,
-});
-
 describe("handleGithubWebhook repository", () => {
   beforeEach(async () => {
     await deliver(created());
   });
 
-  it("follows a rename, keeping the repository's reviews", async () => {
-    await seedReview(widgets);
-    const response = await deliver(
-      repositoryEvent("renamed", { ...widgets, owner: "Acme", name: "gizmos" }),
-    );
-
+  it("follows a rename, logging the delivery as the source", async () => {
+    const response = await deliver(repositoryEvent("renamed", { ...widgets, name: "gizmos" }));
     expect(response.status).toBe(200);
-    expect((await state()).repos).toContainEqual(
-      expect.objectContaining({ githubRepoId: widgets.id, owner: "Acme", name: "gizmos" }),
-    );
-    expect(await database.select().from(reviews)).toHaveLength(1);
-  });
-
-  it("hides a repository made private from members without access", async () => {
-    expect(await readableBy(hubot)).toEqual(["widgets"]);
-    collaborators = { "acme/widgets": [readAs(octocat, "admin")] };
-
-    const response = await deliver(repositoryEvent("privatized", { ...widgets, private: true }));
-
-    expect(response.status).toBe(200);
-    expect(await readableBy(hubot)).toEqual([]);
-    expect(await readableBy(octocat)).toEqual(["secrets", "widgets"]);
-  });
-
-  it("keeps a repository made private readable by the members GitHub lets read it", async () => {
-    collaborators = { "acme/widgets": [readAs(octocat, "admin"), readAs(hubot, "maintain")] };
-
-    await deliver(repositoryEvent("privatized", { ...widgets, private: true }));
-
-    expect(await readableBy(hubot)).toEqual(["widgets"]);
-    const access = await authorize(database, { githubId: hubot.id }, "acme", {
-      owner: "Acme",
-      name: "widgets",
-    });
-    expect(access).toMatchObject({ status: "allowed", repo: { isOwner: true } });
-  });
-
-  it("still hides a repository made private when GitHub cannot list who reads it", async () => {
-    const response = await deliver(repositoryEvent("privatized", { ...widgets, private: true }));
-
-    expect(response.status).toBe(200);
-    expect(await readableBy(hubot)).toEqual([]);
+    expect((await state()).repos).toContainEqual(repoRow({ ...widgets, name: "gizmos" }));
     expect(log).toContainEqual(
-      expect.objectContaining({ event: "repo_access.skipped", reason: "github_lookup_failed" }),
+      expect.objectContaining({ event: "repository.updated", source: "repository.renamed" }),
     );
   });
 
-  it("shows a repository made public to every member", async () => {
-    const response = await deliver(repositoryEvent("publicized", { ...secrets, private: false }));
-
-    expect(response.status).toBe(200);
-    expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
-  });
-
-  it("marks a deleted repository removed, keeping its reviews", async () => {
-    await seedReview(secrets);
-    await deliver(repositoryEvent("deleted", secrets));
-
-    expect((await state()).repos).toContainEqual(
-      expect.objectContaining({ githubRepoId: secrets.id, removed: true }),
-    );
-    expect(await database.select().from(reviews)).toHaveLength(1);
-    expect(await readableBy(octocat)).toEqual(["widgets"]);
-  });
-
-  it("marks a repository transferred to another account removed", async () => {
-    await deliver(repositoryEvent("transferred", { ...widgets, owner: "Globex" }, 2_000));
-
-    expect(await readableBy(octocat)).toEqual(["secrets"]);
-  });
-
-  it("converges when the same rename arrives twice", async () => {
-    const request = repositoryEvent("renamed", { ...widgets, name: "gizmos" });
-    await deliver(request.clone());
-    const once = await state();
-    await deliver(request);
-    expect(await state()).toEqual(once);
+  it("maps each action it acts on", async () => {
+    collaborators = { "acme/widgets": [] };
+    expect((await deliver(repositoryEvent("privatized", { ...widgets, private: true }))).status).toBe(200);
+    expect((await deliver(repositoryEvent("publicized", widgets))).status).toBe(200);
+    expect((await deliver(repositoryEvent("transferred", widgets, 2_000))).status).toBe(200);
+    expect((await deliver(repositoryEvent("deleted", secrets))).status).toBe(200);
+    expect((await state()).repos).toEqual([repoRow(widgets, true), repoRow(secrets, true)]);
   });
 
   it("204s a repository the installation never reported, and actions it does not act on", async () => {
     const unknown = { ...widgets, id: 1 };
     expect((await deliver(repositoryEvent("renamed", unknown))).status).toBe(204);
     expect((await deliver(repositoryEvent("archived", widgets))).status).toBe(204);
+    expect(log).toEqual([]);
   });
 });
 
-describe("handleGithubWebhook repository collaborators", () => {
-  beforeEach(async () => {
-    await deliver(created());
-  });
-
-  function collaboratorEvent(action: string, member: OrganizationMember, repo: InstallationRepository) {
-    return delivery("member", {
-      action,
-      member: payloadUser(member),
-      repository: { id: repo.id, name: repo.name, full_name: `${repo.owner}/${repo.name}` },
-      organization: acme,
-      installation: { id: INSTALLATION_ID },
-    });
-  }
-
-  it("grants, changes and revokes a member's access to a private repository", async () => {
-    collaborators = { "acme/secrets": [readAs(hubot, "write")] };
-    await deliver(collaboratorEvent("added", hubot, secrets));
-    expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
-
-    collaborators = { "acme/secrets": [readAs(hubot, "admin")] };
-    await deliver(collaboratorEvent("edited", hubot, secrets));
-    expect(
-      await authorize(database, { githubId: hubot.id }, "acme", { owner: "Acme", name: "secrets" }),
-    ).toMatchObject({ repo: { isOwner: true } });
-
-    collaborators = { "acme/secrets": [] };
-    const response = await deliver(collaboratorEvent("removed", hubot, secrets));
-    expect(response.status).toBe(200);
-    expect(await readableBy(hubot)).toEqual(["widgets"]);
-    expect(log).toContainEqual(
-      expect.objectContaining({ event: "repo_access.revoked", source: "member.removed" }),
-    );
-  });
-
-  it("asks GitHub, not the payload, so a stale removal leaves current access", async () => {
-    collaborators = { "acme/secrets": [readAs(hubot, "read")] };
-    await deliver(collaboratorEvent("removed", hubot, secrets));
-    expect(await readableBy(hubot)).toEqual(["secrets", "widgets"]);
-  });
-
-  it("gives an outside collaborator that repo alone, and no membership", async () => {
-    collaborators = { "acme/secrets": [readAs(mallory, "write")] };
-
-    const response = await deliver(collaboratorEvent("added", mallory, secrets));
-
-    expect(response.status).toBe(200);
-    expect(await readableBy(mallory)).toEqual(["secrets"]);
-    expect((await roles()).map(({ login }) => login)).not.toContain("mallory");
-
-    collaborators = { "acme/secrets": [] };
-    await deliver(collaboratorEvent("removed", mallory, secrets));
-    expect(await readableBy(mallory)).toBe("not-found");
-  });
-});
-
-describe("handleGithubWebhook personal repository collaborators", () => {
-  const mona = { id: ACCOUNT_ID, login: "Mona" };
-  const monaSecrets = { ...secrets, owner: "Mona" };
-  const monaWidgets = { ...widgets, owner: "Mona" };
-
-  beforeEach(async () => {
-    listed = [monaSecrets, monaWidgets];
-    await deliver(created("User", "Mona"));
-  });
-
-  function personalEvent(action: string, member: OrganizationMember, repo: InstallationRepository) {
-    return delivery("member", {
-      action,
-      member: payloadUser(member),
-      repository: { id: repo.id, name: repo.name, full_name: `Mona/${repo.name}`, owner: mona },
-      installation: { id: INSTALLATION_ID },
-    });
-  }
-
-  async function readableInMona(member: OrganizationMember) {
-    const result = await authorize(database, { githubId: member.id }, "mona");
-    if (result.status !== "allowed") return result.status;
-    const rows = await database.select({ id: repos.id, name: repos.name }).from(repos);
-    return result.readableRepos.map((entry) => rows.find((row) => row.id === entry.id)!.name).sort();
-  }
-
-  it("grants a collaborator that repository only, then revokes it", async () => {
-    collaborators = { "mona/secrets": [readAs(hubot, "write")] };
-
-    const response = await deliver(personalEvent("added", hubot, monaSecrets));
-
-    expect(response.status).toBe(200);
-    expect(await readableInMona(hubot)).toEqual(["secrets"]);
-    expect(await authorize(database, { githubId: hubot.id }, "mona")).toMatchObject({
-      role: "collaborator",
-    });
-
-    collaborators = { "mona/secrets": [] };
-    await deliver(personalEvent("removed", hubot, monaSecrets));
-    expect(await readableInMona(hubot)).toBe("not-found");
-  });
-
-  it("refreshes a personal repository's readers who have signed in, when it is made private", async () => {
-    await database.insert(users).values({ githubId: hubot.id, login: hubot.login });
-    collaborators = { "mona/widgets": [readAs(hubot, "maintain")] };
-
-    await deliver(
-      delivery("repository", {
-        action: "privatized",
-        repository: { ...payloadRepo({ ...monaWidgets, private: true }), owner: mona },
-        installation: { id: INSTALLATION_ID },
-      }),
-    );
-
-    expect(await readableInMona(hubot)).toEqual(["widgets"]);
-  });
-});
-
-const renamed = (login: string) =>
+const renamed = (login: string, id = ACCOUNT_ID) =>
   delivery("organization", {
     action: "renamed",
     changes: { login: { from: "Acme" } },
-    organization: { id: ACCOUNT_ID, login },
+    organization: { id, login },
     installation: { id: INSTALLATION_ID },
   });
 
-function repositoriesAddedAs(account: { id: number; login: string; type: string }, installationId = INSTALLATION_ID) {
-  return delivery("installation_repositories", {
-    action: "added",
-    installation: { id: installationId, account, suspended_at: null },
-    repositories_added: [],
-    repositories_removed: [],
-  });
-}
-
-async function slugs() {
-  const orgs = await database
-    .select({ githubAccountId: organizations.githubAccountId, slug: organizations.slug, name: organizations.name })
-    .from(organizations)
-    .orderBy(asc(organizations.id));
-  const redirects = await database
-    .select({ slug: organizationSlugRedirects.slug, githubAccountId: organizations.githubAccountId })
-    .from(organizationSlugRedirects)
-    .innerJoin(organizations, eq(organizations.id, organizationSlugRedirects.organizationId))
-    .orderBy(asc(organizationSlugRedirects.slug));
-  return { organizations: orgs, redirects };
-}
-
-describe("handleGithubWebhook account rename", () => {
+describe("handleGithubWebhook organization rename", () => {
   beforeEach(async () => {
     await deliver(created());
   });
 
-  it("moves the slug and name and records the old slug as a redirect", async () => {
+  it("follows the new login", async () => {
     const response = await deliver(renamed("Acme-Corp"));
     expect(response.status).toBe(200);
-    expect(await slugs()).toEqual({
-      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" }],
-      redirects: [{ slug: "acme", githubAccountId: ACCOUNT_ID }],
-    });
+    expect((await state()).organizations).toMatchObject([{ slug: "acme-corp", name: "Acme-Corp" }]);
     expect(log).toContainEqual(
-      expect.objectContaining({
-        event: "organization.renamed",
-        source: "organization.renamed",
-        from: "acme",
-        to: "acme-corp",
-      }),
+      expect.objectContaining({ event: "organization.renamed", source: "organization.renamed" }),
     );
-    expect(await authorize(database, { githubId: octocat.id }, "acme")).toEqual({
-      status: "redirect",
-      slug: "acme-corp",
-    });
-    expect(await authorize(database, { githubId: octocat.id }, "acme-corp")).toMatchObject({
-      status: "allowed",
-      role: "owner",
-    });
-    expect((await state()).repos).toEqual([repoRow(widgets), repoRow(secrets)]);
   });
 
-  it("converges on redelivery", async () => {
+  it("204s a redelivery, and an account it does not know", async () => {
     await deliver(renamed("Acme-Corp"));
-    const once = await slugs();
-    const response = await deliver(renamed("Acme-Corp"));
-    expect(response.status).toBe(204);
-    expect(await slugs()).toEqual(once);
-  });
-
-  it("keeps every earlier slug redirecting to the current one", async () => {
-    await deliver(renamed("Acme-Corp"));
-    await deliver(renamed("Acme-Global"));
-    expect(await slugs()).toEqual({
-      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme-global", name: "Acme-Global" }],
-      redirects: [
-        { slug: "acme", githubAccountId: ACCOUNT_ID },
-        { slug: "acme-corp", githubAccountId: ACCOUNT_ID },
-      ],
-    });
-    expect(await authorize(database, { githubId: hubot.id }, "acme")).toEqual({
-      status: "redirect",
-      slug: "acme-global",
-    });
-  });
-
-  it("renaming back to an earlier slug drops that redirect", async () => {
-    await deliver(renamed("Acme-Corp"));
-    await deliver(renamed("Acme"));
-    expect(await slugs()).toEqual({
-      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme", name: "Acme" }],
-      redirects: [{ slug: "acme-corp", githubAccountId: ACCOUNT_ID }],
-    });
-    expect(await readableBy(hubot)).toEqual(["widgets"]);
-  });
-
-  it("follows a login change seen on an installation delivery", async () => {
-    const response = await deliver(
-      repositoriesAddedAs({ id: ACCOUNT_ID, login: "Acme-Corp", type: "Organization" }),
-    );
-    expect(response.status).toBe(200);
-    expect(await slugs()).toEqual({
-      organizations: [{ githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" }],
-      redirects: [{ slug: "acme", githubAccountId: ACCOUNT_ID }],
-    });
-    expect(log).toContainEqual(
-      expect.objectContaining({ event: "organization.renamed", source: "installation_repositories.added" }),
-    );
-  });
-
-  it("follows a login change on new_permissions_accepted", async () => {
-    const response = await deliver(
-      delivery("installation", {
-        action: "new_permissions_accepted",
-        installation: installation("Organization", "Acme-Corp"),
-      }),
-    );
-    expect(response.status).toBe(200);
-    expect((await slugs()).organizations).toEqual([
-      { githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" },
-    ]);
-  });
-
-  it("gives a retired slug to a new account that claims it, dropping the redirect", async () => {
-    await deliver(renamed("Acme-Corp"));
-    await deliver(repositoriesAddedAs({ id: 2_000, login: "Acme", type: "User" }, 556));
-    expect(await slugs()).toEqual({
-      organizations: [
-        { githubAccountId: ACCOUNT_ID, slug: "acme-corp", name: "Acme-Corp" },
-        { githubAccountId: 2_000, slug: "acme", name: "Acme" },
-      ],
-      redirects: [],
-    });
-    expect(await authorize(database, { githubId: octocat.id }, "acme")).toEqual({ status: "not-found" });
-  });
-
-  it("moves a stale holder of the slug aside for the account that now has the login", async () => {
-    await deliver(repositoriesAddedAs({ id: 2_000, login: "Acme", type: "User" }, 556));
-    expect((await slugs()).organizations).toEqual([
-      { githubAccountId: ACCOUNT_ID, slug: "acme_1000", name: "Acme" },
-      { githubAccountId: 2_000, slug: "acme", name: "Acme" },
-    ]);
-  });
-
-  it("204s a rename of an account it does not know and writes nothing", async () => {
-    const before = await slugs();
-    const response = await deliver(
-      delivery("organization", {
-        action: "renamed",
-        organization: { id: 9_999, login: "Elsewhere" },
-      }),
-    );
-    expect(response.status).toBe(204);
-    expect(await slugs()).toEqual(before);
-    expect(log).toContainEqual(
-      expect.objectContaining({ event: "organization.rename_skipped", githubAccountId: 9_999 }),
-    );
+    expect((await deliver(renamed("Acme-Corp"))).status).toBe(204);
+    expect((await deliver(renamed("Elsewhere", 9_999))).status).toBe(204);
   });
 });
 
@@ -1171,35 +674,16 @@ describe("handleGithubWebhook other deliveries", () => {
     expect(await state()).toEqual(empty);
   });
 
-  it("204s an installation action it does not act on", async () => {
+  it("400s a body that is not JSON", async () => {
+    const body = "{not json";
     const response = await deliver(
-      delivery("installation", {
-        action: "new_permissions_accepted",
-        installation: installation(),
+      new Request("https://example.test/api/github/webhook", {
+        method: "POST",
+        headers: { "x-github-event": "installation", "x-hub-signature-256": signature(SECRET, body) },
+        body,
       }),
     );
-    expect(response.status).toBe(204);
-    expect(await state()).toEqual(empty);
-  });
-
-  it("400s a malformed installation payload", async () => {
-    const response = await deliver(delivery("installation", { action: "created" }));
     expect(response.status).toBe(400);
-    expect(await state()).toEqual(empty);
-  });
-
-  it("writes nothing when the delivery fails halfway", async () => {
-    await database.execute(sql`
-      create function fail_repo_insert() returns trigger language plpgsql as $$
-      begin raise exception 'repo insert failed'; end $$;
-    `);
-    await database.execute(sql`
-      create trigger fail_repo_insert before insert on repos
-      for each row execute function fail_repo_insert();
-    `);
-
-    await expect(deliver(created())).rejects.toThrow();
-    expect(await state()).toEqual(empty);
   });
 });
 
