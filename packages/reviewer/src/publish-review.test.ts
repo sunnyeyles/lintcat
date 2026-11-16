@@ -33,7 +33,7 @@ describe("createCheckRunPublisher", () => {
   it("creates the check run on the target's head SHA", async () => {
     const client = makeClient();
     const rendered: RenderedCheckRun = {
-      conclusion: "success",
+      conclusion: "neutral",
       output: { title: "No issues found", summary: "All clear." },
     };
 
@@ -43,7 +43,7 @@ describe("createCheckRunPublisher", () => {
       owner: target.owner,
       repo: target.repo,
       headSha: target.headSha,
-      conclusion: "success",
+      conclusion: "neutral",
       output: rendered.output,
     });
   });

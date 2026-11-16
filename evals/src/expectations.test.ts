@@ -100,7 +100,7 @@ function review(
       changedFiles: [],
       ...result,
     },
-    rendered: { conclusion: "success", output: { title: "Review", summary: "" } },
+    rendered: { conclusion: "neutral", output: { title: "Review", summary: "" } },
     calls,
   };
 }
