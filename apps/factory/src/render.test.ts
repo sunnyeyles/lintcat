@@ -33,6 +33,42 @@ describe("rendering a spec", () => {
   });
 });
 
+describe("rendering a scoping record", () => {
+  const route = { profile: "refactor", reason: "structure", overridden: false } as const;
+  const scoping = {
+    verdict: "change" as const,
+    from: "bugfix" as const,
+    proposed: "refactor" as const,
+    reason: "three call sites",
+    evidence: ["src/a.ts:10 parses by hand"],
+    followUps: [],
+    applied: true,
+    promptVersion: "scoper@1+00000000",
+  };
+
+  it("shows an applied change after the category, with its evidence", () => {
+    const text = renderSpec({ ...spec, category: "refactor", scoping }, route, "r1");
+    expect(text).toMatch(/Category:.*\nScoping:   proposed refactor instead of bugfix \(applied\): three call sites\n  - src\/a.ts:10 parses by hand/);
+  });
+
+  it("shows a rebuttal", () => {
+    expect(renderSpec({ ...spec, scoping: { ...scoping, applied: false } }, route, "r1")).toContain("(rebutted): three call sites");
+  });
+
+  it("lists follow-ups from an accept without a scoping line", () => {
+    const accept = { ...scoping, verdict: "accept" as const, proposed: "bugfix" as const, evidence: [], followUps: ["split the parser"] };
+    const text = renderSpec({ ...spec, scoping: accept }, route, "r1");
+    expect(text).not.toContain("Scoping:");
+    expect(text).toContain("Follow-ups:\n  - split the parser");
+  });
+
+  it("shows nothing without a record", () => {
+    const text = renderSpec(spec, route, "r1");
+    expect(text).not.toContain("Scoping:");
+    expect(text).not.toContain("Follow-ups:");
+  });
+});
+
 describe("formatting an event", () => {
   it("is one line: time, stage, kind and the scalar data", () => {
     const line = formatEvent({

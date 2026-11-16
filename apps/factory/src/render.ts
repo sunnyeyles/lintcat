@@ -11,12 +11,22 @@ export const TERMINAL_STATUSES: readonly FactoryRun["status"][] = ["delivered", 
 const list = (heading: string, items: readonly string[]): string[] =>
   items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `  - ${item}`)];
 
+function scopingLines({ scoping }: Spec): string[] {
+  if (scoping?.verdict !== "change") return [];
+  const outcome = scoping.applied ? "applied" : "rebutted";
+  return [
+    `Scoping:   proposed ${scoping.proposed} instead of ${scoping.from} (${outcome}): ${scoping.reason}`,
+    ...scoping.evidence.map((item) => `  - ${item}`),
+  ];
+}
+
 export function renderSpec(spec: Spec, route: Route, runId: string): string {
   const routing = `Profile:   ${route.profile}${route.overridden ? " (overridden)" : ""}: ${route.reason}`;
   return [
     `── ${spec.title} (${runId})`,
     `Objective: ${spec.objective}`,
     `Category:  ${spec.category}   Risk: ${spec.risk}${spec.touchesSecurityOrData ? " (touches security or data)" : ""}   ~${spec.estimatedFiles} files`,
+    ...scopingLines(spec),
     routing,
     ...list("Requirements", spec.requirements),
     "Acceptance criteria:",
@@ -27,6 +37,7 @@ export function renderSpec(spec: Spec, route: Route, runId: string): string {
     ...list("Assumptions", spec.assumptions),
     ...list("Non-goals", spec.nonGoals),
     ...list("Constraints", spec.constraints),
+    ...list("Follow-ups", spec.scoping?.followUps ?? []),
   ].join("\n");
 }
 

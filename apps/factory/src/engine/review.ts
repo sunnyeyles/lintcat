@@ -2,6 +2,7 @@
 import { z } from "zod";
 
 import type { TaskContract } from "#src/engine/contract";
+import { renderMessage } from "#src/engine/prompts";
 
 const MAX_FINDINGS = 20;
 const MAX_DIFF_CHARS = 80_000;
@@ -57,34 +58,21 @@ export function validateReview(raw: unknown, changed: readonly string[], contrac
 
 export function reviewPrompt(contract: TaskContract, changed: readonly string[], diff: string): string {
   const { spec } = contract;
-  const shown = diff.length > MAX_DIFF_CHARS ? `${diff.slice(0, MAX_DIFF_CHARS)}\n… diff truncated; Read the changed files for the rest` : diff;
-  return [
-    `# Review: ${spec.title}`,
-    `Objective: ${spec.objective}`,
-    "## Approved specification (frozen)",
-    "```json",
-    JSON.stringify(
-      { requirements: spec.requirements, acceptanceCriteria: spec.acceptanceCriteria, nonGoals: spec.nonGoals, constraints: spec.constraints, architectureDecisions: spec.architectureDecisions },
-      null,
-      2,
-    ),
-    "```",
-    "## Changed files",
-    ...changed.map((f) => `- ${f}`),
-    `## Final diff against ${contract.baseSha.slice(0, 12)}`,
-    "```diff",
-    shown,
-    "```",
-    "Review it once and give your final answer.",
-  ].join("\n");
+  const frozen = { requirements: spec.requirements, acceptanceCriteria: spec.acceptanceCriteria, nonGoals: spec.nonGoals, constraints: spec.constraints, architectureDecisions: spec.architectureDecisions };
+  const shown = diff.length > MAX_DIFF_CHARS ? renderMessage("reviewer", "diff-truncated", { diff: diff.slice(0, MAX_DIFF_CHARS) }) : diff;
+  return renderMessage("reviewer", "review", {
+    title: spec.title,
+    objective: spec.objective,
+    spec: JSON.stringify(frozen, null, 2),
+    changed: changed.map((f) => `- ${f}`).join("\n"),
+    base: contract.baseSha.slice(0, 12),
+    diff: shown,
+  });
 }
 
 export function reviewRepairPrompt(blocking: readonly Finding[]): string {
-  return [
-    "The independent review found blocking problems in your change. This is your one repair pass:",
-    ...blocking.map((f) => `- ${f.file}${f.line ? `:${f.line}` : ""}${f.acceptanceId ? ` (${f.acceptanceId})` : ""}: ${f.problem}`),
-    "Fix exactly these, rerun the affected checks with `sandbox_exec`, then give your final answer. Don't refactor anything else.",
-  ].join("\n");
+  const findings = blocking.map((f) => `- ${f.file}${f.line ? `:${f.line}` : ""}${f.acceptanceId ? ` (${f.acceptanceId})` : ""}: ${f.problem}`);
+  return renderMessage("implementer", "review-repair", { findings: findings.join("\n") });
 }
 
 export function renderReview(review: ValidatedReview): string[] {

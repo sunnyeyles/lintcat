@@ -2,8 +2,9 @@
 import { collectRun, type AgentRuntime, type AgentUsage } from "#src/agent/runtime";
 import { z } from "zod";
 
-import { specSchema, type Spec } from "#src/engine/contract";
-import { loadPrompt } from "#src/engine/prompts";
+import { specSchema, type ScopingRecord, type Spec } from "#src/engine/contract";
+import { loadPrompt, renderMessage } from "#src/engine/prompts";
+import { runScoper } from "#src/engine/scoping";
 
 // Flat rather than a union: structured output schemas handle one object shape most reliably.
 const turnSchema = z.object({
@@ -11,7 +12,7 @@ const turnSchema = z.object({
   question: z.string().optional(),
   facts: z.array(z.string()).optional(),
   assumptions: z.array(z.string()).optional(),
-  spec: specSchema.optional(),
+  spec: specSchema.omit({ scoping: true }).optional(),
 });
 
 type DiscoveryTurn =
@@ -44,6 +45,8 @@ export type DiscoveryResult =
 interface DiscoveryState {
   sessionId?: string;
   questions: number;
+  scoped: boolean;
+  scoping?: Omit<ScopingRecord, "applied">;
 }
 
 interface DiscoveryStepOptions {
@@ -63,11 +66,7 @@ interface DiscoveryStep {
   usage: AgentUsage[];
 }
 
-const discoveryMessages = {
-  outcome: (outcome: string) => `Desired outcome:\n\n${outcome}`,
-  answer: (answer: string) => `Answer: ${answer}`,
-  revise: (feedback: string) => `Revise the spec with this feedback, then propose it again:\n\n${feedback}`,
-};
+const bullets = (items: readonly string[]) => (items.length ? items.map((item) => `- ${item}`).join("\n") : "- none");
 
 function parseTurn(structured: unknown): DiscoveryTurn {
   const turn = turnSchema.parse(structured);
@@ -86,9 +85,10 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
   const prompt = loadPrompt("discovery");
   const outputSchema = z.toJSONSchema(turnSchema) as Record<string, unknown>;
   const usage: AgentUsage[] = [];
-  let { sessionId, questions } = options.state;
+  let { sessionId, questions, scoped, scoping } = options.state;
   let message = options.message;
   let repairs = 0;
+  let rescoping = false;
 
   for (;;) {
     options.progress?.("thinking…");
@@ -119,16 +119,52 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
       repairs = 0;
     } catch (error) {
       if (++repairs > 2) throw error;
-      message = `Your last answer did not match the schema (${String(error)}). Answer again.`;
+      message = renderMessage("discovery", "schema-retry", { error: String(error) });
       continue;
     }
 
-    if (turn.kind === "question" && questions >= maxQuestions) {
-      message = "No more questions: propose the spec now, recording every open point as an assumption.";
+    if (turn.kind === "question" && (rescoping || questions >= maxQuestions)) {
+      message = renderMessage("discovery", "no-more-questions");
       continue;
     }
     if (turn.kind === "question") questions++;
-    return { turn, state: { ...(sessionId ? { sessionId } : {}), questions }, promptVersion: prompt.version, usage };
+
+    if (turn.kind === "proposal" && !scoped) {
+      scoped = true;
+      options.progress?.("scoping…");
+      const draft = turn.spec;
+      const scoper = await runScoper({ runtime, repoPath, spec: draft, ...(options.signal ? { signal: options.signal } : {}) });
+      usage.push(...scoper.usage);
+      const verdict = scoper.scoping;
+      if (verdict.verdict === "change" || verdict.followUps.length > 0) {
+        scoping = {
+          verdict: verdict.verdict,
+          from: draft.category,
+          proposed: verdict.verdict === "change" ? verdict.category : draft.category,
+          reason: verdict.reason,
+          evidence: verdict.verdict === "change" ? verdict.evidence : [],
+          followUps: verdict.followUps,
+          promptVersion: scoper.promptVersion,
+        };
+      }
+      if (verdict.verdict === "change") {
+        rescoping = true;
+        message = renderMessage("discovery", "scoping", {
+          proposed: verdict.category,
+          category: draft.category,
+          reason: verdict.reason,
+          evidence: bullets(verdict.evidence),
+          followUps: bullets(verdict.followUps),
+        });
+        continue;
+      }
+    }
+
+    if (turn.kind === "proposal" && scoping) {
+      turn = { kind: "proposal", spec: { ...turn.spec, scoping: { ...scoping, applied: turn.spec.category === scoping.proposed } } };
+    }
+    const state: DiscoveryState = { ...(sessionId ? { sessionId } : {}), questions, scoped, ...(scoping ? { scoping } : {}) };
+    return { turn, state, promptVersion: prompt.version, usage };
   }
 }
 
@@ -136,9 +172,9 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const { io } = options;
   const maxRevisions = options.maxRevisions ?? 3;
   const usage: AgentUsage[] = [];
-  let state: DiscoveryState = { questions: 0 };
+  let state: DiscoveryState = { questions: 0, scoped: false };
   let revisions = 0;
-  let message = discoveryMessages.outcome(options.outcome);
+  let message = renderMessage("discovery", "outcome", { outcome: options.outcome });
 
   for (;;) {
     const step = await discoveryStep({
@@ -155,7 +191,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     const { turn } = step;
 
     if (turn.kind === "question") {
-      message = discoveryMessages.answer(await io.ask(turn));
+      message = renderMessage("discovery", "answer", { answer: await io.ask(turn) });
       continue;
     }
 
@@ -164,6 +200,6 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       return { status: "approved", spec: turn.spec, promptVersion: step.promptVersion, usage };
     }
     if (decision.decision === "abort" || ++revisions > maxRevisions) return { status: "aborted", usage };
-    message = discoveryMessages.revise(decision.feedback);
+    message = renderMessage("discovery", "revise", { feedback: decision.feedback });
   }
 }
