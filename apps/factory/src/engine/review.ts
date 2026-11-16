@@ -2,7 +2,7 @@
 import { z } from "zod";
 
 import type { TaskContract } from "#src/engine/contract";
-import { renderMessage } from "#src/engine/prompts";
+import { bullets, renderMessage } from "#src/engine/prompts";
 
 const MAX_FINDINGS = 20;
 const MAX_DIFF_CHARS = 80_000;
@@ -64,15 +64,15 @@ export function reviewPrompt(contract: TaskContract, changed: readonly string[],
     title: spec.title,
     objective: spec.objective,
     spec: JSON.stringify(frozen, null, 2),
-    changed: changed.map((f) => `- ${f}`).join("\n"),
+    changed: bullets(changed),
     base: contract.baseSha.slice(0, 12),
     diff: shown,
   });
 }
 
 export function reviewRepairPrompt(blocking: readonly Finding[]): string {
-  const findings = blocking.map((f) => `- ${f.file}${f.line ? `:${f.line}` : ""}${f.acceptanceId ? ` (${f.acceptanceId})` : ""}: ${f.problem}`);
-  return renderMessage("implementer", "review-repair", { findings: findings.join("\n") });
+  const findings = blocking.map((f) => `${f.file}${f.line ? `:${f.line}` : ""}${f.acceptanceId ? ` (${f.acceptanceId})` : ""}: ${f.problem}`);
+  return renderMessage("implementer", "review-repair", { findings: bullets(findings) });
 }
 
 export function renderReview(review: ValidatedReview): string[] {

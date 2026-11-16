@@ -1,7 +1,7 @@
 /** The prompts the engine hands the implementer at each stage. */
 import type { CheckPlan } from "#src/engine/checks";
 import type { TaskContract } from "#src/engine/contract";
-import { renderMessage } from "#src/engine/prompts";
+import { bullets, renderMessage } from "#src/engine/prompts";
 
 const tail = (text: string, chars: number) => (text.length > chars ? `…${text.slice(-chars)}` : text);
 
@@ -32,7 +32,7 @@ function taskBlock(contract: TaskContract, located: unknown): string {
 }
 
 const checksBlock = (plan: CheckPlan) =>
-  renderMessage("implementer", "checks", { checks: plan.checks.map((c) => `- ${c.name}: \`${c.command}\``).join("\n") });
+  renderMessage("implementer", "checks", { checks: bullets(plan.checks.map((c) => `${c.name}: \`${c.command}\``)) });
 
 export function reproducePrompt(contract: TaskContract, located: unknown, plan: CheckPlan): string {
   return [taskBlock(contract, located), checksBlock(plan), "", renderMessage("implementer", "reproduce")].join("\n");

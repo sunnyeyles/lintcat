@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { assetPath } from "#src/engine/assets";
 import type { TaskContract } from "#src/engine/contract";
-import { loadPrompt, MESSAGES, renderMessage } from "#src/engine/prompts";
+import { bullets, loadPrompt, MESSAGES, renderMessage } from "#src/engine/prompts";
 import { reviewPrompt, reviewRepairPrompt } from "#src/engine/review";
 import { implementPrompt, repairPrompt, reproducePrompt } from "#src/engine/stage-prompts";
 import { sampleSpec } from "#src/engine/test-fixtures";
@@ -49,6 +49,23 @@ describe("prompt sets", () => {
   it("throws on a slot with no value and on a value with no slot", () => {
     expect(() => renderMessage("discovery", "answer", {})).toThrow(/no value for \[answer\]/);
     expect(() => renderMessage("discovery", "answer", { answer: "a", extra: "b" })).toThrow(/no slot for \[extra\]/);
+  });
+
+  it("throws on an unfilled slot named like an Object.prototype key", async () => {
+    const dir = await copySet();
+    try {
+      await appendFile(path.join(dir, "discovery", "answer.md"), "{{toString}}\n");
+      process.env.FACTORY_PROMPTS_DIR = dir;
+      expect(() => renderMessage("discovery", "answer", { answer: "a" })).toThrow(/no value for \[toString\]/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("bullets a list, or falls back when empty", () => {
+    expect(bullets(["a", "b"])).toBe("- a\n- b");
+    expect(bullets([], "none")).toBe("none");
+    expect(bullets([])).toBe("");
   });
 
   it("never expands a slot inside a value", () => {

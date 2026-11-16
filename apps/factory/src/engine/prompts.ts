@@ -90,13 +90,17 @@ export function loadPrompt(role: Role): AgentPrompt {
   return { role, text, version };
 }
 
+export function bullets(items: readonly string[], empty = ""): string {
+  return items.length ? items.map((i) => `- ${i}`).join("\n") : empty;
+}
+
 const SLOT = /\{\{(\w+)\}\}/g;
 
 export function renderMessage<R extends Role>(role: R, name: MessageName<R>, vars: Record<string, string | number> = {}): string {
   const template = loadSet(role).messages.get(name);
   if (template === undefined) throw new Error(`no ${role}/${name}.md`);
   const slots = new Set([...template.matchAll(SLOT)].map((m) => m[1] ?? ""));
-  const missing = [...slots].filter((slot) => !(slot in vars));
+  const missing = [...slots].filter((slot) => !Object.hasOwn(vars, slot));
   const extra = Object.keys(vars).filter((key) => !slots.has(key));
   if (missing.length || extra.length) {
     throw new Error(`${role}/${name}.md: no value for [${missing.join(", ")}], no slot for [${extra.join(", ")}]`);
