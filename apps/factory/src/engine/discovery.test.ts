@@ -36,7 +36,8 @@ const change = () => ({
     followUps: [],
   },
 });
-const propose = (spec: object = sampleSpec) => () => ({ structured: { kind: "proposal", spec } });
+const draft = { ...sampleSpec, category: "bugfix" as const };
+const propose = (spec: object = draft) => () => ({ structured: { kind: "proposal", spec } });
 
 describe("runDiscovery", () => {
   it("asks one question at a time, then gets one approval, resuming one session", async () => {
@@ -66,7 +67,7 @@ describe("runDiscovery", () => {
       () => ({ structured: { kind: "proposal" } }),
       propose(),
       accept,
-      propose({ ...sampleSpec, title: "Add --version and -v" }),
+      propose({ ...draft, title: "Add --version and -v" }),
     ]);
     const { io: handlers, reviewed } = io([], [{ decision: "revise", feedback: "also -v" }, { decision: "approve" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
@@ -86,12 +87,12 @@ describe("runDiscovery", () => {
   });
 
   it("resumes discovery with a scoping change and records it as applied", async () => {
-    const runtime = createFakeRuntime([propose(), change, propose({ ...sampleSpec, category: "refactor" })]);
+    const runtime = createFakeRuntime([propose(), change, propose({ ...draft, category: "refactor" })]);
     const { io: handlers, versions } = io([], [{ decision: "approve" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
     expect(result).toMatchObject({
       status: "approved",
-      spec: { category: "refactor", scoping: { verdict: "change", from: "quick", proposed: "refactor", applied: true } },
+      spec: { category: "refactor", scoping: { verdict: "change", from: "bugfix", proposed: "refactor", final: "refactor", applied: true } },
     });
     const resumed = runtime.specs[2];
     expect(resumed?.role).toBe("discovery");
@@ -102,16 +103,16 @@ describe("runDiscovery", () => {
   });
 
   it("records a rebuttal and scopes only once across later revisions", async () => {
-    const runtime = createFakeRuntime([propose(), change, propose(), propose({ ...sampleSpec, title: "Revised" })]);
+    const runtime = createFakeRuntime([propose(), change, propose(), propose({ ...draft, title: "Revised" })]);
     const { io: handlers } = io([], [{ decision: "revise", feedback: "rename" }, { decision: "approve" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
-    expect(result).toMatchObject({ status: "approved", spec: { title: "Revised", scoping: { applied: false } } });
+    expect(result).toMatchObject({ status: "approved", spec: { title: "Revised", scoping: { final: "bugfix", applied: false } } });
     expect(runtime.specs.filter((s) => s.role === "scoper")).toHaveLength(1);
   });
 
   it("drops a scoping record the discovery agent forged", async () => {
     const forged = { verdict: "change", from: "bugfix", proposed: "quick", reason: "x", evidence: [], followUps: [], applied: true, promptVersion: "x" };
-    const runtime = createFakeRuntime([propose({ ...sampleSpec, scoping: forged }), accept]);
+    const runtime = createFakeRuntime([propose({ ...draft, scoping: forged }), accept]);
     const { io: handlers } = io([], [{ decision: "approve" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
     expect(result.status === "approved" && result.spec.scoping).toBeUndefined();
@@ -123,5 +124,44 @@ describe("runDiscovery", () => {
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
     expect(result.status).toBe("approved");
     expect(result.status === "approved" && result.spec.scoping).toBeUndefined();
+  });
+
+  it("records a third category as neither applied nor rebutted", async () => {
+    const runtime = createFakeRuntime([propose(), change, propose({ ...draft, category: "feature" })]);
+    const { io: handlers } = io([], [{ decision: "approve" }]);
+    const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
+    expect(result).toMatchObject({
+      status: "approved",
+      spec: { category: "feature", scoping: { from: "bugfix", proposed: "refactor", final: "feature", applied: false } },
+    });
+    expect(runtime.specs.filter((s) => s.role === "scoper")).toHaveLength(1);
+  });
+
+  it("scopes afresh when a revision changes the category, dropping the stale record", async () => {
+    const runtime = createFakeRuntime([propose(), change, propose(), propose({ ...draft, category: "feature" }), accept]);
+    const { io: handlers } = io([], [{ decision: "revise", feedback: "it is a feature" }, { decision: "approve" }]);
+    const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
+    expect(result).toMatchObject({ status: "approved", spec: { category: "feature" } });
+    expect(result.status === "approved" && result.spec.scoping).toBeUndefined();
+    expect(runtime.specs.filter((s) => s.role === "scoper")).toHaveLength(2);
+  });
+
+  it("skips the scoper for a quick, low-risk spec", async () => {
+    const runtime = createFakeRuntime([propose(sampleSpec)]);
+    const { io: handlers } = io([], [{ decision: "approve" }]);
+    const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
+    expect(result.status).toBe("approved");
+    expect(result.status === "approved" && result.spec.scoping).toBeUndefined();
+    expect(runtime.specs.map((s) => s.role)).toEqual(["discovery"]);
+  });
+
+  it("throws when the agent keeps asking past the question cap", async () => {
+    const question = () => ({ structured: { kind: "question", question: "more?" } });
+    const runtime = createFakeRuntime([question, question, question]);
+    const { io: handlers } = io([], []);
+    await expect(runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers, maxQuestions: 0 })).rejects.toThrow(
+      "discovery agent kept asking after the question cap",
+    );
+    expect(runtime.specs).toHaveLength(3);
   });
 });

@@ -13,7 +13,8 @@ const list = (heading: string, items: readonly string[]): string[] =>
 
 function scopingLines({ scoping }: Spec): string[] {
   if (scoping?.verdict !== "change") return [];
-  const outcome = scoping.applied ? "applied" : "rebutted";
+  const outcome =
+    scoping.final === scoping.proposed ? "applied" : scoping.final === scoping.from ? "rebutted" : `changed to ${scoping.final}`;
   return [
     `Scoping:   proposed ${scoping.proposed} instead of ${scoping.from} (${outcome}): ${scoping.reason}`,
     ...scoping.evidence.map((item) => `  - ${item}`),

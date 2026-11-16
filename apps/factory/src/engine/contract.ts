@@ -20,6 +20,7 @@ const scopingRecordSchema = z.object({
   verdict: z.enum(["accept", "change"]),
   from: categorySchema,
   proposed: categorySchema,
+  final: categorySchema,
   reason: z.string(),
   evidence: z.array(z.string()),
   followUps: z.array(z.string()),

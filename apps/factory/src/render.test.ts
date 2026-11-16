@@ -39,6 +39,7 @@ describe("rendering a scoping record", () => {
     verdict: "change" as const,
     from: "bugfix" as const,
     proposed: "refactor" as const,
+    final: "refactor" as const,
     reason: "three call sites",
     evidence: ["src/a.ts:10 parses by hand"],
     followUps: [],
@@ -52,11 +53,16 @@ describe("rendering a scoping record", () => {
   });
 
   it("shows a rebuttal", () => {
-    expect(renderSpec({ ...spec, scoping: { ...scoping, applied: false } }, route, "r1")).toContain("(rebutted): three call sites");
+    expect(renderSpec({ ...spec, scoping: { ...scoping, final: "bugfix", applied: false } }, route, "r1")).toContain("(rebutted): three call sites");
+  });
+
+  it("shows a third category the user settled on", () => {
+    const text = renderSpec({ ...spec, category: "feature", scoping: { ...scoping, final: "feature", applied: false } }, route, "r1");
+    expect(text).toContain("(changed to feature): three call sites");
   });
 
   it("lists follow-ups from an accept without a scoping line", () => {
-    const accept = { ...scoping, verdict: "accept" as const, proposed: "bugfix" as const, evidence: [], followUps: ["split the parser"] };
+    const accept = { ...scoping, verdict: "accept" as const, proposed: "bugfix" as const, final: "bugfix" as const, evidence: [], followUps: ["split the parser"] };
     const text = renderSpec({ ...spec, scoping: accept }, route, "r1");
     expect(text).not.toContain("Scoping:");
     expect(text).toContain("Follow-ups:\n  - split the parser");

@@ -2,8 +2,8 @@
 import { collectRun, type AgentRuntime, type AgentUsage } from "#src/agent/runtime";
 import { z } from "zod";
 
-import { specSchema, type ScopingRecord, type Spec } from "#src/engine/contract";
-import { loadPrompt, renderMessage } from "#src/engine/prompts";
+import { specSchema, type Category, type ScopingRecord, type Spec } from "#src/engine/contract";
+import { bullets, loadPrompt, renderMessage } from "#src/engine/prompts";
 import { runScoper } from "#src/engine/scoping";
 
 // Flat rather than a union: structured output schemas handle one object shape most reliably.
@@ -45,8 +45,9 @@ export type DiscoveryResult =
 interface DiscoveryState {
   sessionId?: string;
   questions: number;
-  scoped: boolean;
-  scoping?: Omit<ScopingRecord, "applied">;
+  /** The category of the last proposal returned; a later proposal in another category is scoped afresh. */
+  scopedCategory?: Category;
+  scoping?: Omit<ScopingRecord, "applied" | "final">;
 }
 
 interface DiscoveryStepOptions {
@@ -66,7 +67,9 @@ interface DiscoveryStep {
   usage: AgentUsage[];
 }
 
-const bullets = (items: readonly string[]) => (items.length ? items.map((item) => `- ${item}`).join("\n") : "- none");
+const MAX_NUDGES = 2;
+
+const needsScoping = (spec: Spec) => !(spec.category === "quick" && spec.risk === "low" && !spec.touchesSecurityOrData);
 
 function parseTurn(structured: unknown): DiscoveryTurn {
   const turn = turnSchema.parse(structured);
@@ -85,9 +88,10 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
   const prompt = loadPrompt("discovery");
   const outputSchema = z.toJSONSchema(turnSchema) as Record<string, unknown>;
   const usage: AgentUsage[] = [];
-  let { sessionId, questions, scoped, scoping } = options.state;
+  let { sessionId, questions, scopedCategory, scoping } = options.state;
   let message = options.message;
   let repairs = 0;
+  let nudges = 0;
   let rescoping = false;
 
   for (;;) {
@@ -124,17 +128,21 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
     }
 
     if (turn.kind === "question" && (rescoping || questions >= maxQuestions)) {
+      if (nudges++ >= MAX_NUDGES) throw new Error("discovery agent kept asking after the question cap");
       message = renderMessage("discovery", "no-more-questions");
       continue;
     }
+    nudges = 0;
     if (turn.kind === "question") questions++;
 
-    if (turn.kind === "proposal" && !scoped) {
-      scoped = true;
+    const rescope = turn.kind === "proposal" && !rescoping && turn.spec.category !== scopedCategory;
+    if (rescope) scoping = undefined;
+    if (rescope && turn.kind === "proposal" && needsScoping(turn.spec)) {
       options.progress?.("scoping…");
       const draft = turn.spec;
       const scoper = await runScoper({ runtime, repoPath, spec: draft, ...(options.signal ? { signal: options.signal } : {}) });
       usage.push(...scoper.usage);
+      if (scoper.failure) options.progress?.(`scoping skipped: ${scoper.failure}`);
       const verdict = scoper.scoping;
       if (verdict.verdict === "change" || verdict.followUps.length > 0) {
         scoping = {
@@ -153,17 +161,24 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
           proposed: verdict.category,
           category: draft.category,
           reason: verdict.reason,
-          evidence: bullets(verdict.evidence),
-          followUps: bullets(verdict.followUps),
+          evidence: bullets(verdict.evidence, "- none"),
+          followUps: bullets(verdict.followUps, "- none"),
         });
         continue;
       }
     }
 
-    if (turn.kind === "proposal" && scoping) {
-      turn = { kind: "proposal", spec: { ...turn.spec, scoping: { ...scoping, applied: turn.spec.category === scoping.proposed } } };
+    if (turn.kind === "proposal") {
+      const final = turn.spec.category;
+      scopedCategory = final;
+      if (scoping) turn = { kind: "proposal", spec: { ...turn.spec, scoping: { ...scoping, final, applied: final === scoping.proposed } } };
     }
-    const state: DiscoveryState = { ...(sessionId ? { sessionId } : {}), questions, scoped, ...(scoping ? { scoping } : {}) };
+    const state: DiscoveryState = {
+      ...(sessionId ? { sessionId } : {}),
+      questions,
+      ...(scopedCategory ? { scopedCategory } : {}),
+      ...(scoping ? { scoping } : {}),
+    };
     return { turn, state, promptVersion: prompt.version, usage };
   }
 }
@@ -172,7 +187,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const { io } = options;
   const maxRevisions = options.maxRevisions ?? 3;
   const usage: AgentUsage[] = [];
-  let state: DiscoveryState = { questions: 0, scoped: false };
+  let state: DiscoveryState = { questions: 0 };
   let revisions = 0;
   let message = renderMessage("discovery", "outcome", { outcome: options.outcome });
 
