@@ -46,6 +46,8 @@ readable event stream.
 ```
 new "<outcome>"
   discovery agent (read-only) ── one question at a time ──▶ spec
+  spec review (not quick): a fresh read-only agent paraphrases and audits it;
+    discovery fixes, contests or escalates findings; one re-audit
   routed to a profile ──▶ awaiting_approval ──▶ one approval (contract frozen by sha256)
   queued ──▶ claimed with a lease ──▶ running
     prepare    worktree on factory/<slug>-<id>; container; install with network; network cut
@@ -62,6 +64,11 @@ new "<outcome>"
 | `bugfix` | **reproduce**: a failing regression test, committed before the fix |
 | `feature` | **review**: one independent read-only review, at most one repair |
 | `refactor` | **baseline** checks before any change, then **review** |
+
+The spec reviewer sees only the spec and the repository, as the implementer
+will. You approve with its paraphrase and any open or escalated findings beside
+the spec; they inform the decision and never block it. Each review is a
+`spec_reviewed` event.
 
 Profiles live in `src/engine/profiles.ts`. Postgres is authoritative; a worker
 that claims an expired lease resumes from the last checkpoint, at most 3 times.

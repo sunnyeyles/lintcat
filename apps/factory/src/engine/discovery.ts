@@ -4,6 +4,17 @@ import { z } from "zod";
 
 import { specSchema, type Spec } from "#src/engine/contract";
 import { loadPrompt } from "#src/engine/prompts";
+import {
+  matchResolutions,
+  needsResolution,
+  resolutionSchema,
+  resolvePrompt,
+  reviewSpec,
+  shouldReviewSpec,
+  type Resolution,
+  type SpecAudit,
+  type SpecReview,
+} from "#src/engine/spec-review";
 
 // Flat rather than a union: structured output schemas handle one object shape most reliably.
 const turnSchema = z.object({
@@ -12,17 +23,19 @@ const turnSchema = z.object({
   facts: z.array(z.string()).optional(),
   assumptions: z.array(z.string()).optional(),
   spec: specSchema.optional(),
+  resolutions: z.array(resolutionSchema).optional(),
 });
 
 type DiscoveryTurn =
   | { kind: "question"; question: string; facts: string[]; assumptions: string[] }
-  | { kind: "proposal"; spec: Spec };
+  | { kind: "proposal"; spec: Spec; resolutions: Resolution[] };
 
 export type ReviewDecision = { decision: "approve" } | { decision: "revise"; feedback: string } | { decision: "abort" };
 
 export interface DiscoveryIO {
   ask(turn: Extract<DiscoveryTurn, { kind: "question" }>): Promise<string>;
-  review(spec: Spec, promptVersion: string): Promise<ReviewDecision>;
+  /** `audit` is absent when the spec was not reviewed (a `quick` change, or review turned off). */
+  review(spec: Spec, promptVersion: string, audit?: SpecAudit): Promise<ReviewDecision>;
   progress?(message: string): void;
 }
 
@@ -33,6 +46,8 @@ export interface DiscoveryOptions {
   io: DiscoveryIO;
   maxQuestions?: number;
   maxRevisions?: number;
+  /** A fresh reviewer audits each non-quick proposal before the person sees it; default on. */
+  specReview?: boolean;
   signal?: AbortSignal;
 }
 
@@ -76,7 +91,7 @@ function parseTurn(structured: unknown): DiscoveryTurn {
     return { kind: "question", question: turn.question, facts: turn.facts ?? [], assumptions: turn.assumptions ?? [] };
   }
   if (!turn.spec) throw new Error("a proposal turn needs `spec`");
-  return { kind: "proposal", spec: turn.spec };
+  return { kind: "proposal", spec: turn.spec, resolutions: turn.resolutions ?? [] };
 }
 
 /** One user-visible turn: a permitted question or a proposal, repairing schema misses and the question cap internally. */
@@ -140,28 +155,60 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   let revisions = 0;
   let message = discoveryMessages.outcome(options.outcome);
 
-  for (;;) {
-    const step = await discoveryStep({
+  const step = async (text: string) => {
+    const result = await discoveryStep({
       runtime: options.runtime,
       repoPath: options.repoPath,
-      message,
+      message: text,
       state,
       ...(options.maxQuestions === undefined ? {} : { maxQuestions: options.maxQuestions }),
       ...(options.signal ? { signal: options.signal } : {}),
-      ...(io.progress ? { progress: (text: string) => io.progress?.(text) } : {}),
+      ...(io.progress ? { progress: (progress: string) => io.progress?.(progress) } : {}),
     });
-    usage.push(...step.usage);
-    state = step.state;
-    const { turn } = step;
+    usage.push(...result.usage);
+    state = result.state;
+    return result;
+  };
 
-    if (turn.kind === "question") {
-      message = discoveryMessages.answer(await io.ask(turn));
+  const audit = async (spec: Spec): Promise<SpecReview | null> => {
+    io.progress?.("fresh review of the spec…");
+    try {
+      const result = await reviewSpec({ runtime: options.runtime, repoPath: options.repoPath, spec, ...(options.signal ? { signal: options.signal } : {}) });
+      usage.push(result.usage);
+      return result.review;
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      return null;
+    }
+  };
+
+  for (;;) {
+    let current = await step(message);
+    if (current.turn.kind === "question") {
+      message = discoveryMessages.answer(await io.ask(current.turn));
       continue;
     }
 
-    const decision = await io.review(turn.spec, step.promptVersion);
+    let spec = current.turn.spec;
+    let specAudit: SpecAudit | undefined;
+    if (options.specReview !== false && shouldReviewSpec(spec)) {
+      const first = await audit(spec);
+      specAudit = { review: first, resolutions: [] };
+      if (first && needsResolution(first)) {
+        current = await step(resolvePrompt(first));
+        if (current.turn.kind === "question") {
+          message = discoveryMessages.answer(await io.ask(current.turn));
+          continue;
+        }
+        spec = current.turn.spec;
+        // The one re-audit, so the paraphrase the person reads matches the spec they approve.
+        specAudit = { review: await audit(spec), resolutions: matchResolutions(first, current.turn.resolutions) };
+      }
+    }
+
+    const decision = await io.review(spec, current.promptVersion, specAudit);
     if (decision.decision === "approve") {
-      return { status: "approved", spec: turn.spec, promptVersion: step.promptVersion, usage };
+      return { status: "approved", spec, promptVersion: current.promptVersion, usage };
     }
     if (decision.decision === "abort" || ++revisions > maxRevisions) return { status: "aborted", usage };
     message = discoveryMessages.revise(decision.feedback);

@@ -3,6 +3,7 @@ import type { FactoryCommand, FactoryEvent, FactoryRun } from "#src/engine/store
 import type { FactoryService } from "#src/engine/service";
 import type { Spec } from "#src/engine/contract";
 import type { Route } from "#src/engine/profiles";
+import type { SpecAudit } from "#src/engine/spec-review";
 
 type ProfileSummary = Awaited<ReturnType<FactoryService["summary"]>>[number];
 
@@ -28,6 +29,21 @@ export function renderSpec(spec: Spec, route: Route, runId: string): string {
     ...list("Non-goals", spec.nonGoals),
     ...list("Constraints", spec.constraints),
   ].join("\n");
+}
+
+export function renderSpecAudit(audit: SpecAudit): string {
+  const { review, resolutions } = audit;
+  const lines = ["── Fresh review (a reader with none of this conversation, like the implementer)"];
+  if (review) lines.push(`It reads this as: ${review.paraphrase.proposes}`, `Existing system, per the spec: ${review.paraphrase.existingSystem}`);
+  else lines.push("The reviewer returned no valid answer; judge the spec without it.");
+  const escalated = resolutions.filter((r) => r.action === "escalate");
+  const settled = resolutions.filter((r) => r.action !== "escalate");
+  const line = (f: { severity: string; field: string; problem: string }) => `[${f.severity}] ${f.field}: ${f.problem}`;
+  lines.push(...list("Needs your call (discovery disagrees, on grounds only you know)", escalated.map((r) => `${line(r.finding)}\n      → ${r.note}`)));
+  lines.push(...list("Resolved by discovery", settled.map((r) => `${r.action}: ${line(r.finding)}\n      → ${r.note}`)));
+  lines.push(...list(resolutions.length ? "Still open after revision" : "Findings", (review?.findings ?? []).map(line)));
+  if (review && review.findings.length === 0 && resolutions.length === 0) lines.push("No findings.");
+  return lines.join("\n");
 }
 
 function scalar(value: unknown): string | undefined {

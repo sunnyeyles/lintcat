@@ -9,6 +9,7 @@ import { executeRun, type EngineDeps } from "#src/engine/engine";
 import { currentBranch, ensureFactoryExcluded, headSha, repoRoot } from "#src/engine/git";
 import { PROFILES, routeTask, workflowVersion, type Route } from "#src/engine/profiles";
 import { readTaskMarkdown } from "#src/engine/run-files";
+import type { SpecAudit } from "#src/engine/spec-review";
 import type { SandboxProvider } from "#src/engine/sandbox/sandbox";
 import {
   appendEvent,
@@ -41,6 +42,7 @@ export interface ProposalInput {
   repoPath: string;
   spec: Spec;
   promptVersion: string;
+  audit?: SpecAudit;
   profileOverride?: ProfileName;
   allowPullRequest?: boolean;
   /** Updates this awaiting-approval run instead of creating one. */
@@ -48,6 +50,26 @@ export interface ProposalInput {
 }
 
 export type ProposalResult = { run: FactoryRun; route: Route };
+
+function specReviewedEvent(runId: string, { review, resolutions }: SpecAudit) {
+  const count = (severity: string) => review?.findings.filter((f) => f.severity === severity).length ?? 0;
+  return {
+    runId,
+    kind: "spec_reviewed",
+    ...(review ? { promptVersion: review.promptVersion } : {}),
+    data: {
+      valid: review !== null,
+      blockers: count("blocker"),
+      majors: count("major"),
+      nits: count("nit"),
+      resolved: resolutions.length,
+      escalated: resolutions.filter((r) => r.action === "escalate").length,
+      paraphrase: review?.paraphrase,
+      findings: review?.findings,
+      resolutions,
+    },
+  };
+}
 
 const newRunId = () => `r${Date.now().toString(36)}${randomBytes(4).toString("hex")}`;
 
@@ -96,6 +118,7 @@ export function createFactoryService(options: FactoryServiceOptions) {
         : await createRun(database, { id, repoPath: repo, title: input.spec.title, contract, status: "awaiting_approval" });
       if (!run) throw new Error(`run ${input.runId} is no longer awaiting approval`);
       await appendEvent(database, { runId: id, kind: "spec_proposed", promptVersion: input.promptVersion, data: { profile: profileName, route } });
+      if (input.audit) await appendEvent(database, specReviewedEvent(id, input.audit));
       return { run, route };
     },
 
