@@ -288,7 +288,7 @@ describe("runReviewJob", () => {
 
     expect(github.createReview).not.toHaveBeenCalled();
     expect(github.createCheckRun).toHaveBeenCalledWith(
-      expect.objectContaining({ headSha, conclusion: "failure" }),
+      expect.objectContaining({ headSha, conclusion: "neutral" }),
     );
     expect(await status(job.id)).toMatchObject({ status: "failed" });
   });
@@ -391,7 +391,7 @@ describe("runReviewJob repo settings", () => {
     expect(createLanguageModel).not.toHaveBeenCalled();
     expect(await status(job.id)).toMatchObject({ status: "failed" });
     expect(github.createCheckRun).toHaveBeenCalledWith(
-      expect.objectContaining({ conclusion: "failure" }),
+      expect.objectContaining({ conclusion: "neutral" }),
     );
     const [input] = github.createCheckRun.mock.calls[0] as unknown as [
       { output: { title: string; summary: string } },

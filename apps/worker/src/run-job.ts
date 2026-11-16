@@ -187,10 +187,7 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       secrets.push(key?.apiKey);
       if (!key) {
         if (!(await stillRunning())) return "superseded";
-        await client.createCheckRun({
-          owner: target.owner,
-          repo: target.repo,
-          headSha: target.headSha,
+        await githubDelivery({ client, logger }).publishCheckRun(target, {
           conclusion: "neutral",
           output: noKeyOutput(organization.slug, deps.settingsUrl(organization.slug)),
         });
@@ -246,12 +243,9 @@ export async function runReviewJob(deps: JobRunnerDeps, job: ReviewJob): Promise
       if (outcome === "superseded") return "superseded";
       logger.error(`review_job.${outcome}`, { ...correlation, error: message });
       if (outcome === "failed" && client) {
-        await client
-          .createCheckRun({
-            owner: target.owner,
-            repo: target.repo,
-            headSha: target.headSha,
-            conclusion: "failure",
+        await githubDelivery({ client, logger })
+          .publishCheckRun(target, {
+            conclusion: "neutral",
             output: unknownModel ? unknownModelOutput(message) : failureOutput(job.attempts),
           })
           .catch((publishError: unknown) =>
