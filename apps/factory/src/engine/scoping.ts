@@ -20,13 +20,14 @@ export type ScopingVerdict =
   | { verdict: "change"; category: Category; reason: string; evidence: string[]; followUps: string[] };
 
 const clean = (items: readonly string[]) => items.map((item) => item.trim()).filter(Boolean);
+const CITATION = /\S+\.\w+:\d+/;
 
 export function validateScoping(raw: unknown, draft: Pick<Spec, "category">): ScopingVerdict {
   const parsed = scopingOutputSchema.safeParse(raw);
   if (!parsed.success) return { verdict: "accept", reason: "", followUps: [] };
   const { verdict, category, reason, evidence, followUps } = parsed.data;
   const kept = clean(followUps).slice(0, MAX_FOLLOW_UPS);
-  const cited = clean(evidence);
+  const cited = clean(evidence).filter((item) => CITATION.test(item));
   if (verdict === "change" && category && category !== draft.category && reason.trim() && cited.length > 0) {
     return { verdict, category, reason: reason.trim(), evidence: cited, followUps: kept };
   }
@@ -44,15 +45,17 @@ export interface ScoperResult {
   scoping: ScopingVerdict;
   promptVersion: string;
   usage: AgentUsage[];
+  failure?: string;
 }
 
-/** Never blocks discovery: any failure is an accept. */
+/** Never blocks discovery: any failure is an accept that carries its `failure`. */
 export async function runScoper({ runtime, repoPath, spec, signal }: ScoperOptions): Promise<ScoperResult> {
   const prompt = loadPrompt("scoper");
-  const accept = (usage: AgentUsage[]): ScoperResult => ({
+  const accept = (usage: AgentUsage[], failure: string): ScoperResult => ({
     scoping: { verdict: "accept", reason: "", followUps: [] },
     promptVersion: prompt.version,
     usage,
+    failure,
   });
   try {
     const result = await collectRun(
@@ -68,10 +71,10 @@ export async function runScoper({ runtime, repoPath, spec, signal }: ScoperOptio
         ...(signal ? { signal } : {}),
       }),
     );
-    if (!result.ok) return accept([result.usage]);
+    if (!result.ok) return accept([result.usage], result.reason);
     return { scoping: validateScoping(result.structured, spec), promptVersion: prompt.version, usage: [result.usage] };
   } catch (error) {
     if (signal?.aborted) throw error;
-    return accept([]);
+    return accept([], error instanceof Error ? error.message : String(error));
   }
 }

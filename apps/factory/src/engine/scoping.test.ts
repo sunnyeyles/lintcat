@@ -18,12 +18,18 @@ describe("validateScoping", () => {
 
   it.each([
     ["no evidence", { ...valid, evidence: [" "] }],
+    ["only uncited evidence", { ...valid, evidence: ["the parser is hand-rolled", "see a.ts"] }],
     ["the same category", { ...valid, category: "bugfix" }],
     ["no category", { ...valid, category: undefined }],
     ["no reason", { ...valid, reason: "  " }],
     ["a schema miss", { verdict: "change", category: "rewrite" }],
   ])("turns a change with %s into an accept", (_, raw) => {
     expect(validateScoping(raw, draft).verdict).toBe("accept");
+  });
+
+  it("drops evidence items that cite no file and line", () => {
+    const evidence = ["src/a.ts:10 parses by hand", "parsing is duplicated"];
+    expect(validateScoping({ ...valid, evidence }, draft)).toMatchObject({ verdict: "change", evidence: ["src/a.ts:10 parses by hand"] });
   });
 
   it("trims follow-ups, drops blanks and caps them at five", () => {
