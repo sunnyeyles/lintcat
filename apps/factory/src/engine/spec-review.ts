@@ -3,6 +3,7 @@ import { collectRun, type AgentRuntime, type AgentUsage } from "#src/agent/runti
 import { z } from "zod";
 
 import type { Spec } from "#src/engine/contract";
+import { routeTask } from "#src/engine/profiles";
 import { loadPrompt, renderMessage } from "#src/engine/prompts";
 
 const MAX_FINDINGS = 12;
@@ -17,11 +18,11 @@ const specReviewOutputSchema = z.object({
       lens: z.enum(LENSES),
       field: z.string(),
       problem: z.string().min(1),
-      evidence: z.array(z.string()),
+      evidence: z.array(z.string()).optional(),
     }),
   ),
 });
-type SpecFinding = z.infer<typeof specReviewOutputSchema>["findings"][number] & { id: string };
+type SpecFinding = Omit<z.infer<typeof specReviewOutputSchema>["findings"][number], "evidence"> & { evidence: string[]; id: string };
 
 export interface SpecReview {
   promptVersion: string;
@@ -43,8 +44,8 @@ export interface SpecAudit {
   resolutions: ResolvedFinding[];
 }
 
-// A `quick` spec gets only the scope lens: its main risk is being bigger than it looks.
-const lensesFor = (spec: Pick<Spec, "category">): readonly (typeof LENSES)[number][] => (spec.category === "quick" ? ["scope"] : LENSES);
+// A spec routed `quick` gets only the scope lens: its main risk is being bigger than it looks.
+const lensesFor = (spec: Spec): readonly (typeof LENSES)[number][] => (routeTask(spec).profile === "quick" ? ["scope"] : LENSES);
 
 /** Scope findings go straight to the person, so discovery resolves only the rest. */
 const resolvable = (review: SpecReview) => review.findings.filter((f) => f.lens !== "scope");
@@ -57,13 +58,13 @@ export const resolvableList = (review: SpecReview) =>
     .join("\n");
 
 /** Null on a schema miss; drops other lenses and uncited scope findings, then dedupes, sorts, caps, numbers. */
-export function validateSpecReview(raw: unknown, promptVersion: string, spec: Pick<Spec, "category">): SpecReview | null {
+export function validateSpecReview(raw: unknown, promptVersion: string, spec: Spec): SpecReview | null {
   const parsed = specReviewOutputSchema.safeParse(raw);
   if (!parsed.success) return null;
   const lenses = lensesFor(spec);
   const seen = new Set<string>();
   const kept = parsed.data.findings
-    .map((f) => ({ ...f, field: f.field.trim(), evidence: f.evidence.map((e) => e.trim()).filter(Boolean) }))
+    .map((f) => ({ ...f, field: f.field.trim(), evidence: (f.evidence ?? []).map((e) => e.trim()).filter(Boolean) }))
     .filter((f) => lenses.includes(f.lens) && (f.lens !== "scope" || f.evidence.length > 0))
     .filter((f) => {
       const key = `${f.field}\n${f.problem.trim().toLowerCase()}`;

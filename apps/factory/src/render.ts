@@ -45,7 +45,7 @@ export function renderSpecAudit(audit: SpecAudit): string {
   lines.push(...list("Scope (your call; discovery left it alone)", findings.filter((f) => f.lens === "scope").map(line)));
   lines.push(...list("Needs your call (discovery disagrees, on grounds only you know)", escalated.map((r) => `${line(r.finding)}\n      → ${r.note}`)));
   lines.push(...list("Resolved by discovery", settled.map((r) => `${r.action}: ${line(r.finding)}\n      → ${r.note}`)));
-  lines.push(...list("Unanswered", findings.filter((f) => f.lens !== "scope" && !answered.has(f.id)).map(line)));
+  lines.push(...list(resolutions.length ? "Unanswered" : "Other findings", findings.filter((f) => f.lens !== "scope" && !answered.has(f.id)).map(line)));
   if (review && findings.length === 0) lines.push("No findings.");
   return lines.join("\n");
 }

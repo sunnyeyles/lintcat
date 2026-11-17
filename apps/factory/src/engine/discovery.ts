@@ -33,7 +33,7 @@ export type ReviewDecision = { decision: "approve" } | { decision: "revise"; fee
 
 export interface DiscoveryIO {
   ask(turn: Extract<DiscoveryTurn, { kind: "question" }>): Promise<string>;
-  /** `audit` is absent only when review is turned off. */
+  /** `audit` is present on the first proposal only, unless review is turned off. */
   review(spec: Spec, promptVersion: string, audit?: SpecAudit): Promise<ReviewDecision>;
   progress?(message: string): void;
 }
@@ -45,7 +45,7 @@ export interface DiscoveryOptions {
   io: DiscoveryIO;
   maxQuestions?: number;
   maxRevisions?: number;
-  /** A fresh reviewer audits each proposal before the person sees it (scope only for `quick`); default on. */
+  /** A fresh reviewer audits the first proposal before the person sees it (scope only when routed `quick`); default on. */
   specReview?: boolean;
   signal?: AbortSignal;
 }
@@ -177,6 +177,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     }
   };
 
+  let reviewed = false;
   for (;;) {
     let current = await step(message);
     if (current.turn.kind === "question") {
@@ -186,7 +187,8 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
 
     let spec = current.turn.spec;
     let specAudit: SpecAudit | undefined;
-    if (options.specReview !== false) {
+    if (options.specReview !== false && !reviewed) {
+      reviewed = true;
       const review = await audit(spec);
       specAudit = { review, resolutions: [] };
       if (review && needsResolution(review)) {
@@ -195,8 +197,9 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
           message = renderMessage("discovery", "answer", { answer: await io.ask(current.turn) });
           continue;
         }
-        // The category is the person's call, so discovery's revision cannot change it.
-        spec = { ...current.turn.spec, category: spec.category };
+        // Routing inputs are the person's call, so discovery's revision cannot change them.
+        const { category, estimatedFiles, risk, touchesSecurityOrData } = spec;
+        spec = { ...current.turn.spec, category, estimatedFiles, risk, touchesSecurityOrData };
         specAudit = { review, resolutions: matchResolutions(review, current.turn.resolutions) };
       }
     }

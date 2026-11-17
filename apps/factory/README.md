@@ -46,7 +46,8 @@ readable event stream.
 ```
 new "<outcome>"
   discovery agent (read-only) ── one question at a time ──▶ draft spec
-  spec review: a fresh read-only agent paraphrases and audits it (quick: scope only);
+  spec review, first proposal only: a fresh read-only agent paraphrases and audits it
+    (scope only when it would route to quick);
     discovery fixes, contests or escalates findings once; scope findings go to you
   routed to a profile ──▶ awaiting_approval ──▶ one approval (contract frozen by sha256)
   queued ──▶ claimed with a lease ──▶ running
@@ -69,7 +70,8 @@ The spec reviewer sees only the spec and the repository, as the implementer
 will. Its scope lens checks `category`, `estimatedFiles` and `risk` against the
 code, for example a bug fix whose defect sits at several call sites
 (`refactor`); a scope finding must cite `path:line` or it is dropped. Discovery
-answers the other findings and cannot change the category: that is your call.
+answers the other findings once and cannot change the routing inputs
+(`category`, `estimatedFiles`, `risk`, `touchesSecurityOrData`): those are your call.
 You approve with the paraphrase and findings beside the spec; they never block
 it. Each review is a `spec_reviewed` event.
 

@@ -52,6 +52,12 @@ describe("rendering a spec review", () => {
     expect(text).toContain("Unanswered:\n  - [nit] plan: wordy");
   });
 
+  it("doesn't call findings discovery never saw unanswered", () => {
+    const text = renderSpecAudit({ review: { promptVersion: "v", paraphrase, findings: [finding("F1", "nit", "wordy")] }, resolutions: [] });
+    expect(text).toContain("Other findings:\n  - [nit] plan: wordy");
+    expect(text).not.toContain("Unanswered");
+  });
+
   it("says when there is nothing to show", () => {
     expect(renderSpecAudit({ review: { promptVersion: "v", paraphrase, findings: [] }, resolutions: [] })).toContain("No findings.");
     expect(renderSpecAudit({ review: null, resolutions: [] })).toContain("no valid answer");

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { matchResolutions, needsResolution, resolvableList, validateSpecReview } from "#src/engine/spec-review";
+import { sampleSpec } from "#src/engine/test-fixtures";
 
 const paraphrase = { proposes: "Adds a flag", existingSystem: "A CLI in src/cli.ts" };
 const finding = (severity: string, field: string, problem: string, lens = "readiness", evidence: string[] = []) => ({ severity, lens, field, problem, evidence });
-const feature = { category: "feature" } as const;
+const feature = { ...sampleSpec, category: "feature" as const, estimatedFiles: 6, risk: "medium" as const };
 
 describe("validateSpecReview", () => {
   it("rejects output that misses the schema", () => {
@@ -41,9 +42,14 @@ describe("validateSpecReview", () => {
     expect(review?.findings).toMatchObject([{ field: "category", evidence: ["src/a.ts:10"] }]);
   });
 
-  it("keeps only scope findings on a quick change", () => {
+  it("tolerates a missing evidence list outside scope", () => {
+    const { evidence: _, ...bare } = finding("major", "plan", "gap");
+    expect(validateSpecReview({ paraphrase, findings: [bare] }, "v", feature)?.findings).toMatchObject([{ evidence: [] }]);
+  });
+
+  it("keeps only scope findings on a change routed quick, whatever its category", () => {
     const scope = finding("major", "category", "bugfix", "scope", ["src/a.ts:1"]);
-    const review = validateSpecReview({ paraphrase, findings: [finding("blocker", "plan", "gap"), scope] }, "v", { category: "quick" });
+    const review = validateSpecReview({ paraphrase, findings: [finding("blocker", "plan", "gap"), scope] }, "v", { ...sampleSpec, category: "feature" });
     expect(review?.findings.map((f) => f.lens)).toEqual(["scope"]);
   });
 });

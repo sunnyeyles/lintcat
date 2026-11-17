@@ -64,12 +64,12 @@ describe("runDiscovery", () => {
       propose(),
       clean,
       propose({ ...sampleSpec, title: "Add --version and -v" }),
-      clean,
     ]);
-    const { io: handlers, reviewed } = io([], [{ decision: "revise", feedback: "also -v" }, { decision: "approve" }]);
+    const { io: handlers, reviewed, audits } = io([], [{ decision: "revise", feedback: "also -v" }, { decision: "approve" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
     expect(result).toMatchObject({ status: "approved", spec: { title: "Add --version and -v" } });
     expect(reviewed).toHaveLength(2);
+    expect(audits[1]).toBeUndefined();
     expect(runtime.specs[1]?.prompt).toMatch(/did not match the schema/);
     expect(runtime.specs[3]?.prompt).toMatch(/also -v/);
   });
@@ -84,7 +84,7 @@ describe("runDiscovery", () => {
   });
 
   describe("the fresh spec review", () => {
-    const feature = { ...sampleSpec, category: "feature" as const, title: "Add export" };
+    const feature = { ...sampleSpec, category: "feature" as const, title: "Add export", estimatedFiles: 6, risk: "medium" as const };
     const gap = { severity: "blocker", lens: "codebase", field: "plan", problem: "src/export.ts is said to exist but doesn't", evidence: [] };
     const scope = {
       severity: "blocker",
@@ -112,16 +112,16 @@ describe("runDiscovery", () => {
       expect(audits[0]?.resolutions).toMatchObject([{ action: "fix", note: "marked as new", finding: { id: "F1", field: "plan" } }]);
     });
 
-    it("sends scope findings to the person, and discovery cannot change the category", async () => {
+    it("sends scope findings to the person, and discovery cannot change the routing inputs", async () => {
       const runtime = createFakeRuntime([
         propose(feature),
         findings(scope, gap),
-        propose({ ...feature, category: "refactor" }, [{ finding: "F2", action: "fix", note: "fixed" }]),
+        propose({ ...feature, category: "refactor", estimatedFiles: 1, risk: "low", touchesSecurityOrData: true }, [{ finding: "F2", action: "fix", note: "fixed" }]),
       ]);
       const { io: handlers, audits } = io([], [{ decision: "approve" }]);
       const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
 
-      expect(result).toMatchObject({ status: "approved", spec: { category: "feature" } });
+      expect(result).toMatchObject({ status: "approved", spec: { category: "feature", estimatedFiles: 6, risk: "medium", touchesSecurityOrData: false } });
       expect(runtime.specs[2]?.prompt).not.toContain("parsing defect");
       expect(audits[0]?.review?.findings.map((f) => f.lens)).toEqual(["scope", "codebase"]);
       expect(audits[0]?.resolutions.map((r) => r.finding.id)).toEqual(["F2"]);
@@ -135,8 +135,8 @@ describe("runDiscovery", () => {
       expect(audits[0]?.review?.findings).toEqual([]);
     });
 
-    it("checks only scope on a quick change", async () => {
-      const runtime = createFakeRuntime([propose(), findings(gap, { ...scope, field: "estimatedFiles" })]);
+    it("checks only scope on a change routed quick", async () => {
+      const runtime = createFakeRuntime([propose({ ...sampleSpec, category: "feature" }), findings(gap, { ...scope, field: "estimatedFiles" })]);
       const { io: handlers, audits } = io([], [{ decision: "approve" }]);
       await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
       expect(runtime.specs[1]?.prompt).toContain("Lenses for this spec: scope.");
