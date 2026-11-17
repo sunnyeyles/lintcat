@@ -140,7 +140,7 @@ Read from the environment and this repository's `.env.local`:
 
 | Variable | Default |
 |---|---|
-| `FACTORY_DATABASE_URL` | `postgres://factory:factory@127.0.0.1:54329/factory` |
+| `FACTORY_DATABASE_URL` | `postgres://factory:factory@127.0.0.1:54329/factory`; lintcat's `DATABASE_URL` works too: tables live in the `factory` schema |
 | `FACTORY_AUTH` | `subscription` (or `api-key`) |
 | `FACTORY_CLAUDE_PATH` | `claude` on `PATH` |
 | `FACTORY_PROMPTS_DIR` | the package's `agents/` |

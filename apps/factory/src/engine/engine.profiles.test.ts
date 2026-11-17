@@ -222,7 +222,7 @@ describe("workflow profiles", () => {
         worktreePath: worktree,
         checkpoint: { stage: "baseline", sha: await headSha(worktree), nextStage: "implement", data: { locate: { files: [] }, baseline } },
       });
-      await database.execute(sql`update factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
+      await database.execute(sql`update factory.factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
 
       expect((await service.runNext({ runId }))?.status).toBe("delivered");
       expect((await listCommands(database, runId)).map((c) => c.stage)).not.toContain("baseline");
@@ -309,7 +309,7 @@ describe("workflow profiles", () => {
         agentSessionId: "earlier-session",
         checkpoint: { stage: "review", sha: await headSha(worktree), nextStage: "review", data: { locate: { files: [] }, review } },
       });
-      await database.execute(sql`update factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
+      await database.execute(sql`update factory.factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
 
       expect((await service.runNext({ runId }))?.status).toBe("delivered");
       expect(runtime.specs.map((s) => [s.role, s.resumeSessionId])).toEqual([["implementer", "earlier-session"]]);
@@ -401,7 +401,7 @@ describe("workflow profiles", () => {
         agentSessionId: "earlier-session",
         checkpoint: { stage: "deploy-impact", sha, nextStage: "deploy-impact", data: { locate: { files: [] }, deployImpact, deployImpactRepair: { sha, verified } } },
       });
-      await database.execute(sql`update factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
+      await database.execute(sql`update factory.factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
     }
 
     it("never repeats the repair when recovering after it (AC7)", async () => {

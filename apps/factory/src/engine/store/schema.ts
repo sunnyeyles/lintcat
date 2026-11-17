@@ -4,15 +4,17 @@ import {
   index,
   integer,
   jsonb,
-  pgEnum,
-  pgTable,
+  pgSchema,
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
 
 import type { TaskContract } from "#src/engine/contract";
 
-export const factoryRunStatus = pgEnum("factory_run_status", [
+// Own schema, so lintcat's `db:push` (public only) never sees or drops these.
+export const factorySchema = pgSchema("factory");
+
+export const factoryRunStatus = factorySchema.enum("factory_run_status", [
   "draft",
   "awaiting_approval",
   "queued",
@@ -45,7 +47,7 @@ const timestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 };
 
-export const factoryRuns = pgTable(
+export const factoryRuns = factorySchema.table(
   "factory_runs",
   {
     id: text("id").primaryKey(),
@@ -74,7 +76,7 @@ export const factoryRuns = pgTable(
   (table) => [index("factory_runs_status_lease_idx").on(table.status, table.leaseExpiresAt)],
 );
 
-export const factoryEvents = pgTable(
+export const factoryEvents = factorySchema.table(
   "factory_events",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -94,7 +96,7 @@ export const factoryEvents = pgTable(
   (table) => [index("factory_events_run_idx").on(table.runId, table.id)],
 );
 
-export const factoryCommands = pgTable(
+export const factoryCommands = factorySchema.table(
   "factory_commands",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -116,7 +118,7 @@ export const factoryCommands = pgTable(
   (table) => [index("factory_commands_run_idx").on(table.runId, table.id)],
 );
 
-export const factoryEffects = pgTable("factory_effects", {
+export const factoryEffects = factorySchema.table("factory_effects", {
   key: text("key").primaryKey(),
   runId: text("run_id")
     .notNull()

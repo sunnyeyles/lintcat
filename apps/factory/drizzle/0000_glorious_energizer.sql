@@ -1,5 +1,7 @@
-CREATE TYPE "public"."factory_run_status" AS ENUM('draft', 'awaiting_approval', 'queued', 'running', 'verifying', 'delivered', 'failed', 'cancelled');--> statement-breakpoint
-CREATE TABLE "factory_commands" (
+CREATE SCHEMA IF NOT EXISTS "factory";
+--> statement-breakpoint
+CREATE TYPE "factory"."factory_run_status" AS ENUM('draft', 'awaiting_approval', 'queued', 'running', 'verifying', 'delivered', 'failed', 'cancelled');--> statement-breakpoint
+CREATE TABLE "factory"."factory_commands" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"run_id" text NOT NULL,
 	"stage" text NOT NULL,
@@ -15,7 +17,7 @@ CREATE TABLE "factory_commands" (
 	"output" text NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "factory_effects" (
+CREATE TABLE "factory"."factory_effects" (
 	"key" text PRIMARY KEY NOT NULL,
 	"run_id" text NOT NULL,
 	"kind" text NOT NULL,
@@ -23,7 +25,7 @@ CREATE TABLE "factory_effects" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "factory_events" (
+CREATE TABLE "factory"."factory_events" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"run_id" text NOT NULL,
 	"at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -37,11 +39,11 @@ CREATE TABLE "factory_events" (
 	"data" jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "factory_runs" (
+CREATE TABLE "factory"."factory_runs" (
 	"id" text PRIMARY KEY NOT NULL,
 	"repo_path" text NOT NULL,
 	"title" text NOT NULL,
-	"status" "factory_run_status" DEFAULT 'draft' NOT NULL,
+	"status" "factory"."factory_run_status" DEFAULT 'draft' NOT NULL,
 	"stage" text,
 	"profile" text,
 	"workflow_version" text,
@@ -63,9 +65,9 @@ CREATE TABLE "factory_runs" (
 	"finished_at" timestamp with time zone
 );
 --> statement-breakpoint
-ALTER TABLE "factory_commands" ADD CONSTRAINT "factory_commands_run_id_factory_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."factory_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "factory_effects" ADD CONSTRAINT "factory_effects_run_id_factory_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."factory_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "factory_events" ADD CONSTRAINT "factory_events_run_id_factory_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "public"."factory_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "factory_commands_run_idx" ON "factory_commands" USING btree ("run_id","id");--> statement-breakpoint
-CREATE INDEX "factory_events_run_idx" ON "factory_events" USING btree ("run_id","id");--> statement-breakpoint
-CREATE INDEX "factory_runs_status_lease_idx" ON "factory_runs" USING btree ("status","lease_expires_at");
+ALTER TABLE "factory"."factory_commands" ADD CONSTRAINT "factory_commands_run_id_factory_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "factory"."factory_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "factory"."factory_effects" ADD CONSTRAINT "factory_effects_run_id_factory_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "factory"."factory_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "factory"."factory_events" ADD CONSTRAINT "factory_events_run_id_factory_runs_id_fk" FOREIGN KEY ("run_id") REFERENCES "factory"."factory_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "factory_commands_run_idx" ON "factory"."factory_commands" USING btree ("run_id","id");--> statement-breakpoint
+CREATE INDEX "factory_events_run_idx" ON "factory"."factory_events" USING btree ("run_id","id");--> statement-breakpoint
+CREATE INDEX "factory_runs_status_lease_idx" ON "factory"."factory_runs" USING btree ("status","lease_expires_at");

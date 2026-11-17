@@ -6,4 +6,6 @@ export default defineConfig({
   schema: "./src/engine/store/schema.ts",
   out: "./drizzle",
   dbCredentials: { url: process.env.FACTORY_DATABASE_URL ?? "" },
+  schemaFilter: ["factory"],
+  migrations: { schema: "factory" },
 });
