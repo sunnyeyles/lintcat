@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { LiveRuns } from "@/app/dev/run-trace/live-runs";
 import { RunTraceExplorer } from "@/app/dev/run-trace/run-trace-explorer";
@@ -18,7 +19,15 @@ export default function RunTraceDevPage() {
       />
       <div className="mt-6 space-y-6">
         {liveRunsEnabled() ? (
-          <LiveRuns />
+          <>
+            <p className="text-sm">
+              <Link href="/dev/factory" className="underline underline-offset-4">
+                Factory board
+              </Link>{" "}
+              shows factory runs by status, with the ones in progress up front.
+            </p>
+            <LiveRuns />
+          </>
         ) : (
           <p className="text-muted-foreground text-sm">
             To see runs live as they are pushed, set <code>RUN_TRACE_TOKEN</code> on the web app.

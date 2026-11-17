@@ -35,7 +35,7 @@ export function BotPortrait({ bot, look, size }: { bot: BotView; look: BotLook; 
   );
 }
 
-function CastFigure({ role, status, px }: { role: CastRole; status?: BotStatus; px: number }) {
+export function CastFigure({ role, status, px }: { role: CastRole; status?: BotStatus; px: number }) {
   const sheet = { "--sprite-sheet": `url(/factory-cast/${role}.png)`, "--sprite-size": `${px}px` } as CSSProperties;
   return (
     <span aria-hidden="true" className={cn(styles.figure, "relative block shrink-0")} style={{ width: px, height: px }}>
