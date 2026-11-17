@@ -2,8 +2,9 @@
 import type { DiscoveryIO, ReviewDecision } from "#src/engine/discovery";
 import type { FactoryService } from "#src/engine/service";
 import type { ProfileName, Spec } from "#src/engine/contract";
+import type { SpecAudit } from "#src/engine/spec-review";
 
-import { renderSpec } from "#src/render";
+import { renderSpec, renderSpecAudit } from "#src/render";
 
 export interface TerminalIOOptions {
   service: FactoryService;
@@ -51,17 +52,19 @@ export function createTerminalIO(options: TerminalIOOptions): TerminalIO {
       return answer || "(no answer: use your best judgement and record it as an assumption)";
     },
 
-    async review(spec: Spec, promptVersion: string): Promise<ReviewDecision> {
+    async review(spec: Spec, promptVersion: string, audit?: SpecAudit): Promise<ReviewDecision> {
       const { run, route } = await service.propose({
         repoPath: options.repoPath,
         spec,
         promptVersion,
+        ...(audit ? { audit } : {}),
         allowPullRequest: options.allowPullRequest,
         ...(options.profile ? { profileOverride: options.profile } : {}),
         ...(runId ? { runId } : {}),
       });
       runId = run.id;
       out(`\n${renderSpec(spec, route, run.id)}\n`);
+      if (audit) out(`${renderSpecAudit(audit)}\n`);
       let blocked = false;
       for (;;) {
         const choice = await choose(blocked);
