@@ -100,13 +100,13 @@ function BotButton({ bot, prefix, selectedId, onOpen }: FloorProps & { bot: BotV
           onClick={() => onOpen(bot.id)}
           className={cn(
             styles.bot,
-            bot.cast ? "w-36" : "w-28",
+            "w-36",
             "focus-visible:ring-ring flex flex-col items-center gap-1 rounded-xl p-2 outline-none focus-visible:ring-2",
             "hover:bg-card",
             selectedId === bot.id && "bg-card ring-primary ring-2",
           )}
         >
-          <BotPortrait bot={bot} look={look} size="floor" />
+          <BotPortrait bot={bot} size="floor" />
           <span className="max-w-full truncate text-xs font-semibold">{look.name}</span>
           {bot.description ? (
             <span className="text-muted-foreground line-clamp-2 max-w-full text-center text-[11px] leading-tight">

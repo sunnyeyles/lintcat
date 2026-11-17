@@ -1,4 +1,4 @@
-import { castRole, type CastRole } from "@/app/dev/run-trace/bot-look";
+import { castFor, type CastRole } from "@/app/dev/run-trace/bot-look";
 import { formatDuration, formatTokens, toMs } from "@/app/dev/run-trace/trace-layout";
 import type { AgentNode, AgentStatus, ContextSample, TraceEvent } from "@/lib/run-trace/types";
 
@@ -40,10 +40,10 @@ export type BotView = {
   stage?: string;
   costUsd?: number;
   events?: BotEvent[];
-  cast?: CastRole;
+  cast: CastRole;
 };
 
-export function toBotView(node: AgentNode, factory = node.role === "factory"): BotView {
+export function toBotView(node: AgentNode): BotView {
   const tools: BotTool[] = [];
   const thoughts: BotThought[] = [];
   const said: BotThought[] = [];
@@ -89,12 +89,12 @@ export function toBotView(node: AgentNode, factory = node.role === "factory"): B
     context,
     peakContext: context.length > 0 ? Math.max(...context.map((sample) => sample.tokens)) : undefined,
     activeTool: pending?.name,
-    children: (node.children ?? []).map((child) => toBotView(child, factory)),
+    children: (node.children ?? []).map((child) => toBotView(child)),
     status: node.status ?? deriveStatus(node, Boolean(pending), events),
     stage: nonEmpty(node.stage),
     costUsd: node.costUsd,
     events,
-    cast: factory ? castRole(node.role, node.stage) : undefined,
+    cast: castFor(node.role, node.stage),
   };
 }
 

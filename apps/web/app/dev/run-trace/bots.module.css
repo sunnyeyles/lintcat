@@ -22,16 +22,7 @@
       sprite-frames 0.8s steps(8) infinite,
       sprite-bounce 0.8s ease-in-out infinite;
   }
-  .bob {
-    animation: bot-bob 1.6s ease-in-out infinite;
-  }
-  .blink {
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: bot-blink 4s infinite;
-  }
   .pop {
-    transform-box: fill-box;
     transform-origin: center bottom;
     animation: bot-pop 1.2s ease-in-out infinite;
   }
@@ -53,27 +44,6 @@
 @keyframes sprite-bounce {
   50% {
     translate: 0 -6%;
-  }
-}
-
-@keyframes bot-bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes bot-blink {
-  0%,
-  90%,
-  100% {
-    transform: scaleY(1);
-  }
-  94% {
-    transform: scaleY(0.1);
   }
 }
 
