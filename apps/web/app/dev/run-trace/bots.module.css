@@ -1,4 +1,27 @@
+/* A sheet is 8 frames across, idle on the top row and active on the bottom. */
+.sprite {
+  display: block;
+  width: var(--sprite-size);
+  height: var(--sprite-size);
+  background: var(--sprite-sheet) 0 0 / calc(var(--sprite-size) * 8) calc(var(--sprite-size) * 2) no-repeat;
+  image-rendering: pixelated;
+}
+.active {
+  background-position-y: calc(var(--sprite-size) * -1);
+}
+.waiting {
+  filter: saturate(0.4) opacity(0.7);
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .sprite {
+    animation: sprite-frames 1.6s steps(8) infinite;
+  }
+  .active {
+    animation:
+      sprite-frames 0.8s steps(8) infinite,
+      sprite-bounce 0.8s ease-in-out infinite;
+  }
   .bob {
     animation: bot-bob 1.6s ease-in-out infinite;
   }
@@ -18,6 +41,18 @@
   }
   .figure {
     transition: transform 150ms ease-out;
+  }
+}
+
+@keyframes sprite-frames {
+  to {
+    background-position-x: calc(var(--sprite-size) * -8);
+  }
+}
+
+@keyframes sprite-bounce {
+  50% {
+    translate: 0 -6%;
   }
 }
 

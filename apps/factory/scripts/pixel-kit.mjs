@@ -5,7 +5,7 @@ export const SIZE = 120;
 
 export const hex = (s, a = 255) => [...[1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)), a];
 export const ramp = (...cs) => cs.map((c) => hex(c));
-export const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 
 export const INK = hex("#17191d");
 export const SHADE = hex("#1f2422");
@@ -18,7 +18,7 @@ export const WOOD = ramp("#5a3d24", "#7a5531", "#9c7141", "#bd8f58");
 export const BRASS = ramp("#6b5320", "#93742c", "#bd9a3e", "#e0c264");
 export const RED = ramp("#7a1616", "#b32222", "#e03a2f", "#ff7a66");
 export const GOLD = ramp("#8a6a12", "#c79a1c", "#f2c530", "#ffe88a");
-export const TOOTH = hex("#e8dcb5");
+const TOOTH = hex("#e8dcb5");
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 const dither = (x, y) => BAYER[(y & 3) * 4 + (x & 3)] / 16 - 0.5;
@@ -35,7 +35,7 @@ export function rng(seed) {
 
 export const layer = (w = SIZE, h = SIZE) => ({ w, h, d: new Uint8ClampedArray(w * h * 4) });
 
-export const alpha = (L, x, y) =>
+const alpha = (L, x, y) =>
   x < 0 || y < 0 || x >= L.w || y >= L.h ? 0 : L.d[(y * L.w + x) * 4 + 3];
 
 export function put(L, x, y, c) {
@@ -71,7 +71,7 @@ export function line(L, x0, y0, x1, y1, c, th = 1) {
 export const path = (L, pts, c, th = 1) =>
   pts.slice(1).forEach((p, i) => line(L, ...pts[i], ...p, c, th));
 
-export const rrect = (x, y, w, h, r) => (px, py) => {
+const rrect = (x, y, w, h, r) => (px, py) => {
   if (px < x || py < y || px >= x + w || py >= y + h) return false;
   const dx = Math.max(x + r - px - 0.5, px + 0.5 - (x + w - r), 0);
   const dy = Math.max(y + r - py - 0.5, py + 0.5 - (y + h - r), 0);
@@ -80,7 +80,7 @@ export const rrect = (x, y, w, h, r) => (px, py) => {
 
 export const disc = (cx, cy, r) => (px, py) => (px - cx) ** 2 + (py - cy) ** 2 <= r * r + r * 0.8;
 
-export const polygon = (pts) => (px, py) => {
+const polygon = (pts) => (px, py) => {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
     const [xi, yi] = pts[i];
@@ -217,7 +217,7 @@ export function wheel(L, cx, cy, r, turn = 0) {
     put(L, Math.round(cx + s * Math.cos(a) * (r - 5)), Math.round(cy + s * Math.sin(a) * (r - 5)), INK);
 }
 
-export function claw(L, x, y, [dx, dy]) {
+function claw(L, x, y, [dx, dy]) {
   for (const s of [-1, 1]) {
     const at = (f, p) => [x + dx * f - dy * p * s, y + dy * f + dx * p * s];
     path(L, [at(0, 2), at(3, 4), at(6, 2)], STEEL[2], 2);
