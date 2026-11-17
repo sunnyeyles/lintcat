@@ -60,14 +60,22 @@ async function seed(database: FactoryDatabase, runs: Seed[]): Promise<void> {
 }
 
 const SEEDED: Seed[] = [
-  { id: "q1", profile: "quick", status: "delivered", seconds: 10, cost: 0.1, events: [["agent_finished"], ["checks_finished", pass], ["run_delivered"]], commands: [{ exitCode: 0 }] },
+  {
+    id: "q1",
+    profile: "quick",
+    status: "delivered",
+    seconds: 10,
+    cost: 0.1,
+    events: [["agent_finished"], ["checks_finished", pass], ["deploy_impact_finished", { fix: 1, prerequisite: 1, note: 0 }], ["deploy_impact_finished", { fix: 0, prerequisite: 1, note: 0 }], ["run_delivered"]],
+    commands: [{ exitCode: 0 }],
+  },
   {
     id: "q2",
     profile: "quick",
     status: "delivered",
     seconds: 30,
     cost: 0.3,
-    events: [["agent_finished"], ["checks_finished", fail], ["repair_started"], ["agent_finished"], ["checks_finished", pass], ["run_delivered"]],
+    events: [["agent_finished"], ["checks_finished", fail], ["repair_started"], ["agent_finished"], ["checks_finished", pass], ["deploy_impact_finished", { fix: 0, prerequisite: 0, note: 2 }], ["run_delivered"]],
     commands: [{ exitCode: 1 }, { exitCode: 0 }],
   },
   {
@@ -120,12 +128,13 @@ describe("profile metrics", () => {
       repairSuccessRate: 0.5,
       testRegressionRate: null,
       agentRunsPerRun: 1.25,
+      deployPrerequisiteRate: 0.5,
       otherEventKinds: { some_future_event: 1 },
     });
     expect(quick!.cost.estimatedUsd).toBeCloseTo(0.4);
     expect(quick!.cost.perVerifiedSuccessUsd).toBeCloseTo(0.2);
     expect(quick!.cost.runsWithoutCost).toBe(1);
-    expect(refactor).toMatchObject({ profile: "refactor", runs: 1, testRegressionRate: 1, repairSuccessRate: 1, firstPassSuccessRate: 0 });
+    expect(refactor).toMatchObject({ profile: "refactor", runs: 1, testRegressionRate: 1, repairSuccessRate: 1, firstPassSuccessRate: 0, deployPrerequisiteRate: null });
   });
 
   it("filters by repository", async () => {

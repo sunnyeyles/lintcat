@@ -22,6 +22,7 @@ export const MESSAGES = {
     "repair",
     "repair-failure",
     "review-repair",
+    "deploy-repair",
   ],
   reviewer: ["review", "diff-truncated"],
 } as const;

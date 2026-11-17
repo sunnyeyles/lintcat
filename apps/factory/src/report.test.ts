@@ -35,13 +35,14 @@ describe("report rendering", () => {
     repairSuccessRate: 0.5,
     testRegressionRate: null,
     agentRunsPerRun: 1.25,
+    deployPrerequisiteRate: 0.25,
     cost: { estimatedUsd: 0.4, perVerifiedSuccessUsd: 0.2, runsWithoutCost: 1 },
     otherEventKinds: { new_kind: 2 },
   };
 
   it("labels subscription cost as notional and marks unknowns", () => {
     const text = renderMetrics([metrics], "subscription");
-    expect(text).toMatch(/quick\s+4\s+50%\s+25%\s+20\.0s\s+6\.7m\s+60%\s+50%\s+50%\s+-\s+\$0\.20 \(1 unknown\)/);
+    expect(text).toMatch(/quick\s+4\s+50%\s+25%\s+20\.0s\s+6\.7m\s+60%\s+50%\s+50%\s+-\s+25%\s+\$0\.20 \(1 unknown\)/);
     expect(text).toContain("notional");
     expect(text).toContain("quick:new_kind×2");
     expect(renderMetrics([metrics], "api-key")).not.toContain("notional");

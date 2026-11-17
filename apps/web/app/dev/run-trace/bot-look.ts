@@ -46,6 +46,7 @@ const CAST = new Map<string, CastRole>([
   ["verify", "verify"],
   ["review", "verify"],
   ["reviewer", "verify"],
+  ["deploy-impact", "verify"],
   ["deliver", "deliver"],
 ]);
 

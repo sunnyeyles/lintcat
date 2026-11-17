@@ -12,11 +12,15 @@ import {
   createWorktree,
   currentBranch,
   ensureFactoryExcluded,
+  grepAt,
   headSha,
   isClean,
+  listAt,
+  nameStatus,
   pushBranch,
   repoRoot,
   resetTo,
+  showAt,
   slugify,
   squashSince,
 } from "#src/engine/git";
@@ -76,6 +80,26 @@ describe("git", () => {
     expect(sha).toMatch(/^[0-9a-f]{40}$/);
     expect(run(repo, "log", "-1", "--format=%B")).toBe("add a");
     expect(await changedFiles(repo, base)).toEqual(["a.txt"]);
+  });
+
+  it("reads statuses, files and tokens at a commit", async () => {
+    writeFileSync(join(repo, "a.txt"), "uses FOO_BAR\n");
+    writeFileSync(join(repo, "b.txt"), "b\n");
+    await checkpointCommit(repo, "add a, b");
+    const middle = run(repo, "rev-parse", "HEAD");
+    run(repo, "mv", "b.txt", "c.txt");
+    writeFileSync(join(repo, "README.md"), "changed\n");
+    writeFileSync(join(repo, "d.txt"), "d\n");
+    run(repo, "rm", "--quiet", "a.txt");
+    await checkpointCommit(repo, "shuffle");
+    expect(Object.fromEntries(await nameStatus(repo, middle))).toEqual({ "README.md": "M", "a.txt": "D", "c.txt": "R", "d.txt": "A" });
+    expect(Object.fromEntries(await nameStatus(repo, middle, ["d.txt"]))).not.toHaveProperty("d.txt");
+    expect(await showAt(repo, middle, "a.txt")).toBe("uses FOO_BAR\n");
+    expect(await showAt(repo, "HEAD", "a.txt")).toBeNull();
+    expect(await listAt(repo, "HEAD")).toEqual(["README.md", "c.txt", "d.txt"]);
+    expect(await grepAt(repo, middle, "FOO_BAR")).toBe(true);
+    expect(await grepAt(repo, middle, "FOO")).toBe(false);
+    expect(await grepAt(repo, "HEAD", "FOO_BAR")).toBe(false);
   });
 
   it("refuses resetTo outside a factory worktree", async () => {

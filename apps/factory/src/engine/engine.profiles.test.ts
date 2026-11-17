@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Spec } from "#src/engine/contract";
 import { createWorktree, headSha } from "#src/engine/git";
+import { PROFILES, workflowVersion } from "#src/engine/profiles";
 import { createFakeSandboxProvider, type FakeHandler } from "#src/engine/sandbox/fake-sandbox";
 import { createFactoryService } from "#src/engine/service";
 import type { FactoryDatabase } from "#src/engine/store/client";
@@ -315,4 +316,110 @@ describe("workflow profiles", () => {
     });
   });
 
+  describe("deploy-impact", () => {
+    const quickSpec: Spec = { ...baseSpec, title: "Configurable greeting", category: "feature" };
+    const envFix = { "src/greet.js": "export const greet = () => process.env.GREETING ?? 'hello';\n" };
+    const message = async ({ service, runId, repo }: { service: Awaited<ReturnType<typeof start>>["service"]; runId: string; repo: string }) =>
+      git(repo, "log", "-1", "--format=%B", (await service.get(runId))!.branch!);
+
+    async function startQuick(turns: Turn[], checks?: string) {
+      const started = await start(quickSpec, turns, checks);
+      expect(started.profile).toBe("quick");
+      return started;
+    }
+
+    it("runs directly before deliver in every profile, as workflow @2 (AC1)", () => {
+      for (const profile of Object.values(PROFILES)) {
+        expect(profile.stages.slice(-2)).toEqual(["deploy-impact", "deliver"]);
+        expect(workflowVersion(profile)).toBe(`${profile.name}@2`);
+      }
+    });
+
+    it("reports no impact and leaves the commit message alone", async () => {
+      const started = await startQuick([writes({ "src/greet.js": "export const greet = () => 'hello';\n" }, done)]);
+      const { service: s, runId, taskMd } = started;
+      expect((await s.runNext({ runId }))?.status).toBe("delivered");
+      expect(taskMd()).toMatch(/## Deploy impact\n\nNo deploy impact detected\./);
+      expect(await message(started)).not.toContain("Before deploying");
+      expect(await eventKinds(runId)).toContain("deploy_impact_finished");
+    });
+
+    it("makes one repair that clears a fix finding, rechecks, and lists the prerequisite (AC6, AC8)", async () => {
+      const started = await startQuick([writes(envFix, done), writes({ ".env.example": "# GREETING=\n" }, done)]);
+      const { service: s, runId, runtime, artifact, taskMd } = started;
+      expect((await s.runNext({ runId }))?.status).toBe("delivered");
+      expect(runtime.specs).toHaveLength(2);
+      expect(runtime.specs[1]?.resumeSessionId).toBe("fake-session-1");
+      expect(runtime.specs[1]?.prompt).toContain("**env.undeclared** `src/greet.js:1`");
+      const impact = JSON.parse(artifact("artifacts/deploy-impact.json")!) as { findings: { rule: string }[] };
+      expect(impact.findings.map((f) => f.rule)).toEqual(["env.new"]);
+      expect(taskMd()).toMatch(/- \*\*env\.new\*\* `src\/greet\.js:1`: set `GREETING` wherever this app runs/);
+      expect(taskMd()).not.toMatch(/Deviation:\*\* deploy-impact/);
+      expect((await listCommands(database, runId)).map((c) => c.stage)).toEqual(["verify", "deploy-impact"]);
+      expect(await message(started)).toMatch(/## Before deploying\n\n- \[ \] \*\*env\.new\*\*/);
+    });
+
+    it("delivers with a deviation when the repair does not clear the finding (AC6)", async () => {
+      const { service: s, runId, runtime, taskMd } = await startQuick([writes(envFix, done), answers(done)]);
+      expect((await s.runNext({ runId }))?.status).toBe("delivered");
+      expect(runtime.specs).toHaveLength(2);
+      expect(taskMd()).toContain("**Deviation:** deploy-impact repair changed nothing");
+      expect(taskMd()).toContain("**Deviation:** deploy-impact: `GREETING` is read but no env example file declares it");
+    });
+
+    it("fails the run when checks break after the repair (AC6)", async () => {
+      const { service: s, runId } = await startQuick(
+        [writes(envFix, done), writes({ ".env.example": "# GREETING=\n", "src/greet.js": "export const greet = () => process.env.GREETING ?? 'broken';\n" }, done)],
+        "test: node test.js\nlint: node lint.js\n",
+      );
+      expect((await s.runNext({ runId }))?.status).toBe("failed");
+      expect((await s.get(runId))!.blocker).toMatch(/checks failing after the deploy-impact repair: lint \(exit 1/);
+    });
+
+    it("fails at start on a malformed .factory/deploy (AC9)", async () => {
+      const { service: s, runId, repo, runtime } = await startQuick([writes(envFix, done)]);
+      writeFileSync(path.join(repo, ".factory", "deploy"), "targets: nope\n");
+      expect((await s.runNext({ runId }))?.status).toBe("failed");
+      expect((await s.get(runId))!.blocker).toMatch(/^\.factory\/deploy is malformed/);
+      expect(runtime.specs).toHaveLength(0);
+    });
+
+    async function crashAtDeployImpact(started: Awaited<ReturnType<typeof startQuick>>, verified: boolean) {
+      const { repo, runId } = started;
+      const crashed = (await claimRun(database, { leaseMs: 60_000, runId }))!;
+      const worktree = path.join(repo, ".factory", "worktrees", runId);
+      const branch = `factory/crashed-${runId.slice(-6)}`;
+      await createWorktree(repo, { path: worktree, branch, baseSha: crashed.contract.baseSha });
+      writeFileSync(path.join(worktree, "src", "greet.js"), envFix["src/greet.js"]);
+      git(worktree, "commit", "-qam", "factory: implement");
+      const sha = await headSha(worktree);
+      const finding = { rule: "env.undeclared", severity: "fix", file: "src/greet.js", line: 1, subject: "GREETING", detail: "declare GREETING" };
+      const deployImpact = { findings: [finding], changed: { migrations: [], workflows: [], deployConfig: [], manifests: [] } };
+      await saveProgress(database, runId, {
+        branch,
+        worktreePath: worktree,
+        agentSessionId: "earlier-session",
+        checkpoint: { stage: "deploy-impact", sha, nextStage: "deploy-impact", data: { locate: { files: [] }, deployImpact, deployImpactRepair: { sha, verified } } },
+      });
+      await database.execute(sql`update factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
+    }
+
+    it("never repeats the repair when recovering after it (AC7)", async () => {
+      const started = await startQuick([]);
+      await crashAtDeployImpact(started, true);
+      expect((await started.service.runNext({ runId: started.runId }))?.status).toBe("delivered");
+      expect(started.runtime.specs).toHaveLength(0);
+      expect(await listCommands(database, started.runId)).toEqual([]);
+      expect(started.taskMd()).toContain("**Deviation:** deploy-impact: declare GREETING (src/greet.js)");
+    });
+
+    it("rechecks and reanalyses an unverified repair on recovery, without a second pass (AC7)", async () => {
+      const started = await startQuick([]);
+      await crashAtDeployImpact(started, false);
+      expect((await started.service.runNext({ runId: started.runId }))?.status).toBe("delivered");
+      expect(started.runtime.specs).toHaveLength(0);
+      expect((await listCommands(database, started.runId)).map((c) => c.stage)).toEqual(["deploy-impact"]);
+      expect(started.taskMd()).toContain("**Deviation:** deploy-impact: `GREETING` is read but no env example file declares it");
+    });
+  });
 });

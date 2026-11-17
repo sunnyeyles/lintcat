@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import type { CheckPlan } from "#src/engine/checks";
 import { recordDecision } from "#src/engine/contract";
+import { DEFAULT_DEPLOY_CONFIG, renderDeployImpact, type DeployImpact, type DeployImpactConfig } from "#src/engine/deploy-impact";
 import type { EngineDeps } from "#src/engine/engine";
 import { headSha, slugify } from "#src/engine/git";
 import { PROFILES, workflowVersion, type Profile, type Stage } from "#src/engine/profiles";
@@ -46,6 +47,9 @@ interface RunData {
   reproduce?: { status: "reproduced"; testFiles: string[]; failing: CheckRecord[] } | { status: "not_reproducible"; reason: string };
   review?: ValidatedReview;
   reviewRepair?: { sha: string };
+  deployImpact?: DeployImpact;
+  // `sha` is null when the repair changed nothing; `verified` once checks ran on it.
+  deployImpactRepair?: { sha: string | null; verified: boolean };
   turnsUsed?: number;
 }
 
@@ -76,6 +80,7 @@ export class ActiveRun {
   currentStage: Stage | null = null;
   sandbox: Sandbox | undefined;
   setupPaths: string[] = [];
+  deployConfig: DeployImpactConfig = DEFAULT_DEPLOY_CONFIG;
 
   private readonly abort = new AbortController();
   private readonly heartbeat: ReturnType<typeof setInterval>;
@@ -282,7 +287,7 @@ export class ActiveRun {
   }
 }
 
-/** The profile-specific evidence task.md shows: baseline, reproduction, review. */
+/** The profile-specific evidence task.md shows: baseline, reproduction, review, deploy impact. */
 function evidenceSections(data: RunData, verification: TaskView["verification"]): NonNullable<TaskView["sections"]> {
   const sections: NonNullable<TaskView["sections"]> = [];
   const passedNow = (name: string) => verification.find((v) => v.name === name)?.passed;
@@ -315,6 +320,7 @@ function evidenceSections(data: RunData, verification: TaskView["verification"])
       lines: [...renderReview(data.review), ...(data.reviewRepair ? [`- One repair pass made: \`${data.reviewRepair.sha.slice(0, 12)}\``] : [])],
     });
   }
+  if (data.deployImpact) sections.push({ heading: "Deploy impact", lines: renderDeployImpact(data.deployImpact) });
   return sections;
 }
 

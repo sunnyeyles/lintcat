@@ -106,6 +106,7 @@ export interface ProfileMetrics {
   repairSuccessRate: number | null;
   testRegressionRate: number | null;
   agentRunsPerRun: number | null;
+  deployPrerequisiteRate: number | null;
   cost: { estimatedUsd: number | null; perVerifiedSuccessUsd: number | null; runsWithoutCost: number };
   otherEventKinds: Record<string, number>;
 }
@@ -132,6 +133,8 @@ const KNOWN_KINDS = new Set([
   "reproduce_rejected",
   "review_finished",
   "review_repair_started",
+  "deploy_impact_finished",
+  "deploy_impact_repair_started",
 ]);
 
 // A failing check while reproducing a bug is the point of that stage, not a failure.
@@ -183,6 +186,13 @@ function regressed(events: readonly HistoryEvent[]): boolean | null {
     .some((e) => checkResults(e.data).some((c) => !c.passed && passing.has(c.name)));
 }
 
+/** Null when the run never reached deploy-impact, as every run before `@2`; the last analysis wins. */
+function needsDeployPrerequisite(events: readonly HistoryEvent[]): boolean | null {
+  const last = events.filter((e) => e.kind === "deploy_impact_finished").at(-1);
+  if (!last) return null;
+  return typeof last.data.prerequisite === "number" && last.data.prerequisite > 0;
+}
+
 function computeProfileMetrics(history: RunHistory): ProfileMetrics[] {
   const byProfile = new Map<string, HistoryRun[]>();
   for (const run of history.runs) byProfile.set(run.profile!, [...(byProfile.get(run.profile!) ?? []), run]);
@@ -202,6 +212,7 @@ function computeProfileMetrics(history: RunHistory): ProfileMetrics[] {
       const failedCommands = commands.filter((c) => c.exitCode !== 0 || c.timedOut);
       const walls = runs.map((r) => wallTime(r, eventsOf(r))).filter((w): w is number => w !== null);
       const regressions = runs.map((r) => regressed(eventsOf(r))).filter((r): r is boolean => r !== null);
+      const prerequisites = runs.map((r) => needsDeployPrerequisite(eventsOf(r))).filter((p): p is boolean => p !== null);
       const agentRuns = runs.map((r) => eventsOf(r).filter((e) => e.kind === "agent_finished").length);
       const costs = runs.map(runCost);
       const known = costs.filter((c): c is number => c !== null);
@@ -225,6 +236,7 @@ function computeProfileMetrics(history: RunHistory): ProfileMetrics[] {
         repairSuccessRate: ratio(repairedRuns.filter((r) => r.status === "delivered").length, repairedRuns.length),
         testRegressionRate: ratio(regressions.filter(Boolean).length, regressions.length),
         agentRunsPerRun: ratio(agentRuns.reduce((sum, n) => sum + n, 0), runs.length),
+        deployPrerequisiteRate: ratio(prerequisites.filter(Boolean).length, prerequisites.length),
         cost: {
           estimatedUsd: totalCost,
           perVerifiedSuccessUsd: totalCost === null || delivered.length === 0 ? null : totalCost / delivered.length,

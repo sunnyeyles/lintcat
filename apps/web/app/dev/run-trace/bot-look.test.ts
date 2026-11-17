@@ -61,6 +61,7 @@ describe("castRole", () => {
     ["implement", undefined, "implementer"],
     ["baseline", undefined, "verify"],
     ["review", undefined, "verify"],
+    ["deploy-impact", undefined, "verify"],
     ["deliver", undefined, "deliver"],
     ["reviewer", "review", "verify"],
     ["claude", "deliver", "deliver"],
