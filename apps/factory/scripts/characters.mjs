@@ -16,7 +16,7 @@ const docs = path.join(here, "../assets/characters");
 
 const FRAMES = 8;
 const STATES = ["idle", "active"];
-const BOB = { idle: [0, 0, 1, 1, 1, 1, 0, 0], active: [0, -1, -2, -2, -1, 0, 1, 0] };
+const BOB = { idle: [0, 0, 0, 0, 0, 0, 0, 0], active: [0, -1, -2, -2, -1, 0, 1, 0] };
 const HOP = [0, -1, -2, -3, -3, -2, -1, 0];
 
 const CYAN = hex("#45e4ff");
