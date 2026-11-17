@@ -2,7 +2,7 @@ import type { FactoryCommand, FactoryRun } from "#src/engine/store/schema";
 import type { Spec } from "#src/engine/contract";
 import { describe, expect, it } from "vitest";
 
-import { formatData, formatEvent, renderFailedCommand, renderResult, renderRuns, renderSpec } from "#src/render";
+import { formatData, formatEvent, renderFailedCommand, renderResult, renderRuns, renderSpec, renderSpecAudit } from "#src/render";
 
 const spec: Spec = {
   title: "Add a --json flag",
@@ -21,21 +21,39 @@ const spec: Spec = {
   touchesSecurityOrData: false,
 };
 
+describe("rendering a spec review", () => {
+  const paraphrase = { proposes: "Adds a --json flag", existingSystem: "Output is plain text" };
+  const finding = (id: string, severity: "blocker" | "major" | "nit", problem: string) => ({ id, severity, lens: "readiness" as const, field: "plan", problem });
+
+  it("puts the paraphrase first and escalations ahead of settled findings", () => {
+    const text = renderSpecAudit({
+      review: { promptVersion: "v", paraphrase, findings: [finding("F1", "nit", "wordy")] },
+      resolutions: [
+        { finding: finding("F1", "major", "which encoder?"), action: "fix", note: "JSON.stringify" },
+        { finding: finding("F2", "blocker", "no YAML"), action: "escalate", note: "you said YAML is out" },
+      ],
+    });
+    expect(text).toContain("It reads this as: Adds a --json flag");
+    expect(text.indexOf("Needs your call")).toBeLessThan(text.indexOf("Resolved by discovery"));
+    expect(text).toContain("fix: [major] plan: which encoder?\n      → JSON.stringify");
+    expect(text).toContain("Still open after revision:\n  - [nit] plan: wordy");
+  });
+
+  it("says when there is nothing to show", () => {
+    expect(renderSpecAudit({ review: { promptVersion: "v", paraphrase, findings: [] }, resolutions: [] })).toContain("No findings.");
+    expect(renderSpecAudit({ review: null, resolutions: [] })).toContain("no valid answer");
+  });
+});
+
 describe("rendering a spec", () => {
   it("shows the routed profile, the criteria and the numbered plan, and drops empty sections", () => {
-    const text = renderSpec(spec, { ok: true, profile: "feature", reason: "new behaviour", overridden: false }, "r1");
+    const text = renderSpec(spec, { profile: "feature", reason: "new behaviour", overridden: false }, "r1");
     expect(text).toContain("── Add a --json flag (r1)");
     expect(text).toContain("Profile:   feature: new behaviour");
     expect(text).toContain("  AC1 [automated] --json prints valid JSON");
     expect(text).toContain("  2. test it");
     expect(text).toContain("Non-goals:\n  - YAML");
     expect(text).not.toContain("Constraints:");
-  });
-
-  it("shows the blocker in place of a profile", () => {
-    const text = renderSpec(spec, { ok: false, blocker: "greenfield is out of scope" }, "r1");
-    expect(text).toContain("Blocked:   greenfield is out of scope");
-    expect(text).not.toContain("Profile:");
   });
 });
 

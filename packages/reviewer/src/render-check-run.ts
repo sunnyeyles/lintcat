@@ -176,7 +176,7 @@ export function renderCheckRun(
   }
   if (findings.length === 0) {
     return {
-      conclusion: "success",
+      conclusion: "neutral",
       output: {
         title: "No issues found",
         summary: [

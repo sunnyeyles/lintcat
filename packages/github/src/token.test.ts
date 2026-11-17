@@ -842,7 +842,7 @@ describe("createCheckRun", () => {
       owner: "octo-org",
       repo: "example-service",
       headSha,
-      conclusion: "success",
+      conclusion: "neutral",
       output: { title: "No issues found", summary: "Clean.", annotations: [] },
     });
 

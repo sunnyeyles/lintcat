@@ -11,15 +11,12 @@ export type Command =
       pr: boolean;
       run: boolean;
     }
-  | { kind: "run" | "resume" | "cancel" | "result"; runId: string }
+  | { kind: "run" | "cancel" | "result"; runId: string }
   | { kind: "worker"; pollMs: number }
   | { kind: "status"; runId: string | undefined }
   | { kind: "logs"; runId: string; follow: boolean }
-  | { kind: "mcp" }
   | { kind: "report"; json: boolean; repoPath: string | undefined; sinceDays: number | undefined }
   | { kind: "prune"; days: number | undefined }
-  | { kind: "bench-run"; configPath: string; fixtures: string[] | undefined; keep: boolean }
-  | { kind: "bench-compare"; a: string; b: string }
   | { kind: "help" }
   | { kind: "version" };
 
@@ -36,25 +33,20 @@ Commands:
   init [--repo <path>]                 Check Docker and the database, build the sandbox image
   new "<outcome>" [--repo <path>]      Discover, approve and run a task
       [--profile quick|bugfix|feature|refactor] [--pr] [--no-run]
-  run <id>                             Run a queued run in the foreground
-  resume <id>                          Recover a run whose worker died
+  run <id>                             Run a queued run, or recover one whose worker died
   worker [--poll-ms <n>]               Run queued tasks until interrupted
   status [<id>]                        One run, or the recent runs and per-profile summary
   logs <id> [-f]                       A run's events; -f follows until it finishes
   cancel <id>                          Cancel a run
   result <id>                          Branch, PR, checks, usage and task.md
-  mcp                                  Serve the factory as MCP tools over stdio (apps/factory/docs/mcp.md)
-  report [--json] [--repo <path>]      Per-profile metrics and the learning report
+  report [--json] [--repo <path>]      Per-profile outcome metrics
       [--since-days <n>]
   prune [--days <n>]                   Drop old runs' events and commands (FACTORY_RETENTION_DAYS)
-  bench run --config <file>            Run benchmark fixtures, judged by hidden checks
-      [--fixture a,b] [--keep]           (evaluate is an alias of bench)
-  bench compare <a> <b>                Compare two configs' results (config files or result dirs)
   help | version
 
 Exit codes: 0 ok, 1 run failed or cancelled, 2 usage error, 3 environment problem.`;
 
-const SWITCHES = new Set(["pr", "no-run", "f", "follow", "help", "h", "version", "json", "keep"]);
+const SWITCHES = new Set(["pr", "no-run", "f", "follow", "help", "h", "version", "json"]);
 
 function readDays(value: string | undefined, flag: string): number | undefined {
   if (value === undefined) return undefined;
@@ -109,7 +101,7 @@ function positionals(parsed: Parsed, command: string, count: number, label: stri
   return parsed.positional;
 }
 
-function runIdCommand(kind: "run" | "resume" | "cancel" | "result", parsed: Parsed): Command {
+function runIdCommand(kind: "run" | "cancel" | "result", parsed: Parsed): Command {
   allow(parsed, []);
   const [runId] = positionals(parsed, kind, 1, "a run id");
   return { kind, runId: runId! };
@@ -157,7 +149,6 @@ export function parseArguments(argv: readonly string[]): Command {
       };
     }
     case "run":
-    case "resume":
     case "cancel":
     case "result":
       return runIdCommand(command, parsed);
@@ -178,28 +169,6 @@ export function parseArguments(argv: readonly string[]): Command {
       allow(parsed, ["days"]);
       positionals(parsed, command, 0, "");
       return { kind: "prune", days: readDays(parsed.values.get("days"), "days") };
-    case "bench":
-    case "evaluate": {
-      const [action, ...rest] = parsed.positional;
-      if (action === "run") {
-        allow(parsed, ["config", "fixture", "keep"]);
-        if (rest.length) throw new UsageError(`unexpected argument ${JSON.stringify(rest[0])}`);
-        const configPath = parsed.values.get("config");
-        if (!configPath) throw new UsageError(`${command} run needs --config <file>`);
-        const fixtures = parsed.values.get("fixture")?.split(",").map((f) => f.trim()).filter(Boolean);
-        return { kind: "bench-run", configPath, fixtures, keep: parsed.switches.has("keep") };
-      }
-      if (action === "compare") {
-        allow(parsed, []);
-        if (rest.length !== 2) throw new UsageError(`${command} compare needs two configs or result directories`);
-        return { kind: "bench-compare", a: rest[0]!, b: rest[1]! };
-      }
-      throw new UsageError(`${command} needs run or compare`);
-    }
-    case "mcp":
-      allow(parsed, []);
-      positionals(parsed, command, 0, "");
-      return { kind: "mcp" };
     case "logs": {
       allow(parsed, ["f", "follow"]);
       const [runId] = positionals(parsed, command, 1, "a run id");

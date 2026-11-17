@@ -23,10 +23,10 @@ function finding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
 }
 
 describe("renderCheckRun with no findings", () => {
-  it("renders a clean success check run", () => {
+  it("renders a clean neutral check run", () => {
     const rendered = renderCheckRun([], { annotate: true });
 
-    expect(rendered.conclusion).toBe("success");
+    expect(rendered.conclusion).toBe("neutral");
     expect(rendered.output.title).toMatch(/no issues found/i);
     expect(rendered.output.summary).toMatch(/no issues/i);
   });
@@ -333,7 +333,7 @@ describe("renderCheckRun with a blast radius", () => {
   it("never changes the conclusion", () => {
     expect(
       renderCheckRun([], { annotate: false, blastRadius }).conclusion,
-    ).toBe("success");
+    ).toBe("neutral");
     expect(
       renderCheckRun([finding()], { annotate: false, blastRadius }).conclusion,
     ).toBe("neutral");

@@ -92,13 +92,11 @@ export async function createWorktree(
 export async function checkpointCommit(
   dir: string,
   message: string,
-  author?: { name: string; email: string },
   exclude: readonly string[] = [],
 ): Promise<string | null> {
   await git(dir, ["add", "-A", "--", ".", ...exclude.map((path) => `:(exclude)${path}`)]);
   if (await gitOk(dir, ["diff", "--cached", "--quiet"])) return null;
-  const authorArgs = author ? [`--author=${author.name} <${author.email}>`] : [];
-  await git(dir, ["commit", "--quiet", "--no-edit", ...authorArgs, "-m", message]);
+  await git(dir, ["commit", "--quiet", "--no-edit", "-m", message]);
   return headSha(dir);
 }
 
@@ -125,24 +123,6 @@ export async function squashSince(dir: string, baseSha: string, message: string)
   if (await gitOk(dir, ["diff", "--cached", "--quiet"])) return headSha(dir);
   await git(dir, ["commit", "--quiet", "--no-edit", "-m", message]);
   return headSha(dir);
-}
-
-export type DiffStat = { files: number; insertions: number; deletions: number; summary: string };
-
-/** Tracked changes from `baseSha` to the working tree; untracked files are not counted. */
-export async function diffStat(dir: string, baseSha: string): Promise<DiffStat> {
-  const numstat = (await git(dir, ["diff", "--numstat", baseSha])).trim();
-  let files = 0;
-  let insertions = 0;
-  let deletions = 0;
-  for (const line of numstat ? numstat.split("\n") : []) {
-    const [added, removed] = line.split("\t");
-    files += 1;
-    insertions += Number(added) || 0;
-    deletions += Number(removed) || 0;
-  }
-  const summary = (await git(dir, ["diff", "--shortstat", baseSha])).trim();
-  return { files, insertions, deletions, summary };
 }
 
 /** Committed, staged, unstaged and untracked paths that differ from `baseSha`, sorted. */
@@ -193,11 +173,6 @@ export async function ensureFactoryExcluded(repo: string): Promise<void> {
   if (!(await gitOk(repo, ["check-ignore", "-q", ".factory/probe"]))) {
     throw new Error(`.factory/ is still not ignored in ${repo}; a negating rule may override it`);
   }
-}
-
-export async function hasRemote(repo: string, name: string): Promise<boolean> {
-  const remotes = (await git(repo, ["remote"])).split("\n").map((r) => r.trim());
-  return remotes.includes(name);
 }
 
 async function remoteDefaultBranch(dir: string, remote: string): Promise<string | null> {

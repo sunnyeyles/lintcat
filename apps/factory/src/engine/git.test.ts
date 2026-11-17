@@ -11,9 +11,7 @@ import {
   checkpointCommit,
   createWorktree,
   currentBranch,
-  diffStat,
   ensureFactoryExcluded,
-  hasRemote,
   headSha,
   isClean,
   pushBranch,
@@ -74,10 +72,9 @@ describe("git", () => {
   it("checkpoints only when something changed, without trailers", async () => {
     expect(await checkpointCommit(repo, "nothing")).toBeNull();
     writeFileSync(join(repo, "a.txt"), "a\n");
-    const sha = await checkpointCommit(repo, "add a", { name: "Bot", email: "bot@example.com" });
+    const sha = await checkpointCommit(repo, "add a");
     expect(sha).toMatch(/^[0-9a-f]{40}$/);
     expect(run(repo, "log", "-1", "--format=%B")).toBe("add a");
-    expect(run(repo, "log", "-1", "--format=%an|%cn")).toBe("Bot|Factory Test");
     expect(await changedFiles(repo, base)).toEqual(["a.txt"]);
   });
 
@@ -113,7 +110,6 @@ describe("git", () => {
     expect(run(repo, "rev-list", "--count", `${base}..HEAD`)).toBe("1");
     expect(run(repo, "log", "-1", "--format=%B")).toBe("Add a and b");
     expect(await squashSince(repo, base, "Add a and b")).toBe(squashed);
-    expect(await diffStat(repo, base)).toMatchObject({ files: 2, insertions: 2, deletions: 0 });
   });
 
   it("excludes .factory/ idempotently via info/exclude", async () => {
@@ -132,8 +128,6 @@ describe("git", () => {
     const remote = join(root, "remote.git");
     execFileSync("git", ["init", "--quiet", "--bare", remote]);
     run(repo, "remote", "add", "origin", remote);
-    expect(await hasRemote(repo, "origin")).toBe(true);
-    expect(await hasRemote(repo, "upstream")).toBe(false);
 
     await expect(pushBranch(repo, "origin", "main")).rejects.toThrow(/protected/);
     await expect(pushBranch(repo, "origin", "master")).rejects.toThrow(/protected/);

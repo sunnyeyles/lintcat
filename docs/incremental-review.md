@@ -115,8 +115,8 @@ Findings this run reported again are filtered out, and the rest render on the
 check run under a heading naming them as open from earlier commits.
 
 Without that, an incremental run reads as though the pull request came back
-clean when its earlier findings are all still there. The conclusion stays
-`neutral` while either set is non-empty. A GraphQL read that fails logs
+clean when its earlier findings are all still there. The conclusion is
+`neutral` either way. A GraphQL read that fails logs
 `review.carried_forward.unreadable` and lists nothing, rather than failing the
 review.
 

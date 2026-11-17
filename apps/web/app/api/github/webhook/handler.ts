@@ -3,40 +3,16 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   effectiveRepoSettings,
   enqueueReviewJob,
-  findOrganizationByAccountId,
   findOrganizationById,
   findRepoByGithubId,
-  markUninstalled,
-  removeRepositories,
-  removeRepository,
-  replaceRepoAccess,
-  setInstallationSuspended,
-  updateRepository,
-  upsertAccountUser,
-  upsertInstallation,
-  upsertRepositories,
   type InstallationInput,
-  type Organization,
-  type RepoPermission,
   type RepoReviewMode,
 } from "@pr-review/db";
-import { errorMessage } from "@pr-review/logging";
 import { z } from "zod";
 
-import {
-  followRename,
-  installOrganization,
-  toInstallation,
-  type InstallationDeps,
-} from "@/lib/installation";
-import {
-  applyMembership,
-  installedAccount,
-  lookupMembers,
-  lookupMembership,
-  replaceMembers,
-} from "@/lib/membership-sync";
-import { applyRepoAccess, lookupRepoPermission } from "@/lib/repo-access-sync";
+import { toInstallation, type InstallationDeps } from "@/lib/installation";
+import { applyInstallationEvent, type RepositoryChange } from "@/lib/installation-lifecycle";
+import { installedAccount } from "@/lib/membership-sync";
 import type { PingWorker } from "@/lib/worker-ping";
 
 export interface GithubWebhookDeps extends InstallationDeps {
@@ -232,114 +208,63 @@ async function withPayload<T>(
   return run(parsed.data);
 }
 
-async function onInstallation(
+const INSTALLATION_KINDS = {
+  created: "installed",
+  deleted: "uninstalled",
+  suspend: "suspended",
+  unsuspend: "unsuspended",
+  new_permissions_accepted: "permissions_accepted",
+} as const;
+
+function onInstallation(
   deps: GithubWebhookDeps,
   payload: z.infer<typeof installationEventSchema>,
 ): Promise<boolean> {
-  const { database, github } = deps;
   const installation = fromPayload(payload.installation);
-  if (!installation) return false;
-  const source = `installation.${payload.action}`;
-  switch (payload.action) {
-    case "created":
-      await installOrganization(deps, installation, source);
-      return true;
-    case "deleted":
-      await database.transaction(async (tx) => {
-        await followRename(deps, tx, installation, source);
-        await markUninstalled(tx, installation.accountId);
-      });
-      return true;
-    case "suspend":
-      await database.transaction(async (tx) => {
-        await followRename(deps, tx, installation, source);
-        await setInstallationSuspended(
-          tx,
-          installation.accountId,
-          installation.suspendedAt ?? new Date(),
-        );
-      });
-      return true;
-    case "new_permissions_accepted":
-      return database.transaction((tx) => followRename(deps, tx, installation, source));
-    case "unsuspend": {
-      // No deliveries arrive while suspended, so members may have drifted.
-      const members = await lookupMembers(github, installation);
-      await database.transaction(async (tx) => {
-        await followRename(deps, tx, installation, source);
-        await setInstallationSuspended(tx, installation.accountId, null);
-        const organization = await findOrganizationByAccountId(tx, installation.accountId);
-        if (organization && !organization.uninstalledAt) {
-          await replaceMembers({ ...deps, database: tx }, organization, members, source);
-        }
-      });
-      return true;
-    }
-    default:
-      return false;
-  }
+  const kind = Object.hasOwn(INSTALLATION_KINDS, payload.action)
+    ? INSTALLATION_KINDS[payload.action as keyof typeof INSTALLATION_KINDS]
+    : undefined;
+  if (!installation || !kind) return Promise.resolve(false);
+  return applyInstallationEvent(deps, {
+    kind,
+    installation,
+    source: `installation.${payload.action}`,
+  });
 }
 
-async function onInstallationRepositories(
+function onInstallationRepositories(
   deps: GithubWebhookDeps,
   payload: z.infer<typeof installationRepositoriesEventSchema>,
 ): Promise<boolean> {
-  const { database } = deps;
   const installation = fromPayload(payload.installation);
-  if (!installation) return false;
-  if (payload.action !== "added" && payload.action !== "removed") return false;
-  // Only `created` brings an uninstalled organization back, so a late delivery cannot.
-  const existing = await findOrganizationByAccountId(database, installation.accountId);
-  if (existing?.uninstalledAt) return false;
-  const source = `installation_repositories.${payload.action}`;
-  // A missed `created` leaves no organization; set it up whole so it has an owner.
-  if (!existing) {
-    await installOrganization(deps, installation, source);
-    return true;
-  }
-  await database.transaction(async (tx) => {
-    await followRename(deps, tx, installation, source);
-    const organization = await upsertInstallation(tx, installation);
-    await upsertRepositories(
-      tx,
-      organization.id,
-      payload.repositories_added.map((repo) => ({
-        githubRepoId: repo.id,
-        owner: repo.full_name.split("/")[0] ?? installation.login,
-        name: repo.name,
-        private: repo.private,
-      })),
-    );
-    await removeRepositories(
-      tx,
-      organization.id,
-      payload.repositories_removed.map((repo) => repo.id),
-    );
+  if (!installation) return Promise.resolve(false);
+  if (payload.action !== "added" && payload.action !== "removed") return Promise.resolve(false);
+  return applyInstallationEvent(deps, {
+    kind: "repositories_changed",
+    installation,
+    added: payload.repositories_added.map((repo) => ({
+      githubRepoId: repo.id,
+      owner: repo.full_name.split("/")[0] ?? installation.login,
+      name: repo.name,
+      private: repo.private,
+    })),
+    removed: payload.repositories_removed.map((repo) => repo.id),
+    source: `installation_repositories.${payload.action}`,
   });
-  return true;
 }
 
-async function onOrganizationRenamed(
+function onOrganizationRenamed(
   deps: GithubWebhookDeps,
   organization: z.infer<typeof payloadOrganizationSchema>,
 ): Promise<boolean> {
-  const source = "organization.renamed";
-  const renamed = await deps.database.transaction((tx) =>
-    followRename(deps, tx, { accountId: organization.id, login: organization.login }, source),
-  );
-  if (!renamed) {
-    deps.logger.info("organization.rename_skipped", {
-      source,
-      githubAccountId: organization.id,
-      login: organization.login,
-      reason: "unchanged_or_not_installed",
-    });
-  }
-  return renamed;
+  return applyInstallationEvent(deps, {
+    kind: "account_renamed",
+    account: { accountId: organization.id, login: organization.login },
+    source: "organization.renamed",
+  });
 }
 
-// The payload's role is not trusted: GitHub is asked for the current one, so reordered deliveries converge.
-async function onMemberChanged(
+function onMemberChanged(
   deps: GithubWebhookDeps,
   event: string,
   action: string,
@@ -348,47 +273,15 @@ async function onMemberChanged(
   payloadRepository?: { id: number },
 ): Promise<boolean> {
   if (!MEMBER_ACTIONS[event]?.includes(action) || !payloadOrganization || !user) {
-    return false;
+    return Promise.resolve(false);
   }
-  const source = `${event}.${action}`;
-  const account = {
-    githubId: user.id,
-    login: user.login,
-    avatarUrl: user.avatar_url ?? null,
-  };
-  const organization = await findOrganizationByAccountId(
-    deps.database,
-    payloadOrganization.id,
-  );
-  const installed = organization && installedAccount(organization);
-  const skip = (reason: string) => {
-    deps.logger.info("membership.skipped", {
-      source,
-      organization: payloadOrganization.login.toLowerCase(),
-      githubUserId: account.githubId,
-      login: account.login,
-      reason,
-    });
-    return false;
-  };
-  if (!organization || !installed) return skip("organization_not_installed");
-  if (organization.suspendedAt) return skip("installation_suspended");
-
-  const decision = await lookupMembership(deps.github, installed, account);
-  const repo = payloadRepository && (await findRepoByGithubId(deps.database, payloadRepository.id));
-  const tracked = repo && repo.organizationId === organization.id && !repo.removedAt;
-  // Asked whatever the membership: an outside collaborator holds the repo without one.
-  const permission = tracked
-    ? await lookupRepoPermission(deps.github, organization, repo, account)
-    : undefined;
-  await deps.database.transaction(async (tx) => {
-    const txDeps = { ...deps, database: tx };
-    await applyMembership(txDeps, organization, { account, decision }, source);
-    if (!tracked || permission === undefined) return;
-    const { id: userId } = await upsertAccountUser(tx, account);
-    await applyRepoAccess(txDeps, userId, account, { organization, repo, permission }, source);
+  return applyInstallationEvent(deps, {
+    kind: "member_changed",
+    account: { accountId: payloadOrganization.id, login: payloadOrganization.login },
+    user: { githubId: user.id, login: user.login, avatarUrl: user.avatar_url ?? null },
+    githubRepoId: payloadRepository?.id,
+    source: `${event}.${action}`,
   });
-  return true;
 }
 
 // Every mode's actions of interest; anything else is skipped before the repo is even looked up.
@@ -462,86 +355,30 @@ async function onPullRequest(
   return true;
 }
 
-const REPOSITORY_ACTIONS = ["renamed", "privatized", "publicized", "transferred", "deleted"];
+const REPOSITORY_ACTIONS: readonly string[] = [
+  "renamed",
+  "privatized",
+  "publicized",
+  "transferred",
+  "deleted",
+] satisfies RepositoryChange[];
 
-// Each action writes only its own field, so a late delivery of another action cannot undo it.
-async function onRepository(
+function onRepository(
   deps: GithubWebhookDeps,
   payload: z.infer<typeof repositoryEventSchema>,
 ): Promise<boolean> {
   const { action, repository } = payload;
-  if (!REPOSITORY_ACTIONS.includes(action)) return false;
-  const source = `repository.${action}`;
-  const fields = { source, githubRepoId: repository.id, repo: `${repository.owner.login}/${repository.name}` };
-  const existing = await findRepoByGithubId(deps.database, repository.id);
-  const organization = existing && (await findOrganizationById(deps.database, existing.organizationId));
-  if (!existing || !organization) {
-    deps.logger.info("repository.skipped", { ...fields, reason: "repository_not_tracked" });
-    return false;
-  }
-  const { database } = deps;
-
-  switch (action) {
-    case "renamed":
-      await updateRepository(database, repository.id, {
-        owner: repository.owner.login,
-        name: repository.name,
-      });
-      break;
-    case "publicized":
-      await updateRepository(database, repository.id, { private: false });
-      break;
-    case "privatized": {
-      const readers = await listReaders(deps, organization, repository, fields);
-      await database.transaction(async (tx) => {
-        await updateRepository(tx, repository.id, { private: true });
-        if (readers) await replaceRepoAccess(tx, existing.id, readers);
-      });
-      break;
-    }
-    case "transferred":
-      if (repository.owner.id === organization.githubAccountId) {
-        await updateRepository(database, repository.id, {
-          owner: repository.owner.login,
-          name: repository.name,
-        });
-      } else {
-        await removeRepository(database, repository.id);
-      }
-      break;
-    case "deleted":
-      await removeRepository(database, repository.id);
-      break;
-  }
-  deps.logger.info("repository.updated", { ...fields, organization: organization.slug });
-  return true;
-}
-
-// Undefined when GitHub cannot say; the repo is still made private, and stored rows stay.
-async function listReaders(
-  deps: GithubWebhookDeps,
-  organization: Organization,
-  repository: z.infer<typeof repositoryEventSchema>["repository"],
-  fields: Record<string, unknown>,
-): Promise<{ githubId: number; permission: RepoPermission }[] | undefined> {
-  const installed = installedAccount(organization);
-  if (!installed || organization.suspendedAt) return undefined;
-  try {
-    const listed = await deps.github.listRepositoryCollaborators(
-      installed.installationId,
-      repository.owner.login,
-      repository.name,
-    );
-    return listed.map(({ id, permission }) => ({ githubId: id, permission }));
-  } catch (error) {
-    deps.logger.error("repo_access.skipped", {
-      ...fields,
-      organization: organization.slug,
-      reason: "github_lookup_failed",
-      error: errorMessage(error),
-    });
-    return undefined;
-  }
+  if (!REPOSITORY_ACTIONS.includes(action)) return Promise.resolve(false);
+  return applyInstallationEvent(deps, {
+    kind: "repository_changed",
+    change: action as RepositoryChange,
+    repository: {
+      githubRepoId: repository.id,
+      owner: { accountId: repository.owner.id, login: repository.owner.login },
+      name: repository.name,
+    },
+    source: `repository.${action}`,
+  });
 }
 
 function validSignature(

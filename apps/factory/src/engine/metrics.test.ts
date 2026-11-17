@@ -80,7 +80,7 @@ const SEEDED: Seed[] = [
     events: [["agent_finished"], ["checks_finished", fail], ["repair_started"], ["agent_finished"], ["checks_finished", fail], ["repeated_failure"], ["run_failed"]],
     commands: [{ exitCode: 1 }, { exitCode: 1 }],
   },
-  { id: "q4", profile: "quick", status: "cancelled", seconds: 40, cost: 0, events: [["profile_escalated"], ["some_future_event", { x: 1 }], ["run_cancelled"]] },
+  { id: "q4", profile: "quick", status: "cancelled", seconds: 40, cost: 0, events: [["some_future_event", { x: 1 }], ["run_cancelled"]] },
   {
     id: "f1",
     profile: "refactor",
@@ -121,7 +121,6 @@ describe("profile metrics", () => {
       testRegressionRate: null,
       agentRunsPerRun: 1.25,
       otherEventKinds: { some_future_event: 1 },
-      escalationRate: 0.25,
     });
     expect(quick!.cost.estimatedUsd).toBeCloseTo(0.4);
     expect(quick!.cost.perVerifiedSuccessUsd).toBeCloseTo(0.2);

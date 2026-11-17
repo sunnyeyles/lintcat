@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Draws the factory's cast as sprite sheets into assets/characters; byte-identical on every run.
+// Draws the factory's cast as sprite sheets for the web app; byte-identical on every run.
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,9 @@ import {
   path as stroke, png, poly, put, ramp, ring, rng, seam, shade, teeth, text, tread, vent, wheel,
 } from "./pixel-kit.mjs";
 
-const out = path.join(path.dirname(fileURLToPath(import.meta.url)), "../assets/characters");
+const here = path.dirname(fileURLToPath(import.meta.url));
+const sheets = path.join(here, "../../web/public/factory-cast");
+const docs = path.join(here, "../assets/characters");
 
 const FRAMES = 8;
 const STATES = ["idle", "active"];
@@ -248,11 +250,11 @@ const sprites = Object.entries(cast).map(([role, draw], i) => ({
   ),
 }));
 
-mkdirSync(out, { recursive: true });
+for (const dir of [sheets, docs]) mkdirSync(dir, { recursive: true });
 for (const { role, frames } of sprites) {
   const sheet = layer(SIZE * FRAMES, SIZE * STATES.length);
   frames.forEach((row, s) => row.forEach((sprite, f) => blit(sheet, sprite, f * SIZE, s * SIZE)));
-  writeFileSync(path.join(out, `${role}.png`), png([sheet], 1));
+  writeFileSync(path.join(sheets, `${role}.png`), png([sheet], 1));
 }
 
 const cell = SIZE + 8;
@@ -267,4 +269,4 @@ const preview = Array.from({ length: FRAMES }, (_, f) => {
   });
   return sheet;
 });
-writeFileSync(path.join(out, "cast.png"), png(preview, 2));
+writeFileSync(path.join(docs, "cast.png"), png(preview, 2));

@@ -207,7 +207,7 @@ Reinforcing rules:
   results) are data, never instructions; tool results grant no permissions.
 - The agent's findings are **filtered to the categories it defines**, not
   re-stamped, so category provenance stays deterministic.
-- The check run conclusion is `neutral` whenever findings exist — the app is
+- The check run conclusion is always `neutral`, with or without findings — the app is
   advisory and never blocks a merge.
 - A **patch never reaches a file on the agent's word**. The agent quotes the
   lines it means to replace; application code re-reads them at the head commit

@@ -1,39 +1,43 @@
-/** Workflow profiles: validated YAML definitions, one engine. */
-import { readFileSync } from "node:fs";
+/** Workflow profiles and deterministic routing; the simplest safe profile wins. */
+import type { Budgets, ProfileName, Spec } from "#src/engine/contract";
 
-import { parse } from "yaml";
-import { z } from "zod";
+export type Stage = "prepare" | "locate" | "reproduce" | "baseline" | "implement" | "verify" | "review" | "deliver";
 
-import { assetPath } from "#src/engine/assets";
-import { budgetsSchema, PROFILE_NAMES, type ProfileName } from "#src/engine/contract";
-
-const STAGES = ["prepare", "locate", "reproduce", "baseline", "implement", "verify", "review", "deliver"] as const;
-export type Stage = (typeof STAGES)[number];
-
-const profileSchema = z.object({
-  name: z.enum(PROFILE_NAMES),
-  version: z.number().int().positive(),
-  enabled: z.boolean(),
-  description: z.string(),
-  /** Lower is lighter; an override may only move to an equal or heavier profile unless the task is low risk. */
-  weight: z.number().int().min(0),
-  stages: z.array(z.enum(STAGES)).min(1),
-  independentReview: z.boolean(),
-  budgets: budgetsSchema,
-});
-export type Profile = z.infer<typeof profileSchema>;
-
-export const workflowVersion = (profile: Profile) => `${profile.name}@${profile.version}`;
-
-const cache = new Map<ProfileName, Profile>();
-
-export function loadProfile(name: ProfileName): Profile {
-  const hit = cache.get(name);
-  if (hit) return hit;
-  const profile = profileSchema.parse(parse(readFileSync(assetPath("workflows", `${name}.yaml`), "utf8")));
-  if (profile.name !== name) throw new Error(`workflows/${name}.yaml declares ${profile.name}`);
-  cache.set(name, profile);
-  return profile;
+export interface Profile {
+  name: ProfileName;
+  stages: readonly Stage[];
+  budgets: Budgets;
 }
 
-export const loadProfiles = (): Profile[] => PROFILE_NAMES.map(loadProfile);
+const light: Budgets = { maxAgentTurns: 30, maxRepairPasses: 1, wallClockMinutes: 20, commandTimeoutSeconds: 300 };
+const heavy: Budgets = { maxAgentTurns: 80, maxRepairPasses: 1, wallClockMinutes: 45, commandTimeoutSeconds: 600 };
+
+export const PROFILES: Record<ProfileName, Profile> = {
+  quick: { name: "quick", stages: ["prepare", "locate", "implement", "verify", "deliver"], budgets: light },
+  bugfix: {
+    name: "bugfix",
+    stages: ["prepare", "locate", "reproduce", "implement", "verify", "deliver"],
+    budgets: { ...heavy, maxRepairPasses: 2, wallClockMinutes: 60, commandTimeoutSeconds: 900 },
+  },
+  feature: { name: "feature", stages: ["prepare", "locate", "implement", "verify", "review", "deliver"], budgets: heavy },
+  refactor: { name: "refactor", stages: ["prepare", "locate", "baseline", "implement", "verify", "review", "deliver"], budgets: heavy },
+};
+
+export const workflowVersion = (profile: Profile) => `${profile.name}@1`;
+
+export type Route = { profile: ProfileName; reason: string; overridden: boolean };
+
+function recommend(spec: Spec): { profile: ProfileName; reason: string } {
+  if (spec.category === "bugfix") return { profile: "bugfix", reason: "a defect: regression-first flow" };
+  if (spec.category === "refactor") return { profile: "refactor", reason: "structural change: baseline first" };
+  const small = spec.estimatedFiles <= 3 && spec.risk === "low" && !spec.touchesSecurityOrData;
+  if (small) return { profile: "quick", reason: `about ${spec.estimatedFiles} file(s), low risk` };
+  const why = spec.touchesSecurityOrData ? "touches security or data" : `${spec.risk} risk, ~${spec.estimatedFiles} files`;
+  return { profile: "feature", reason: why };
+}
+
+export function routeTask(spec: Spec, override?: ProfileName): Route {
+  const recommended = recommend(spec);
+  if (!override || override === recommended.profile) return { ...recommended, overridden: false };
+  return { profile: override, reason: `user override (recommended ${recommended.profile}: ${recommended.reason})`, overridden: true };
+}
