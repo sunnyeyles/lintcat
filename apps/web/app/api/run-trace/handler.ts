@@ -91,7 +91,7 @@ function titleOf(runId: string, format: string, files: readonly RunTraceFileInpu
 }
 
 const unsupported = (error: string) =>
-  Response.json({ error, supported: FORMAT_IDS, docs: "/docs/plug-in-your-factory" }, { status: 400 });
+  Response.json({ error, supported: FORMAT_IDS }, { status: 400 });
 
 export async function handleRunTraceIngest(
   request: Request,
