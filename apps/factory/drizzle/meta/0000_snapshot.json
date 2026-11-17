@@ -1,12 +1,12 @@
 {
-  "id": "df4d7b22-36ef-4520-b4b6-c00029a90745",
+  "id": "f8c6f782-7480-48b3-b7af-9c51db21afff",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.factory_commands": {
+    "factory.factory_commands": {
       "name": "factory_commands",
-      "schema": "",
+      "schema": "factory",
       "columns": {
         "id": {
           "name": "id",
@@ -115,6 +115,7 @@
           "name": "factory_commands_run_id_factory_runs_id_fk",
           "tableFrom": "factory_commands",
           "tableTo": "factory_runs",
+          "schemaTo": "factory",
           "columnsFrom": [
             "run_id"
           ],
@@ -131,9 +132,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.factory_effects": {
+    "factory.factory_effects": {
       "name": "factory_effects",
-      "schema": "",
+      "schema": "factory",
       "columns": {
         "key": {
           "name": "key",
@@ -173,6 +174,7 @@
           "name": "factory_effects_run_id_factory_runs_id_fk",
           "tableFrom": "factory_effects",
           "tableTo": "factory_runs",
+          "schemaTo": "factory",
           "columnsFrom": [
             "run_id"
           ],
@@ -189,9 +191,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.factory_events": {
+    "factory.factory_events": {
       "name": "factory_events",
-      "schema": "",
+      "schema": "factory",
       "columns": {
         "id": {
           "name": "id",
@@ -290,6 +292,7 @@
           "name": "factory_events_run_id_factory_runs_id_fk",
           "tableFrom": "factory_events",
           "tableTo": "factory_runs",
+          "schemaTo": "factory",
           "columnsFrom": [
             "run_id"
           ],
@@ -306,9 +309,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.factory_runs": {
+    "factory.factory_runs": {
       "name": "factory_runs",
-      "schema": "",
+      "schema": "factory",
       "columns": {
         "id": {
           "name": "id",
@@ -331,7 +334,7 @@
         "status": {
           "name": "status",
           "type": "factory_run_status",
-          "typeSchema": "public",
+          "typeSchema": "factory",
           "primaryKey": false,
           "notNull": true,
           "default": "'draft'"
@@ -488,9 +491,9 @@
     }
   },
   "enums": {
-    "public.factory_run_status": {
+    "factory.factory_run_status": {
       "name": "factory_run_status",
-      "schema": "public",
+      "schema": "factory",
       "values": [
         "draft",
         "awaiting_approval",
@@ -503,7 +506,9 @@
       ]
     }
   },
-  "schemas": {},
+  "schemas": {
+    "factory": "factory"
+  },
   "sequences": {},
   "roles": {},
   "policies": {},

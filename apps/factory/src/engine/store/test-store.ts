@@ -8,6 +8,6 @@ import * as schema from "#src/engine/store/schema";
 /** An in-memory Postgres with `drizzle/` applied. */
 export async function createTestFactoryDatabase(): Promise<FactoryDatabase> {
   const database = drizzle(new PGlite(), { schema });
-  await migrate(database, { migrationsFolder: factoryMigrationsFolder() });
+  await migrate(database, { migrationsFolder: factoryMigrationsFolder(), migrationsSchema: "factory" });
   return database;
 }

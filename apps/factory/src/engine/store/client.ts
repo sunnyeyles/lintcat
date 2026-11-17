@@ -26,5 +26,6 @@ export function openFactoryDatabase(url: string): {
 export async function migrateFactoryDatabase(database: FactoryDatabase): Promise<void> {
   await migrate(database as Parameters<typeof migrate>[0], {
     migrationsFolder: factoryMigrationsFolder(),
+    migrationsSchema: "factory",
   });
 }

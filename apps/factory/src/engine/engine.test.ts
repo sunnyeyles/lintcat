@@ -180,7 +180,7 @@ describe("quick workflow", () => {
       checkpoint: { stage: "locate", sha: await headSha(worktree), nextStage: "implement", data: { locate: { files: [] } } },
     });
     writeFileSync(path.join(worktree, "half-written.txt"), "partial");
-    await database.execute(sql`update factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
+    await database.execute(sql`update factory.factory_runs set lease_expires_at = now() - interval '1 second' where id = ${runId}`);
 
     expect((await service.runNext({ runId }))?.status).toBe("delivered");
     expect(existsSync(path.join(worktree, "half-written.txt"))).toBe(false);
@@ -213,7 +213,7 @@ describe("quick workflow", () => {
   it("refuses to run a contract edited after approval", async () => {
     const { service, runId } = await approvedRun([writeGreet("x")]);
     await database.execute(
-      sql`update factory_runs set contract = jsonb_set(contract, '{spec,title}', '"Something else"') where id = ${runId}`,
+      sql`update factory.factory_runs set contract = jsonb_set(contract, '{spec,title}', '"Something else"') where id = ${runId}`,
     );
     const claimed = (await claimRun(database, { leaseMs: 60_000, runId }))!;
     const status = await executeRun(
