@@ -673,7 +673,7 @@ describe("runReview, narrowed to the commits since the last review", () => {
     await runReview(spec);
 
     expect(client.createCheckRun.mock.calls[0]?.[0]).toMatchObject({
-      conclusion: "success",
+      conclusion: "neutral",
     });
   });
 

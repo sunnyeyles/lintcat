@@ -3,6 +3,7 @@ import type { FactoryCommand, FactoryEvent, FactoryRun } from "#src/engine/store
 import type { FactoryService } from "#src/engine/service";
 import type { Spec } from "#src/engine/contract";
 import type { Route } from "#src/engine/profiles";
+import type { SpecAudit } from "#src/engine/spec-review";
 
 type ProfileSummary = Awaited<ReturnType<FactoryService["summary"]>>[number];
 
@@ -11,22 +12,12 @@ export const TERMINAL_STATUSES: readonly FactoryRun["status"][] = ["delivered", 
 const list = (heading: string, items: readonly string[]): string[] =>
   items.length === 0 ? [] : [`${heading}:`, ...items.map((item) => `  - ${item}`)];
 
-function scopingLines({ scoping }: Spec): string[] {
-  if (scoping?.verdict !== "change") return [];
-  const outcome = scoping.applied ? "applied" : "rebutted";
-  return [
-    `Scoping:   proposed ${scoping.proposed} instead of ${scoping.from} (${outcome}): ${scoping.reason}`,
-    ...scoping.evidence.map((item) => `  - ${item}`),
-  ];
-}
-
 export function renderSpec(spec: Spec, route: Route, runId: string): string {
   const routing = `Profile:   ${route.profile}${route.overridden ? " (overridden)" : ""}: ${route.reason}`;
   return [
     `── ${spec.title} (${runId})`,
     `Objective: ${spec.objective}`,
     `Category:  ${spec.category}   Risk: ${spec.risk}${spec.touchesSecurityOrData ? " (touches security or data)" : ""}   ~${spec.estimatedFiles} files`,
-    ...scopingLines(spec),
     routing,
     ...list("Requirements", spec.requirements),
     "Acceptance criteria:",
@@ -37,8 +28,26 @@ export function renderSpec(spec: Spec, route: Route, runId: string): string {
     ...list("Assumptions", spec.assumptions),
     ...list("Non-goals", spec.nonGoals),
     ...list("Constraints", spec.constraints),
-    ...list("Follow-ups", spec.scoping?.followUps ?? []),
   ].join("\n");
+}
+
+export function renderSpecAudit(audit: SpecAudit): string {
+  const { review, resolutions } = audit;
+  const lines = ["── Fresh review (a reader with none of this conversation, like the implementer)"];
+  if (review) lines.push(`It reads this as: ${review.paraphrase.proposes}`, `Existing system, per the spec: ${review.paraphrase.existingSystem}`);
+  else lines.push("The reviewer returned no valid answer; judge the spec without it.");
+  const findings = review?.findings ?? [];
+  const answered = new Set(resolutions.map((r) => r.finding.id));
+  const escalated = resolutions.filter((r) => r.action === "escalate");
+  const settled = resolutions.filter((r) => r.action !== "escalate");
+  const line = (f: { severity: string; field: string; problem: string; evidence: string[] }) =>
+    [`[${f.severity}] ${f.field}: ${f.problem}`, ...f.evidence.map((e) => `      · ${e}`)].join("\n");
+  lines.push(...list("Scope (your call; discovery left it alone)", findings.filter((f) => f.lens === "scope").map(line)));
+  lines.push(...list("Needs your call (discovery disagrees, on grounds only you know)", escalated.map((r) => `${line(r.finding)}\n      → ${r.note}`)));
+  lines.push(...list("Resolved by discovery", settled.map((r) => `${r.action}: ${line(r.finding)}\n      → ${r.note}`)));
+  lines.push(...list("Unanswered", findings.filter((f) => f.lens !== "scope" && !answered.has(f.id)).map(line)));
+  if (review && findings.length === 0) lines.push("No findings.");
+  return lines.join("\n");
 }
 
 function scalar(value: unknown): string | undefined {

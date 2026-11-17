@@ -9,8 +9,8 @@ import { z } from "zod";
 import { assetPath } from "#src/engine/assets";
 
 export const MESSAGES = {
-  discovery: ["outcome", "answer", "revise", "schema-retry", "no-more-questions", "scoping"],
-  scoper: ["scope"],
+  discovery: ["outcome", "answer", "revise", "schema-retry", "no-more-questions", "resolve"],
+  "spec-reviewer": ["review"],
   implementer: [
     "task",
     "checks",

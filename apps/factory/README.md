@@ -46,7 +46,8 @@ readable event stream.
 ```
 new "<outcome>"
   discovery agent (read-only) ── one question at a time ──▶ draft spec
-  scoper agent (read-only, once) ── accept, or a cited category change ──▶ discovery applies or rebuts ──▶ spec
+  spec review: a fresh read-only agent paraphrases and audits it (quick: scope only);
+    discovery fixes, contests or escalates findings once; scope findings go to you
   routed to a profile ──▶ awaiting_approval ──▶ one approval (contract frozen by sha256)
   queued ──▶ claimed with a lease ──▶ running
     prepare    worktree on factory/<slug>-<id>; container; install with network; network cut
@@ -64,11 +65,13 @@ new "<outcome>"
 | `feature` | **review**: one independent read-only review, at most one repair |
 | `refactor` | **baseline** checks before any change, then **review** |
 
-The scoper reads the draft fresh against the code and pushes back on its
-`category` only with cited files and lines, for example a bug fix whose defect
-sits at several call sites (`refactor`). Discovery stays the spec's only
-author; code records the outcome in `spec.scoping` (applied or rebutted, plus
-any `followUps`, which are never started). A failed scoper is an accept.
+The spec reviewer sees only the spec and the repository, as the implementer
+will. Its scope lens checks `category`, `estimatedFiles` and `risk` against the
+code, for example a bug fix whose defect sits at several call sites
+(`refactor`); a scope finding must cite `path:line` or it is dropped. Discovery
+answers the other findings and cannot change the category: that is your call.
+You approve with the paraphrase and findings beside the spec; they never block
+it. Each review is a `spec_reviewed` event.
 
 Profiles live in `src/engine/profiles.ts`. Postgres is authoritative; a worker
 that claims an expired lease resumes from the last checkpoint, at most 3 times.

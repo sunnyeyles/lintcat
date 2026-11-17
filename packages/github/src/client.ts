@@ -145,7 +145,7 @@ export interface ChangedFile {
   patch?: string | undefined;
 }
 
-export type CheckRunConclusion = "success" | "failure" | "neutral";
+export type CheckRunConclusion = "neutral";
 
 export type AnnotationLevel = "notice" | "warning" | "failure";
 

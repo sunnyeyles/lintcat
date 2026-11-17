@@ -2,7 +2,7 @@ import type { FactoryCommand, FactoryRun } from "#src/engine/store/schema";
 import type { Spec } from "#src/engine/contract";
 import { describe, expect, it } from "vitest";
 
-import { formatData, formatEvent, renderFailedCommand, renderResult, renderRuns, renderSpec } from "#src/render";
+import { formatData, formatEvent, renderFailedCommand, renderResult, renderRuns, renderSpec, renderSpecAudit } from "#src/render";
 
 const spec: Spec = {
   title: "Add a --json flag",
@@ -21,6 +21,43 @@ const spec: Spec = {
   touchesSecurityOrData: false,
 };
 
+describe("rendering a spec review", () => {
+  const paraphrase = { proposes: "Adds a --json flag", existingSystem: "Output is plain text" };
+  const finding = (id: string, severity: "blocker" | "major" | "nit", problem: string, lens: "readiness" | "scope" = "readiness", evidence: string[] = []) => ({
+    id,
+    severity,
+    lens,
+    field: lens === "scope" ? "category" : "plan",
+    problem,
+    evidence,
+  });
+
+  it("puts the paraphrase and scope first, then escalations ahead of settled findings", () => {
+    const scope = finding("F1", "blocker", "refactor: two call sites", "scope", ["src/a.ts:10 parses by hand"]);
+    const fixed = finding("F2", "major", "which encoder?");
+    const escalated = finding("F3", "blocker", "no YAML");
+    const wordy = finding("F4", "nit", "wordy");
+    const text = renderSpecAudit({
+      review: { promptVersion: "v", paraphrase, findings: [scope, fixed, escalated, wordy] },
+      resolutions: [
+        { finding: fixed, action: "fix", note: "JSON.stringify" },
+        { finding: escalated, action: "escalate", note: "you said YAML is out" },
+      ],
+    });
+    expect(text).toContain("It reads this as: Adds a --json flag");
+    expect(text).toContain("Scope (your call; discovery left it alone):\n  - [blocker] category: refactor: two call sites\n      · src/a.ts:10 parses by hand");
+    expect(text.indexOf("Scope (your call")).toBeLessThan(text.indexOf("Needs your call"));
+    expect(text.indexOf("Needs your call")).toBeLessThan(text.indexOf("Resolved by discovery"));
+    expect(text).toContain("fix: [major] plan: which encoder?\n      → JSON.stringify");
+    expect(text).toContain("Unanswered:\n  - [nit] plan: wordy");
+  });
+
+  it("says when there is nothing to show", () => {
+    expect(renderSpecAudit({ review: { promptVersion: "v", paraphrase, findings: [] }, resolutions: [] })).toContain("No findings.");
+    expect(renderSpecAudit({ review: null, resolutions: [] })).toContain("no valid answer");
+  });
+});
+
 describe("rendering a spec", () => {
   it("shows the routed profile, the criteria and the numbered plan, and drops empty sections", () => {
     const text = renderSpec(spec, { profile: "feature", reason: "new behaviour", overridden: false }, "r1");
@@ -30,42 +67,6 @@ describe("rendering a spec", () => {
     expect(text).toContain("  2. test it");
     expect(text).toContain("Non-goals:\n  - YAML");
     expect(text).not.toContain("Constraints:");
-  });
-});
-
-describe("rendering a scoping record", () => {
-  const route = { profile: "refactor", reason: "structure", overridden: false } as const;
-  const scoping = {
-    verdict: "change" as const,
-    from: "bugfix" as const,
-    proposed: "refactor" as const,
-    reason: "three call sites",
-    evidence: ["src/a.ts:10 parses by hand"],
-    followUps: [],
-    applied: true,
-    promptVersion: "scoper@1+00000000",
-  };
-
-  it("shows an applied change after the category, with its evidence", () => {
-    const text = renderSpec({ ...spec, category: "refactor", scoping }, route, "r1");
-    expect(text).toMatch(/Category:.*\nScoping: {3}proposed refactor instead of bugfix \(applied\): three call sites\n {2}- src\/a.ts:10 parses by hand/);
-  });
-
-  it("shows a rebuttal", () => {
-    expect(renderSpec({ ...spec, scoping: { ...scoping, applied: false } }, route, "r1")).toContain("(rebutted): three call sites");
-  });
-
-  it("lists follow-ups from an accept without a scoping line", () => {
-    const accept = { ...scoping, verdict: "accept" as const, proposed: "bugfix" as const, evidence: [], followUps: ["split the parser"] };
-    const text = renderSpec({ ...spec, scoping: accept }, route, "r1");
-    expect(text).not.toContain("Scoping:");
-    expect(text).toContain("Follow-ups:\n  - split the parser");
-  });
-
-  it("shows nothing without a record", () => {
-    const text = renderSpec(spec, route, "r1");
-    expect(text).not.toContain("Scoping:");
-    expect(text).not.toContain("Follow-ups:");
   });
 });
 

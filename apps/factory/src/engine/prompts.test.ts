@@ -71,10 +71,10 @@ describe("prompt sets", () => {
   it("throws on an incomplete or padded set", async () => {
     const dir = await copySet();
     try {
-      await rm(path.join(dir, "scoper", "scope.md"));
+      await rm(path.join(dir, "spec-reviewer", "review.md"));
       await appendFile(path.join(dir, "reviewer", "stray.md"), "x");
       process.env.FACTORY_PROMPTS_DIR = dir;
-      expect(() => loadPrompt("scoper")).toThrow(/missing \[scope\.md\]/);
+      expect(() => loadPrompt("spec-reviewer")).toThrow(/missing \[review\.md\]/);
       expect(() => loadPrompt("reviewer")).toThrow(/unexpected \[stray\.md\]/);
     } finally {
       await rm(dir, { recursive: true, force: true });
