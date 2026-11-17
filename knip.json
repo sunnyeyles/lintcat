@@ -23,7 +23,8 @@
     },
     "apps/factory": {
       "entry": [
-        "src/index.ts"
+        "src/index.ts",
+        "scripts/characters.mjs"
       ]
     },
     "packages/design": {

@@ -3,7 +3,7 @@
 import { cn, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@pr-review/design";
 import { ArrowRight } from "@pr-review/design/icons";
 
-import { BotFigure } from "@/app/dev/run-trace/bot-figure";
+import { BotPortrait } from "@/app/dev/run-trace/bot-figure";
 import type { Floor, TreeBox } from "@/app/dev/run-trace/bot-layout";
 import { botLook } from "@/app/dev/run-trace/bot-look";
 import { botLabel, botStats, type BotView } from "@/app/dev/run-trace/bot-view";
@@ -100,18 +100,13 @@ function BotButton({ bot, prefix, selectedId, onOpen }: FloorProps & { bot: BotV
           onClick={() => onOpen(bot.id)}
           className={cn(
             styles.bot,
-            "focus-visible:ring-ring flex w-28 flex-col items-center gap-1 rounded-xl p-2 outline-none focus-visible:ring-2",
+            bot.cast ? "w-36" : "w-28",
+            "focus-visible:ring-ring flex flex-col items-center gap-1 rounded-xl p-2 outline-none focus-visible:ring-2",
             "hover:bg-card",
             selectedId === bot.id && "bg-card ring-primary ring-2",
           )}
         >
-          <BotFigure
-            look={look}
-            status={bot.status}
-            activeTool={bot.activeTool}
-            peakContext={bot.peakContext}
-            className="h-24 w-20"
-          />
+          <BotPortrait bot={bot} look={look} size="floor" />
           <span className="max-w-full truncate text-xs font-semibold">{look.name}</span>
           {bot.description ? (
             <span className="text-muted-foreground line-clamp-2 max-w-full text-center text-[11px] leading-tight">

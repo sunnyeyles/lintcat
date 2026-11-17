@@ -34,6 +34,26 @@ const KNOWN: { accessory: Accessory; words: string[]; exact?: boolean }[] = [
   },
 ];
 
+export type CastRole = "locate" | "implementer" | "verify" | "deliver";
+
+const CAST = new Map<string, CastRole>([
+  ["locate", "locate"],
+  ["architecture", "locate"],
+  ["reproduce", "implementer"],
+  ["implement", "implementer"],
+  ["implementer", "implementer"],
+  ["baseline", "verify"],
+  ["verify", "verify"],
+  ["review", "verify"],
+  ["reviewer", "verify"],
+  ["deliver", "deliver"],
+]);
+
+/** A factory agent's own character wins over its stage's. */
+export function castRole(role: string, stage?: string): CastRole | undefined {
+  return CAST.get(role) ?? (stage ? CAST.get(stage) : undefined);
+}
+
 const SPARE: Accessory[] = ["antenna", "propeller", "headphones", "bowtie", "flower"];
 
 const KNOWN_PREFIXES = ["marrow"];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { botLook, commonPrefix, displayRole } from "./bot-look";
+import { botLook, castRole, commonPrefix, displayRole } from "./bot-look";
 import { roleColor } from "./trace-layout";
 
 describe("botLook", () => {
@@ -50,5 +50,31 @@ describe("role names", () => {
   it("always strips marrow-, but never down to nothing", () => {
     expect(displayRole("marrow-implementer")).toBe("implementer");
     expect(displayRole("marrow")).toBe("marrow");
+  });
+});
+
+describe("castRole", () => {
+  it.each([
+    ["locate", undefined, "locate"],
+    ["architecture", undefined, "locate"],
+    ["reproduce", undefined, "implementer"],
+    ["implement", undefined, "implementer"],
+    ["baseline", undefined, "verify"],
+    ["review", undefined, "verify"],
+    ["deliver", undefined, "deliver"],
+    ["reviewer", "review", "verify"],
+    ["claude", "deliver", "deliver"],
+  ])("%s in stage %s is played by %s", (role, stage, cast) => {
+    expect(castRole(role, stage)).toBe(cast);
+  });
+
+  it("lets an agent's own character win over its stage's", () => {
+    expect(castRole("implementer", "verify")).toBe("implementer");
+  });
+
+  it("has no character for stages outside the cast", () => {
+    expect(castRole("factory")).toBeUndefined();
+    expect(castRole("discovery", "discovery")).toBeUndefined();
+    expect(castRole("constructor")).toBeUndefined();
   });
 });

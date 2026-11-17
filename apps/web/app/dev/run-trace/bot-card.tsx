@@ -4,7 +4,7 @@ import { Badge, cn, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTit
 import { ArrowRight, ChevronDown } from "@pr-review/design/icons";
 import type { ReactNode } from "react";
 
-import { BotFigure } from "@/app/dev/run-trace/bot-figure";
+import { BotPortrait } from "@/app/dev/run-trace/bot-figure";
 import { botLook } from "@/app/dev/run-trace/bot-look";
 import { botStats, type BotEvent, type BotThought, type BotTool, type BotView } from "@/app/dev/run-trace/bot-view";
 import { ContextChart } from "@/app/dev/run-trace/context-chart";
@@ -78,13 +78,7 @@ function CardBody({
   return (
     <>
       <SheetHeader className="bg-surface-2 items-center border-b pt-8 text-center">
-        <BotFigure
-          look={look}
-          status={bot.status}
-          activeTool={bot.activeTool}
-          peakContext={bot.peakContext}
-          className="h-36 w-32"
-        />
+        <BotPortrait bot={bot} look={look} size="card" />
         <SheetTitle className="text-xl">Hi, I'm {look.name}</SheetTitle>
         <SheetDescription className="flex flex-wrap justify-center gap-1.5">
           {bot.status ? <StatusBadge status={bot.status} /> : null}

@@ -91,6 +91,24 @@ so editing any message changes it.
 `FACTORY_PROMPTS_DIR` loads another folder with the same layout, for trying
 prompt variants. Prompts are never read from the repository being worked on.
 
+## Cast
+
+![The factory cast](assets/characters/cast.png)
+
+`scripts/characters.mjs` draws four characters as sprite sheets (8 frames of
+120×120 across, `idle` on the top row, `active` on the bottom) into
+`apps/web/public/factory-cast/`, and the preview above. The Factory trace shows
+them for a run's stages and agents, the running one on its `active` row.
+Regenerate with `node apps/factory/scripts/characters.mjs`; the output is
+byte-identical on every run.
+
+| Sheet | Stages | Active animation |
+|---|---|---|
+| `locate.png` | locate, architecture | radar sweeps, flashlight on, map pin hops |
+| `implementer.png` | reproduce, implement | wrench waves, torch sparks, treads roll |
+| `verify.png` | baseline, verify, review | stamps, checklist ticks off, lamp blinks |
+| `deliver.png` | deliver | crate lifts, beacon flashes, wheels turn |
+
 ## Auth
 
 The agent runs the official Claude Code binary through the Agent SDK; the

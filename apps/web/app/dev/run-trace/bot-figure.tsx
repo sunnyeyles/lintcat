@@ -1,8 +1,9 @@
 import { cn } from "@pr-review/design";
-import type { ReactNode } from "react";
+import { Check as CheckIcon, X } from "@pr-review/design/icons";
+import type { CSSProperties, ReactNode } from "react";
 
-import type { Accessory, BotLook } from "@/app/dev/run-trace/bot-look";
-import type { BotStatus } from "@/app/dev/run-trace/bot-view";
+import type { Accessory, BotLook, CastRole } from "@/app/dev/run-trace/bot-look";
+import type { BotStatus, BotView } from "@/app/dev/run-trace/bot-view";
 import styles from "@/app/dev/run-trace/bots.module.css";
 import { CONTEXT_LIMIT } from "@/app/dev/run-trace/trace-layout";
 
@@ -21,7 +22,42 @@ function fuelColor(fraction: number): string {
   return "var(--success)";
 }
 
-export function BotFigure({
+export function BotPortrait({ bot, look, size }: { bot: BotView; look: BotLook; size: "floor" | "card" }) {
+  if (bot.cast) return <CastFigure role={bot.cast} status={bot.status} px={size === "card" ? 240 : 120} />;
+  return (
+    <BotFigure
+      look={look}
+      status={bot.status}
+      activeTool={bot.activeTool}
+      peakContext={bot.peakContext}
+      className={size === "card" ? "h-36 w-32" : "h-24 w-20"}
+    />
+  );
+}
+
+function CastFigure({ role, status, px }: { role: CastRole; status?: BotStatus; px: number }) {
+  const sheet = { "--sprite-sheet": `url(/factory-cast/${role}.png)`, "--sprite-size": `${px}px` } as CSSProperties;
+  return (
+    <span aria-hidden="true" className={cn(styles.figure, "relative block shrink-0")} style={{ width: px, height: px }}>
+      <span
+        className={cn(styles.sprite, status === "running" && styles.active, status === undefined && styles.waiting)}
+        style={sheet}
+      />
+      {status === "done" ? (
+        <span className="bg-success text-success-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full">
+          <CheckIcon animate="none" className="size-3" />
+        </span>
+      ) : null}
+      {status === "failed" ? (
+        <span className="bg-destructive text-destructive-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full">
+          <X animate="none" className="size-3" />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function BotFigure({
   look,
   status,
   activeTool,
