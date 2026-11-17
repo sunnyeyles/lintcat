@@ -4,6 +4,7 @@ import { errorMessage, type StructuredLogger } from "@pr-review/logging";
 
 import { detectChecks } from "#src/engine/checks";
 import { assertFrozen } from "#src/engine/contract";
+import { loadDeployConfig } from "#src/engine/deploy-config";
 import type { Stage } from "#src/engine/profiles";
 import { ActiveRun, RunStopped, usageTotals } from "#src/engine/run-context";
 import type { SandboxProvider } from "#src/engine/sandbox/sandbox";
@@ -53,6 +54,9 @@ export async function executeRun(deps: EngineDeps, claimed: FactoryRun): Promise
     if (plan.checks.length === 0) {
       throw new RunStopped("failed", "no checks detected: add .factory/checks so the change can be verified");
     }
+    run.deployConfig = await loadDeployConfig(run.repo).catch((error: unknown) => {
+      throw new RunStopped("failed", errorMessage(error));
+    });
     const { stages } = profile;
     const startIndex = run.checkpoint ? stages.indexOf(run.checkpoint.nextStage as Stage) : 0;
     if (startIndex < 0) throw new RunStopped("failed", `checkpoint names unknown stage ${run.checkpoint?.nextStage}`);

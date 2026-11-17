@@ -1,7 +1,7 @@
 /** Workflow profiles and deterministic routing; the simplest safe profile wins. */
 import type { Budgets, ProfileName, Spec } from "#src/engine/contract";
 
-export type Stage = "prepare" | "locate" | "reproduce" | "baseline" | "implement" | "verify" | "review" | "deliver";
+export type Stage = "prepare" | "locate" | "reproduce" | "baseline" | "implement" | "verify" | "review" | "deploy-impact" | "deliver";
 
 export interface Profile {
   name: ProfileName;
@@ -13,17 +13,17 @@ const light: Budgets = { maxAgentTurns: 30, maxRepairPasses: 1, wallClockMinutes
 const heavy: Budgets = { maxAgentTurns: 80, maxRepairPasses: 1, wallClockMinutes: 45, commandTimeoutSeconds: 600 };
 
 export const PROFILES: Record<ProfileName, Profile> = {
-  quick: { name: "quick", stages: ["prepare", "locate", "implement", "verify", "deliver"], budgets: light },
+  quick: { name: "quick", stages: ["prepare", "locate", "implement", "verify", "deploy-impact", "deliver"], budgets: light },
   bugfix: {
     name: "bugfix",
-    stages: ["prepare", "locate", "reproduce", "implement", "verify", "deliver"],
+    stages: ["prepare", "locate", "reproduce", "implement", "verify", "deploy-impact", "deliver"],
     budgets: { ...heavy, maxRepairPasses: 2, wallClockMinutes: 60, commandTimeoutSeconds: 900 },
   },
-  feature: { name: "feature", stages: ["prepare", "locate", "implement", "verify", "review", "deliver"], budgets: heavy },
-  refactor: { name: "refactor", stages: ["prepare", "locate", "baseline", "implement", "verify", "review", "deliver"], budgets: heavy },
+  feature: { name: "feature", stages: ["prepare", "locate", "implement", "verify", "review", "deploy-impact", "deliver"], budgets: heavy },
+  refactor: { name: "refactor", stages: ["prepare", "locate", "baseline", "implement", "verify", "review", "deploy-impact", "deliver"], budgets: heavy },
 };
 
-export const workflowVersion = (profile: Profile) => `${profile.name}@1`;
+export const workflowVersion = (profile: Profile) => `${profile.name}@2`;
 
 export type Route = { profile: ProfileName; reason: string; overridden: boolean };
 

@@ -145,6 +145,46 @@ export async function committedDiff(
   return { files: names.split("\0").filter(Boolean).sort(), diff };
 }
 
+/** Change status per path from `baseSha` to HEAD; a rename is keyed by its new path. */
+export async function nameStatus(
+  dir: string,
+  baseSha: string,
+  exclude: readonly string[] = [],
+): Promise<Map<string, "A" | "M" | "D" | "R">> {
+  const scope = ["--", ".", ...exclude.map((path) => `:(exclude)${path}`)];
+  const fields = (await git(dir, ["diff", "--name-status", "-M", "-z", baseSha, "HEAD", ...scope])).split("\0");
+  const status = new Map<string, "A" | "M" | "D" | "R">();
+  for (let i = 0; i < fields.length; i++) {
+    const code = fields[i]?.[0];
+    if (!code) continue;
+    if (code === "R" || code === "C") {
+      i += 2;
+      status.set(fields[i]!, code === "R" ? "R" : "A");
+    } else {
+      i += 1;
+      status.set(fields[i]!, code === "A" || code === "D" ? code : "M");
+    }
+  }
+  return status;
+}
+
+export async function showAt(dir: string, sha: string, path: string): Promise<string | null> {
+  try {
+    return await git(dir, ["show", `${sha}:${path}`]);
+  } catch (error) {
+    if (error instanceof GitError && error.exitCode !== null) return null;
+    throw error;
+  }
+}
+
+export async function grepAt(dir: string, sha: string, token: string): Promise<boolean> {
+  return gitOk(dir, ["grep", "-q", "-w", "-F", "-e", token, sha]);
+}
+
+export async function listAt(dir: string, sha: string): Promise<string[]> {
+  return (await git(dir, ["ls-tree", "-r", "--name-only", "-z", sha])).split("\0").filter(Boolean);
+}
+
 /** Uncommitted paths, with untracked directories collapsed to one entry. */
 export async function dirtyPaths(dir: string): Promise<string[]> {
   const out = await git(dir, ["status", "--porcelain", "-z", "--untracked-files=normal"]);

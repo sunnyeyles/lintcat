@@ -5,7 +5,23 @@ import path from "node:path";
 import { z } from "zod";
 
 import type { CheckPlan } from "#src/engine/checks";
-import { changedFiles, checkpointCommit, committedDiff, createWorktree, dirtyPaths, headSha, isClean, pushBranch, resetTo, squashSince } from "#src/engine/git";
+import { analyse, beforeDeploying, deployRepairPrompt, type DeployImpact } from "#src/engine/deploy-impact";
+import {
+  changedFiles,
+  checkpointCommit,
+  committedDiff,
+  createWorktree,
+  dirtyPaths,
+  grepAt,
+  headSha,
+  isClean,
+  listAt,
+  nameStatus,
+  pushBranch,
+  resetTo,
+  showAt,
+  squashSince,
+} from "#src/engine/git";
 import { locate } from "#src/engine/locate";
 import type { Stage } from "#src/engine/profiles";
 import { isTestPath } from "#src/engine/repository";
@@ -216,7 +232,7 @@ async function verify(run: ActiveRun, plan: CheckPlan, nextStage: Stage) {
 }
 
 /** One review of the immutable diff; at most one repair pass and one recheck. */
-async function review(run: ActiveRun, plan: CheckPlan) {
+async function review(run: ActiveRun, plan: CheckPlan, nextStage: Stage) {
   const stage = "review";
   const { worktree, data } = run;
   if (!data.review) {
@@ -247,7 +263,70 @@ async function review(run: ActiveRun, plan: CheckPlan) {
       throw new RunStopped("failed", `checks failing after the review repair: ${blamed.map((f) => `${f.name} (exit ${f.exitCode}, output ${f.result.outputHash.slice(0, 12)})`).join(", ")}`);
     }
   }
-  await run.save(stage, "deliver");
+  await run.save(stage, nextStage);
+}
+
+/** Reads only git at the base commit and HEAD; no network, no credentials. */
+async function analyseDeployImpact(run: ActiveRun): Promise<DeployImpact> {
+  const { worktree, contract, setupPaths } = run;
+  const { files, diff } = await committedDiff(worktree, contract.baseSha, setupPaths);
+  const impact = await analyse({
+    diff,
+    files,
+    baseStatus: await nameStatus(worktree, contract.baseSha, setupPaths),
+    readBase: (file) => showAt(worktree, contract.baseSha, file),
+    readHead: (file) => showAt(worktree, "HEAD", file),
+    listHead: () => listAt(worktree, "HEAD"),
+    baseHasToken: (token) => grepAt(worktree, contract.baseSha, token),
+    config: run.deployConfig,
+  });
+  await writeArtifact(run.repo, run.claimed.id, "deploy-impact.json", JSON.stringify(impact, null, 2));
+  const count = (severity: string) => impact.findings.filter((f) => f.severity === severity).length;
+  await run.recorder.event({
+    kind: "deploy_impact_finished",
+    stage: "deploy-impact",
+    data: { fix: count("fix"), prerequisite: count("prerequisite"), note: count("note"), rules: [...new Set(impact.findings.map((f) => f.rule))] },
+  });
+  return impact;
+}
+
+/** Advisory: at most one repair pass for fixable findings; whatever remains becomes a deviation. */
+async function deployImpact(run: ActiveRun, plan: CheckPlan, nextStage: Stage) {
+  const stage = "deploy-impact";
+  const { data, deviations, contract } = run;
+  if (!data.deployImpact) {
+    data.deployImpact = await analyseDeployImpact(run);
+    await run.save(stage, stage);
+  }
+  const fixable = () => data.deployImpact!.findings.filter((f) => f.severity === "fix");
+  if (fixable().length > 0 && !data.deployImpactRepair) {
+    if (contract.budgets.maxAgentTurns - (data.turnsUsed ?? 0) <= 0) {
+      deviations.push("deploy-impact repair skipped: the implementer's turn budget is spent");
+    } else {
+      await run.recorder.event({ kind: "deploy_impact_repair_started", stage, data: { fix: fixable().length } });
+      const { result } = await run.runAgent(stage, deployRepairPrompt(fixable()), { role: "implementer", resume: true, schema: implementerOutputSchema });
+      run.throwIfStopped();
+      if (!result.ok) throw new RunStopped("failed", `deploy-impact repair ended with ${result.reason}`);
+      const sha = await checkpointCommit(run.worktree, "factory: deploy-impact repair", run.setupPaths);
+      if (!sha) deviations.push("deploy-impact repair changed nothing");
+      data.deployImpactRepair = { sha, verified: sha === null };
+      await run.save(stage, stage, sha ?? undefined);
+    }
+  }
+  if (data.deployImpactRepair?.sha && !data.deployImpactRepair.verified) {
+    const { blamed } = await run.verifyChecks(plan, stage, "verify-deploy-repair");
+    if (blamed.length) {
+      throw new RunStopped("failed", `checks failing after the deploy-impact repair: ${blamed.map((f) => `${f.name} (exit ${f.exitCode}, output ${f.result.outputHash.slice(0, 12)})`).join(", ")}`);
+    }
+    data.deployImpact = await analyseDeployImpact(run);
+    data.deployImpactRepair.verified = true;
+    await run.save(stage, stage);
+  }
+  for (const f of fixable()) {
+    const note = `deploy-impact: ${f.detail} (${f.file})`;
+    if (!deviations.includes(note)) deviations.push(note);
+  }
+  await run.save(stage, nextStage);
 }
 
 async function deliver(run: ActiveRun): Promise<RunOutcome> {
@@ -257,6 +336,7 @@ async function deliver(run: ActiveRun): Promise<RunOutcome> {
     contract.spec.objective,
     "",
     ...contract.spec.acceptanceCriteria.map((ac) => `- ${ac.id}: ${ac.text}`),
+    ...beforeDeploying(run.data.deployImpact),
   ].join("\n");
   const sha = await squashSince(worktree, contract.baseSha, `${contract.spec.title}\n\n${body}`);
   await recordEffect(database, { key: `branch:${claimed.id}`, runId: claimed.id, kind: "branch", result: { branch, sha } });
@@ -298,5 +378,6 @@ export const STAGE_STEPS: Partial<Record<Stage, StageStep>> = {
   implement,
   verify,
   review,
+  "deploy-impact": deployImpact,
   deliver,
 };

@@ -55,6 +55,8 @@ new "<outcome>"
     locate     git grep for the spec's terms and named paths
     implement  file tools confined to the worktree; commands only via sandbox_exec
     verify     every check in the offline container, with repair passes
+    deploy-impact  env vars, migrations, workflows and deploy config the final diff touches,
+               read from git alone; one repair for fixable findings, the rest go in task.md and the PR
     deliver    one squashed commit; optional push + PR, each behind an idempotency key
   delivered | failed | cancelled, with .factory/runs/<id>/task.md as the record
 ```
@@ -65,6 +67,11 @@ new "<outcome>"
 | `bugfix` | **reproduce**: a failing regression test, committed before the fix |
 | `feature` | **review**: one independent read-only review, at most one repair |
 | `refactor` | **baseline** checks before any change, then **review** |
+
+Every profile runs **deploy-impact** just before **deliver**. Its findings never
+fail the run; a repair that breaks a check does. `.factory/deploy` (optional
+YAML) can replace the `envExamples` and `migrations` globs, add `deployConfig`
+paths, and list `ignoreEnv` names.
 
 The spec reviewer sees only the spec and the repository, as the implementer
 will. Its scope lens checks `category`, `estimatedFiles` and `risk` against the

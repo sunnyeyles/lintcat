@@ -19,6 +19,7 @@ Metrics are per profile, over finished runs (`delivered`, `failed`, `cancelled`)
 | Repeated-failure rate | runs with a `repeated_failure` event ÷ runs where some `checks_finished` had a failing check |
 | Repair success | runs with a `repair_started` event that were delivered ÷ runs with a `repair_started` event |
 | Test regression rate | runs where a check that passed in `baseline_recorded` later failed in `checks_finished` ÷ runs with a baseline. Only `refactor` records a baseline, so other profiles show `-`. |
+| Deploy prerequisites | runs whose last `deploy_impact_finished` has a `prerequisite` finding ÷ runs with a `deploy_impact_finished` event. Runs before workflow `@2` never reach the stage, so they show `-`. |
 | Cost per verified success | the sum of `outcome.usage.estimatedCostUsd` ÷ delivered runs. Runs with no cost figure are counted and reported as unknown. This is the runtime's estimate. On a subscription it is notional, not a bill, and the report says so. |
 
 `-` means the history can't support the figure, for example no repairs or no baseline. Event kinds the metrics don't read are counted and listed but never cause an error. Human rework after delivery isn't recorded, so it isn't reported.
