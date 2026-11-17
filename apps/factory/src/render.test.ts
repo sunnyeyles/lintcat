@@ -23,20 +23,39 @@ const spec: Spec = {
 
 describe("rendering a spec review", () => {
   const paraphrase = { proposes: "Adds a --json flag", existingSystem: "Output is plain text" };
-  const finding = (id: string, severity: "blocker" | "major" | "nit", problem: string) => ({ id, severity, lens: "readiness" as const, field: "plan", problem });
+  const finding = (id: string, severity: "blocker" | "major" | "nit", problem: string, lens: "readiness" | "scope" = "readiness", evidence: string[] = []) => ({
+    id,
+    severity,
+    lens,
+    field: lens === "scope" ? "category" : "plan",
+    problem,
+    evidence,
+  });
 
-  it("puts the paraphrase first and escalations ahead of settled findings", () => {
+  it("puts the paraphrase and scope first, then escalations ahead of settled findings", () => {
+    const scope = finding("F1", "blocker", "refactor: two call sites", "scope", ["src/a.ts:10 parses by hand"]);
+    const fixed = finding("F2", "major", "which encoder?");
+    const escalated = finding("F3", "blocker", "no YAML");
+    const wordy = finding("F4", "nit", "wordy");
     const text = renderSpecAudit({
-      review: { promptVersion: "v", paraphrase, findings: [finding("F1", "nit", "wordy")] },
+      review: { promptVersion: "v", paraphrase, findings: [scope, fixed, escalated, wordy] },
       resolutions: [
-        { finding: finding("F1", "major", "which encoder?"), action: "fix", note: "JSON.stringify" },
-        { finding: finding("F2", "blocker", "no YAML"), action: "escalate", note: "you said YAML is out" },
+        { finding: fixed, action: "fix", note: "JSON.stringify" },
+        { finding: escalated, action: "escalate", note: "you said YAML is out" },
       ],
     });
     expect(text).toContain("It reads this as: Adds a --json flag");
+    expect(text).toContain("Scope (your call; discovery left it alone):\n  - [blocker] category: refactor: two call sites\n      · src/a.ts:10 parses by hand");
+    expect(text.indexOf("Scope (your call")).toBeLessThan(text.indexOf("Needs your call"));
     expect(text.indexOf("Needs your call")).toBeLessThan(text.indexOf("Resolved by discovery"));
     expect(text).toContain("fix: [major] plan: which encoder?\n      → JSON.stringify");
-    expect(text).toContain("Still open after revision:\n  - [nit] plan: wordy");
+    expect(text).toContain("Unanswered:\n  - [nit] plan: wordy");
+  });
+
+  it("doesn't call findings discovery never saw unanswered", () => {
+    const text = renderSpecAudit({ review: { promptVersion: "v", paraphrase, findings: [finding("F1", "nit", "wordy")] }, resolutions: [] });
+    expect(text).toContain("Other findings:\n  - [nit] plan: wordy");
+    expect(text).not.toContain("Unanswered");
   });
 
   it("says when there is nothing to show", () => {

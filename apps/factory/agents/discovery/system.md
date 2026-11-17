@@ -40,7 +40,7 @@ Keep the spec proportional: a one-line fix gets a short spec.
 
 ## Review findings
 
-Before the person sees a non-quick spec, a fresh reviewer reads only the spec and the repository, as the implementer will. When you are sent its findings, give each one exactly one `resolutions` entry (`finding` is its id, such as `F1`) and propose the revised spec:
+Before the person sees your spec, a fresh reviewer reads only the spec and the repository, as the implementer will. Its scope findings (the `category` and the size of the work) go to the person, not you: don't change `category` in response. When you are sent its other findings, give each one exactly one `resolutions` entry (`finding` is its id, such as `F1`) and propose the revised spec:
 
 - `fix`: the finding is valid. Change the spec and say what changed in `note`.
 - `contest`: the finding is wrong. `note` must cite evidence the reviewer could read: a file and symbol, or a part of the spec. "This was intended" is not evidence.

@@ -8,18 +8,21 @@ import type { SpecAudit } from "#src/engine/spec-review";
 const io = (answers: string[], decisions: Awaited<ReturnType<DiscoveryIO["review"]>>[]) => {
   const asked: string[] = [];
   const reviewed: string[] = [];
+  const versions: string[] = [];
   const audits: (SpecAudit | undefined)[] = [];
   return {
     asked,
     reviewed,
+    versions,
     audits,
     io: {
       ask: async (turn) => {
         asked.push(turn.question);
         return answers.shift() ?? "no preference";
       },
-      review: async (spec, _version, audit) => {
+      review: async (spec, promptVersion, audit) => {
         reviewed.push(spec.title);
+        versions.push(promptVersion);
         audits.push(audit);
         return decisions.shift() ?? { decision: "abort" };
       },
@@ -27,38 +30,53 @@ const io = (answers: string[], decisions: Awaited<ReturnType<DiscoveryIO["review
   };
 };
 
+const paraphrase = { proposes: "Adds an export command", existingSystem: "Commands live in src/cli.ts" };
+const clean = () => ({ structured: { paraphrase, findings: [] } });
+const findings = (...items: object[]) => () => ({ structured: { paraphrase, findings: items } });
+const propose = (spec: object = sampleSpec, resolutions?: object[]) => () => ({
+  structured: { kind: "proposal", spec, ...(resolutions ? { resolutions } : {}) },
+});
+
 describe("runDiscovery", () => {
   it("asks one question at a time, then gets one approval, resuming one session", async () => {
     const runtime = createFakeRuntime([
       () => ({ structured: { kind: "question", question: "Which flag name?", facts: ["CLI in src/cli.ts"] } }),
-      () => ({ structured: { kind: "proposal", spec: sampleSpec } }),
+      propose(),
+      clean,
     ]);
-    const { io: handlers, asked } = io(["--version"], [{ decision: "approve" }]);
+    const { io: handlers, asked, versions } = io(["--version"], [{ decision: "approve" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "add a version flag", io: handlers });
     expect(result.status).toBe("approved");
     expect(asked).toEqual(["Which flag name?"]);
-    expect(runtime.specs.map((s) => s.readOnly)).toEqual([true, true]);
+    expect(runtime.specs.map((s) => [s.role, s.readOnly])).toEqual([
+      ["discovery", true],
+      ["discovery", true],
+      ["spec-reviewer", true],
+    ]);
     expect(runtime.specs[1]?.resumeSessionId).toBe("fake-session-1");
     expect(runtime.specs[1]?.prompt).toBe("Answer: --version");
+    expect(versions[0]).toMatch(/^discovery@/);
   });
 
   it("sends revision feedback and re-asks for a schema-valid answer", async () => {
     const runtime = createFakeRuntime([
       () => ({ structured: { kind: "proposal" } }),
-      () => ({ structured: { kind: "proposal", spec: sampleSpec } }),
-      () => ({ structured: { kind: "proposal", spec: { ...sampleSpec, title: "Add --version and -v" } } }),
+      propose(),
+      clean,
+      propose({ ...sampleSpec, title: "Add --version and -v" }),
     ]);
-    const { io: handlers, reviewed } = io([], [{ decision: "revise", feedback: "also -v" }, { decision: "approve" }]);
+    const { io: handlers, reviewed, audits } = io([], [{ decision: "revise", feedback: "also -v" }, { decision: "approve" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
     expect(result).toMatchObject({ status: "approved", spec: { title: "Add --version and -v" } });
     expect(reviewed).toHaveLength(2);
+    expect(audits[1]).toBeUndefined();
     expect(runtime.specs[1]?.prompt).toMatch(/did not match the schema/);
-    expect(runtime.specs[2]?.prompt).toMatch(/also -v/);
+    expect(runtime.specs[3]?.prompt).toMatch(/also -v/);
   });
 
   it("stops asking after the question cap", async () => {
     const question = () => ({ structured: { kind: "question", question: "more?" } });
-    const runtime = createFakeRuntime([question, question, () => ({ structured: { kind: "proposal", spec: sampleSpec } })]);
+    const runtime = createFakeRuntime([question, question, propose(), clean]);
     const { io: handlers } = io([], [{ decision: "abort" }]);
     const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers, maxQuestions: 1 });
     expect(result.status).toBe("aborted");
@@ -66,39 +84,68 @@ describe("runDiscovery", () => {
   });
 
   describe("the fresh spec review", () => {
-    const feature = { ...sampleSpec, category: "feature" as const, title: "Add export" };
-    const paraphrase = { proposes: "Adds an export command", existingSystem: "Commands live in src/cli.ts" };
-    const gap = { severity: "blocker", lens: "codebase", field: "plan", problem: "src/export.ts is said to exist but doesn't" };
+    const feature = { ...sampleSpec, category: "feature" as const, title: "Add export", estimatedFiles: 6, risk: "medium" as const };
+    const gap = { severity: "blocker", lens: "codebase", field: "plan", problem: "src/export.ts is said to exist but doesn't", evidence: [] };
+    const scope = {
+      severity: "blocker",
+      lens: "scope",
+      field: "category",
+      problem: "refactor: the same parsing defect sits at two call sites",
+      evidence: ["src/a.ts:10 parses by hand", "src/b.ts:22 parses by hand"],
+    };
 
-    it("has discovery resolve real findings, re-audits once, and shows both", async () => {
+    it("has discovery resolve findings once, with no re-audit", async () => {
       const revised = { ...feature, plan: ["Create src/export.ts"] };
-      const runtime = createFakeRuntime([
-        () => ({ structured: { kind: "proposal", spec: feature } }),
-        () => ({ structured: { paraphrase, findings: [gap] } }),
-        () => ({ structured: { kind: "proposal", spec: revised, resolutions: [{ finding: "F1", action: "fix", note: "marked as new" }] } }),
-        () => ({ structured: { paraphrase, findings: [] } }),
-      ]);
+      const runtime = createFakeRuntime([propose(feature), findings(gap), propose(revised, [{ finding: "F1", action: "fix", note: "marked as new" }])]);
       const { io: handlers, audits } = io([], [{ decision: "approve" }]);
       const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "add export", io: handlers });
 
       expect(result).toMatchObject({ status: "approved", spec: { plan: ["Create src/export.ts"] } });
-      expect(runtime.specs.map((s) => s.role)).toEqual(["discovery", "spec-reviewer", "discovery", "spec-reviewer"]);
+      expect(runtime.specs.map((s) => s.role)).toEqual(["discovery", "spec-reviewer", "discovery"]);
       const reviewer = runtime.specs[1]!;
-      expect(reviewer.readOnly).toBe(true);
       expect(reviewer.resumeSessionId).toBeUndefined();
       expect(reviewer.prompt).not.toContain("add export");
+      expect(reviewer.prompt).toContain("Lenses for this spec: scope, comprehension, readiness, codebase");
       expect(runtime.specs[2]?.resumeSessionId).toBe("fake-session-1");
       expect(runtime.specs[2]?.prompt).toContain("F1 [blocker, codebase] plan");
-      expect(runtime.specs[3]?.prompt).toContain("Create src/export.ts");
-      expect(audits[0]?.review?.findings).toEqual([]);
+      expect(audits[0]?.review?.findings).toHaveLength(1);
       expect(audits[0]?.resolutions).toMatchObject([{ action: "fix", note: "marked as new", finding: { id: "F1", field: "plan" } }]);
     });
 
-    it("goes straight to the person when only nits remain", async () => {
+    it("sends scope findings to the person, and discovery cannot change the routing inputs", async () => {
       const runtime = createFakeRuntime([
-        () => ({ structured: { kind: "proposal", spec: feature } }),
-        () => ({ structured: { paraphrase, findings: [{ ...gap, severity: "nit" }] } }),
+        propose(feature),
+        findings(scope, gap),
+        propose({ ...feature, category: "refactor", estimatedFiles: 1, risk: "low", touchesSecurityOrData: true }, [{ finding: "F2", action: "fix", note: "fixed" }]),
       ]);
+      const { io: handlers, audits } = io([], [{ decision: "approve" }]);
+      const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
+
+      expect(result).toMatchObject({ status: "approved", spec: { category: "feature", estimatedFiles: 6, risk: "medium", touchesSecurityOrData: false } });
+      expect(runtime.specs[2]?.prompt).not.toContain("parsing defect");
+      expect(audits[0]?.review?.findings.map((f) => f.lens)).toEqual(["scope", "codebase"]);
+      expect(audits[0]?.resolutions.map((r) => r.finding.id)).toEqual(["F2"]);
+    });
+
+    it("drops a scope finding without cited evidence", async () => {
+      const runtime = createFakeRuntime([propose(feature), findings({ ...scope, evidence: [" "] })]);
+      const { io: handlers, audits } = io([], [{ decision: "approve" }]);
+      await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
+      expect(runtime.specs).toHaveLength(2);
+      expect(audits[0]?.review?.findings).toEqual([]);
+    });
+
+    it("checks only scope on a change routed quick", async () => {
+      const runtime = createFakeRuntime([propose({ ...sampleSpec, category: "feature" }), findings(gap, { ...scope, field: "estimatedFiles" })]);
+      const { io: handlers, audits } = io([], [{ decision: "approve" }]);
+      await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
+      expect(runtime.specs[1]?.prompt).toContain("Lenses for this spec: scope.");
+      expect(runtime.specs).toHaveLength(2);
+      expect(audits[0]?.review?.findings).toMatchObject([{ lens: "scope", field: "estimatedFiles" }]);
+    });
+
+    it("goes straight to the person when only nits remain", async () => {
+      const runtime = createFakeRuntime([propose(feature), findings({ ...gap, severity: "nit" })]);
       const { io: handlers, audits } = io([], [{ decision: "approve" }]);
       await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
       expect(runtime.specs).toHaveLength(2);
@@ -106,21 +153,18 @@ describe("runDiscovery", () => {
     });
 
     it("never blocks discovery when the reviewer fails", async () => {
-      const runtime = createFakeRuntime([() => ({ structured: { kind: "proposal", spec: feature } }), () => ({ ok: false })]);
+      const runtime = createFakeRuntime([propose(feature), () => ({ ok: false })]);
       const { io: handlers, audits } = io([], [{ decision: "approve" }]);
       const result = await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers });
       expect(result.status).toBe("approved");
       expect(audits[0]).toEqual({ review: null, resolutions: [] });
     });
 
-    it("is skipped for quick changes and when turned off", async () => {
-      const quick = createFakeRuntime([() => ({ structured: { kind: "proposal", spec: sampleSpec } })]);
-      const off = createFakeRuntime([() => ({ structured: { kind: "proposal", spec: feature } })]);
-      const a = io([], [{ decision: "approve" }]);
-      const b = io([], [{ decision: "approve" }]);
-      await runDiscovery({ runtime: quick, repoPath: "/repo", outcome: "x", io: a.io });
-      await runDiscovery({ runtime: off, repoPath: "/repo", outcome: "x", io: b.io, specReview: false });
-      expect([...a.audits, ...b.audits]).toEqual([undefined, undefined]);
+    it("is skipped when turned off", async () => {
+      const runtime = createFakeRuntime([propose(feature)]);
+      const { io: handlers, audits } = io([], [{ decision: "approve" }]);
+      await runDiscovery({ runtime, repoPath: "/repo", outcome: "x", io: handlers, specReview: false });
+      expect(audits).toEqual([undefined]);
     });
   });
 });

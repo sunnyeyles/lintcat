@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { matchResolutions, needsResolution, shouldReviewSpec, validateSpecReview } from "#src/engine/spec-review";
+import { matchResolutions, needsResolution, resolvableList, validateSpecReview } from "#src/engine/spec-review";
 import { sampleSpec } from "#src/engine/test-fixtures";
 
 const paraphrase = { proposes: "Adds a flag", existingSystem: "A CLI in src/cli.ts" };
-const finding = (severity: string, field: string, problem: string) => ({ severity, lens: "readiness", field, problem });
+const finding = (severity: string, field: string, problem: string, lens = "readiness", evidence: string[] = []) => ({ severity, lens, field, problem, evidence });
+const feature = { ...sampleSpec, category: "feature" as const, estimatedFiles: 6, risk: "medium" as const };
 
 describe("validateSpecReview", () => {
   it("rejects output that misses the schema", () => {
-    expect(validateSpecReview({ findings: [] }, "v")).toBeNull();
-    expect(validateSpecReview({ paraphrase, findings: [finding("fatal", "plan", "x")] }, "v")).toBeNull();
+    expect(validateSpecReview({ findings: [] }, "v", feature)).toBeNull();
+    expect(validateSpecReview({ paraphrase, findings: [finding("fatal", "plan", "x")] }, "v", feature)).toBeNull();
   });
 
   it("dedupes, orders by severity, then numbers", () => {
@@ -18,46 +19,65 @@ describe("validateSpecReview", () => {
         paraphrase,
         findings: [finding("nit", "title", "wordy"), finding("blocker", "plan", "No file named"), finding("blocker", " plan ", "no file named"), finding("major", "AC1", "untestable")],
       },
-      "spec-reviewer@1",
+      "spec-reviewer@2",
+      feature,
     );
     expect(review?.findings.map((f) => [f.id, f.severity, f.field])).toEqual([
       ["F1", "blocker", "plan"],
       ["F2", "major", "AC1"],
       ["F3", "nit", "title"],
     ]);
-    expect(review?.promptVersion).toBe("spec-reviewer@1");
+    expect(review?.promptVersion).toBe("spec-reviewer@2");
   });
 
   it("caps the findings", () => {
     const findings = Array.from({ length: 20 }, (_, i) => finding("major", "plan", `gap ${i}`));
-    expect(validateSpecReview({ paraphrase, findings }, "v")?.findings).toHaveLength(12);
+    expect(validateSpecReview({ paraphrase, findings }, "v", feature)?.findings).toHaveLength(12);
+  });
+
+  it("keeps a scope finding only with cited evidence", () => {
+    const cited = finding("blocker", "category", "refactor", "scope", [" src/a.ts:10 ", ""]);
+    const uncited = finding("blocker", "risk", "high", "scope", ["  "]);
+    const review = validateSpecReview({ paraphrase, findings: [cited, uncited] }, "v", feature);
+    expect(review?.findings).toMatchObject([{ field: "category", evidence: ["src/a.ts:10"] }]);
+  });
+
+  it("tolerates a missing evidence list outside scope", () => {
+    const { evidence: _, ...bare } = finding("major", "plan", "gap");
+    expect(validateSpecReview({ paraphrase, findings: [bare] }, "v", feature)?.findings).toMatchObject([{ evidence: [] }]);
+  });
+
+  it("keeps only scope findings on a change routed quick, whatever its category", () => {
+    const scope = finding("major", "category", "bugfix", "scope", ["src/a.ts:1"]);
+    const review = validateSpecReview({ paraphrase, findings: [finding("blocker", "plan", "gap"), scope] }, "v", { ...sampleSpec, category: "feature" });
+    expect(review?.findings.map((f) => f.lens)).toEqual(["scope"]);
   });
 });
 
 describe("resolution", () => {
-  const review = validateSpecReview({ paraphrase, findings: [finding("blocker", "plan", "a"), finding("nit", "title", "b")] }, "v")!;
+  const scope = finding("blocker", "category", "refactor", "scope", ["src/a.ts:1"]);
+  const review = validateSpecReview({ paraphrase, findings: [finding("blocker", "plan", "a"), scope, finding("nit", "title", "b")] }, "v", feature)!;
 
-  it("is needed for anything above a nit", () => {
+  it("is needed for a non-scope finding above a nit", () => {
     expect(needsResolution(review)).toBe(true);
-    expect(needsResolution({ ...review, findings: review.findings.filter((f) => f.severity === "nit") })).toBe(false);
+    expect(needsResolution({ ...review, findings: review.findings.filter((f) => f.lens === "scope" || f.severity === "nit") })).toBe(false);
   });
 
-  it("keeps one answer per issued finding", () => {
+  it("never sends scope findings to discovery", () => {
+    expect(resolvableList(review)).toBe("- F1 [blocker, readiness] plan: a\n- F3 [nit, readiness] title: b");
+  });
+
+  it("keeps one answer per resolvable finding", () => {
     const matched = matchResolutions(review, [
       { finding: "F1", action: "fix", note: "named the file" },
       { finding: "F1", action: "contest", note: "again" },
+      { finding: "F2", action: "fix", note: "scope is not discovery's" },
       { finding: "F9", action: "fix", note: "invented" },
-      { finding: " F2", action: "decline", note: "nit" },
+      { finding: " F3", action: "decline", note: "nit" },
     ]);
     expect(matched.map((r) => [r.finding.id, r.action])).toEqual([
       ["F1", "fix"],
-      ["F2", "decline"],
+      ["F3", "decline"],
     ]);
-  });
-
-  it("skips quick changes only", () => {
-    expect(shouldReviewSpec(sampleSpec)).toBe(false);
-    expect(shouldReviewSpec({ ...sampleSpec, category: "feature" })).toBe(true);
-    expect(shouldReviewSpec({ ...sampleSpec, category: "bugfix" })).toBe(true);
   });
 });

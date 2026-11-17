@@ -3,23 +3,26 @@ import { collectRun, type AgentRuntime, type AgentUsage } from "#src/agent/runti
 import { z } from "zod";
 
 import type { Spec } from "#src/engine/contract";
-import { loadPrompt } from "#src/engine/prompts";
+import { routeTask } from "#src/engine/profiles";
+import { loadPrompt, renderMessage } from "#src/engine/prompts";
 
 const MAX_FINDINGS = 12;
 const SEVERITIES = ["blocker", "major", "nit"] as const;
+const LENSES = ["scope", "comprehension", "readiness", "codebase"] as const;
 
 const specReviewOutputSchema = z.object({
   paraphrase: z.object({ proposes: z.string().min(1), existingSystem: z.string().min(1) }),
   findings: z.array(
     z.object({
       severity: z.enum(SEVERITIES),
-      lens: z.enum(["comprehension", "readiness", "codebase"]),
+      lens: z.enum(LENSES),
       field: z.string(),
       problem: z.string().min(1),
+      evidence: z.array(z.string()).optional(),
     }),
   ),
 });
-type SpecFinding = z.infer<typeof specReviewOutputSchema>["findings"][number] & { id: string };
+type SpecFinding = Omit<z.infer<typeof specReviewOutputSchema>["findings"][number], "evidence"> & { evidence: string[]; id: string };
 
 export interface SpecReview {
   promptVersion: string;
@@ -35,62 +38,56 @@ export const resolutionSchema = z.object({
 export type Resolution = z.infer<typeof resolutionSchema>;
 export type ResolvedFinding = { finding: SpecFinding; action: Resolution["action"]; note: string };
 
-/** What the person sees beside the spec: the latest review, and how discovery answered the first. */
+/** What the person sees beside the spec: the review, and how discovery answered it. */
 export interface SpecAudit {
   review: SpecReview | null;
   resolutions: ResolvedFinding[];
 }
 
-export const shouldReviewSpec = (spec: Spec) => spec.category !== "quick";
+// A spec routed `quick` gets only the scope lens: its main risk is being bigger than it looks.
+const lensesFor = (spec: Spec): readonly (typeof LENSES)[number][] => (routeTask(spec).profile === "quick" ? ["scope"] : LENSES);
 
-export const needsResolution = (review: SpecReview) => review.findings.some((f) => f.severity !== "nit");
+/** Scope findings go straight to the person, so discovery resolves only the rest. */
+const resolvable = (review: SpecReview) => review.findings.filter((f) => f.lens !== "scope");
 
-/** Null when the output fails the schema; otherwise deduped, most severe first, capped, numbered. */
-export function validateSpecReview(raw: unknown, promptVersion: string): SpecReview | null {
+export const needsResolution = (review: SpecReview) => resolvable(review).some((f) => f.severity !== "nit");
+
+export const resolvableList = (review: SpecReview) =>
+  resolvable(review)
+    .map((f) => `- ${f.id} [${f.severity}, ${f.lens}] ${f.field}: ${f.problem}`)
+    .join("\n");
+
+/** Null on a schema miss; drops other lenses and uncited scope findings, then dedupes, sorts, caps, numbers. */
+export function validateSpecReview(raw: unknown, promptVersion: string, spec: Spec): SpecReview | null {
   const parsed = specReviewOutputSchema.safeParse(raw);
   if (!parsed.success) return null;
+  const lenses = lensesFor(spec);
   const seen = new Set<string>();
-  const unique = parsed.data.findings.filter((f) => {
-    const key = `${f.field.trim()}\n${f.problem.trim().toLowerCase()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  const findings = unique
+  const kept = parsed.data.findings
+    .map((f) => ({ ...f, field: f.field.trim(), evidence: (f.evidence ?? []).map((e) => e.trim()).filter(Boolean) }))
+    .filter((f) => lenses.includes(f.lens) && (f.lens !== "scope" || f.evidence.length > 0))
+    .filter((f) => {
+      const key = `${f.field}\n${f.problem.trim().toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const findings = kept
     .sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity))
     .slice(0, MAX_FINDINGS)
-    .map((f, index) => ({ ...f, field: f.field.trim(), id: `F${index + 1}` }));
+    .map((f, index) => ({ ...f, id: `F${index + 1}` }));
   return { promptVersion, paraphrase: parsed.data.paraphrase, findings };
 }
 
-/** Keeps one resolution per known finding; ids the review never issued are dropped. */
+/** Keeps one resolution per resolvable finding; other ids are dropped. */
 export function matchResolutions(review: SpecReview, resolutions: readonly Resolution[]): ResolvedFinding[] {
-  const byId = new Map(review.findings.map((f) => [f.id, f]));
+  const byId = new Map(resolvable(review).map((f) => [f.id, f]));
   const matched = new Map<string, ResolvedFinding>();
   for (const r of resolutions) {
     const finding = byId.get(r.finding.trim());
     if (finding && !matched.has(finding.id)) matched.set(finding.id, { finding, action: r.action, note: r.note });
   }
   return [...matched.values()];
-}
-
-function specReviewPrompt(spec: Spec): string {
-  return [
-    `# Proposed task: ${spec.title}`,
-    "```json",
-    JSON.stringify(spec, null, 2),
-    "```",
-    "Review it once and give your final answer.",
-  ].join("\n");
-}
-
-export function resolvePrompt(review: SpecReview): string {
-  return [
-    "A fresh reviewer, who saw only your spec and the repository, reports these findings:",
-    ...review.findings.map((f) => `- ${f.id} [${f.severity}, ${f.lens}] ${f.field}: ${f.problem}`),
-    `It read the spec as: ${review.paraphrase.proposes}`,
-    "Resolve every finding as the system prompt describes, then propose the revised spec with `resolutions`.",
-  ].join("\n");
 }
 
 export interface ReviewSpecOptions {
@@ -108,7 +105,11 @@ export async function reviewSpec(options: ReviewSpecOptions): Promise<{ review: 
       role: "spec-reviewer",
       promptVersion: prompt.version,
       systemPrompt: prompt.text,
-      prompt: specReviewPrompt(options.spec),
+      prompt: renderMessage("spec-reviewer", "review", {
+        title: options.spec.title,
+        spec: JSON.stringify(options.spec, null, 2),
+        lenses: lensesFor(options.spec).join(", "),
+      }),
       cwd: options.repoPath,
       readOnly: true,
       maxTurns: 40,
@@ -116,5 +117,5 @@ export async function reviewSpec(options: ReviewSpecOptions): Promise<{ review: 
       ...(options.signal ? { signal: options.signal } : {}),
     }),
   );
-  return { review: result.ok ? validateSpecReview(result.structured, prompt.version) : null, usage: result.usage };
+  return { review: result.ok ? validateSpecReview(result.structured, prompt.version, options.spec) : null, usage: result.usage };
 }

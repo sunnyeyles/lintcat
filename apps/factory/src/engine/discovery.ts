@@ -3,14 +3,13 @@ import { collectRun, type AgentRuntime, type AgentUsage } from "#src/agent/runti
 import { z } from "zod";
 
 import { specSchema, type Spec } from "#src/engine/contract";
-import { loadPrompt } from "#src/engine/prompts";
+import { loadPrompt, renderMessage } from "#src/engine/prompts";
 import {
   matchResolutions,
   needsResolution,
+  resolvableList,
   resolutionSchema,
-  resolvePrompt,
   reviewSpec,
-  shouldReviewSpec,
   type Resolution,
   type SpecAudit,
   type SpecReview,
@@ -34,7 +33,7 @@ export type ReviewDecision = { decision: "approve" } | { decision: "revise"; fee
 
 export interface DiscoveryIO {
   ask(turn: Extract<DiscoveryTurn, { kind: "question" }>): Promise<string>;
-  /** `audit` is absent when the spec was not reviewed (a `quick` change, or review turned off). */
+  /** `audit` is present on the first proposal only, unless review is turned off. */
   review(spec: Spec, promptVersion: string, audit?: SpecAudit): Promise<ReviewDecision>;
   progress?(message: string): void;
 }
@@ -46,7 +45,7 @@ export interface DiscoveryOptions {
   io: DiscoveryIO;
   maxQuestions?: number;
   maxRevisions?: number;
-  /** A fresh reviewer audits each non-quick proposal before the person sees it; default on. */
+  /** A fresh reviewer audits the first proposal before the person sees it (scope only when routed `quick`); default on. */
   specReview?: boolean;
   signal?: AbortSignal;
 }
@@ -77,12 +76,6 @@ interface DiscoveryStep {
   promptVersion: string;
   usage: AgentUsage[];
 }
-
-const discoveryMessages = {
-  outcome: (outcome: string) => `Desired outcome:\n\n${outcome}`,
-  answer: (answer: string) => `Answer: ${answer}`,
-  revise: (feedback: string) => `Revise the spec with this feedback, then propose it again:\n\n${feedback}`,
-};
 
 function parseTurn(structured: unknown): DiscoveryTurn {
   const turn = turnSchema.parse(structured);
@@ -134,16 +127,18 @@ async function discoveryStep(options: DiscoveryStepOptions): Promise<DiscoverySt
       repairs = 0;
     } catch (error) {
       if (++repairs > 2) throw error;
-      message = `Your last answer did not match the schema (${String(error)}). Answer again.`;
+      message = renderMessage("discovery", "schema-retry", { error: String(error) });
       continue;
     }
 
     if (turn.kind === "question" && questions >= maxQuestions) {
-      message = "No more questions: propose the spec now, recording every open point as an assumption.";
+      message = renderMessage("discovery", "no-more-questions");
       continue;
     }
     if (turn.kind === "question") questions++;
-    return { turn, state: { ...(sessionId ? { sessionId } : {}), questions }, promptVersion: prompt.version, usage };
+
+    const state: DiscoveryState = { ...(sessionId ? { sessionId } : {}), questions };
+    return { turn, state, promptVersion: prompt.version, usage };
   }
 }
 
@@ -153,7 +148,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const usage: AgentUsage[] = [];
   let state: DiscoveryState = { questions: 0 };
   let revisions = 0;
-  let message = discoveryMessages.outcome(options.outcome);
+  let message = renderMessage("discovery", "outcome", { outcome: options.outcome });
 
   const step = async (text: string) => {
     const result = await discoveryStep({
@@ -182,27 +177,30 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     }
   };
 
+  let reviewed = false;
   for (;;) {
     let current = await step(message);
     if (current.turn.kind === "question") {
-      message = discoveryMessages.answer(await io.ask(current.turn));
+      message = renderMessage("discovery", "answer", { answer: await io.ask(current.turn) });
       continue;
     }
 
     let spec = current.turn.spec;
     let specAudit: SpecAudit | undefined;
-    if (options.specReview !== false && shouldReviewSpec(spec)) {
-      const first = await audit(spec);
-      specAudit = { review: first, resolutions: [] };
-      if (first && needsResolution(first)) {
-        current = await step(resolvePrompt(first));
+    if (options.specReview !== false && !reviewed) {
+      reviewed = true;
+      const review = await audit(spec);
+      specAudit = { review, resolutions: [] };
+      if (review && needsResolution(review)) {
+        current = await step(renderMessage("discovery", "resolve", { findings: resolvableList(review), reading: review.paraphrase.proposes }));
         if (current.turn.kind === "question") {
-          message = discoveryMessages.answer(await io.ask(current.turn));
+          message = renderMessage("discovery", "answer", { answer: await io.ask(current.turn) });
           continue;
         }
-        spec = current.turn.spec;
-        // The one re-audit, so the paraphrase the person reads matches the spec they approve.
-        specAudit = { review: await audit(spec), resolutions: matchResolutions(first, current.turn.resolutions) };
+        // Routing inputs are the person's call, so discovery's revision cannot change them.
+        const { category, estimatedFiles, risk, touchesSecurityOrData } = spec;
+        spec = { ...current.turn.spec, category, estimatedFiles, risk, touchesSecurityOrData };
+        specAudit = { review, resolutions: matchResolutions(review, current.turn.resolutions) };
       }
     }
 
@@ -211,6 +209,6 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       return { status: "approved", spec, promptVersion: current.promptVersion, usage };
     }
     if (decision.decision === "abort" || ++revisions > maxRevisions) return { status: "aborted", usage };
-    message = discoveryMessages.revise(decision.feedback);
+    message = renderMessage("discovery", "revise", { feedback: decision.feedback });
   }
 }

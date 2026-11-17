@@ -6,6 +6,7 @@
       "passThroughEnv": [
         "FACTORY_DATABASE_URL",
         "FACTORY_PACKAGE_DIR",
+        "FACTORY_PROMPTS_DIR",
         "FACTORY_AUTH",
         "FACTORY_CLAUDE_PATH",
         "FACTORY_DELIVERY"

@@ -1,6 +1,7 @@
 /** The prompts the engine hands the implementer at each stage. */
 import type { CheckPlan } from "#src/engine/checks";
 import type { TaskContract } from "#src/engine/contract";
+import { renderMessage } from "#src/engine/prompts";
 
 const tail = (text: string, chars: number) => (text.length > chars ? `…${text.slice(-chars)}` : text);
 
@@ -11,46 +12,30 @@ export interface FailedCheck {
   output: string;
 }
 
-function specBlock(contract: TaskContract): string[] {
+function taskBlock(contract: TaskContract, located: unknown): string {
   const { spec } = contract;
-  return [
-    `# Task: ${spec.title}`,
-    `Objective: ${spec.objective}`,
-    "## Approved specification (frozen)",
-    "```json",
-    JSON.stringify(
-      {
-        requirements: spec.requirements,
-        acceptanceCriteria: spec.acceptanceCriteria,
-        nonGoals: spec.nonGoals,
-        constraints: spec.constraints,
-        plan: spec.plan,
-        architectureDecisions: spec.architectureDecisions,
-        assumptions: spec.assumptions,
-      },
-      null,
-      2,
-    ),
-    "```",
-  ];
+  const frozen = {
+    requirements: spec.requirements,
+    acceptanceCriteria: spec.acceptanceCriteria,
+    nonGoals: spec.nonGoals,
+    constraints: spec.constraints,
+    plan: spec.plan,
+    architectureDecisions: spec.architectureDecisions,
+    assumptions: spec.assumptions,
+  };
+  return renderMessage("implementer", "task", {
+    title: spec.title,
+    objective: spec.objective,
+    spec: JSON.stringify(frozen, null, 2),
+    located: JSON.stringify(located, null, 2),
+  });
 }
 
-const contextBlock = (located: unknown) => ["## Where to look first", "```json", JSON.stringify(located, null, 2), "```"];
-
-const checksBlock = (plan: CheckPlan) => [
-  "## Checks the factory runs afterwards",
-  ...plan.checks.map((c) => `- ${c.name}: \`${c.command}\``),
-  "",
-];
+const checksBlock = (plan: CheckPlan) =>
+  renderMessage("implementer", "checks", { checks: plan.checks.map((c) => `- ${c.name}: \`${c.command}\``).join("\n") });
 
 export function reproducePrompt(contract: TaskContract, located: unknown, plan: CheckPlan): string {
-  return [
-    ...specBlock(contract),
-    ...contextBlock(located),
-    ...checksBlock(plan),
-    "Reproduce the bug now: diagnose it, then write a regression test that fails because of it.",
-    "Change test files only and don't fix the bug yet. If no test can reproduce it, change nothing and answer `not_reproducible` with the reason.",
-  ].join("\n");
+  return [taskBlock(contract, located), checksBlock(plan), "", renderMessage("implementer", "reproduce")].join("\n");
 }
 
 export interface ImplementContext {
@@ -61,28 +46,31 @@ export interface ImplementContext {
 }
 
 export function implementPrompt(contract: TaskContract, context: ImplementContext, plan: CheckPlan): string {
-  const lines = [...specBlock(contract), ...contextBlock(context.located), ...checksBlock(plan)];
+  const lines = [taskBlock(contract, context.located), checksBlock(plan), ""];
   if (context.regression) {
     lines.push(
-      `Your regression test (${context.regression.testFiles.join(", ")}) fails in ${context.regression.failing.join(", ")}. Fix the bug so it passes; never weaken or delete it.`,
+      renderMessage("implementer", "implement-regression", {
+        testFiles: context.regression.testFiles.join(", "),
+        failing: context.regression.failing.join(", "),
+      }),
     );
   }
   if (context.baselineFailing?.length) {
-    lines.push(`These checks already fail at the base commit and are not blamed on you: ${context.baselineFailing.join(", ")}. Every other check must keep passing.`);
+    lines.push(renderMessage("implementer", "implement-baseline", { failing: context.baselineFailing.join(", ") }));
   }
-  if (context.placement) {
-    lines.push("Before writing code, compare extending a candidate module with adding a new one. Report the choice in `placement`.");
-  }
-  lines.push("Implement the task now. Use `sandbox_exec` for targeted checks.");
+  if (context.placement) lines.push(renderMessage("implementer", "implement-placement"));
+  lines.push(renderMessage("implementer", "implement"));
   return lines.join("\n");
 }
 
 export function repairPrompt(failures: readonly FailedCheck[], pass: number, max: number): string {
-  return [
-    `Repair pass ${pass} of ${max}. These mandatory checks failed after your change:`,
-    ...failures.map((f) =>
-      [`## ${f.name} (exit ${f.exitCode}${f.timedOut ? ", timed out" : ""})`, "```", tail(f.output, 6000), "```"].join("\n"),
-    ),
-    "Fix the cause, rerun the failing checks with `sandbox_exec`, then give your final answer.",
-  ].join("\n");
+  const rendered = failures.map((f) =>
+    renderMessage("implementer", "repair-failure", {
+      name: f.name,
+      exitCode: f.exitCode,
+      timedOut: f.timedOut ? ", timed out" : "",
+      output: tail(f.output, 6000),
+    }),
+  );
+  return renderMessage("implementer", "repair", { pass, max, failures: rendered.join("\n") });
 }

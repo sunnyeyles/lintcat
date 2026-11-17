@@ -45,9 +45,10 @@ readable event stream.
 
 ```
 new "<outcome>"
-  discovery agent (read-only) ── one question at a time ──▶ spec
-  spec review (not quick): a fresh read-only agent paraphrases and audits it;
-    discovery fixes, contests or escalates findings; one re-audit
+  discovery agent (read-only) ── one question at a time ──▶ draft spec
+  spec review, first proposal only: a fresh read-only agent paraphrases and audits it
+    (scope only when it would route to quick);
+    discovery fixes, contests or escalates findings once; scope findings go to you
   routed to a profile ──▶ awaiting_approval ──▶ one approval (contract frozen by sha256)
   queued ──▶ claimed with a lease ──▶ running
     prepare    worktree on factory/<slug>-<id>; container; install with network; network cut
@@ -66,12 +67,29 @@ new "<outcome>"
 | `refactor` | **baseline** checks before any change, then **review** |
 
 The spec reviewer sees only the spec and the repository, as the implementer
-will. You approve with its paraphrase and any open or escalated findings beside
-the spec; they inform the decision and never block it. Each review is a
-`spec_reviewed` event.
+will. Its scope lens checks `category`, `estimatedFiles` and `risk` against the
+code, for example a bug fix whose defect sits at several call sites
+(`refactor`); a scope finding must cite `path:line` or it is dropped. Discovery
+answers the other findings once and cannot change the routing inputs
+(`category`, `estimatedFiles`, `risk`, `touchesSecurityOrData`): those are your call.
+You approve with the paraphrase and findings beside the spec; they never block
+it. Each review is a `spec_reviewed` event.
 
 Profiles live in `src/engine/profiles.ts`. Postgres is authoritative; a worker
 that claims an expired lease resumes from the last checkpoint, at most 3 times.
+
+## Prompts
+
+Each agent role has a folder under `agents/`: `system.md` (frontmatter `role`
+and `version`, then the system prompt) plus one template per message the
+engine sends, with `{{name}}` slots. `MESSAGES` in `src/engine/prompts.ts`
+lists the templates per role; a folder with a missing or extra `.md` file fails
+to load, and rendering fails on an unfilled slot or an unused value. The
+recorded version, `<role>@<version>+<hash>`, hashes every file in the folder,
+so editing any message changes it.
+
+`FACTORY_PROMPTS_DIR` loads another folder with the same layout, for trying
+prompt variants. Prompts are never read from the repository being worked on.
 
 ## Cast
 
@@ -118,6 +136,7 @@ Read from the environment and this repository's `.env.local`:
 | `FACTORY_DATABASE_URL` | `postgres://factory:factory@127.0.0.1:54329/factory` |
 | `FACTORY_AUTH` | `subscription` (or `api-key`) |
 | `FACTORY_CLAUDE_PATH` | `claude` on `PATH` |
+| `FACTORY_PROMPTS_DIR` | the package's `agents/` |
 | `FACTORY_DELIVERY` | `branch` (or `pr`; `--pr` sets it per task) |
 | `FACTORY_RETENTION_DAYS` | `90`, for `prune` |
 
