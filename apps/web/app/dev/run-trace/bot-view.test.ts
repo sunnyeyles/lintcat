@@ -111,13 +111,27 @@ describe("toBotView", () => {
   });
 });
 
+describe("toBotView cast", () => {
+  it("casts a factory run's stages and leaves the run itself uncast", () => {
+    const { trace } = parseTrace(loadFixture("lintcat-factory"));
+    const bots = [...walkBots(toBotView(trace.root))];
+    expect(bots[0].cast).toBeUndefined();
+    expect(bots.find((bot) => bot.id === "stage:verify")?.cast).toBe("verify");
+  });
+
+  it("casts nothing outside a factory run", () => {
+    const bots = [...walkBots(toBotView(node([], { role: "main", children: [node([], { role: "verify" })] })))];
+    expect(bots.map((bot) => bot.cast)).toEqual([undefined, undefined]);
+  });
+});
+
 describe("toBotView over adapter output", () => {
   it("passes status, stage, costUsd and events through from the factory adapter", () => {
     const { trace } = parseTrace(loadFixture("lintcat-factory"));
     const bots = [...walkBots(toBotView(trace.root))];
     expect(bots[0]).toMatchObject({ status: "failed", costUsd: 0.62 });
     const implementer = bots.find((bot) => bot.id === "agent:verify/implementer");
-    expect(implementer).toMatchObject({ status: "failed", stage: "verify", costUsd: 0.08 });
+    expect(implementer).toMatchObject({ status: "failed", stage: "verify", costUsd: 0.08, cast: "implementer" });
     expect(implementer?.events?.map((event) => [event.kind, event.ok])).toEqual([
       ["command", false],
       ["error", false],
