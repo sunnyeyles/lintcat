@@ -12,12 +12,10 @@ export const SHADE = hex("#1f2422");
 export const WHITE = hex("#ffffff");
 export const STEEL = ramp("#353b3f", "#4d565a", "#697377", "#869094", "#a3acaf", "#c2c9cb");
 export const IRON = ramp("#1e2226", "#2b3035", "#3a4045", "#4c5358", "#60686d");
-export const RUST = ramp("#4f2f22", "#6e4530", "#8a5a3c", "#a8724c");
 export const GLASS = ramp("#39433f", "#4e5a56", "#65726e", "#7d8a86", "#96a29e", "#aab5b1");
 export const PAPER = ramp("#a89f84", "#cfc5a3", "#e8dfc0", "#f6f0d8");
 export const WOOD = ramp("#5a3d24", "#7a5531", "#9c7141", "#bd8f58");
 export const BRASS = ramp("#6b5320", "#93742c", "#bd9a3e", "#e0c264");
-export const BLUE = ramp("#1c3f73", "#2a5ba3", "#3f7bd0", "#7fb0ee");
 export const RED = ramp("#7a1616", "#b32222", "#e03a2f", "#ff7a66");
 export const GOLD = ramp("#8a6a12", "#c79a1c", "#f2c530", "#ffe88a");
 export const TOOTH = hex("#e8dcb5");
@@ -147,7 +145,8 @@ export function crt(L, x, y, w, h, r = 5, tint = GLASS) {
   line(L, x + 5, y + 8, x + 9, y + 4, mix(tint.at(-1), WHITE, 0.45));
 }
 
-export function eye(L, cx, cy, r, c) {
+export function eye(L, cx, cy, r, c, shut = false) {
+  if (shut) return fill(L, cx - r, cy, 2 * r + 1, 1, c);
   for (let y = cy - r - 4; y <= cy + r + 4; y++)
     for (let x = cx - r - 4; x <= cx + r + 4; x++) {
       const d = Math.hypot(x - cx, y - cy);
@@ -162,8 +161,6 @@ export function eye(L, cx, cy, r, c) {
   put(L, cx, cy, mix(c, WHITE, 0.85));
   if (r > 2) put(L, cx - 1, cy - 1, mix(c, WHITE, 0.85));
 }
-
-export const brow = (L, x0, y0, x1, y1) => line(L, x0, y0, x1, y1, SHADE, 2);
 
 export const mouth = (L, pts) => {
   path(L, pts, SHADE);
@@ -183,13 +180,6 @@ export function teeth(L, x, y, w, h, curve = 0) {
   }
 }
 
-export function rivet(L, x, y) {
-  put(L, x, y, STEEL[5]);
-  put(L, x + 1, y, STEEL[2]);
-  put(L, x, y + 1, STEEL[2]);
-  put(L, x + 1, y + 1, IRON[1]);
-}
-
 export function seam(L, x0, y0, x1, y1) {
   const [dx, dy] = x0 === x1 ? [1, 0] : [0, 1];
   line(L, x0, y0, x1, y1, IRON[2]);
@@ -203,27 +193,9 @@ export function vent(L, x, y, w, n) {
   }
 }
 
-// Blotches that favour the edges of the box, some of them dripping.
-export function rust(L, rand, [x0, y0, x1, y1], n) {
-  const edge = (u) => (u < 0.5 ? (u * 2) ** 2 / 2 : 1 - ((1 - u) * 2) ** 2 / 2);
-  for (let i = 0; i < n; i++) {
-    let x = Math.round(x0 + edge(rand()) * (x1 - x0));
-    let y = Math.round(y0 + edge(rand()) * (y1 - y0));
-    const steps = 4 + Math.floor(rand() * 14);
-    for (let s = 0; s < steps; s++) {
-      if (alpha(L, x, y) === 255) put(L, x, y, RUST[1 + Math.floor(rand() * 3)]);
-      if (rand() < 0.5) x += rand() < 0.5 ? -1 : 1;
-      else y += rand() < 0.5 ? -1 : 1;
-    }
-    if (rand() < 0.45)
-      for (let d = 1, len = 2 + Math.floor(rand() * 5); d <= len; d++)
-        if (alpha(L, x, y + d) === 255) put(L, x, y + d, RUST[d === len ? 0 : 1]);
-  }
-}
-
-export function tread(L, x, y, w, h) {
+export function tread(L, x, y, w, h, shift = 0) {
   box(L, x, y, w, h, Math.min(6, h >> 1), IRON, 0.55);
-  for (let i = x + 3; i < x + w - 3; i += 3) {
+  for (let i = x + 3 + (shift % 3); i < x + w - 3; i += 3) {
     put(L, i, y, IRON[4]);
     put(L, i, y + h - 1, IRON[0]);
   }
@@ -236,10 +208,13 @@ export function tread(L, x, y, w, h) {
   }
 }
 
-export function wheel(L, cx, cy, r) {
+export function wheel(L, cx, cy, r, turn = 0) {
   ball(L, cx, cy, r, IRON, 0.6);
   ball(L, cx, cy, r - 3, STEEL, 0.55);
   ball(L, cx, cy, 1, IRON, 0.3);
+  const a = (turn * Math.PI) / 4;
+  for (const s of [-1, 1])
+    put(L, Math.round(cx + s * Math.cos(a) * (r - 5)), Math.round(cy + s * Math.sin(a) * (r - 5)), INK);
 }
 
 export function claw(L, x, y, [dx, dy]) {
@@ -251,17 +226,17 @@ export function claw(L, x, y, [dx, dy]) {
   ball(L, x, y, 2, STEEL, 0.6);
 }
 
-// Draws into its own layer, then stamps it with a dark outline.
-export function part(M, draw) {
+// Draws into its own layer, then stamps it at an offset with a dark outline.
+export function part(M, draw, dx = 0, dy = 0) {
   const L = layer(M.w, M.h);
   draw(L);
   for (let y = 0; y < L.h; y++)
     for (let x = 0; x < L.w; x++) {
       if (alpha(L, x, y) > 200) continue;
       const near = [alpha(L, x - 1, y), alpha(L, x + 1, y), alpha(L, x, y - 1), alpha(L, x, y + 1)];
-      if (near.some((a) => a > 200)) put(M, x, y, INK);
+      if (near.some((a) => a > 200)) put(M, x + dx, y + dy, INK);
     }
-  blit(M, L, 0, 0);
+  blit(M, L, dx, dy);
 }
 
 export function blit(M, L, ox, oy) {
@@ -284,8 +259,6 @@ export function arm(M, pts, grip) {
   });
 }
 
-export const cable = (M, pts) => part(M, (L) => path(L, pts, IRON[3], 2));
-
 const GLYPHS = {
   a: "010101111101101", c: "011100100100011", d: "110101101101110", e: "111100110100111",
   f: "111100110100100", h: "101101111101101", i: "111010010010111", l: "100100100100111",
@@ -306,15 +279,19 @@ export function text(L, str, cx, y, c, scale = 2) {
   }
 }
 
-export function png(L, scale) {
-  const w = L.w * scale;
-  const h = L.h * scale;
-  const raw = Buffer.alloc((w * 4 + 1) * h);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const src = (Math.floor(y / scale) * L.w + Math.floor(x / scale)) * 4;
-      raw.set(L.d.subarray(src, src + 4), y * (w * 4 + 1) + 1 + x * 4);
-    }
+// More than one frame makes an animated PNG that loops forever.
+export function png(frames, scale, delay = 120) {
+  const w = frames[0].w * scale;
+  const h = frames[0].h * scale;
+  const pack = (L) => {
+    const raw = Buffer.alloc((w * 4 + 1) * h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const src = (Math.floor(y / scale) * L.w + Math.floor(x / scale)) * 4;
+        raw.set(L.d.subarray(src, src + 4), y * (w * 4 + 1) + 1 + x * 4);
+      }
+    return deflateSync(raw, { level: 9 });
+  };
   const chunk = (type, data) => {
     const body = Buffer.concat([Buffer.from(type), data]);
     const out = Buffer.alloc(body.length + 8);
@@ -323,14 +300,23 @@ export function png(L, scale) {
     out.writeUInt32BE(crc32(body), body.length + 4);
     return out;
   };
-  const head = Buffer.alloc(13);
-  head.writeUInt32BE(w, 0);
-  head.writeUInt32BE(h, 4);
-  head.set([8, 6, 0, 0, 0], 8);
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    chunk("IHDR", head),
-    chunk("IDAT", deflateSync(raw, { level: 9 })),
-    chunk("IEND", Buffer.alloc(0)),
-  ]);
+  const u32 = (...ns) => Buffer.concat(ns.map((n) => {
+    const b = Buffer.alloc(4);
+    b.writeUInt32BE(n);
+    return b;
+  }));
+  const animated = frames.length > 1;
+  const chunks = [chunk("IHDR", Buffer.concat([u32(w, h), Buffer.from([8, 6, 0, 0, 0])]))];
+  if (animated) chunks.push(chunk("acTL", u32(frames.length, 0)));
+  let seq = 0;
+  frames.forEach((L, i) => {
+    if (animated) {
+      const timing = Buffer.alloc(6);
+      timing.writeUInt16BE(delay, 0);
+      timing.writeUInt16BE(1000, 2);
+      chunks.push(chunk("fcTL", Buffer.concat([u32(seq++, w, h, 0, 0), timing])));
+    }
+    chunks.push(i === 0 ? chunk("IDAT", pack(L)) : chunk("fdAT", Buffer.concat([u32(seq++), pack(L)])));
+  });
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), ...chunks, chunk("IEND", Buffer.alloc(0))]);
 }

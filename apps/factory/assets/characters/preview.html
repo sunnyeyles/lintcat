@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Factory cast</title>
+<link rel="stylesheet" href="characters.css" />
+<style>
+  body { display: flex; gap: 24px; padding: 32px; font: 14px system-ui; }
+  .factory-character { --size: 240px; cursor: pointer; }
+</style>
+<body>
+  <div class="factory-character" data-role="locate"></div>
+  <div class="factory-character" data-role="implementer" data-state="active"></div>
+  <div class="factory-character" data-role="verify"></div>
+  <div class="factory-character" data-role="deliver"></div>
+  <script>
+    const cast = [...document.querySelectorAll(".factory-character")];
+    for (const el of cast)
+      el.addEventListener("click", () =>
+        cast.forEach((c) => (c === el ? (c.dataset.state = "active") : delete c.dataset.state)),
+      );
+  </script>
+</body>

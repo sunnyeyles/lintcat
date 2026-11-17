@@ -49,20 +49,18 @@ All four profiles run on the one engine; `workflows/*.yaml` lists each one's sta
 
 ## Cast
 
-One character per job, drawn by `scripts/characters.mjs` into `assets/characters/`. Regenerate with `node apps/factory/scripts/characters.mjs`; the output is byte-identical on every run.
+Four characters, drawn by `scripts/characters.mjs` into `assets/characters/`. Regenerate with `node apps/factory/scripts/characters.mjs`; the output is byte-identical on every run.
 
 ![The factory cast](../assets/characters/cast.png)
 
-| Character | Job | Carries |
+| Sheet | Stages | Active animation |
 | --- | --- | --- |
-| `discovery.png` | discovery agent: outcome to spec | clipboard, pencil |
-| `locate.png` | locate | radar dish, flashlight, map pin |
-| `architect.png` | architecture brief | blueprint, compass |
-| `reproduce.png` | reproduce | bug net, bug in a jar |
-| `implementer.png` | implement | wrench, welding torch |
-| `verify.png` | verify and baseline | checklist, stamp |
-| `reviewer.png` | independent review | monocle, red pen |
-| `deliver.png` | deliver | forklift, crate |
+| `locate.png` | locate, architecture | radar sweeps, flashlight on, map pin hops |
+| `implementer.png` | reproduce, implement | wrench waves, torch sparks, treads roll |
+| `verify.png` | baseline, verify, review | stamps, checklist ticks off, lamp blinks |
+| `deliver.png` | deliver | crate lifts, beacon flashes, wheels turn |
+
+Each sheet is 8 frames of 120×120 across, `idle` on the top row and `active` on the bottom. `assets/characters/characters.css` plays them: `<div class="factory-character" data-role="verify" data-state="active">`, sized with `--size`. Idle characters blink and breathe, desaturated; the active one runs its row and bounces. `assets/characters/preview.html` shows all four; click one to make it active.
 
 ## Auth
 
