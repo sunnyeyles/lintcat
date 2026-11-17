@@ -28,7 +28,7 @@ export function TokenForm({ onSave, invalid }: { onSave: (token: string) => void
         value={value}
         onChange={(event) => setValue(event.currentTarget.value)}
         placeholder="RUN_TRACE_TOKEN"
-        aria-label="Factory trace token"
+        aria-label="Run trace token"
         aria-invalid={invalid || undefined}
         className="max-w-xs"
       />
@@ -99,7 +99,7 @@ export function LiveRuns() {
       ) : runs.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           No runs yet. Push one to <code>/api/run-trace/&lt;runId&gt;</code>, or set{" "}
-          <code>FACTORY_DATABASE_URL</code> to read the factory&rsquo;s runs.
+          <code>FACTORY_DATABASE_URL</code> to read runs from a connected database.
         </p>
       ) : (
         <ul className="divide-y">

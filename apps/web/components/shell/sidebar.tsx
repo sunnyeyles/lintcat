@@ -12,7 +12,6 @@ import {
 } from "@pr-review/design";
 import {
   ChartLine,
-  Factory,
   FolderGit2,
   GitPullRequest,
   type IconComponent,
@@ -50,12 +49,10 @@ const LINK_CLASS =
 function NavLinks({
   slug,
   isOwner,
-  runTraceHref,
   onNavigate,
 }: {
   slug: string;
   isOwner: boolean;
-  runTraceHref?: string;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -82,16 +79,6 @@ function NavLinks({
           </Link>
         );
       })}
-      {runTraceHref ? (
-        <a
-          href={runTraceHref}
-          onClick={onNavigate}
-          className={cn(LINK_CLASS, "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}
-        >
-          <Factory className="size-4 shrink-0" />
-          <span className="truncate">Factory trace</span>
-        </a>
-      ) : null}
     </nav>
   );
 }
@@ -100,11 +87,10 @@ export type SidebarProps = {
   slug: string;
   organizationName: string;
   isOwner?: boolean;
-  runTraceHref?: string;
   className?: string;
 };
 
-export function Sidebar({ slug, organizationName, isOwner = false, runTraceHref, className }: SidebarProps) {
+export function Sidebar({ slug, organizationName, isOwner = false, className }: SidebarProps) {
   return (
     <aside
       className={cn(
@@ -117,7 +103,7 @@ export function Sidebar({ slug, organizationName, isOwner = false, runTraceHref,
           {organizationName}
         </p>
         <div className="pt-3">
-          <NavLinks slug={slug} isOwner={isOwner} runTraceHref={runTraceHref} />
+          <NavLinks slug={slug} isOwner={isOwner} />
         </div>
       </div>
     </aside>
@@ -126,11 +112,9 @@ export function Sidebar({ slug, organizationName, isOwner = false, runTraceHref,
 
 export function SidebarDrawer({
   isOwner = false,
-  runTraceHref,
   className,
 }: {
   isOwner?: boolean;
-  runTraceHref?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -154,7 +138,7 @@ export function SidebarDrawer({
           <SheetDescription>LintCat dashboard</SheetDescription>
         </SheetHeader>
         <div className="px-3 py-4">
-          <NavLinks slug={slug} isOwner={isOwner} runTraceHref={runTraceHref} onNavigate={() => setOpen(false)} />
+          <NavLinks slug={slug} isOwner={isOwner} onNavigate={() => setOpen(false)} />
         </div>
       </SheetContent>
     </Sheet>

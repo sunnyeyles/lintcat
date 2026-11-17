@@ -2,7 +2,6 @@
 
 import { Alert, AlertDescription, AlertTitle, Badge, Button, cn } from "@pr-review/design";
 import { FolderGit2, Sparkles, TriangleAlert } from "@pr-review/design/icons";
-import Link from "next/link";
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { FormatPicker } from "@/app/dev/run-trace/format-picker";
@@ -153,10 +152,6 @@ export function RunTraceExplorer() {
           <AlertTitle>Couldn&rsquo;t read this run</AlertTitle>
           <AlertDescription>
             <p className="whitespace-pre-wrap">{error}</p>
-            <p>
-              See <Link href="/docs/plug-in-your-factory" className="underline">Plug in your factory</Link> for the formats
-              and how to export them.
-            </p>
           </AlertDescription>
         </Alert>
       ) : null}
