@@ -9,6 +9,10 @@ export type LiveRunSummary = {
   source: string;
   startedAt: string;
   lastSeenAt: string;
+  status?: string;
+  stage?: string | null;
+  profile?: string | null;
+  leaseExpiresAt?: string | null;
 };
 export type LiveRunFiles = { run: LiveRunSummary; files: { name: string; text: string }[] };
 export type LiveRunList = { runs: LiveRunSummary[]; errors?: { source: string; error: string }[] };
@@ -54,7 +58,10 @@ export function useRunTraceToken(): [string | null, (token: string | null) => vo
   return [token, set];
 }
 
+const LIVE_STATUSES = new Set(["queued", "running", "verifying"]);
+
 export function isLive(run: LiveRunSummary, now = Date.now()): boolean {
+  if (run.status) return LIVE_STATUSES.has(run.status);
   return now - Date.parse(run.lastSeenAt) < LIVE_WINDOW_MS;
 }
 

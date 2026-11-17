@@ -42,7 +42,13 @@ describe("factoryConnector", () => {
   it("lists runs with their latest activity", async () => {
     const runs = await factoryConnector(database).list(10);
     expect(runs).toHaveLength(1);
-    expect(runs[0]).toMatchObject({ runId: "run_a", title: "Add retries", format: "lintcat-factory" });
+    expect(runs[0]).toMatchObject({
+      runId: "run_a",
+      title: "Add retries",
+      format: "lintcat-factory",
+      status: "draft",
+      leaseExpiresAt: null,
+    });
   });
 
   it("reads a run into a file the factory adapter parses", async () => {

@@ -24,6 +24,10 @@ function summary(run: FactoryRun, lastEventAt?: Date | null): TraceRunSummary {
     format: factoryAdapter.id,
     startedAt: run.createdAt,
     lastSeenAt: new Date(Math.max(...last.map((d) => d.getTime()))),
+    status: run.status,
+    stage: run.stage,
+    profile: run.profile,
+    leaseExpiresAt: run.leaseExpiresAt,
   };
 }
 

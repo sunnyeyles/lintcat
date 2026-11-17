@@ -6,6 +6,10 @@ export type TraceRunSummary = {
   format: string | null;
   startedAt: Date;
   lastSeenAt: Date;
+  status?: string;
+  stage?: string | null;
+  profile?: string | null;
+  leaseExpiresAt?: Date | null;
 };
 
 type TraceRunFiles = { run: TraceRunSummary; files: RunFile[] };
