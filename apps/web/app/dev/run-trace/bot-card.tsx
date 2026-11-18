@@ -78,7 +78,7 @@ function CardBody({
   return (
     <>
       <SheetHeader className="bg-surface-2 items-center border-b pt-8 text-center">
-        <BotPortrait bot={bot} look={look} size="card" />
+        <BotPortrait bot={bot} size="card" />
         <SheetTitle className="text-xl">Hi, I'm {look.name}</SheetTitle>
         <SheetDescription className="flex flex-wrap justify-center gap-1.5">
           {bot.status ? <StatusBadge status={bot.status} /> : null}

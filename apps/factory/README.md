@@ -104,8 +104,9 @@ prompt variants. Prompts are never read from the repository being worked on.
 
 `scripts/characters.mjs` draws four characters as sprite sheets (8 frames of
 120×120 across, `idle` on the top row, `active` on the bottom) into
-`apps/web/public/factory-cast/`, and the preview above. The Factory trace shows
-them for a run's stages and agents, the running one on its `active` row.
+`apps/web/public/factory-cast/`, and the preview above. The run-trace viewer
+draws every agent as one of them, by factory stage or by the words in its role
+name, the running one on its `active` row.
 Regenerate with `node apps/factory/scripts/characters.mjs`; the output is
 byte-identical on every run.
 

@@ -112,16 +112,16 @@ describe("toBotView", () => {
 });
 
 describe("toBotView cast", () => {
-  it("casts a factory run's stages and leaves the run itself uncast", () => {
+  it("casts a factory run's stages and the run itself", () => {
     const { trace } = parseTrace(loadFixture("lintcat-factory"));
     const bots = [...walkBots(toBotView(trace.root))];
-    expect(bots[0].cast).toBeUndefined();
+    expect(bots[0].cast).toBe("deliver");
     expect(bots.find((bot) => bot.id === "stage:verify")?.cast).toBe("verify");
   });
 
-  it("casts nothing outside a factory run", () => {
-    const bots = [...walkBots(toBotView(node([], { role: "main", children: [node([], { role: "verify" })] })))];
-    expect(bots.map((bot) => bot.cast)).toEqual([undefined, undefined]);
+  it("casts every agent outside a factory run from its role", () => {
+    const tree = node([], { role: "main", children: [node([], { role: "marrow-test-writer" })] });
+    expect([...walkBots(toBotView(tree))].map((bot) => bot.cast)).toEqual(["deliver", "verify"]);
   });
 });
 
