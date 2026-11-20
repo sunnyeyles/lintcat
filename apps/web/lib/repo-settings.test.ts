@@ -63,6 +63,7 @@ describe("saveRepoSettingsForm", () => {
       mode: "every_pr",
       model: "claude-sonnet-4-5",
       fixes: true,
+      ciInsights: true,
     });
   });
 
@@ -91,6 +92,7 @@ describe("saveRepoSettingsForm", () => {
       mode: "off",
       model: null,
       fixes: true,
+      ciInsights: true,
     });
   });
 
@@ -115,6 +117,7 @@ describe("saveRepoSettingsForm", () => {
       mode: "every_pr",
       model: null,
       fixes: false,
+      ciInsights: true,
     });
   });
 

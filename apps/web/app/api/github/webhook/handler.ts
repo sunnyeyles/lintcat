@@ -5,7 +5,10 @@ import {
   enqueueReviewJob,
   findOrganizationById,
   findRepoByGithubId,
+  upsertWorkflowJob,
+  upsertWorkflowRun,
   type InstallationInput,
+  type Repo,
   type RepoReviewMode,
 } from "@pr-review/db";
 import { z } from "zod";
@@ -101,6 +104,44 @@ const pullRequestEventSchema = z.object({
   repository: z.object({ id: z.number() }),
 });
 
+const workflowRunEventSchema = z.object({
+  action: z.string(),
+  workflow_run: z.object({
+    id: z.number(),
+    run_attempt: z.number(),
+    workflow_id: z.number(),
+    name: z.string().nullish(),
+    path: z.string(),
+    event: z.string(),
+    head_branch: z.string().nullish(),
+    head_sha: z.string(),
+    status: z.string(),
+    conclusion: z.string().nullish(),
+    created_at: z.string(),
+    run_started_at: z.string().nullish(),
+    updated_at: z.string(),
+    html_url: z.string(),
+    pull_requests: z.array(z.object({ number: z.number() })),
+  }),
+  repository: z.object({ id: z.number() }),
+});
+
+const workflowJobEventSchema = z.object({
+  action: z.string(),
+  workflow_job: z.object({
+    id: z.number(),
+    run_id: z.number(),
+    run_attempt: z.number(),
+    name: z.string(),
+    status: z.string(),
+    conclusion: z.string().nullish(),
+    started_at: z.string().nullish(),
+    completed_at: z.string().nullish(),
+    labels: z.array(z.string()),
+  }),
+  repository: z.object({ id: z.number() }),
+});
+
 /** Adding this label to a pull request asks for a hosted review. */
 const REVIEW_LABEL = "ai-review";
 
@@ -188,6 +229,12 @@ function dispatch(
         withPayload(pullRequestEventSchema, payload, (data) =>
           onPullRequest(deps, data, deliveryId),
         );
+    case "workflow_run":
+      return (payload) =>
+        withPayload(workflowRunEventSchema, payload, (data) => onWorkflowRun(deps, data));
+    case "workflow_job":
+      return (payload) =>
+        withPayload(workflowJobEventSchema, payload, (data) => onWorkflowJob(deps, data));
     default:
       return undefined;
   }
@@ -352,6 +399,93 @@ async function onPullRequest(
     });
     deps.pingWorker();
   }
+  return true;
+}
+
+// Scheduled and hand-dispatched runs say nothing about a change's health.
+const DROPPED_RUN_EVENTS = new Set(["schedule", "workflow_dispatch"]);
+
+async function ciRepo(
+  deps: GithubWebhookDeps,
+  githubRepoId: number,
+  skip: (reason: string) => false,
+): Promise<Repo | false> {
+  const repo = await findRepoByGithubId(deps.database, githubRepoId);
+  if (!repo || repo.removedAt) return skip("repository_not_tracked");
+  const organization = await findOrganizationById(deps.database, repo.organizationId);
+  if (!organization || !installedAccount(organization)) return skip("organization_not_installed");
+  const settings = await effectiveRepoSettings(deps.database, repo.id);
+  if (!settings.ciInsights) return skip("ci_insights_off");
+  return repo;
+}
+
+async function onWorkflowRun(
+  deps: GithubWebhookDeps,
+  payload: z.infer<typeof workflowRunEventSchema>,
+): Promise<boolean> {
+  const run = payload.workflow_run;
+  const fields = {
+    source: `workflow_run.${payload.action}`,
+    githubRepoId: payload.repository.id,
+    githubRunId: run.id,
+    runAttempt: run.run_attempt,
+  };
+  const skip = (reason: string) => {
+    deps.logger.info("workflow_run.skipped", { ...fields, reason });
+    return false as const;
+  };
+  if (DROPPED_RUN_EVENTS.has(run.event)) return skip("event_not_ingested");
+  const repo = await ciRepo(deps, payload.repository.id, skip);
+  if (!repo) return false;
+  const stored = await upsertWorkflowRun(deps.database, repo.id, {
+    githubRunId: run.id,
+    runAttempt: run.run_attempt,
+    workflowId: run.workflow_id,
+    workflowName: run.name ?? run.path,
+    event: run.event,
+    headBranch: run.head_branch ?? null,
+    headSha: run.head_sha,
+    prNumber: run.pull_requests[0]?.number ?? null,
+    status: run.status,
+    conclusion: run.conclusion ?? null,
+    runStartedAt: new Date(run.run_started_at ?? run.created_at),
+    githubUpdatedAt: new Date(run.updated_at),
+    htmlUrl: run.html_url,
+  });
+  deps.logger.info(stored ? "workflow_run.stored" : "workflow_run.stale", fields);
+  return true;
+}
+
+async function onWorkflowJob(
+  deps: GithubWebhookDeps,
+  payload: z.infer<typeof workflowJobEventSchema>,
+): Promise<boolean> {
+  const job = payload.workflow_job;
+  const fields = {
+    source: `workflow_job.${payload.action}`,
+    githubRepoId: payload.repository.id,
+    githubRunId: job.run_id,
+    githubJobId: job.id,
+  };
+  const skip = (reason: string) => {
+    deps.logger.info("workflow_job.skipped", { ...fields, reason });
+    return false as const;
+  };
+  const repo = await ciRepo(deps, payload.repository.id, skip);
+  if (!repo) return false;
+  const result = await upsertWorkflowJob(deps.database, repo.id, {
+    githubRunId: job.run_id,
+    runAttempt: job.run_attempt,
+    githubJobId: job.id,
+    name: job.name,
+    status: job.status,
+    conclusion: job.conclusion ?? null,
+    startedAt: job.started_at ? new Date(job.started_at) : null,
+    completedAt: job.completed_at ? new Date(job.completed_at) : null,
+    runnerLabels: job.labels,
+  });
+  if (result === "run_not_ingested") return skip(result);
+  deps.logger.info(`workflow_job.${result}`, fields);
   return true;
 }
 

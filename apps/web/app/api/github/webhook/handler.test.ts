@@ -9,6 +9,8 @@ import {
   reviewJobs,
   saveRepoSettings,
   users,
+  workflowJobs,
+  workflowRuns,
   type Database,
   type RepoReviewMode,
 } from "@pr-review/db";
@@ -889,5 +891,199 @@ describe("handleGithubWebhook pull_request", () => {
       expect(response.status).toBe(204);
       expect(await jobs()).toEqual([]);
     });
+  });
+});
+
+describe("handleGithubWebhook workflow runs and jobs", () => {
+  beforeEach(async () => {
+    await deliver(created());
+  });
+
+  function workflowRunEvent(
+    action: string,
+    {
+      status = "queued",
+      conclusion = null,
+      updatedAt = "2026-11-01T12:00:00Z",
+      runAttempt = 1,
+      event = "pull_request",
+      repo = widgets,
+    }: {
+      status?: string;
+      conclusion?: string | null;
+      updatedAt?: string;
+      runAttempt?: number;
+      event?: string;
+      repo?: InstallationRepository;
+    } = {},
+  ): Request {
+    return delivery("workflow_run", {
+      action,
+      workflow_run: {
+        id: 9_000_000_001,
+        run_attempt: runAttempt,
+        workflow_id: 7_000_000_001,
+        name: "CI",
+        path: ".github/workflows/ci.yml",
+        event,
+        head_branch: "feature",
+        head_sha: "head-1",
+        status,
+        conclusion,
+        created_at: "2026-11-01T11:59:50Z",
+        run_started_at: "2026-11-01T12:00:00Z",
+        updated_at: updatedAt,
+        html_url: "https://github.com/Acme/widgets/actions/runs/9000000001",
+        pull_requests: [{ number: 7 }],
+      },
+      repository: { id: repo.id },
+      installation: { id: INSTALLATION_ID },
+    });
+  }
+
+  function workflowJobEvent(action: string, status: string, runAttempt = 1): Request {
+    return delivery("workflow_job", {
+      action,
+      workflow_job: {
+        id: 8_000_000_001,
+        run_id: 9_000_000_001,
+        run_attempt: runAttempt,
+        name: "test",
+        status,
+        conclusion: status === "completed" ? "success" : null,
+        started_at: "2026-11-01T12:00:05Z",
+        completed_at: status === "completed" ? "2026-11-01T12:01:00Z" : null,
+        labels: ["ubuntu-latest"],
+      },
+      repository: { id: widgets.id },
+      installation: { id: INSTALLATION_ID },
+    });
+  }
+
+  const runs = () =>
+    database
+      .select({
+        runAttempt: workflowRuns.runAttempt,
+        status: workflowRuns.status,
+        conclusion: workflowRuns.conclusion,
+      })
+      .from(workflowRuns)
+      .orderBy(asc(workflowRuns.id));
+
+  const jobs = () =>
+    database
+      .select({ runId: workflowJobs.runId, status: workflowJobs.status })
+      .from(workflowJobs)
+      .orderBy(asc(workflowJobs.id));
+
+  async function setCiInsights(ciInsights: boolean): Promise<void> {
+    const [row] = await database
+      .select({ id: repos.id })
+      .from(repos)
+      .where(eq(repos.githubRepoId, widgets.id));
+    await saveRepoSettings(database, row!.id, {
+      mode: "every_pr",
+      model: null,
+      fixes: false,
+      ciInsights,
+    });
+  }
+
+  it("stores a requested run and moves it to completed", async () => {
+    expect((await deliver(workflowRunEvent("requested"))).status).toBe(200);
+    const completed = workflowRunEvent("completed", {
+      status: "completed",
+      conclusion: "failure",
+      updatedAt: "2026-11-01T12:05:00Z",
+    });
+    expect((await deliver(completed)).status).toBe(200);
+    expect(await runs()).toEqual([{ runAttempt: 1, status: "completed", conclusion: "failure" }]);
+    const [stored] = await database.select().from(workflowRuns);
+    expect(stored).toMatchObject({
+      workflowName: "CI",
+      event: "pull_request",
+      headBranch: "feature",
+      prNumber: 7,
+      runStartedAt: new Date("2026-11-01T12:00:00Z"),
+    });
+  });
+
+  it("keeps one row for a redelivery, and ignores a stale event", async () => {
+    const completed = () =>
+      workflowRunEvent("completed", {
+        status: "completed",
+        conclusion: "success",
+        updatedAt: "2026-11-01T12:05:00Z",
+      });
+    await deliver(completed());
+    expect((await deliver(completed())).status).toBe(200);
+    const stale = workflowRunEvent("in_progress", {
+      status: "in_progress",
+      updatedAt: "2026-11-01T12:01:00Z",
+    });
+    expect((await deliver(stale)).status).toBe(200);
+    expect(await runs()).toEqual([{ runAttempt: 1, status: "completed", conclusion: "success" }]);
+    expect(log).toContainEqual(expect.objectContaining({ event: "workflow_run.stale" }));
+  });
+
+  it("stores a rerun as a new attempt", async () => {
+    await deliver(workflowRunEvent("completed", { status: "completed", conclusion: "failure" }));
+    await deliver(workflowRunEvent("requested", { runAttempt: 2, updatedAt: "2026-11-01T13:00:00Z" }));
+    expect(await runs()).toEqual([
+      { runAttempt: 1, status: "completed", conclusion: "failure" },
+      { runAttempt: 2, status: "queued", conclusion: null },
+    ]);
+  });
+
+  it("ignores a repository it does not track", async () => {
+    const stranger = { ...widgets, id: 42 };
+    await deliver(repositoriesChanged("removed", [secrets]));
+    for (const repo of [stranger, secrets]) {
+      expect((await deliver(workflowRunEvent("requested", { repo }))).status).toBe(204);
+    }
+    expect(await runs()).toEqual([]);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "workflow_run.skipped", reason: "repository_not_tracked" }),
+    );
+  });
+
+  it("ignores a repository with CI insights turned off", async () => {
+    await setCiInsights(false);
+    expect((await deliver(workflowRunEvent("requested"))).status).toBe(204);
+    expect((await deliver(workflowJobEvent("queued", "queued"))).status).toBe(204);
+    expect(await runs()).toEqual([]);
+    expect(log).toContainEqual(expect.objectContaining({ reason: "ci_insights_off" }));
+  });
+
+  it("drops scheduled and hand-dispatched runs, and their jobs", async () => {
+    for (const event of ["schedule", "workflow_dispatch"]) {
+      expect((await deliver(workflowRunEvent("requested", { event }))).status).toBe(204);
+    }
+    expect((await deliver(workflowJobEvent("completed", "completed"))).status).toBe(204);
+    expect(await runs()).toEqual([]);
+    expect(await jobs()).toEqual([]);
+  });
+
+  it("stores a job under its run, and never reopens it once completed", async () => {
+    await deliver(workflowRunEvent("requested"));
+    expect((await deliver(workflowJobEvent("in_progress", "in_progress"))).status).toBe(200);
+    expect((await deliver(workflowJobEvent("completed", "completed"))).status).toBe(200);
+    expect((await deliver(workflowJobEvent("in_progress", "in_progress"))).status).toBe(200);
+    const [run] = await database.select({ id: workflowRuns.id }).from(workflowRuns);
+    expect(await jobs()).toEqual([{ runId: run!.id, status: "completed" }]);
+  });
+
+  it("skips a job whose run attempt it has not stored", async () => {
+    await deliver(workflowRunEvent("requested"));
+    expect((await deliver(workflowJobEvent("queued", "queued", 2))).status).toBe(204);
+    expect(await jobs()).toEqual([]);
+    expect(log).toContainEqual(
+      expect.objectContaining({ event: "workflow_job.skipped", reason: "run_not_ingested" }),
+    );
+  });
+
+  it("400s a malformed workflow payload", async () => {
+    expect((await deliver(delivery("workflow_run", { action: "requested" }))).status).toBe(400);
+    expect((await deliver(delivery("workflow_job", { action: "queued" }))).status).toBe(400);
   });
 });

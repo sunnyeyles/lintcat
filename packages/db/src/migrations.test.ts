@@ -227,6 +227,7 @@ describe("the hosted review migration", () => {
 describe("the repo settings migration", () => {
   it("adds one row per repo for mode, model and fixes", async () => {
     expect(await columns("repo_settings")).toEqual([
+      "ci_insights",
       "created_at",
       "fixes",
       "id",
@@ -284,6 +285,21 @@ describe("the every-PR default migration on a populated database", () => {
       { repo_id: 2, mode: "off" },
       { repo_id: 3, mode: "every_pr" },
     ]);
+  });
+});
+
+describe("the workflow runs migration on a populated database", () => {
+  it("turns CI insights on for repos with saved settings", async () => {
+    const { pg, applyTarget } = await migratedUpTo("0022_");
+    await pg.exec(`
+      insert into organizations (github_account_id, account_type, slug, name) values (1, 'user', 'acme', 'acme');
+      insert into repos (organization_id, owner, name) values (1, 'acme', 'widgets');
+      insert into repo_settings (repo_id, mode) values (1, 'off');
+    `);
+    await applyTarget();
+
+    const result = await pg.query<{ ci_insights: boolean }>("select ci_insights from repo_settings");
+    expect(result.rows).toEqual([{ ci_insights: true }]);
   });
 });
 

@@ -16,6 +16,8 @@ erDiagram
   organizations ||--o| model_keys : "pays with"
   repos ||--o{ review_jobs : "queues"
   repos ||--o| repo_settings : "configures"
+  repos ||--o{ workflow_runs : "runs"
+  workflow_runs ||--o{ workflow_jobs : "holds"
 
   users {
     serial id PK
@@ -120,7 +122,36 @@ erDiagram
     repo_review_mode mode "off label every_pr"
     text model "override; null uses the key's default"
     boolean fixes
+    boolean ci_insights "default true"
     timestamptz updated_at
+  }
+  workflow_runs {
+    serial id PK
+    int repo_id FK
+    bigint github_run_id "unique with run_attempt"
+    int run_attempt
+    bigint workflow_id
+    text workflow_name
+    text event
+    text head_branch
+    text head_sha
+    int pr_number
+    text status
+    text conclusion
+    timestamptz run_started_at
+    timestamptz github_updated_at
+    text html_url
+  }
+  workflow_jobs {
+    serial id PK
+    int run_id FK
+    bigint github_job_id UK
+    text name
+    text status
+    text conclusion
+    timestamptz started_at
+    timestamptz completed_at
+    jsonb runner_labels
   }
   rate_limits {
     text key PK
@@ -179,6 +210,15 @@ erDiagram
   key's default model, and offers fixes as suggestions rather than committing
   them — `effectiveRepoSettings` returns those defaults. `model` is a model id
   in the organization key's own provider, not a provider name.
+- `workflow_runs` is one attempt of a GitHub Actions run, unique on
+  `(github_run_id, run_attempt)`, so a rerun is a new row
+  (`src/workflow-runs.ts`). The webhook stores it only for a repo with
+  `ci_insights` on, and drops `schedule` and `workflow_dispatch` runs.
+  `upsertWorkflowRun` only moves a row forward on GitHub's `updated_at`, so a
+  stale redelivery is a no-op. `upsertWorkflowJob` stores a job only under a
+  stored run attempt and never reopens a completed one; a job for an unknown
+  run is skipped, and its next event stores it once the run exists.
+  `pruneWorkflowRuns` deletes runs past the 30-day retention, jobs with them.
 - `rate_limits` counts requests per `(key, window_start)` fixed window
   (`src/rate-limits.ts`); the docs chat keys it on an HMAC of the client
   address, never the address. `consumeRateLimit` is one upsert that increments
