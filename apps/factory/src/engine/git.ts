@@ -27,6 +27,8 @@ async function git(cwd: string, args: readonly string[]): Promise<string> {
   }
 }
 
+const pathspec = (exclude: readonly string[]) => ["--", ".", ...exclude.map((path) => `:(exclude)${path}`)];
+
 async function gitOk(cwd: string, args: readonly string[]): Promise<boolean> {
   try {
     await git(cwd, args);
@@ -94,7 +96,7 @@ export async function checkpointCommit(
   message: string,
   exclude: readonly string[] = [],
 ): Promise<string | null> {
-  await git(dir, ["add", "-A", "--", ".", ...exclude.map((path) => `:(exclude)${path}`)]);
+  await git(dir, ["add", "-A", ...pathspec(exclude)]);
   if (await gitOk(dir, ["diff", "--cached", "--quiet"])) return null;
   await git(dir, ["commit", "--quiet", "--no-edit", "-m", message]);
   return headSha(dir);
@@ -139,7 +141,7 @@ export async function committedDiff(
   baseSha: string,
   exclude: readonly string[] = [],
 ): Promise<{ files: string[]; diff: string }> {
-  const scope = ["--", ".", ...exclude.map((path) => `:(exclude)${path}`)];
+  const scope = pathspec(exclude);
   const names = await git(dir, ["diff", "--name-only", "-z", baseSha, "HEAD", ...scope]);
   const diff = await git(dir, ["diff", baseSha, "HEAD", ...scope]);
   return { files: names.split("\0").filter(Boolean).sort(), diff };
@@ -151,7 +153,7 @@ export async function nameStatus(
   baseSha: string,
   exclude: readonly string[] = [],
 ): Promise<Map<string, "A" | "M" | "D" | "R">> {
-  const scope = ["--", ".", ...exclude.map((path) => `:(exclude)${path}`)];
+  const scope = pathspec(exclude);
   const fields = (await git(dir, ["diff", "--name-status", "-M", "-z", baseSha, "HEAD", ...scope])).split("\0");
   const status = new Map<string, "A" | "M" | "D" | "R">();
   for (let i = 0; i < fields.length; i++) {

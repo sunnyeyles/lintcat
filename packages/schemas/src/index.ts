@@ -2,7 +2,6 @@
 export {
   categoryLabel,
   evidenceLabel,
-  findingCategorySchema,
   isConventionCount,
   reviewFindingSchema,
   type ConventionCountEvidence,
@@ -34,9 +33,7 @@ export {
 } from "#src/review-record";
 export {
   RUN_EVENT_TYPES,
-  RUN_FORMAT_VERSION,
   runEventJsonSchema,
   runEventSchema,
   type RunEvent,
-  type RunEventType,
 } from "#src/run-event";

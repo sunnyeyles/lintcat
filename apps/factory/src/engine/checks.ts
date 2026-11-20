@@ -22,7 +22,7 @@ export async function detectChecks(repoRoot: string): Promise<CheckPlan> {
   return detect(repoRoot);
 }
 
-function parseChecksFile(text: string, file = ".factory/checks"): CheckPlan {
+function parseChecksFile(text: string, file: string): CheckPlan {
   const installs: string[] = [];
   const checks: Check[] = [];
   for (const raw of text.split(/\r?\n/)) {

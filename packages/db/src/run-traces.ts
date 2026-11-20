@@ -13,6 +13,14 @@ export type RunTraceSummary = {
   lastSeenAt: Date;
 };
 
+const summaryColumns = {
+  runId: runTraces.runId,
+  title: runTraces.title,
+  format: runTraces.format,
+  startedAt: runTraces.startedAt,
+  lastSeenAt: runTraces.lastSeenAt,
+};
+
 /** Upserts the run and overwrites each file; a title or format, once known, is kept. */
 export async function saveRunTraceFiles(
   database: Database,
@@ -43,13 +51,7 @@ export async function saveRunTraceFiles(
 
 export async function listRunTraces(database: Database, limit = 50): Promise<RunTraceSummary[]> {
   return database
-    .select({
-      runId: runTraces.runId,
-      title: runTraces.title,
-      format: runTraces.format,
-      startedAt: runTraces.startedAt,
-      lastSeenAt: runTraces.lastSeenAt,
-    })
+    .select(summaryColumns)
     .from(runTraces)
     .orderBy(desc(runTraces.lastSeenAt))
     .limit(limit);
@@ -60,13 +62,7 @@ export async function findRunTrace(
   runId: string,
 ): Promise<{ run: RunTraceSummary; files: RunTraceFileInput[] } | undefined> {
   const runs = await database
-    .select({
-      runId: runTraces.runId,
-      title: runTraces.title,
-      format: runTraces.format,
-      startedAt: runTraces.startedAt,
-      lastSeenAt: runTraces.lastSeenAt,
-    })
+    .select(summaryColumns)
     .from(runTraces)
     .where(eq(runTraces.runId, runId))
     .limit(1);

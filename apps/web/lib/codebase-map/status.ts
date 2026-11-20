@@ -1,5 +1,6 @@
 import { groupIdFor } from "@/lib/codebase-map/clustering";
 import type { NormalisedGraph } from "@/lib/codebase-map/normalise";
+import { plural } from "@/lib/format";
 
 type MapStatusKind = "empty" | "no-changes" | "partial" | "ready";
 
@@ -35,10 +36,6 @@ export interface MapStatus {
   totalFileCount: number;
   changedCount: number;
   flagCoverage: FlagCoverage;
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 /** `hiddenTests` is what the view left out, so the banner never hides a gap it made. */

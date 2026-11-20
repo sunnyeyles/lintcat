@@ -29,8 +29,6 @@ export function bundle({ entryPoint, outfile, logLevel = "info" }) {
     format: "esm",
     target: "node22",
     banner: { js: BANNER },
-    sourcemap: false,
-    minify: false,
     legalComments: "none",
     logLevel,
   });

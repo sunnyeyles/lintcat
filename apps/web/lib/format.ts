@@ -86,6 +86,10 @@ export function formatRelative(date: DateLike, now: DateLike = Date.now()): stri
   return suffix(`${Math.floor(abs / YEAR)}y`);
 }
 
+export function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
 export function shortSha(sha: string): string {
   return sha.trim().slice(0, 7);
 }

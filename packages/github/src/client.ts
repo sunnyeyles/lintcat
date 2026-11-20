@@ -212,7 +212,7 @@ export interface ExistingReviewComment {
 }
 
 /** One file's complete new contents in a commit built over the API. */
-export interface CommitFileChange {
+interface CommitFileChange {
   path: string;
   content: string;
 }

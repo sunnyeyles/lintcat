@@ -28,7 +28,7 @@ function noModelAccessMessage(): string {
 /** The key-backed engine: the tool-calling agent over the run's model. */
 export function modelReviewEngine(environment: McpEnvironment): SelectedEngine {
   return {
-    engine: toolLoopEngine({ model: resolveModel(environment).model }),
+    engine: toolLoopEngine({ model: resolveModel(environment) }),
     singleShot: false,
   };
 }

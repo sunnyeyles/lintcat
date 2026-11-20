@@ -11,6 +11,7 @@ import {
   pushStep,
   rootOf,
   settleTimes,
+  summaryOf,
 } from "@/lib/run-trace/adapters/build";
 import { LIMITS, type RunFile, type TraceAdapter } from "@/lib/run-trace/adapters/types";
 import type { AgentNode, RunTrace, ToolCall } from "@/lib/run-trace/types";
@@ -26,12 +27,6 @@ function events(files: readonly RunFile[]): RunEvent[] {
     }
   }
   return out.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-}
-
-function summaryOf(input: unknown): string {
-  const object = asObject(input);
-  const first = object ? Object.values(object).find((value) => typeof value === "string") : input;
-  return typeof first === "string" ? first.split("\n")[0]!.slice(0, 160) : "";
 }
 
 function parseLintcat(files: readonly RunFile[]): RunTrace {

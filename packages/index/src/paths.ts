@@ -66,8 +66,5 @@ export function ancestorDirectories(path: string): string[] {
       return directories;
     }
     directory = directoryOf(directory);
-    if (directories.at(-1) === directory) {
-      return directories;
-    }
   }
 }

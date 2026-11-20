@@ -1,7 +1,4 @@
-/**
- * The shared structured-logging seam: one single-line JSON object per event.
- * Fields must be JSON-serialisable and must never contain secrets.
- */
+// One single-line JSON object per event; fields must be serialisable and secret-free.
 type LogLevel = "info" | "error";
 
 /** Extra structured fields on one log line. Never include secrets. */

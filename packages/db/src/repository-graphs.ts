@@ -1,7 +1,4 @@
-/**
- * The repository index at one commit: stored as the gzipped JSON the reviewer
- * sent, never recompressed here, and bounded per repository.
- */
+// The repository index at one commit, stored as the reviewer's gzipped JSON, never recompressed.
 import { decodeRepositoryGraph, type RepositoryGraphSnapshot } from "@pr-review/index";
 import type { ReviewRecordGraph } from "@pr-review/schemas";
 import { and, desc, eq, notInArray } from "drizzle-orm";

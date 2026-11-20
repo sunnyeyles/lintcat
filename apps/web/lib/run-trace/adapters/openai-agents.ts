@@ -8,11 +8,13 @@ import {
   iso,
   jsonDocument,
   jsonValues,
+  num,
   pushEvent,
   pushStep,
   rootOf,
   settleTimes,
   stringify,
+  summaryOf,
 } from "@/lib/run-trace/adapters/build";
 import { LIMITS, type RunFile, type TraceAdapter } from "@/lib/run-trace/adapters/types";
 import type { AgentNode, RunTrace } from "@/lib/run-trace/types";
@@ -94,8 +96,6 @@ function messageTexts(value: unknown, role?: string): string[] {
   });
 }
 
-const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
-
 function parseOpenAiAgents(files: readonly RunFile[]): RunTrace {
   const { traces, spans } = read(files);
   const byId = new Map(spans.map((span) => [span.id, span]));
@@ -172,14 +172,12 @@ function addStep(owner: AgentNode, span: Span, nodes: Map<string, AgentNode>, sp
     const raw = data.input;
     const input = typeof raw === "string" ? (jsonDocument(raw) ?? raw) : (raw ?? {});
     const child = spans.find((s) => s.parent_id === span.id && nodes.has(s.id));
-    const object = asObject(input);
-    const first = object ? Object.values(object).find((v) => typeof v === "string") : input;
     pushStep(owner, {
       kind: "tool",
       call: {
         id: span.id,
         name: asString(data.name) ?? data.type,
-        summary: typeof first === "string" ? first.split("\n")[0]!.slice(0, 160) : "",
+        summary: summaryOf(input),
         input,
         result: span.ended_at ? (stringify(data.output) ?? "") : undefined,
         isError: !!span.error,

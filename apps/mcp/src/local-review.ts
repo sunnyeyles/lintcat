@@ -1,5 +1,5 @@
 /** The local-checkout review path, for entry points that are not MCP clients. */
-export { git, GitError } from "#src/git";
+export { git } from "#src/git";
 export {
   hasModelApiKey,
   processEnvironment,
@@ -8,10 +8,8 @@ export {
 export {
   openLocalRepository,
   repositoryRoot,
-  type LocalRepository,
   type LocalScope,
-  type ResolvedScope,
 } from "#src/local-git-client";
-export { openLocalMemoryStore, type LocalMemoryStore } from "#src/local-memory-store";
-export { runReview, type ReviewRequest, type ReviewResult } from "#src/review";
-export { modelReviewEngine, type SelectedEngine } from "#src/review-engine";
+export { openLocalMemoryStore } from "#src/local-memory-store";
+export { runReview } from "#src/review";
+export { modelReviewEngine } from "#src/review-engine";

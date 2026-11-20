@@ -68,10 +68,8 @@ export function processEnvironment(): McpEnvironment {
   };
 }
 
-/** The run's default model, and the factory an agent's own `model` uses. */
-export interface ModelSelection {
-  model: ReviewModel;
-}
+const apiKeyOf = (env: McpEnvironment["env"], provider: ModelProvider) =>
+  env[apiKeyEnvFor(provider)]?.trim() ?? "";
 
 /** Unset, the default provider wins when its key is present, else any provider that has one. */
 function selectProvider(env: Record<string, string | undefined>): ModelProvider {
@@ -79,36 +77,33 @@ function selectProvider(env: Record<string, string | undefined>): ModelProvider 
   if (named !== "") {
     return resolveModelProvider(named);
   }
-  const hasKey = (provider: ModelProvider) => (env[apiKeyEnvFor(provider)]?.trim() ?? "") !== "";
+  const hasKey = (provider: ModelProvider) => apiKeyOf(env, provider) !== "";
   return [DEFAULT_MODEL_PROVIDER, ...MODEL_PROVIDERS].find(hasKey) ?? DEFAULT_MODEL_PROVIDER;
 }
 
 /** Whether resolveModel would find a key; a named but unknown provider still throws. */
 export function hasModelApiKey(environment: McpEnvironment): boolean {
   const { env } = environment;
-  return (env[apiKeyEnvFor(selectProvider(env))]?.trim() ?? "") !== "";
+  return apiKeyOf(env, selectProvider(env)) !== "";
 }
 
 /** Reads PR_REVIEW_MODEL_PROVIDER / PR_REVIEW_MODEL / PR_REVIEW_MODEL_BASE_URL and the provider's key. */
-export function resolveModel(environment: McpEnvironment): ModelSelection {
+export function resolveModel(environment: McpEnvironment): ReviewModel {
   const { env } = environment;
   const provider = selectProvider(env);
-  const keyEnv = apiKeyEnvFor(provider);
-  const apiKey = env[keyEnv]?.trim() ?? "";
+  const apiKey = apiKeyOf(env, provider);
   if (apiKey === "") {
     const keys = MODEL_PROVIDERS.map(apiKeyEnvFor).join(" or ");
     throw new Error(`No model API key is set. Set ${keys} in the MCP server's environment or .env.local.`);
   }
   const baseUrl = env["PR_REVIEW_MODEL_BASE_URL"]?.trim() ?? "";
   const modelId = env["PR_REVIEW_MODEL"]?.trim() || defaultModelFor(provider);
-  return {
-    model: environment.createLanguageModel({
-      provider,
-      apiKey,
-      ...(baseUrl === "" ? {} : { baseUrl }),
-      modelId,
-    }),
-  };
+  return environment.createLanguageModel({
+    provider,
+    apiKey,
+    ...(baseUrl === "" ? {} : { baseUrl }),
+    modelId,
+  });
 }
 
 /** GITHUB_TOKEN, then GH_TOKEN, then the `gh` CLI's own login. */

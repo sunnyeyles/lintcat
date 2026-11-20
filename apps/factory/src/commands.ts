@@ -13,6 +13,7 @@ import { migrateFactoryDatabase, openFactoryDatabase } from "#src/engine/store/c
 import { listRuns } from "#src/engine/store/runs";
 import { errorMessage } from "@pr-review/logging";
 import { runDiscovery } from "#src/engine/discovery";
+import { runDir } from "#src/engine/run-files";
 import { TOOL_VERSION } from "#src/engine/telemetry";
 import type { FactoryRun } from "#src/engine/store/schema";
 
@@ -382,7 +383,7 @@ async function result(ctx: CommandContext, runId: string): Promise<number> {
   return withService(ctx, async (service) => {
     const run = await getOrReport(ctx, service, runId);
     if (!run) return 1;
-    ctx.out(renderResult(run, path.join(run.repoPath, ".factory", "runs", run.id, "task.md")));
+    ctx.out(renderResult(run, path.join(runDir(run.repoPath, run.id), "task.md")));
     const task = await service.readTask(run);
     if (task) ctx.out(`\n${task}`);
     return run.status === "delivered" ? 0 : 1;

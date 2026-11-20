@@ -1,4 +1,4 @@
-import { truncate } from "@/lib/run-trace/json";
+import { asObject, truncate } from "@/lib/run-trace/json";
 import { LIMITS } from "@/lib/run-trace/adapters/types";
 import type { AgentNode, AgentStep, TraceEvent } from "@/lib/run-trace/types";
 
@@ -8,6 +8,12 @@ export function emptyNode(id: string, role: string): AgentNode {
 
 export function clip(text: string | undefined): string | undefined {
   return text === undefined ? undefined : truncate(text, LIMITS.text);
+}
+
+export function summaryOf(input: unknown): string {
+  const object = asObject(input);
+  const first = object ? Object.values(object).find((value) => typeof value === "string") : input;
+  return typeof first === "string" ? first.split("\n")[0]!.slice(0, 160) : "";
 }
 
 export function pushStep(node: AgentNode, step: AgentStep): void {
@@ -79,6 +85,8 @@ export function iso(value: unknown): string {
   const ms = Date.parse(value);
   return Number.isNaN(ms) ? "" : new Date(ms).toISOString();
 }
+
+export const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
 
 export const baseName = (name: string) => name.split(/[\\/]/).pop() ?? name;
 

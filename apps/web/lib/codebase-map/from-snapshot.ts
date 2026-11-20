@@ -9,8 +9,7 @@ import type {
   MapGraph,
   MapImport,
 } from "@/lib/codebase-map/types";
-
-export type { FindingCounts };
+import { text } from "@/lib/codebase-map/normalise";
 
 /** Counts per path, plain so it crosses the server boundary unchanged. */
 export type FindingHeat = Record<string, FindingCounts>;
@@ -64,10 +63,6 @@ export function findingHeat(findings: readonly MapSourceFinding[]): FindingHeat 
     else if (finding.severity === "low") counts.low += 1;
   }
   return heat;
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 /**

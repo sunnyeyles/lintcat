@@ -115,7 +115,6 @@ export function renderTaskMarkdown(view: TaskView): string {
   return `${sections.map((lines) => lines.join("\n")).join("\n\n")}\n`;
 }
 
-
 async function atomicWrite(path: string, content: string): Promise<void> {
   const tmp = `${path}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
   await writeFile(tmp, content);

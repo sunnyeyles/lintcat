@@ -4,15 +4,13 @@ import { z } from "zod";
 import type { McpEnvironment } from "#src/environment";
 import { reviewResourceUri } from "#src/resources/context-resources";
 import { readStoredReview, scopeToOrganization, summariseReview } from "#src/review-history";
-import { json } from "#src/tools/shared";
+import { json, orgSchema, rangeSchema } from "#src/tools/shared";
 
-const orgSchema = z.string().min(1).describe('The account slug (a GitHub organization or personal account), as in the dashboard URL /o/<slug>.');
 const repoSchema = z
   .string()
   .regex(/^[^/\s]+\/[^/\s]+$/)
   .optional()
   .describe('Limit to one repository, as "owner/name".');
-const rangeSchema = z.enum(["7d", "30d", "90d"]).optional().describe("Time window; defaults to 30d.");
 
 export function registerHistoryTools(
   server: McpServer,

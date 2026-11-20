@@ -16,12 +16,6 @@ export interface EffectiveRepoSettings {
   fixes: boolean;
 }
 
-export interface RepoSettingsInput {
-  mode: RepoReviewMode;
-  model: string | null;
-  fixes: boolean;
-}
-
 export async function findRepoSettings(
   database: Database,
   repoId: number,
@@ -47,7 +41,7 @@ export async function effectiveRepoSettings(
 export async function saveRepoSettings(
   database: Database,
   repoId: number,
-  input: RepoSettingsInput,
+  input: EffectiveRepoSettings,
 ): Promise<RepoSettings> {
   const values = { repoId, ...input };
   const [row] = await database

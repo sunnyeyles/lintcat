@@ -1,7 +1,4 @@
-/**
- * Telling "this token is not allowed to do that" apart from a real failure.
- * Both write paths need the distinction and must not disagree on it.
- */
+// Shared by both write paths, so they never disagree on what a permission error is.
 
 /** Reads an HTTP status off an Octokit RequestError, if there is one. */
 export function httpStatus(error: unknown): number | undefined {

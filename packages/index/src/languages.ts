@@ -38,11 +38,7 @@ const LANGUAGE_BY_EXTENSION = new Map<string, string>([
 
 /** "other" for anything with no extension this map knows. */
 export function languageOf(path: string): string {
-  const extension = extensionOf(path);
-  if (extension === "") {
-    return "other";
-  }
-  return LANGUAGE_BY_EXTENSION.get(extension.toLowerCase()) ?? "other";
+  return LANGUAGE_BY_EXTENSION.get(extensionOf(path).toLowerCase()) ?? "other";
 }
 
 /** The languages whose imports the builder parses. Everything else is seen only. */

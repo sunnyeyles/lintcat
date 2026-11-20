@@ -1,5 +1,5 @@
 import { type BotView } from "@/app/dev/run-trace/bot-view";
-import { toMs } from "@/app/dev/run-trace/trace-layout";
+import { sortByStart, toMs } from "@/app/dev/run-trace/trace-layout";
 
 export type TreeBox = { bot: BotView; waves: TreeBox[][] };
 
@@ -58,8 +58,4 @@ function byStage(sorted: BotView[]): StageLane[] {
     else lanes.push({ stage: bot.stage, bots: [bot] });
   }
   return lanes;
-}
-
-function sortByStart(bots: BotView[]): BotView[] {
-  return [...bots].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt));
 }

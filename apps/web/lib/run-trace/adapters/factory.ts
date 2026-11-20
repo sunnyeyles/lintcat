@@ -10,6 +10,7 @@ import {
   iso,
   jsonDocument,
   jsonLines,
+  num,
   pushEvent,
   settleTimes,
 } from "@/lib/run-trace/adapters/build";
@@ -111,8 +112,6 @@ const RUN_STATUS: Record<string, AgentStatus> = {
   running: "running",
   verifying: "running",
 };
-
-const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
 
 const usageUsd = (usage: unknown) => num(asObject(usage)?.estimatedCostUsd);
 

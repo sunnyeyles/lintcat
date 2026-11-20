@@ -33,7 +33,7 @@ export type LocalScope =
   | { kind: "staged" }
   | { kind: "range"; range: string };
 
-export interface ResolvedScope {
+interface ResolvedScope {
   kind: LocalScope["kind"];
   baseRef: string;
   baseSha: string;
@@ -248,20 +248,13 @@ function relativeInside(root: string, file: string): string {
   return real === root ? "." : path.relative(root, real);
 }
 
-export interface WorkingTreeFile {
-  root: string;
-  path: string;
-  text: string;
-}
-
 /** One file's text as it is on disk now; a directory or an escape is a 404. */
-export async function readWorkingTreeFile(repoPath: string, file: string): Promise<WorkingTreeFile> {
-  const root = await repositoryRoot(repoPath);
-  const absolute = resolveInside(root, file);
+export async function readWorkingTreeFile(repoPath: string, file: string): Promise<string> {
+  const absolute = resolveInside(await repositoryRoot(repoPath), file);
   if (!statSync(absolute).isFile()) {
     throw new GitError(`${file} is not a file in the working tree`, 404);
   }
-  return { root, path: path.relative(root, absolute), text: readFileSync(absolute, "utf8") };
+  return readFileSync(absolute, "utf8");
 }
 
 /**

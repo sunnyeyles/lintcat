@@ -11,7 +11,7 @@ export interface InstallationRepository {
   private: boolean;
 }
 
-export type OrganizationRole = "admin" | "member";
+type OrganizationRole = "admin" | "member";
 
 export interface OrganizationMember {
   id: number;
