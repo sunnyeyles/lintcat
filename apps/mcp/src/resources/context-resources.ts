@@ -72,7 +72,7 @@ export function registerContextResources(
     async (uri, variables) => {
       const file = variable(variables, "path", uri);
       try {
-        const { text } = await readWorkingTreeFile(environment.cwd, file);
+        const text = await readWorkingTreeFile(environment.cwd, file);
         return { contents: [{ uri: uri.toString(), mimeType: "text/plain", text }] };
       } catch (error: unknown) {
         throw new Error(`Cannot read ${uri.toString()}: ${(error as Error).message}`);

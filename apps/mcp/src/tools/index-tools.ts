@@ -1,5 +1,4 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { renderRepository } from "@pr-review/ai";
 import {
   findReferences,
@@ -7,7 +6,6 @@ import {
   indexHeader,
   renderFindReferences,
   unknownPath,
-  type RepositoryIndex,
 } from "@pr-review/index";
 import { z } from "zod";
 
@@ -21,10 +19,6 @@ const filePathSchema = z
   .string()
   .min(1)
   .describe('Repository-relative path, e.g. "packages/index/src/references.ts".');
-
-function unknown(index: RepositoryIndex, file: string): CallToolResult {
-  return json(unknownPath(index, file));
-}
 
 export function registerIndexTools(
   server: McpServer,
@@ -93,7 +87,7 @@ export function registerIndexTools(
       const { index } = await load(repoPath);
       const described = index.files.get(file);
       if (described === undefined) {
-        return unknown(index, file);
+        return json(unknownPath(index, file));
       }
       const imports = index.edges
         .filter((edge) => edge.from === file)

@@ -2,7 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-const orgArg = z.string().min(1).describe('The account slug (a GitHub organization or personal account), as in the dashboard URL /o/<slug>.');
+import { orgSchema, rangeSchema } from "#src/tools/shared";
+
 const repoArg = z.string().optional().describe('Limit to one repository, as "owner/name".');
 
 function userPrompt(text: string): GetPromptResult {
@@ -62,7 +63,7 @@ export function registerWorkflowPrompts(server: McpServer): void {
         "or dismiss with a reason. Use this when the user points at one finding from a past review or " +
         "from the dashboard and asks whether it matters.",
       argsSchema: {
-        org: orgArg,
+        org: orgSchema,
         review: z.string().min(1).describe("The review id, as listed by list_reviews."),
         finding: z
           .string()
@@ -96,9 +97,9 @@ export function registerWorkflowPrompts(server: McpServer): void {
         "or down, and what the reviews cost. Use this for retrospectives, for questions like \"what do we " +
         "keep getting wrong\", or when the user asks about review volume, trends or spend.",
       argsSchema: {
-        org: orgArg,
+        org: orgSchema,
         repo: repoArg,
-        range: z.enum(["7d", "30d", "90d"]).optional().describe("Time window; defaults to 30d."),
+        range: rangeSchema,
       },
     },
     ({ org, repo, range }) =>
