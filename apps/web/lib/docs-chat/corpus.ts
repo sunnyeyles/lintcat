@@ -140,6 +140,7 @@ GitHub shows these when you install the App. It never approves or merges a pull 
 | Contents | Read and write | Reads the files a review needs. Writes only to commit fixes, when you turn fixes on. |
 | Pull requests | Read and write | Reads the pull request and posts the inline review comments. |
 | Checks | Read and write | Publishes the AI PR Review check run. |
+| Actions | Read | Shows each repository's workflow runs on its CI page. Never starts or changes a run. |
 | Organization members | Read | Decides who can see the organization on the dashboard. |
 | Metadata, email addresses | Read | Lists repositories and signs you in. |`,
   },

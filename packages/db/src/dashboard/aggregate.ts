@@ -1,7 +1,9 @@
-import type { Repo } from "../schema";
+import type { Repo, WorkflowRun } from "../schema";
 
 import {
   type CategoryCount,
+  type CiConclusionFilter,
+  type CiTrends,
   type Range,
   type ReviewDetail,
   type ReviewStat,
@@ -10,6 +12,7 @@ import {
   type Trends,
   type Usage,
   type UsagePoint,
+  type WorkflowTrend,
 } from "./types";
 
 // USD per million tokens; cache reads bill at a tenth of input.
@@ -174,5 +177,113 @@ export function computeUsage(
     points: [...byDay.values()],
     byRepo: perRepo,
     totals: { ...totals, costUsd: costOf(totals), reviewCount: scoped.length },
+  };
+}
+
+const FAILED = new Set(["failure", "timed_out", "startup_failure"]);
+
+export const CONCLUSIONS_FOR: Record<CiConclusionFilter, readonly string[]> = {
+  success: ["success"],
+  failure: [...FAILED],
+  cancelled: ["cancelled"],
+};
+
+export type CiRunStat = Pick<
+  WorkflowRun,
+  | "workflowId"
+  | "workflowName"
+  | "status"
+  | "conclusion"
+  | "runStartedAt"
+  | "githubUpdatedAt"
+>;
+
+export function runDurationMs(run: Pick<CiRunStat, "status" | "runStartedAt" | "githubUpdatedAt">): number | null {
+  if (run.status !== "completed") return null;
+  return Math.max(0, run.githubUpdatedAt.getTime() - run.runStartedAt.getTime());
+}
+
+// Only a pass or a fail counts; cancelled, skipped, neutral and action_required stay out.
+function hasVerdict(run: CiRunStat): boolean {
+  return run.status === "completed" && (run.conclusion === "success" || isFailedRun(run));
+}
+
+function isFailedRun(run: Pick<CiRunStat, "conclusion">): boolean {
+  return run.conclusion !== null && FAILED.has(run.conclusion);
+}
+
+// Nearest rank, so every value reported is a duration some run really took.
+export function percentile(xs: number[], p: number): number | null {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.max(0, Math.ceil((p / 100) * s.length) - 1)]!;
+}
+
+type WorkflowAccumulator = {
+  latest: CiRunStat;
+  runs: number;
+  failures: number;
+  decided: number;
+  durations: number[];
+};
+
+/** Runs must already be scoped to the repo and window; every attempt counts as a run. */
+export function computeCiTrends(runs: CiRunStat[]): CiTrends {
+  const byWorkflow = new Map<number, WorkflowAccumulator>();
+  let failures = 0;
+  let decided = 0;
+  const durations: number[] = [];
+  for (const run of runs) {
+    let entry = byWorkflow.get(run.workflowId);
+    if (!entry) {
+      entry = { latest: run, runs: 0, failures: 0, decided: 0, durations: [] };
+      byWorkflow.set(run.workflowId, entry);
+    }
+    if (run.runStartedAt > entry.latest.runStartedAt) entry.latest = run;
+    entry.runs += 1;
+    if (!hasVerdict(run)) continue;
+    const failed = isFailedRun(run);
+    const duration = runDurationMs(run)!;
+    entry.decided += 1;
+    entry.durations.push(duration);
+    durations.push(duration);
+    decided += 1;
+    if (failed) {
+      entry.failures += 1;
+      failures += 1;
+    }
+  }
+
+  const workflows: WorkflowTrend[] = [...byWorkflow.values()]
+    .map((entry) => ({
+      workflowId: entry.latest.workflowId,
+      workflowName: entry.latest.workflowName,
+      runs: entry.runs,
+      failures: entry.failures,
+      failureRate: entry.decided === 0 ? null : entry.failures / entry.decided,
+      p50DurationMs: percentile(entry.durations, 50),
+      p95DurationMs: percentile(entry.durations, 95),
+      lastStatus: entry.latest.status,
+      lastConclusion: entry.latest.conclusion,
+      lastRunAt: entry.latest.runStartedAt,
+    }))
+    .sort((a, b) => b.runs - a.runs || a.workflowName.localeCompare(b.workflowName));
+
+  let slowest: CiTrends["totals"]["slowestWorkflow"] = null;
+  for (const w of workflows) {
+    if (w.p50DurationMs !== null && (slowest === null || w.p50DurationMs > slowest.p50DurationMs)) {
+      slowest = { workflowId: w.workflowId, workflowName: w.workflowName, p50DurationMs: w.p50DurationMs };
+    }
+  }
+
+  return {
+    workflows,
+    totals: {
+      runs: runs.length,
+      failures,
+      failureRate: decided === 0 ? null : failures / decided,
+      medianDurationMs: durations.length === 0 ? null : median(durations),
+      slowestWorkflow: slowest,
+    },
   };
 }

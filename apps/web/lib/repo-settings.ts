@@ -23,7 +23,13 @@ const KNOWN_MODELS = new Set(Object.values(REPO_MODEL_CHOICES).flat());
 
 export type RepoSettingsFormState =
   | { status: "idle" }
-  | { status: "saved"; mode: RepoReviewMode; model: string | null; fixes: boolean }
+  | {
+      status: "saved";
+      mode: RepoReviewMode;
+      model: string | null;
+      fixes: boolean;
+      ciInsights: boolean;
+    }
   | { status: "error"; message: string };
 
 const formSchema = z.object({
@@ -39,6 +45,7 @@ const formSchema = z.object({
       error: "Choose one of the offered models.",
     }),
   fixes: z.string().optional(),
+  ciInsights: z.string().optional(),
 });
 
 interface RepoOwnerAccess {
@@ -61,6 +68,7 @@ export async function saveRepoSettingsForm(
     mode: form.get("mode") ?? undefined,
     model: form.get("model") ?? undefined,
     fixes: form.get("fixes") ?? undefined,
+    ciInsights: form.get("ciInsights") ?? undefined,
   });
   if (!parsed.success) {
     return { status: "error", message: parsed.error.issues[0]?.message ?? "Check the form." };
@@ -69,8 +77,15 @@ export async function saveRepoSettingsForm(
     mode: parsed.data.mode,
     model: parsed.data.model,
     fixes: parsed.data.fixes === "on",
+    ciInsights: parsed.data.ciInsights === "on",
   });
-  return { status: "saved", mode: saved.mode, model: saved.model, fixes: saved.fixes };
+  return {
+    status: "saved",
+    mode: saved.mode,
+    model: saved.model,
+    fixes: saved.fixes,
+    ciInsights: saved.ciInsights,
+  };
 }
 
 /** The model options for a repo: its org key's provider's models, or all of them with no key. */

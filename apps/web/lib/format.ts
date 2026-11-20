@@ -42,6 +42,12 @@ export function formatUsd(n: number): string {
   })}`;
 }
 
+// Null is "no data", not zero.
+export function formatPercent(ratio: number | null): string {
+  if (ratio === null || !Number.isFinite(ratio)) return "—";
+  return `${Math.round(ratio * 100)}%`;
+}
+
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms)) return "—";
   const sign = ms < 0 ? "-" : "";

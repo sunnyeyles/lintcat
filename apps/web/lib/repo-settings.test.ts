@@ -47,32 +47,41 @@ describe("saveRepoSettingsForm", () => {
     }
   });
 
-  it("saves mode, a model override and fixes for an owner", async () => {
+  it("saves mode, a model override, fixes and CI insights for an owner", async () => {
     const state = await saveRepoSettingsForm(
       database,
       asOwner(),
-      form({ mode: "every_pr", model: "  claude-sonnet-4-5  ", fixes: "on" }),
+      form({ mode: "every_pr", model: "  claude-sonnet-4-5  ", fixes: "on", ciInsights: "on" }),
     );
     expect(state).toEqual({
       status: "saved",
       mode: "every_pr",
       model: "claude-sonnet-4-5",
       fixes: true,
+      ciInsights: true,
     });
     expect(await effectiveRepoSettings(database, repo.id)).toEqual({
       mode: "every_pr",
       model: "claude-sonnet-4-5",
       fixes: true,
+      ciInsights: true,
     });
   });
 
-  it("treats a blank model as no override, and an absent checkbox as fixes off", async () => {
+  it("treats a blank model as no override, and absent switches as fixes and CI insights off", async () => {
     const state = await saveRepoSettingsForm(
       database,
       asOwner(),
       form({ mode: "label", model: "   " }),
     );
-    expect(state).toMatchObject({ status: "saved", mode: "label", model: null, fixes: false });
+    expect(state).toMatchObject({
+      status: "saved",
+      mode: "label",
+      model: null,
+      fixes: false,
+      ciInsights: false,
+    });
+    expect(await effectiveRepoSettings(database, repo.id)).toMatchObject({ ciInsights: false });
   });
 
   it("treats the default option as no override", async () => {
@@ -84,13 +93,14 @@ describe("saveRepoSettingsForm", () => {
     const state = await saveRepoSettingsForm(
       database,
       asOwner(),
-      form({ mode: "off", model: DEFAULT_MODEL_VALUE, fixes: "on" }),
+      form({ mode: "off", model: DEFAULT_MODEL_VALUE, fixes: "on", ciInsights: "on" }),
     );
     expect(state).toMatchObject({ status: "saved", mode: "off", model: null, fixes: true });
     expect(await effectiveRepoSettings(database, repo.id)).toEqual({
       mode: "off",
       model: null,
       fixes: true,
+      ciInsights: true,
     });
   });
 
@@ -115,6 +125,7 @@ describe("saveRepoSettingsForm", () => {
       mode: "every_pr",
       model: null,
       fixes: false,
+      ciInsights: true,
     });
   });
 

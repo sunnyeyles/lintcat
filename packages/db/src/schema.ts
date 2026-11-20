@@ -262,6 +262,7 @@ export const repoSettings = pgTable("repo_settings", {
   // Model id override for the organization's key's provider; null uses the provider's default.
   model: text("model"),
   fixes: boolean("fixes").notNull().default(false),
+  ciInsights: boolean("ci_insights").notNull().default(true),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -278,6 +279,54 @@ export const rateLimits = pgTable(
     primaryKey({ columns: [t.key, t.windowStart] }),
     index("rate_limits_window_start_idx").on(t.windowStart),
   ],
+);
+
+// One attempt of a GitHub Actions run; a rerun is a new attempt and a new row.
+export const workflowRuns = pgTable(
+  "workflow_runs",
+  {
+    id: serial("id").primaryKey(),
+    repoId: integer("repo_id")
+      .notNull()
+      .references(() => repos.id, { onDelete: "cascade" }),
+    githubRunId: bigint("github_run_id", { mode: "number" }).notNull(),
+    runAttempt: integer("run_attempt").notNull(),
+    workflowId: bigint("workflow_id", { mode: "number" }).notNull(),
+    workflowName: text("workflow_name").notNull(),
+    event: text("event").notNull(),
+    headBranch: text("head_branch"),
+    headSha: text("head_sha").notNull(),
+    prNumber: integer("pr_number"),
+    status: text("status").notNull(),
+    conclusion: text("conclusion"),
+    runStartedAt: timestamp("run_started_at", { withTimezone: true }).notNull(),
+    githubUpdatedAt: timestamp("github_updated_at", { withTimezone: true }).notNull(),
+    htmlUrl: text("html_url").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("workflow_runs_github_run_attempt_idx").on(t.githubRunId, t.runAttempt),
+    index("workflow_runs_repo_started_idx").on(t.repoId, t.runStartedAt),
+  ],
+);
+
+export const workflowJobs = pgTable(
+  "workflow_jobs",
+  {
+    id: serial("id").primaryKey(),
+    runId: integer("run_id")
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: "cascade" }),
+    githubJobId: bigint("github_job_id", { mode: "number" }).notNull().unique(),
+    name: text("name").notNull(),
+    status: text("status").notNull(),
+    conclusion: text("conclusion"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    runnerLabels: jsonb("runner_labels").$type<string[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [index("workflow_jobs_run_idx").on(t.runId)],
 );
 
 // Mirrors reviewFindingSchema in @pr-review/schemas; keep the two in step.
@@ -345,5 +394,7 @@ export type ReviewJobStatus = ReviewJob["status"];
 export type RepoSettings = typeof repoSettings.$inferSelect;
 export type RepoReviewMode = RepoSettings["mode"];
 export type RateLimit = typeof rateLimits.$inferSelect;
+export type WorkflowRun = typeof workflowRuns.$inferSelect;
+export type WorkflowJob = typeof workflowJobs.$inferSelect;
 export type Finding =typeof findings.$inferSelect;
 export type NewFinding = typeof findings.$inferInsert;

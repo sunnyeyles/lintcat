@@ -1,5 +1,12 @@
 
-import type { Finding, Organization, Repo, Review } from "../schema";
+import type {
+  Finding,
+  Organization,
+  Repo,
+  Review,
+  WorkflowJob,
+  WorkflowRun,
+} from "../schema";
 
 export type Severity = "low" | "medium" | "high";
 
@@ -87,6 +94,50 @@ export type ReviewListOptions = {
   limit?: number;
 };
 
+// Null until the run completes.
+export type WorkflowRunSummary = WorkflowRun & { durationMs: number | null };
+
+export type WorkflowRunDetail = WorkflowRunSummary & {
+  repo: Repo;
+  jobs: WorkflowJob[];
+};
+
+// "failure" also matches timed_out and startup_failure, as the failure rate counts them.
+export type CiConclusionFilter = "success" | "failure" | "cancelled";
+
+export type WorkflowRunListOptions = {
+  repoId: number;
+  branch?: string;
+  workflowId?: number;
+  conclusion?: CiConclusionFilter;
+  limit?: number;
+};
+
+export type WorkflowTrend = {
+  workflowId: number;
+  workflowName: string;
+  runs: number;
+  failures: number;
+  // Null when no run has a success-or-failure verdict yet.
+  failureRate: number | null;
+  p50DurationMs: number | null;
+  p95DurationMs: number | null;
+  lastStatus: string;
+  lastConclusion: string | null;
+  lastRunAt: Date;
+};
+
+export type CiTrends = {
+  workflows: WorkflowTrend[];
+  totals: {
+    runs: number;
+    failures: number;
+    failureRate: number | null;
+    medianDurationMs: number | null;
+    slowestWorkflow: { workflowId: number; workflowName: string; p50DurationMs: number } | null;
+  };
+};
+
 export type DataSource = {
   organization: Organization;
   listRepos(): Promise<RepoSummary[]>;
@@ -99,4 +150,8 @@ export type DataSource = {
   getMapAccess(id: number): Promise<{ repoId: number; baseSha: string | null } | null>;
   getTrends(range: Range, repoId?: number): Promise<Trends>;
   getUsage(range: Range, repoId?: number): Promise<Usage>;
+  listWorkflowRuns(opts: WorkflowRunListOptions): Promise<WorkflowRunSummary[]>;
+  getWorkflowRun(id: number): Promise<WorkflowRunDetail | null>;
+  /** Every workflow's last 30 days of runs in the repo. */
+  getCiTrends(repoId: number): Promise<CiTrends>;
 };

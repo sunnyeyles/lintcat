@@ -27,12 +27,13 @@ beforeEach(async () => {
 });
 
 describe("effectiveRepoSettings", () => {
-  it("defaults to every pull request, no model override, and fixes off with no row", async () => {
+  it("defaults to every pull request, no model override, fixes off and CI insights on with no row", async () => {
     expect(await findRepoSettings(database, repoId)).toBeUndefined();
     expect(await effectiveRepoSettings(database, repoId)).toEqual({
       mode: "every_pr",
       model: null,
       fixes: false,
+      ciInsights: true,
     });
   });
 
@@ -41,11 +42,13 @@ describe("effectiveRepoSettings", () => {
       mode: "label",
       model: "claude-sonnet-4-5",
       fixes: true,
+      ciInsights: false,
     });
     expect(await effectiveRepoSettings(database, repoId)).toEqual({
       mode: "label",
       model: "claude-sonnet-4-5",
       fixes: true,
+      ciInsights: false,
     });
   });
 });
@@ -87,5 +90,22 @@ describe("saveRepoSettings", () => {
     });
     await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: false });
     expect(await findRepoSettings(database, repoId)).toMatchObject({ model: null });
+  });
+
+  it("keeps the stored CI insights setting when a save omits it", async () => {
+    expect(
+      await saveRepoSettings(database, repoId, { mode: "label", model: null, fixes: false }),
+    ).toMatchObject({ ciInsights: true });
+    await saveRepoSettings(database, repoId, {
+      mode: "label",
+      model: null,
+      fixes: false,
+      ciInsights: false,
+    });
+    await saveRepoSettings(database, repoId, { mode: "off", model: null, fixes: false });
+    expect(await findRepoSettings(database, repoId)).toMatchObject({
+      mode: "off",
+      ciInsights: false,
+    });
   });
 });

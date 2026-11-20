@@ -19,17 +19,23 @@ import {
   findings,
   repos,
   reviews,
+  workflowJobs,
+  workflowRuns,
   type Finding,
   type Repo,
   type Organization,
   type Review,
+  type WorkflowRun,
 } from "../schema";
 
 import {
+  computeCiTrends,
+  CONCLUSIONS_FOR,
   computeTrends,
   computeUsage,
   costOf,
   emptySeverity,
+  runDurationMs,
   windowStart,
 } from "./aggregate";
 import type {
@@ -41,6 +47,7 @@ import type {
   ReviewStat,
   ReviewSummary,
   Severity,
+  WorkflowRunSummary,
 } from "./types";
 
 type ReviewFilter = {
@@ -97,6 +104,10 @@ function toDetail(
     bySeverity,
     costUsd: costOf(review),
   };
+}
+
+function withDuration(run: WorkflowRun): WorkflowRunSummary {
+  return { ...run, durationMs: runDurationMs(run) };
 }
 
 function strip(review: ReviewDetail): ReviewSummary {
@@ -514,5 +525,63 @@ export function createDbSource(
       return computeUsage(scoped, repoRows, range);
     },
 
+    async listWorkflowRuns({ repoId, branch, workflowId, conclusion, limit = 50 }) {
+      const rows = await database
+        .select({ run: workflowRuns })
+        .from(workflowRuns)
+        .innerJoin(repos, eq(repos.id, workflowRuns.repoId))
+        .where(
+          and(
+            liveRepos,
+            eq(workflowRuns.repoId, repoId),
+            branch === undefined ? undefined : eq(workflowRuns.headBranch, branch),
+            workflowId === undefined ? undefined : eq(workflowRuns.workflowId, workflowId),
+            conclusion === undefined
+              ? undefined
+              : inArray(workflowRuns.conclusion, [...CONCLUSIONS_FOR[conclusion]]),
+          ),
+        )
+        .orderBy(desc(workflowRuns.runStartedAt), desc(workflowRuns.id))
+        .limit(limit);
+      return rows.map(({ run }) => withDuration(run));
+    },
+
+    async getWorkflowRun(id) {
+      const [row] = await database
+        .select({ run: workflowRuns, repo: repos })
+        .from(workflowRuns)
+        .innerJoin(repos, eq(repos.id, workflowRuns.repoId))
+        .where(and(liveRepos, eq(workflowRuns.id, id)))
+        .limit(1);
+      if (!row) return null;
+      const jobs = await database
+        .select()
+        .from(workflowJobs)
+        .where(eq(workflowJobs.runId, row.run.id))
+        .orderBy(sql`${workflowJobs.startedAt} asc nulls last`, asc(workflowJobs.id));
+      return { ...withDuration(row.run), repo: row.repo, jobs };
+    },
+
+    async getCiTrends(repoId) {
+      const rows = await database
+        .select({
+          workflowId: workflowRuns.workflowId,
+          workflowName: workflowRuns.workflowName,
+          status: workflowRuns.status,
+          conclusion: workflowRuns.conclusion,
+          runStartedAt: workflowRuns.runStartedAt,
+          githubUpdatedAt: workflowRuns.githubUpdatedAt,
+        })
+        .from(workflowRuns)
+        .innerJoin(repos, eq(repos.id, workflowRuns.repoId))
+        .where(
+          and(
+            liveRepos,
+            eq(workflowRuns.repoId, repoId),
+            gte(workflowRuns.runStartedAt, new Date(windowStart("30d"))),
+          ),
+        );
+      return computeCiTrends(rows);
+    },
   };
 }

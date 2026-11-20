@@ -3,23 +3,27 @@ import { eq, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { repoSettings, type RepoReviewMode, type RepoSettings } from "./schema";
 
-/** What a repo without a row gets: every pull request reviewed, no model override, no fixes. */
+/** What a repo without a row gets: every pull request reviewed, no model override, no fixes, CI insights on. */
 const DEFAULT_REPO_SETTINGS: EffectiveRepoSettings = {
   mode: "every_pr",
   model: null,
   fixes: false,
+  ciInsights: true,
 };
 
 export interface EffectiveRepoSettings {
   mode: RepoReviewMode;
   model: string | null;
   fixes: boolean;
+  ciInsights: boolean;
 }
 
 export interface RepoSettingsInput {
   mode: RepoReviewMode;
   model: string | null;
   fixes: boolean;
+  // Omitted keeps the stored value, or the default on a first save.
+  ciInsights?: boolean;
 }
 
 export async function findRepoSettings(
@@ -41,7 +45,7 @@ export async function effectiveRepoSettings(
 ): Promise<EffectiveRepoSettings> {
   const row = await findRepoSettings(database, repoId);
   if (!row) return DEFAULT_REPO_SETTINGS;
-  return { mode: row.mode, model: row.model, fixes: row.fixes };
+  return { mode: row.mode, model: row.model, fixes: row.fixes, ciInsights: row.ciInsights };
 }
 
 export async function saveRepoSettings(

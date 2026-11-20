@@ -78,6 +78,14 @@ export {
   type RunTraceSummary,
 } from "./run-traces";
 export {
+  pruneWorkflowRuns,
+  upsertWorkflowJob,
+  upsertWorkflowRun,
+  type WorkflowJobInput,
+  type WorkflowJobResult,
+  type WorkflowRunInput,
+} from "./workflow-runs";
+export {
   deleteOrganizationRepoAccess,
   listCollaboratorOrganizationIds,
   listPrivateRepos,

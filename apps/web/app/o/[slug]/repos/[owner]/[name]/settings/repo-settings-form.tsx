@@ -31,7 +31,7 @@ export type RepoSettingsFormProps = {
   isOwner: boolean;
   modes: { value: string; label: string }[];
   models: { value: string; label: string }[];
-  current: { mode: string; model: string; fixes: boolean };
+  current: { mode: string; model: string; fixes: boolean; ciInsights: boolean };
 };
 
 const IDLE: RepoSettingsFormState = { status: "idle" };
@@ -50,6 +50,7 @@ export function RepoSettingsForm({
     IDLE,
   );
   const fixesId = useId();
+  const ciInsightsId = useId();
 
   return (
     <Card>
@@ -107,6 +108,21 @@ export function RepoSettingsForm({
                 name="fixes"
                 value="on"
                 defaultChecked={current.fixes}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="grid gap-0.5">
+                <Label htmlFor={ciInsightsId}>CI insights</Label>
+                <p className="text-muted-foreground text-xs">
+                  Records GitHub Actions runs for the repository&rsquo;s CI page. Off stops recording.
+                </p>
+              </div>
+              <Switch
+                id={ciInsightsId}
+                name="ciInsights"
+                value="on"
+                defaultChecked={current.ciInsights}
               />
             </div>
 
