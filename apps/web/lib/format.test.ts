@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDuration,
   formatNumber,
+  formatPercent,
   formatRelative,
   formatTokens,
   formatUsd,
@@ -155,5 +156,13 @@ describe("shortSha", () => {
 
   it("trims surrounding whitespace first", () => {
     expect(shortSha("  9f1c0a2b3d4e  ")).toBe("9f1c0a2");
+  });
+});
+
+describe("formatPercent", () => {
+  it("rounds a ratio to a whole percent, and shows a dash for no data", () => {
+    expect(formatPercent(0.125)).toBe("13%");
+    expect(formatPercent(0)).toBe("0%");
+    expect(formatPercent(null)).toBe("—");
   });
 });

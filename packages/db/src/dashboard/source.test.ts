@@ -15,6 +15,7 @@ import {
   type Organization,
 } from "../schema";
 import { createTestDatabase } from "../test-database";
+import { upsertWorkflowJob, upsertWorkflowRun, type WorkflowRunInput } from "../workflow-runs";
 import { categoryCounts, computeTrends, costOf } from "./aggregate";
 import { createDbSource } from "./source";
 
@@ -642,5 +643,128 @@ describe("createDbSource rolls trends up in Postgres", () => {
 
     expect(totals.reviews).toBe(1);
     expect(byCategory.map((c) => c.category)).toEqual(["security", "performance"]);
+  });
+});
+
+describe("createDbSource reads workflow runs only through a readable repo", () => {
+  const now = Date.now();
+  let widgets: number;
+  let vault: number;
+  let secret: number;
+
+  function ciRun(githubRunId: number, overrides: Partial<WorkflowRunInput> = {}): WorkflowRunInput {
+    const runStartedAt = new Date(now - githubRunId * 60_000);
+    return {
+      githubRunId,
+      runAttempt: 1,
+      workflowId: 1,
+      workflowName: "CI",
+      event: "pull_request",
+      headBranch: "main",
+      headSha: "c".repeat(40),
+      prNumber: null,
+      status: "completed",
+      conclusion: "success",
+      runStartedAt,
+      githubUpdatedAt: new Date(runStartedAt.getTime() + 30_000),
+      htmlUrl: `https://github.com/acme/widgets/actions/runs/${githubRunId}`,
+      ...overrides,
+    };
+  }
+
+  async function repoId(organization: Organization, name: string): Promise<number> {
+    const [row] = await database
+      .insert(repos)
+      .values({ organizationId: organization.id, owner: organization.slug, name })
+      .returning();
+    return row!.id;
+  }
+
+  async function store(id: number, input: WorkflowRunInput): Promise<number> {
+    const row = await upsertWorkflowRun(database, id, input);
+    return row!.id;
+  }
+
+  beforeEach(async () => {
+    widgets = await repoId(acme, "widgets");
+    vault = await repoId(acme, "vault");
+    secret = await repoId(globex, "secret");
+  });
+
+  it("lists a repo's runs newest first, filtered by branch, workflow and conclusion", async () => {
+    await store(widgets, ciRun(3, { conclusion: "timed_out" }));
+    await store(widgets, ciRun(2, { headBranch: "feature", conclusion: "failure" }));
+    await store(widgets, ciRun(1, { workflowId: 2, workflowName: "Lint" }));
+    const source = createDbSource(database, acme, [widgets, vault]);
+
+    const all = await source.listWorkflowRuns({ repoId: widgets });
+    expect(all.map((run) => run.githubRunId)).toEqual([1, 2, 3]);
+    expect(all[0]!.durationMs).toBe(30_000);
+    const ids = async (opts: Parameters<typeof source.listWorkflowRuns>[0]) =>
+      (await source.listWorkflowRuns(opts)).map((run) => run.githubRunId);
+    expect(await ids({ repoId: widgets, branch: "feature" })).toEqual([2]);
+    expect(await ids({ repoId: widgets, workflowId: 2 })).toEqual([1]);
+    expect(await ids({ repoId: widgets, conclusion: "failure" })).toEqual([2, 3]);
+    expect(await ids({ repoId: widgets, limit: 1 })).toEqual([1]);
+  });
+
+  it("returns a run with its jobs in start order", async () => {
+    const id = await store(widgets, ciRun(1));
+    const job = (githubJobId: number, name: string, startedAt: Date | null) =>
+      upsertWorkflowJob(database, widgets, {
+        githubRunId: 1,
+        runAttempt: 1,
+        githubJobId,
+        name,
+        status: "completed",
+        conclusion: "success",
+        startedAt,
+        completedAt: startedAt,
+        runnerLabels: ["ubuntu-latest"],
+      });
+    await job(11, "queued", null);
+    await job(12, "test", new Date(now - 30_000));
+    await job(13, "build", new Date(now - 50_000));
+
+    const run = await createDbSource(database, acme, [widgets]).getWorkflowRun(id);
+
+    expect(run?.repo.name).toBe("widgets");
+    expect(run?.jobs.map((j) => j.name)).toEqual(["build", "test", "queued"]);
+  });
+
+  it("answers another organization's run, or one in an unreadable repo, as an unknown one", async () => {
+    const hidden = await store(vault, ciRun(1));
+    const foreign = await store(secret, ciRun(2));
+    const source = createDbSource(database, acme, [widgets]);
+
+    expect(await source.getWorkflowRun(hidden)).toBeNull();
+    expect(await source.getWorkflowRun(foreign)).toBeNull();
+    expect(await source.getWorkflowRun(999_999)).toBeNull();
+    expect(await source.listWorkflowRuns({ repoId: vault })).toEqual([]);
+    expect(await source.listWorkflowRuns({ repoId: secret })).toEqual([]);
+    expect((await source.getCiTrends(vault)).totals.runs).toBe(0);
+    expect((await source.getCiTrends(secret)).totals.runs).toBe(0);
+  });
+
+  it("hides a removed repo's runs", async () => {
+    const id = await store(widgets, ciRun(1));
+    await database.update(repos).set({ removedAt: new Date() }).where(eq(repos.id, widgets));
+    const source = createDbSource(database, acme, [widgets]);
+
+    expect(await source.getWorkflowRun(id)).toBeNull();
+    expect(await source.listWorkflowRuns({ repoId: widgets })).toEqual([]);
+    expect((await source.getCiTrends(widgets)).totals.runs).toBe(0);
+  });
+
+  it("rolls up the last 30 days of a repo's runs", async () => {
+    await store(widgets, ciRun(1));
+    await store(widgets, ciRun(2, { conclusion: "failure" }));
+    await store(widgets, ciRun(3, { runStartedAt: new Date(now - 40 * 864e5) }));
+    await store(vault, ciRun(4, { conclusion: "failure" }));
+
+    const trends = await createDbSource(database, acme, [widgets, vault]).getCiTrends(widgets);
+
+    expect(trends.totals).toMatchObject({ runs: 2, failures: 1, failureRate: 0.5 });
+    expect(trends.workflows.map((w) => w.workflowName)).toEqual(["CI"]);
   });
 });

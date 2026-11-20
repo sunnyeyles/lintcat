@@ -1,5 +1,5 @@
 import { Button, Card } from "@pr-review/design";
-import { Settings } from "@pr-review/design/icons";
+import { ChartLine, Settings } from "@pr-review/design/icons";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
@@ -116,12 +116,20 @@ export default async function RepoDetailPage({
           </>
         }
         actions={
-          <Button asChild variant="outline">
-            <Link href={organizationPath(slug, `/repos/${repo.owner}/${repo.name}/settings`)}>
-              <Settings aria-hidden />
-              Settings
-            </Link>
-          </Button>
+          <>
+            <Button asChild variant="outline">
+              <Link href={organizationPath(slug, `/repos/${repo.owner}/${repo.name}/ci`)}>
+                <ChartLine aria-hidden />
+                CI
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={organizationPath(slug, `/repos/${repo.owner}/${repo.name}/settings`)}>
+                <Settings aria-hidden />
+                Settings
+              </Link>
+            </Button>
+          </>
         }
       />
 

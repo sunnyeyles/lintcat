@@ -55,6 +55,7 @@ export default async function RepoSettingsPage({
             mode: settings.mode,
             model: settings.model ?? DEFAULT_MODEL_VALUE,
             fixes: settings.fixes,
+            ciInsights: settings.ciInsights,
           }}
         />
       </div>

@@ -193,14 +193,17 @@ neutral check run asking an owner to add one.
 ### Registering the App
 
 - Permissions: repository **Metadata** (read), **Contents** (read and write),
-  **Pull requests** (read and write) and **Checks** (read and write), organization
-  **Members** (read), account **Email addresses** (read). The writes are the
-  hosted review's check run, inline comments and, with fixes on, the fix commit.
+  **Pull requests** (read and write), **Checks** (read and write) and **Actions**
+  (read), organization **Members** (read), account **Email addresses** (read).
+  The writes are the hosted review's check run, inline comments and, with fixes
+  on, the fix commit. **Actions** feeds each repository's CI page.
 - Webhook URL `https://<app-domain>/api/github/webhook`, secret in
   `GITHUB_APP_WEBHOOK_SECRET`. Subscribe to `installation`,
   `installation_repositories`, `organization`, `member`, `membership`,
-  `repository` and `pull_request`. Repository permissions need nothing beyond **Metadata**: both
-  collaborator endpoints are listed under it with installation tokens.
+  `repository`, `pull_request`, `workflow_run` and `workflow_job` (the last
+  two need **Actions**). Otherwise repository permissions need nothing beyond
+  **Metadata**: both collaborator endpoints are listed under it with
+  installation tokens.
 - User authorization: callback URL as under Environment; its client id and
   secret are `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET`. There is no separate
   OAuth app.
