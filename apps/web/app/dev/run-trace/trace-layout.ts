@@ -63,8 +63,8 @@ export function visibleRows(root: AgentNode, collapsed: ReadonlySet<string>): La
   return rows;
 }
 
-function sortByStart(nodes: AgentNode[]): AgentNode[] {
-  return [...nodes].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt));
+export function sortByStart<T extends { startedAt: string }>(items: readonly T[]): T[] {
+  return [...items].sort((a, b) => toMs(a.startedAt) - toMs(b.startedAt));
 }
 
 export function timeBounds(root: AgentNode): TimeBounds {

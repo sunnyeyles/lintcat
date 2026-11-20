@@ -9,6 +9,7 @@ import {
   isoFromNanos,
   jsonDocument,
   jsonValues,
+  num,
   pushEvent,
   pushStep,
   rootOf,
@@ -106,8 +107,6 @@ const LLM_OPS = new Set(["chat", "text_completion", "generate_content"]);
 const op = (p: Parsed) => asString(p.attrs["gen_ai.operation.name"]);
 const isAgent = (p: Parsed) => AGENT_OPS.has(op(p) ?? "") || (!op(p) && typeof p.attrs["gen_ai.agent.name"] === "string");
 const failed = (span: Span) => span.status?.code === 2 || span.status?.code === "STATUS_CODE_ERROR";
-const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
-
 type Message = { role: string; text: string; reasoning: string };
 
 /** `gen_ai.*.messages` in the current conventions, or a plain string prompt from older ones. */

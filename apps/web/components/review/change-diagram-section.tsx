@@ -14,12 +14,9 @@ import type { ReactNode } from "react";
 import { DiagramFrame } from "@/components/codebase-map/diagram-frame";
 import { SectionHeading } from "@/components/ui";
 import { changeDiagram, type ChangeDiagram, type MapSource } from "@/lib/codebase-map";
+import { plural } from "@/lib/format";
 
 import { ReviewChangeDiagram } from "./change-diagram";
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
-}
 
 function describe(diagram: ChangeDiagram, graphed: boolean): string {
   const drawn = diagram.nodes.length - diagram.neighbourCount;

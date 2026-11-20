@@ -85,7 +85,7 @@ export function categoryCounts(scoped: ReviewDetail[]): CategoryCount[] {
         bySeverity: emptySeverity(),
       };
       entry.count += 1;
-      entry.bySeverity[f.severity as Severity] += 1;
+      entry.bySeverity[f.severity] += 1;
       categories.set(f.category, entry);
     }
   }

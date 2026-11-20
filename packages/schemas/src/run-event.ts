@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** The lintcat run format: one JSON object per line, emitted by any agent factory. */
-export const RUN_FORMAT_VERSION = 1;
+const RUN_FORMAT_VERSION = 1;
 
 const MAX_ID = 128;
 const MAX_TEXT = 100_000;
@@ -112,7 +112,7 @@ export const runEventSchema = z.discriminatedUnion("type", [
 ]);
 
 export type RunEvent = z.infer<typeof runEventSchema>;
-export type RunEventType = RunEvent["type"];
+type RunEventType = RunEvent["type"];
 
 export const RUN_EVENT_TYPES: readonly RunEventType[] = runEventSchema.options.map(
   (option) => option.shape.type.value,

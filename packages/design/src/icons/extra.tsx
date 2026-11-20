@@ -32,8 +32,6 @@ export const CheckGlyph = glyph("CheckGlyph", <path d="M5 12.5l4.5 4.5L19 7.5" /
 
 export const CloseGlyph = glyph("CloseGlyph", <path d="M6 6l12 12M18 6L6 18" />);
 
-export const DotGlyph = glyph("DotGlyph", <circle cx="12" cy="12" r="4" fill="currentColor" />);
-
 export const LoaderGlyph = glyph("LoaderGlyph", <path d="M12 3a9 9 0 1 0 9 9" />);
 
 export const GitPullRequestGlyph = glyph(

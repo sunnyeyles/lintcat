@@ -193,7 +193,7 @@ export function MapExplorer() {
                 onQueryChange={actions.setQuery}
                 onSelect={actions.focusFile}
                 inputRef={searchRef}
-                searcher={state.lod ? source?.adapter?.search : undefined}
+                searcher={state.lod ? source.adapter?.search : undefined}
                 fileCount={graph.totalFileCount}
               />
               <FileDetails

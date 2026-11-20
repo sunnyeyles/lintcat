@@ -10,7 +10,6 @@ import {
   Category as IsxCategory,
   Chart as IsxChart,
   Clock as IsxClock,
-  Coin1 as IsxCoin1,
   Cpu as IsxCpu,
   DocumentText as IsxDocumentText,
   Folder2 as IsxFolder2,
@@ -42,7 +41,6 @@ import { cn } from "#src/cn";
 import {
   CheckGlyph,
   CloseGlyph,
-  DotGlyph,
   GitPullRequestGlyph,
   type GlyphProps,
   LinkOffGlyph,
@@ -108,8 +106,6 @@ export const BookText = icon("BookText", IsxDocumentText, "float");
 export const Bot = icon("Bot", IsxCpu, "float");
 export const ChartLine = icon("ChartLine", IsxChart, "float");
 export const Check = icon("Check", CheckGlyph, "float");
-export const Circle = icon("Circle", DotGlyph, "float");
-export const Coins = icon("Coins", IsxCoin1, "float");
 export const Factory = icon("Factory", IsxBuilding3, "float");
 export const FolderGit2 = icon("FolderGit2", IsxFolder2, "float");
 export const GitPullRequest = icon("GitPullRequest", GitPullRequestGlyph, "float");

@@ -40,7 +40,7 @@ const FLAG_KEYS = [
   "inCycle",
 ] as const;
 
-function text(value: unknown): string {
+export function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 

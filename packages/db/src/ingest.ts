@@ -10,7 +10,7 @@ import {
   type Organization,
 } from "./schema";
 
-export type IngestFailure = "organization-not-found" | "owner-mismatch" | "repo-removed";
+type IngestFailure = "organization-not-found" | "owner-mismatch" | "repo-removed";
 
 export type IngestResult =
   | { ok: true; reviewId: number }

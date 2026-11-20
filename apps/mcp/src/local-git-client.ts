@@ -33,7 +33,7 @@ export type LocalScope =
   | { kind: "staged" }
   | { kind: "range"; range: string };
 
-export interface ResolvedScope {
+interface ResolvedScope {
   kind: LocalScope["kind"];
   baseRef: string;
   baseSha: string;

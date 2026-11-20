@@ -22,23 +22,6 @@ export {
 } from "#src/components/card";
 // Chart lives at @pr-review/design/chart: re-exporting it here pulls recharts into every route.
 export {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "#src/components/dropdown-menu";
-export {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -95,7 +78,6 @@ export {
 } from "#src/components/tabs";
 export { Toggle, toggleVariants } from "#src/components/toggle";
 export { ToggleGroup, ToggleGroupItem } from "#src/components/toggle-group";
-export { Toolbar, ToolbarGroup } from "#src/components/toolbar";
 export {
   Tooltip,
   TooltipContent,
