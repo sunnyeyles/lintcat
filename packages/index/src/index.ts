@@ -30,7 +30,6 @@ export {
   MIN_MAJORITY,
   type ConventionCount,
 } from "#src/conventions";
-export { nodesInCycles } from "#src/cycles";
 export {
   changedNames,
   docLinesMentioning,
@@ -47,11 +46,7 @@ export {
   type LinkDestination,
   type MentionKind,
 } from "#src/docs";
-export {
-  collectEntryPoints,
-  isEntryPoint,
-  type EntryPoints,
-} from "#src/entry-points";
+export { type EntryPoints } from "#src/entry-points";
 export {
   findReferences,
   findReferencesDescription,
@@ -68,7 +63,6 @@ export {
 } from "#src/find-references";
 export {
   computeImpact,
-  MAX_IMPACT_FILES,
   type BrokenImport,
   type Impact,
   type ImpactChange,
@@ -76,7 +70,6 @@ export {
   type ImpactHub,
 } from "#src/impact";
 export {
-  parseImports,
   type ImportedName,
   type ImportKind,
   type ParsedImport,
@@ -89,7 +82,6 @@ export {
 } from "#src/languages";
 export { type LintConfig } from "#src/lint-config";
 export {
-  parseWorkspaceYamlPackages,
   type PackageManifest,
   type PathAlias,
 } from "#src/manifests";
@@ -97,9 +89,7 @@ export {
   buildChangeOverlay,
   type ChangeOverlay,
 } from "#src/overlay";
-export { coveredSourcePaths } from "#src/pairing";
 export {
-  referencesTo,
   type Reference,
   type ReferenceImport,
 } from "#src/references";
@@ -113,7 +103,7 @@ export {
 export {
   type ResolvedImport,
 } from "#src/resolve";
-export { classifyFileRole, ROLE_PRECEDENCE, type FileRole } from "#src/roles";
+export { classifyFileRole, type FileRole } from "#src/roles";
 export {
   governs,
   isRuleDoc,
@@ -121,7 +111,6 @@ export {
 } from "#src/rule-docs";
 export { siblingsOf } from "#src/siblings";
 export {
-  readWorkspace,
   type WorkspaceModel,
   type WorkspacePackage,
 } from "#src/workspace";

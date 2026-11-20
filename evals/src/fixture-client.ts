@@ -74,6 +74,15 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
     }
   };
 
+  const checkRepo = (request: { owner: string; repo: string }): void => {
+    const { owner, repo } = fixture.context;
+    if (request.owner !== owner || request.repo !== repo) {
+      throw new FixtureNotFoundError(
+        `fixture ${fixture.name} serves ${owner}/${repo}, not ${request.owner}/${request.repo}`,
+      );
+    }
+  };
+
   const client: FixtureGithubClient = {
     async getPullRequest(ref): Promise<PullRequestDetails> {
       checkRef(ref);
@@ -94,12 +103,7 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
     },
 
     async getFileContents(request: FileContentsRequest): Promise<string> {
-      const { owner, repo } = fixture.context;
-      if (request.owner !== owner || request.repo !== repo) {
-        throw new FixtureNotFoundError(
-          `fixture ${fixture.name} serves ${owner}/${repo}, not ${request.owner}/${request.repo}`,
-        );
-      }
+      checkRepo(request);
       // Reads are pinned to a SHA: head is the proposed state, base the
       // state before the pull request, where an added file is absent.
       const atHead = request.ref === fixture.pullRequest.headSha;
@@ -115,12 +119,7 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
     },
 
     async searchCode(request): Promise<CodeSearchResult> {
-      const { owner, repo } = fixture.context;
-      if (request.owner !== owner || request.repo !== repo) {
-        throw new FixtureNotFoundError(
-          `fixture ${fixture.name} serves ${owner}/${repo}, not ${request.owner}/${request.repo}`,
-        );
-      }
+      checkRepo(request);
       record("searchCode", request.query);
       return searchFiles(request.query, fixture.headFiles);
     },
@@ -128,16 +127,11 @@ export function createFixtureClient(fixture: LoadedFixture): FixtureClient {
     async getRepositoryArchive(
       request: RepositoryArchiveRequest,
     ): Promise<RepositoryArchive> {
-      const { owner, repo } = fixture.context;
-      if (request.owner !== owner || request.repo !== repo) {
-        throw new FixtureNotFoundError(
-          `fixture ${fixture.name} serves ${owner}/${repo}, not ${request.owner}/${request.repo}`,
-        );
-      }
+      checkRepo(request);
       record("getRepositoryArchive", request.ref);
       if (!indexEnabled(process.env)) {
         throw new FixtureNotFoundError(
-          `${INDEX_ENV}=off: the archive of ${owner}/${repo} is unavailable for this run`,
+          `${INDEX_ENV}=off: the archive of ${request.owner}/${request.repo} is unavailable for this run`,
         );
       }
       // The index is always built at the base commit, so that is what it serves.

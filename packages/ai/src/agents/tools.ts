@@ -172,7 +172,6 @@ function patchFor(changedFiles: readonly ChangedFile[], path: string): string {
   return file.patch;
 }
 
-/** Why the index has no node for a path, or undefined when it has one. */
 /** The one reason the index alone cannot give: the base commit predates the file. */
 function addedReason(
   changedFiles: readonly ChangedFile[],
@@ -205,6 +204,14 @@ export function createReviewTools(
     }
     return files;
   };
+
+  const readFile = async (
+    { path, startLine, endLine }: z.infer<typeof fileReadSchema>,
+    ref: string,
+  ): Promise<string> =>
+    truncate(
+      sliceLines(await github.getFileContents({ owner, repo, path, ref }), { startLine, endLine }),
+    );
 
   return {
     get_pull_request: tool({
@@ -255,19 +262,7 @@ export function createReviewTools(
         'The path is relative to the repository root, e.g. "src/index.ts".' +
         RANGE_HINT,
       inputSchema: fileReadSchema,
-      async execute({ path, startLine, endLine }) {
-        return truncate(
-          sliceLines(
-            await github.getFileContents({
-              owner,
-              repo,
-              path,
-              ref: context.pullRequest.headSha,
-            }),
-            { startLine, endLine },
-          ),
-        );
-      },
+      execute: (input) => readFile(input, context.pullRequest.headSha),
     }),
     get_base_file: tool({
       description:
@@ -275,19 +270,7 @@ export function createReviewTools(
         'The path is relative to the repository root, e.g. "src/index.ts".' +
         RANGE_HINT,
       inputSchema: fileReadSchema,
-      async execute({ path, startLine, endLine }) {
-        return truncate(
-          sliceLines(
-            await github.getFileContents({
-              owner,
-              repo,
-              path,
-              ref: context.pullRequest.baseSha,
-            }),
-            { startLine, endLine },
-          ),
-        );
-      },
+      execute: (input) => readFile(input, context.pullRequest.baseSha),
     }),
     search_repository: tool({
       description:

@@ -17,6 +17,7 @@ import {
 } from "@pr-review/schemas";
 
 import { impactChange, type BlastRadius } from "#src/blast-radius";
+import { countLabel } from "#src/finding-format";
 import type { FinishedReviewRun } from "#src/review-delivery";
 import { reviewCorrelation, type ReviewTarget } from "#src/review-target";
 
@@ -102,7 +103,6 @@ export function buildReviewRecord(
     );
   };
 
-  const count = outcome.findings.length;
   const baseSha = checked("baseSha", outcome.baseSha);
   const changedFiles = checked(
     "changedFiles",
@@ -134,7 +134,7 @@ export function buildReviewRecord(
     repo: target.repo,
     prNumber: target.pullRequestNumber,
     headSha: target.headSha,
-    summary: count === 1 ? "1 finding" : `${count} findings`,
+    summary: countLabel(outcome.findings.length, "finding"),
     durationMs,
     ...(baseSha === undefined ? {} : { baseSha }),
     ...(changedFiles === undefined ? {} : { changedFiles }),

@@ -27,10 +27,7 @@ import {
   errorMessage,
   type StructuredLogger,
 } from "@pr-review/logging";
-import type {
-  ReviewFinding,
-  ReviewMemory as MemoryContents,
-} from "@pr-review/schemas";
+import type { ReviewFinding } from "@pr-review/schemas";
 
 import { assessBlastRadius, type BlastRadius } from "#src/blast-radius";
 import { buildReviewIndex } from "#src/build-index";
@@ -216,14 +213,6 @@ async function openEarlierFindings(
   }
 }
 
-/** Empty when there is no store; `readMemory` never throws. */
-async function loadMemory(
-  store: MemoryStore | undefined,
-  logger: StructuredLogger,
-): Promise<MemoryContents> {
-  return store === undefined ? emptyMemory() : readMemory(store, logger);
-}
-
 function stillOpen(
   carriedForward: readonly PostedFinding[],
   findings: readonly ReviewFinding[],
@@ -394,7 +383,8 @@ async function review(
     return unreviewed(tree);
   }
 
-  const memory = await loadMemory(memorySpec?.store, logger);
+  const memory =
+    memorySpec === undefined ? emptyMemory() : await readMemory(memorySpec.store, logger);
 
   // Built once, before the agent starts, and serialised onto the outcome.
   const { index: repositoryIndex, codeowners } = await traceStage(

@@ -19,10 +19,6 @@ export const INDEX_ABSENT_LINE =
 /** Said for a path the index has no entry for, an addition included. */
 const UNKNOWN_LINE = "not in the index at this commit";
 
-function importers(file: IndexedFile): string {
-  return `${file.importerCount} importer${file.importerCount === 1 ? "" : "s"}`;
-}
-
 /** The graph flags, appended only when they are true. */
 function flags(file: IndexedFile): string {
   return [
@@ -35,7 +31,7 @@ function flags(file: IndexedFile): string {
 
 function describe(file: IndexedFile): string {
   const owner = file.package === undefined ? "" : `${file.package}, `;
-  const tail = `${importers(file)}${flags(file)}`;
+  const tail = `${plural(file.importerCount, "importer")}${flags(file)}`;
   if (file.role === "test" && file.covers !== undefined) {
     return `${owner}test, covers ${file.covers}, ${tail}`;
   }
