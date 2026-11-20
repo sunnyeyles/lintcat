@@ -102,7 +102,7 @@ export type WorkflowRunDetail = WorkflowRunSummary & {
   jobs: WorkflowJob[];
 };
 
-// "failure" also matches timed_out, as the failure rate counts it.
+// "failure" also matches timed_out and startup_failure, as the failure rate counts them.
 export type CiConclusionFilter = "success" | "failure" | "cancelled";
 
 export type WorkflowRunListOptions = {

@@ -86,6 +86,21 @@ describe("computeCiTrends", () => {
     expect(trends.totals.medianDurationMs).toBe(300_000);
   });
 
+  it("counts startup failures as failures and leaves neutral and action_required out", () => {
+    const trends = computeCiTrends([
+      run(2),
+      run(0, { conclusion: "startup_failure" }),
+      run(0, { conclusion: "action_required" }),
+      run(0, { conclusion: "neutral" }),
+    ]);
+
+    expect(trends.totals).toMatchObject({ runs: 4, failures: 1, failureRate: 1 / 2 });
+    expect(computeCiTrends([run(0, { conclusion: "action_required" })]).totals).toMatchObject({
+      failureRate: null,
+      medianDurationMs: null,
+    });
+  });
+
   it("has no rate or durations without a verdict", () => {
     const trends = computeCiTrends([run(0, { status: "queued", conclusion: null })]);
 

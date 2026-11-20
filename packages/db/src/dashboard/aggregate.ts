@@ -180,9 +180,7 @@ export function computeUsage(
   };
 }
 
-const FAILED = new Set(["failure", "timed_out"]);
-// Neither a pass nor a fail, so they stay out of the failure rate and durations.
-const NO_VERDICT = new Set(["cancelled", "skipped"]);
+const FAILED = new Set(["failure", "timed_out", "startup_failure"]);
 
 export const CONCLUSIONS_FOR: Record<CiConclusionFilter, readonly string[]> = {
   success: ["success"],
@@ -205,8 +203,9 @@ export function runDurationMs(run: Pick<CiRunStat, "status" | "runStartedAt" | "
   return Math.max(0, run.githubUpdatedAt.getTime() - run.runStartedAt.getTime());
 }
 
+// Only a pass or a fail counts; cancelled, skipped, neutral and action_required stay out.
 function hasVerdict(run: CiRunStat): boolean {
-  return run.status === "completed" && run.conclusion !== null && !NO_VERDICT.has(run.conclusion);
+  return run.status === "completed" && (run.conclusion === "success" || isFailedRun(run));
 }
 
 function isFailedRun(run: Pick<CiRunStat, "conclusion">): boolean {
